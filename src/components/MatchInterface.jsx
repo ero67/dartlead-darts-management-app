@@ -61,7 +61,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         score: 0,
         darts: 0,
         scores: [],
-        dartCount: 0
+        dartCount: 0,
+        turnStartScore: null
       },
       turnHistory: [],
       matchComplete: false,
@@ -82,7 +83,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     score: 0,
     darts: 0,
     scores: [],
-    dartCount: 0
+    dartCount: 0,
+    turnStartScore: null // Track score at start of turn for bust restoration
   });
   const [turnHistory, setTurnHistory] = useState(initialState?.turnHistory || []);
   const [matchComplete, setMatchComplete] = useState(initialState?.matchComplete || false);
@@ -271,7 +273,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
               currentPlayer: dbState.currentPlayer,
               matchStarter: dbState.matchStarter,
               legScores: dbState.legScores,
-              currentTurn: { score: 0, darts: 0, scores: [], dartCount: 0 },
+              currentTurn: { score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null },
               turnHistory: [],
               matchComplete: false,
               inputMode: 'single',
@@ -429,6 +431,11 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (currentTurn.darts >= 3) return;
     if (currentPlayer === null || currentPlayer === undefined || !currentPlayerData) return;
 
+    // Capture starting score on first dart of turn
+    const turnStartScore = currentTurn.turnStartScore !== null 
+      ? currentTurn.turnStartScore 
+      : currentPlayerData.currentScore;
+
     let scoreValue = 0;
     let label = '';
 
@@ -483,7 +490,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       score: newScore,
       darts: newDarts,
       scores: newScores,
-      dartCount: currentTurn.dartCount + 1
+      dartCount: currentTurn.dartCount + 1,
+      turnStartScore: turnStartScore
     });
 
     // Calculate new score but don't update if it would be a bust
@@ -491,13 +499,14 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     
     // Check for bust BEFORE updating the score display
     if (newCurrentScore < 0 || newCurrentScore === 1) {
-      // Bust - don't update score, just handle the bust
+      // Bust - restore score to what it was at the start of the turn
       // Update turn to show the dart was thrown
       setCurrentTurn({
         score: newScore,
         darts: newDarts,
         scores: newScores,
-        dartCount: currentTurn.dartCount + 1
+        dartCount: currentTurn.dartCount + 1,
+        turnStartScore: turnStartScore
       });
       
       // Reset input mode
@@ -506,20 +515,24 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       // Show red background for bust
       setBustingPlayer(currentPlayer);
       
-      // Show visual feedback, restore score by adding back ALL darts in this turn, and switch player
+      // Show visual feedback, restore score to start of turn, add darts to count, and switch player
       setTimeout(() => {
         setCurrentTurn(prev => ({
           ...prev,
           score: 0,
           darts: 0,
-          scores: []
+          scores: [],
+          turnStartScore: null
         }));
-        // Restore the score by adding back the sum of ALL darts thrown in this turn
+        // Restore the score to what it was at the start of the turn
+        // But add the darts that were thrown (even though they resulted in a bust)
         setLegScores(prev => ({
           ...prev,
           [`player${currentPlayer + 1}`]: {
             ...prev[`player${currentPlayer + 1}`],
-            currentScore: prev[`player${currentPlayer + 1}`].currentScore + newScore
+            currentScore: turnStartScore,
+            totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + newDarts,
+            legDarts: prev[`player${currentPlayer + 1}`].legDarts + newDarts
           }
         }));
         // Remove bust visual feedback
@@ -682,15 +695,22 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     console.log('finishTurn - turnData.currentScore:', turnData.currentScore);
     console.log('finishTurn - currentScore (used):', currentScore);
     
+    // Get the starting score for this turn (for bust restoration)
+    const turnStartScore = turnData.turnStartScore !== null && turnData.turnStartScore !== undefined
+      ? turnData.turnStartScore
+      : currentPlayerData.currentScore + turnData.score; // Calculate from current score + turn score
+    
     // Check for bust (score goes below 0 or to 1)
     if (currentScore < 0 || currentScore === 1) {
-      // Reset to previous score - restore the turn's score
-      setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: turnData.dartCount });
+      // Reset to score at start of turn, but add darts that were thrown
+      setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: turnData.dartCount, turnStartScore: null });
       setLegScores(prev => ({
         ...prev,
         [`player${currentPlayer + 1}`]: {
           ...prev[`player${currentPlayer + 1}`],
-          currentScore: prev[`player${currentPlayer + 1}`].currentScore + turnData.score
+          currentScore: turnStartScore,
+          totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + turnData.darts,
+          legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts
         }
       }));
       // Switch to next player after bust
@@ -709,12 +729,14 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       if (lastDart.multiplier !== 2) {
         // Not finished on double - bust
         console.log('Bust: Not finished on double');
-        setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: turnData.dartCount });
+        setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: turnData.dartCount, turnStartScore: null });
         setLegScores(prev => ({
           ...prev,
           [`player${currentPlayer + 1}`]: {
             ...prev[`player${currentPlayer + 1}`],
-            currentScore: prev[`player${currentPlayer + 1}`].currentScore + turnData.score
+            currentScore: turnStartScore,
+            totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + turnData.darts,
+            legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts
           }
         }));
         // Switch to next player after bust
@@ -924,7 +946,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       }]);
     }
 
-    setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: turnData.dartCount });
+    setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: turnData.dartCount, turnStartScore: null });
   };
 
   const completeMatch = (finalLegScores = legScores) => {
