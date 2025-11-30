@@ -110,7 +110,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   // Enhanced function to check if match should be considered "live" (either in live context or localStorage)
   const isMatchActuallyLive = (matchId) => {
     // First check the match status - if it's completed, it's not live
-    const match = tournament?.groups?.flatMap(g => g.matches || []).find(m => m.id === matchId);
+    // Check both group matches and playoff matches
+    const groupMatch = tournament?.groups?.flatMap(g => g.matches || []).find(m => m.id === matchId);
+    const playoffMatch = tournament?.playoffMatches?.find(m => m.id === matchId);
+    const match = groupMatch || playoffMatch;
+    
     if (match?.status === 'completed') {
       return false;
     }
@@ -1128,6 +1132,25 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   const match = playoffMatches.find(pm => pm.id === bracketMatch.id) || bracketMatch;
                   return (
                   <div key={match.id} className={`playoff-match ${match.status}`}>
+                    <div className="match-header">
+                      <div className="match-status">
+                        <span 
+                          className="status-badge"
+                          style={{ backgroundColor: getMatchStatusColor(match.status, match.id) }}
+                        >
+                          {getMatchStatusText(match.status, match.id)}
+                        </span>
+                        {isMatchActuallyLive(match.id) && (
+                          <div className="live-indicator">
+                            {isMatchInLocalStorage(match.id) ? (
+                              <Wifi size={14} className="live-icon this-device" />
+                            ) : (
+                              <Eye size={14} className="live-icon other-device" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     <div className="match-players">
                       <div className={`player ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
                         <span className="player-name">
@@ -1149,7 +1172,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     </div>
                     
                     <div className="match-actions">
-                      {isAdmin && match.status === 'pending' && (
+                      {isAdmin && match.status === 'pending' && !isMatchActuallyLive(match.id) && (
                         <button 
                           className="edit-match-btn"
                           onClick={() => setEditingMatch(match)}
@@ -1159,7 +1182,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           {t('common.edit')}
                         </button>
                       )}
-                      {match.status === 'pending' && match.player1 && match.player2 && (
+                      {match.status === 'pending' && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
                         user ? (
                           <button 
                             className="start-match-btn"
@@ -1183,6 +1206,62 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             <Eye size={16} />
                             {t('management.loginToStartMatch') || 'Login required to start match'}
                           </div>
+                        )
+                      )}
+                      {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
+                        <button 
+                          className={`view-match-btn ${isAdmin && user ? 'continue-match-btn' : ''}`}
+                          onClick={() => {
+                            const roundSize = round.matches.length * 2;
+                            const legsToWin = getPlayoffLegsToWin(roundSize);
+                            onMatchStart({ 
+                              ...match,
+                              legsToWin: legsToWin,
+                              startingScore: tournament.startingScore,
+                              isPlayoff: true
+                            });
+                          }}
+                          disabled={!isAdmin || !user}
+                        >
+                          <Eye size={16} />
+                          {isAdmin && user ? t('management.continueMatch') : t('management.viewLiveMatch')}
+                        </button>
+                      )}
+                      {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && (
+                        user ? (
+                          <button 
+                            className="continue-match-btn"
+                            onClick={() => {
+                              const roundSize = round.matches.length * 2;
+                              const legsToWin = getPlayoffLegsToWin(roundSize);
+                              onMatchStart({ 
+                                ...match,
+                                legsToWin: legsToWin,
+                                startingScore: tournament.startingScore,
+                                isPlayoff: true
+                              });
+                            }}
+                          >
+                            <Play size={16} />
+                            {t('management.continueMatch')}
+                          </button>
+                        ) : (
+                          <button 
+                            className="view-match-btn"
+                            onClick={() => {
+                              const roundSize = round.matches.length * 2;
+                              const legsToWin = getPlayoffLegsToWin(roundSize);
+                              onMatchStart({ 
+                                ...match,
+                                legsToWin: legsToWin,
+                                startingScore: tournament.startingScore,
+                                isPlayoff: true
+                              });
+                            }}
+                          >
+                            <Eye size={16} />
+                            {t('management.viewLiveMatch')}
+                          </button>
                         )
                       )}
                       {match.status === 'completed' && (
