@@ -156,6 +156,12 @@ body {
   transition: color 0.3s ease;
 }
 
+.nav-logo-image {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+}
+
 .collapse-btn {
   background: none;
   border: none;
@@ -635,9 +641,10 @@ body {
 }
 
 .list-header h1 {
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 2rem;
   font-weight: 700;
+  transition: color 0.3s ease;
 }
 
 .list-controls {
@@ -655,40 +662,40 @@ body {
 
 .filter-btn {
   padding: 0.5rem 1rem;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .filter-btn.active {
-  background: #3b82f6;
+  background: var(--accent-primary);
   color: white;
-  border-color: #3b82f6;
+  border-color: var(--accent-primary);
 }
 
 .filter-btn:hover:not(.active) {
-  background: #f8fafc;
-  border-color: #cbd5e0;
+  background: var(--bg-tertiary);
+  border-color: var(--border-color-dark);
 }
 
 .sort-controls {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .sort-controls select {
   padding: 0.5rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: white;
-  color: #374151;
+  background: var(--input-bg);
+  color: var(--text-primary);
 }
 
 .tournaments-grid {
@@ -711,27 +718,31 @@ body {
 }
 
 .tournament-info h3 {
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .tournament-info span {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.875rem;
+  transition: color 0.3s ease;
 }
 
 .tournament-card .card-header h3 {
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .tournament-card .card-header span {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.875rem;
+  transition: color 0.3s ease;
 }
 
 .tournament-stats {
@@ -745,13 +756,15 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.875rem;
+  transition: color 0.3s ease;
 }
 
 .tournament-stats .stat span {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.875rem;
+  transition: color 0.3s ease;
 }
 
 .card-actions {
@@ -813,8 +826,9 @@ body {
   align-items: center;
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--text-secondary);
   font-weight: 500;
+  transition: color 0.3s ease;
 }
 
 .progress-bar {
@@ -853,12 +867,13 @@ body {
 
 /* Tournament Creation */
 .tournament-creation {
-  background: white;
+  background: var(--card-bg);
   border-radius: 20px;
   padding: 2rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px var(--shadow-md);
   max-width: 800px;
   margin: 0 auto;
+  transition: background-color 0.3s ease;
 }
 
 .creation-header {
@@ -867,7 +882,8 @@ body {
   gap: 1rem;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--border-color);
+  transition: border-color 0.3s ease;
 }
 
 .header-content {
@@ -877,14 +893,16 @@ body {
 }
 
 .header-icon {
-  color: #667eea;
+  color: var(--accent-primary);
   size: 2rem;
+  transition: color 0.3s ease;
 }
 
 .header-content h2 {
-  color: #2d3748;
+  color: var(--text-primary);
   font-size: 1.5rem;
   font-weight: 600;
+  transition: color 0.3s ease;
 }
 
 .creation-form {
@@ -899,23 +917,34 @@ body {
   gap: 0.5rem;
 }
 
+.form-section h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
 .form-section label {
   font-weight: 600;
-  color: #4a5568;
+  color: var(--text-primary);
   font-size: 0.9rem;
+  transition: color 0.3s ease;
 }
 
 .form-section input {
   padding: 0.75rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--border-color);
   border-radius: 10px;
   font-size: 1rem;
-  transition: border-color 0.2s;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
 }
 
 .form-section input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--accent-primary);
 }
 
 .group-settings {
@@ -926,17 +955,17 @@ body {
 
 .legs-selector {
   padding: 0.75rem;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--border-color);
   border-radius: 10px;
   font-size: 1rem;
-  background: white;
-  color: #1e293b;
-  transition: border-color 0.2s;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
 }
 
 .legs-selector:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--accent-primary);
 }
 
 .radio-group {
@@ -950,6 +979,8 @@ body {
   gap: 0.5rem;
   font-weight: normal;
   cursor: pointer;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
 }
 
 .player-input {
@@ -963,7 +994,7 @@ body {
 
 .player-input button {
   padding: 0.75rem 1rem;
-  background: #667eea;
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 10px;
@@ -972,16 +1003,17 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
 }
 
 .player-input button:hover:not(:disabled) {
-  background: #5a67d8;
+  opacity: 0.9;
 }
 
 .player-input button:disabled {
-  background: #a0aec0;
+  background: var(--text-tertiary);
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .players-list {
@@ -995,15 +1027,17 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #f7fafc;
+  background: var(--bg-tertiary);
   padding: 0.5rem 1rem;
   border-radius: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .remove-btn {
-  background: #fed7d7;
-  color: #c53030;
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--accent-danger);
   border: none;
   border-radius: 50%;
   width: 24px;
@@ -1016,19 +1050,21 @@ body {
 }
 
 .remove-btn:hover {
-  background: #feb2b2;
+  background: rgba(239, 68, 68, 0.3);
 }
 
 .tournament-preview {
-  background: #f7fafc;
+  background: var(--bg-tertiary);
   padding: 1.5rem;
   border-radius: 15px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .tournament-preview h3 {
-  color: #2d3748;
+  color: var(--text-primary);
   margin-bottom: 1rem;
+  transition: color 0.3s ease;
 }
 
 .preview-stats {
@@ -1040,13 +1076,14 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #4a5568;
+  color: var(--text-secondary);
   font-weight: 500;
+  transition: color 0.3s ease;
 }
 
 .create-tournament-btn {
   padding: 1rem 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 15px;
@@ -1057,18 +1094,23 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  transition: transform 0.2s;
+  transition: all 0.2s ease;
   margin-top: 1rem;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .create-tournament-btn:hover:not(:disabled) {
   transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+  opacity: 0.9;
 }
 
 .create-tournament-btn:disabled {
-  background: #a0aec0;
+  background: var(--text-tertiary);
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+  opacity: 0.6;
 }
 
 /* Tournament Management */
@@ -3435,6 +3477,44 @@ body {
   text-align: center;
 }
 
+.playoff-match .match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.playoff-match .match-header .match-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.playoff-match .match-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.edit-match-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+.edit-match-icon-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
 .match-players {
   display: flex;
   align-items: center;
@@ -3473,11 +3553,6 @@ body {
   font-size: 0.9rem;
 }
 
-.match-actions {
-  display: flex;
-  justify-content: center;
-}
-
 .match-completed {
   display: flex;
   align-items: center;
@@ -3485,6 +3560,11 @@ body {
   color: #22c55e;
   font-weight: 500;
   font-size: 0.9rem;
+}
+
+.match-actions {
+  display: flex;
+  justify-content: center;
 }
 
 /* Start Playoffs Section */
@@ -3606,6 +3686,154 @@ body {
   font-style: italic;
 }
 
+/* Dark mode styles for playoff cards */
+.dark-mode .playoffs-header {
+  border-bottom-color: var(--border-color);
+}
+
+.dark-mode .playoffs-header h3 {
+  color: var(--text-primary);
+}
+
+.dark-mode .playoff-info {
+  color: var(--text-secondary);
+}
+
+.dark-mode .playoff-info span {
+  color: var(--text-secondary);
+}
+
+.dark-mode .qualifying-players h4 {
+  color: var(--text-primary);
+}
+
+.dark-mode .group-qualifiers {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .group-qualifiers h5 {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+}
+
+.dark-mode .qualifier {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .qualifier:hover {
+  box-shadow: 0 2px 8px var(--shadow-md);
+  background: var(--bg-secondary);
+}
+
+.dark-mode .qualifier .player-name {
+  color: var(--text-primary);
+}
+
+.dark-mode .playoffs-note {
+  color: var(--text-tertiary);
+}
+
+.dark-mode .start-playoffs-btn {
+  background: var(--accent-success);
+  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);
+}
+
+.dark-mode .start-playoffs-btn:hover {
+  background: #059669;
+  box-shadow: 0 6px 20px rgba(52, 211, 153, 0.4);
+}
+
+.dark-mode .start-playoffs-btn:active {
+  box-shadow: 0 2px 8px rgba(52, 211, 153, 0.3);
+}
+
+.dark-mode .no-playoffs h3 {
+  color: var(--text-primary);
+}
+
+.dark-mode .no-playoffs p {
+  color: var(--text-secondary);
+}
+
+.dark-mode .no-playoffs svg {
+  color: var(--text-tertiary);
+}
+
+/* Dark mode styles for playoff brackets */
+.dark-mode .bracket-round {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .bracket-round.current {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.2);
+}
+
+.dark-mode .round-header {
+  border-bottom-color: var(--border-color);
+}
+
+.dark-mode .round-header h4 {
+  color: var(--text-primary);
+}
+
+.dark-mode .match-count {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.dark-mode .playoff-match {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.dark-mode .playoff-match:hover {
+  box-shadow: 0 2px 8px var(--shadow-md);
+}
+
+.dark-mode .playoff-match.completed {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: var(--accent-success);
+}
+
+.dark-mode .playoff-match.third-place-match {
+  border-color: var(--accent-warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.dark-mode .match-label {
+  color: var(--accent-warning);
+}
+
+.dark-mode .playoff-match .player {
+  background: var(--bg-tertiary);
+}
+
+.dark-mode .playoff-match .player.winner {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--accent-success);
+}
+
+.dark-mode .vs {
+  color: var(--text-secondary);
+}
+
+.dark-mode .edit-match-icon-btn {
+  background: transparent;
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.dark-mode .edit-match-icon-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color-light);
+  color: var(--text-primary);
+}
+
 /* Tournament Registration Styles */
 .tournament-registration {
   padding: 2rem;
@@ -3633,9 +3861,9 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   font-size: 0.9rem;
   font-weight: 500;
@@ -3644,16 +3872,17 @@ body {
 }
 
 .edit-settings-btn:hover {
-  background: #e2e8f0;
-  border-color: #94a3b8;
-  color: #334155;
+  background: var(--border-color-light);
+  border-color: var(--border-color-dark);
+  color: var(--text-primary);
 }
 
 .registration-header h1 {
   margin: 0;
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 2rem;
   font-weight: 700;
+  transition: color 0.3s ease;
 }
 
 .status-badge {
@@ -3683,10 +3912,11 @@ body {
 }
 
 .players-section {
-  background: white;
+  background: var(--card-bg);
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--shadow-sm);
+  transition: background-color 0.3s ease;
 }
 
 .section-header {
@@ -3700,12 +3930,13 @@ body {
 
 .section-header h2 {
   margin: 0;
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 1.25rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  transition: color 0.3s ease;
 }
 
 .add-player-form {
@@ -3716,15 +3947,18 @@ body {
 
 .add-player-form input {
   padding: 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 0.875rem;
   min-width: 200px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  transition: border-color 0.2s, background-color 0.3s ease, color 0.3s ease;
 }
 
 .add-player-form input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -3733,23 +3967,24 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #3b82f6;
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
 }
 
 .add-player-btn:hover:not(:disabled) {
-  background: #2563eb;
+  opacity: 0.9;
 }
 
 .add-player-btn:disabled {
-  background: #9ca3af;
+  background: var(--text-tertiary);
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .players-list {
@@ -3759,8 +3994,9 @@ body {
 .no-players {
   text-align: center;
   padding: 3rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-style: italic;
+  transition: color 0.3s ease;
 }
 
 .players-grid {
@@ -3774,16 +4010,16 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   transition: all 0.2s;
   min-height: 2.5rem;
 }
 
 .player-card:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: var(--border-color-light);
+  border-color: var(--border-color-dark);
 }
 
 .player-number {
@@ -3802,10 +4038,11 @@ body {
 
 .player-name {
   font-weight: 500;
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 0.9rem;
   line-height: 1.2;
   flex: 1;
+  transition: color 0.3s ease;
 }
 
 .remove-player-btn {
@@ -3814,7 +4051,7 @@ body {
   justify-content: center;
   width: 1.75rem;
   height: 1.75rem;
-  background: #ef4444;
+  background: var(--accent-danger);
   color: white;
   border: none;
   border-radius: 4px;
@@ -3827,6 +4064,7 @@ body {
 .remove-player-btn:hover {
   background: #dc2626;
   transform: scale(1.05);
+  opacity: 0.9;
 }
 
 .remove-player-btn:active {
@@ -3836,9 +4074,10 @@ body {
 .start-tournament-section {
   text-align: center;
   padding: 2rem;
-  background: #f8fafc;
+  background: var(--bg-tertiary);
   border-radius: 12px;
-  border: 2px dashed #cbd5e1;
+  border: 2px dashed var(--border-color);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .start-tournament-btn {
@@ -3846,7 +4085,7 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 2rem;
-  background: #10b981;
+  background: var(--accent-success);
   color: white;
   border: none;
   border-radius: 12px;
@@ -3857,7 +4096,7 @@ body {
 }
 
 .start-tournament-btn:hover {
-  background: #059669;
+  opacity: 0.9;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
@@ -3954,23 +4193,26 @@ body {
 }
 
 .form-info {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
   margin: 1rem 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .form-info p {
   margin: 0 0 0.5rem 0;
-  color: #374151;
+  color: var(--text-primary);
   font-weight: 500;
+  transition: color 0.3s ease;
 }
 
 .form-info ul {
   margin: 0;
   padding-left: 1.5rem;
-  color: #6b7280;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
 }
 
 .form-info li {
@@ -4106,38 +4348,42 @@ body {
 }
 
 .tournament-preview {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .tournament-preview h4 {
   margin: 0 0 0.75rem 0;
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 1rem;
   font-weight: 600;
+  transition: color 0.3s ease;
 }
 
 .tournament-preview p {
   margin: 0.25rem 0;
-  color: #374151;
+  color: var(--text-secondary);
   font-size: 0.875rem;
+  transition: color 0.3s ease;
 }
 
 .modal-actions {
   display: flex;
   gap: 1rem;
   padding: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-color);
   justify-content: flex-end;
+  transition: border-color 0.3s ease;
 }
 
 .cancel-btn {
   padding: 0.75rem 1.5rem;
-  background: #f3f4f6;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 500;
@@ -4146,12 +4392,13 @@ body {
 }
 
 .cancel-btn:hover {
-  background: #e5e7eb;
+  background: var(--border-color-light);
+  border-color: var(--border-color-dark);
 }
 
 .confirm-btn {
   padding: 0.75rem 1.5rem;
-  background: #10b981;
+  background: var(--accent-success);
   color: white;
   border: none;
   border-radius: 8px;
@@ -4162,7 +4409,7 @@ body {
 }
 
 .confirm-btn:hover {
-  background: #059669;
+  opacity: 0.9;
 }
 
 /* Responsive bracket */
@@ -4513,8 +4760,9 @@ body {
   gap: 0.5rem;
   font-size: 2rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
 }
 
 .dashboard-subtitle {

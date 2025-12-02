@@ -209,7 +209,7 @@ function AppContent() {
         await deleteTournament(tournamentId);
       } catch (error) {
         console.error('Error deleting tournament:', error);
-        // Tournament is still removed from local state
+        alert('Failed to delete tournament. Please check the console for details. Make sure the "deleted" column exists in the database.');
       }
     }
   };
@@ -226,7 +226,7 @@ function AppContent() {
           >
             <Menu size={24} />
           </button>
-          <div className="app-title">Darts Manager</div>
+          <div className="app-title">DartLead</div>
         </div>
       )}
 

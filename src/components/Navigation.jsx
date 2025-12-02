@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import logo from '../assets/logo.png';
 
 export function Navigation({ currentView, onViewChange, tournament, isMobileOpen, onMobileClose }) {
   const { user, signOut } = useAuth();
@@ -63,8 +64,12 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
     <nav className={getNavigationClasses()}>
       <div className="nav-header">
         <div className="nav-logo">
-          <Target size={20} />
-          {!isCollapsed && <span>Darts Manager</span>}
+          <img
+            src={logo}
+            alt="DartLead"
+            className="nav-logo-image"
+          />
+          {!isCollapsed && <span>DartLead</span>}
         </div>
         {!isMobile && (
           <button 

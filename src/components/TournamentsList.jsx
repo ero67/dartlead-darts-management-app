@@ -86,6 +86,9 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
           const hasActiveMatches = tournament.groups.some(g => 
             g.matches.some(m => m.status === 'pending')
           );
+          
+          // Check if current user owns this tournament
+          const isOwner = user && tournament.userId && user.id === tournament.userId;
 
           return (
             <div key={tournament.id} className="tournament-card">
@@ -106,11 +109,11 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       <Play size={16} />
                     </button>
                   )}
-                  {isAdmin && (
+                  {isAdmin && isOwner && (
                     <button 
                       className="action-btn delete"
                       onClick={() => onDeleteTournament(tournament.id)}
-                      title="Delete Tournament (Admin Only)"
+                      title="Delete Tournament"
                     >
                       <Trash2 size={16} />
                     </button>

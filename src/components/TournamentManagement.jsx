@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
@@ -40,6 +40,19 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const activeTabRef = useRef(activeTab); // Track active tab for interval callback
   const [matchGroupFilter, setMatchGroupFilter] = useState('all'); // Filter by group
   const [matchPlayerFilter, setMatchPlayerFilter] = useState(''); // Filter by player name
+  
+  // Deduplicate groups - ensure each group appears only once
+  const uniqueGroups = useMemo(() => {
+    if (!tournament?.groups) return [];
+    const seen = new Map();
+    return tournament.groups.filter(group => {
+      if (seen.has(group.id)) {
+        return false;
+      }
+      seen.set(group.id, true);
+      return true;
+    });
+  }, [tournament?.groups]);
   
   // Update URL when tab changes
   const handleTabChange = (tab) => {
@@ -149,7 +162,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           // Default new structure
           return {
             enabled: false,
+            qualificationMode: 'perGroup', // 'perGroup' or 'totalPlayers'
             playersPerGroup: 1,
+            totalPlayersToAdvance: 8,
             legsToWinByRound: {
               16: 3,  // Round of 16
               8: 3,   // Quarter-finals
@@ -420,37 +435,113 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const getQualifyingPlayers = () => {
     if (!tournament || !tournament.groups) return [];
     
+    const qualificationMode = tournament.playoffSettings?.qualificationMode || 'perGroup';
     const allQualifyingPlayers = [];
-    const playersPerGroup = tournament.playoffSettings?.playersPerGroup || 2;
     const allPlayersValue = 9999; // Special value to represent "all players"
     
-    tournament.groups.forEach(group => {
-      if (group.standings && group.standings.length > 0) {
-        // Sort standings by points (descending), then by leg difference, then by average
-        const sortedStandings = [...group.standings].sort((a, b) => {
-          if (b.points !== a.points) return b.points - a.points;
-          const legDiffA = a.legsWon - a.legsLost;
-          const legDiffB = b.legsWon - b.legsLost;
-          if (legDiffB !== legDiffA) return legDiffB - legDiffA;
-          return (b.average || 0) - (a.average || 0);
-        });
-        
-        // Take top N players from each group with their position info
-        // If playersPerGroup is 9999 (all players), take all players
-        const topPlayers = playersPerGroup === allPlayersValue 
-          ? sortedStandings 
-          : sortedStandings.slice(0, playersPerGroup);
-        topPlayers.forEach((standing, index) => {
-          allQualifyingPlayers.push({
-            player: standing.player,
-            groupPosition: index + 1, // 1st, 2nd, etc. in group
-            points: standing.points,
-            legDifference: standing.legsWon - standing.legsLost,
-            average: standing.average || 0
+    if (qualificationMode === 'totalPlayers') {
+      // Mode: Total players to advance
+      const totalPlayersToAdvance = tournament.playoffSettings?.totalPlayersToAdvance || 8;
+      const numberOfGroups = tournament.groups.length;
+      const playersPerGroup = Math.floor(totalPlayersToAdvance / numberOfGroups);
+      const remainder = totalPlayersToAdvance % numberOfGroups;
+      
+      // First, collect players from each group (equal distribution)
+      const playersByPosition = {}; // position -> array of players from all groups
+      
+      tournament.groups.forEach(group => {
+        if (group.standings && group.standings.length > 0) {
+          // Sort standings by points (descending), then by leg difference, then by average
+          const sortedStandings = [...group.standings].sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            const legDiffA = a.legsWon - a.legsLost;
+            const legDiffB = b.legsWon - b.legsLost;
+            if (legDiffB !== legDiffA) return legDiffB - legDiffA;
+            return (b.average || 0) - (a.average || 0);
           });
-        });
+          
+          // Take playersPerGroup players from this group
+          for (let i = 0; i < playersPerGroup && i < sortedStandings.length; i++) {
+            const standing = sortedStandings[i];
+            allQualifyingPlayers.push({
+              player: standing.player,
+              groupPosition: i + 1,
+              points: standing.points,
+              legDifference: standing.legsWon - standing.legsLost,
+              average: standing.average || 0,
+              groupId: group.id
+            });
+          }
+          
+          // Store remaining players by position for remainder selection
+          for (let i = playersPerGroup; i < sortedStandings.length; i++) {
+            const standing = sortedStandings[i];
+            const position = i + 1;
+            if (!playersByPosition[position]) {
+              playersByPosition[position] = [];
+            }
+            playersByPosition[position].push({
+              player: standing.player,
+              groupPosition: position,
+              points: standing.points,
+              legDifference: standing.legsWon - standing.legsLost,
+              average: standing.average || 0,
+              groupId: group.id
+            });
+          }
+        }
+      });
+      
+      // If there's a remainder, take the best players from the next position
+      if (remainder > 0) {
+        const nextPosition = playersPerGroup + 1;
+        if (playersByPosition[nextPosition]) {
+          // Sort by performance criteria
+          const candidates = [...playersByPosition[nextPosition]].sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
+            if (b.average !== a.average) return b.average - a.average;
+            return 0;
+          });
+          
+          // Take top 'remainder' players
+          for (let i = 0; i < remainder && i < candidates.length; i++) {
+            allQualifyingPlayers.push(candidates[i]);
+          }
+        }
       }
-    });
+    } else {
+      // Mode: Players per group (original logic)
+      const playersPerGroup = tournament.playoffSettings?.playersPerGroup || 2;
+      
+      tournament.groups.forEach(group => {
+        if (group.standings && group.standings.length > 0) {
+          // Sort standings by points (descending), then by leg difference, then by average
+          const sortedStandings = [...group.standings].sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            const legDiffA = a.legsWon - a.legsLost;
+            const legDiffB = b.legsWon - b.legsLost;
+            if (legDiffB !== legDiffA) return legDiffB - legDiffA;
+            return (b.average || 0) - (a.average || 0);
+          });
+          
+          // Take top N players from each group with their position info
+          // If playersPerGroup is 9999 (all players), take all players
+          const topPlayers = playersPerGroup === allPlayersValue 
+            ? sortedStandings 
+            : sortedStandings.slice(0, playersPerGroup);
+          topPlayers.forEach((standing, index) => {
+            allQualifyingPlayers.push({
+              player: standing.player,
+              groupPosition: index + 1, // 1st, 2nd, etc. in group
+              points: standing.points,
+              legDifference: standing.legsWon - standing.legsLost,
+              average: standing.average || 0
+            });
+          });
+        }
+      });
+    }
     
     // Sort all qualifying players by performance for seeding:
     // 1. Points (descending)
@@ -594,7 +685,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     <div className="groups-view">
       <h3>{t('management.tournamentGroups')}</h3>
       <div className="groups-grid">
-        {tournament.groups && tournament.groups.length > 0 ? tournament.groups.map(group => (
+        {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map(group => (
           <div key={group.id} className="group-card">
             <div className="group-header">
               <h4>{group.name}</h4>
@@ -630,7 +721,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
   const renderMatches = () => {
     // Collect all matches from all groups
-    const allMatches = tournament.groups?.flatMap(group => 
+    const allMatches = uniqueGroups?.flatMap(group => 
       group.matches.map(match => ({ ...match, groupId: group.id, groupName: group.name }))
     ) || [];
 
@@ -681,7 +772,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 onChange={(e) => setMatchGroupFilter(e.target.value)}
               >
                 <option value="all">{t('management.allGroups') || 'All Groups'}</option>
-                {tournament.groups?.map(group => (
+                {uniqueGroups.map(group => (
                   <option key={group.id} value={group.id}>{group.name}</option>
                 ))}
               </select>
@@ -789,6 +880,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         className="start-match-btn"
                         onClick={() => onMatchStart({ 
                           ...match,
+                          tournamentId: tournament.id,
                           groupId: match.groupId,
                           legsToWin: match.legsToWin || tournament.legsToWin,
                           startingScore: match.startingScore || tournament.startingScore
@@ -866,7 +958,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     <div className="standings-view">
       <h3>{t('management.groupStandings')}</h3>
       <div className="standings-list">
-        {tournament.groups && tournament.groups.length > 0 ? tournament.groups.map(group => {
+        {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map(group => {
           return (
           <div key={group.id} className="group-standings">
             <h4>{group.name}</h4>
@@ -970,7 +1062,15 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
     // Helper function to process a match and collect statistics
     const processMatch = (match) => {
-      if (match.status !== 'completed' || !match.result) {
+      // Check if match is completed and has result data
+      if (match.status !== 'completed') {
+        return;
+      }
+      
+      // Match result can be in match.result (from database JSONB) or needs to be constructed
+      if (!match.result) {
+        // If no result object but match is completed, skip it (data might not be loaded yet)
+        console.warn('Match is completed but has no result data:', match.id);
         return;
       }
 
@@ -1068,11 +1168,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
     };
 
-    // Iterate through all groups and matches
-    if (tournament.groups) {
-      tournament.groups.forEach(group => {
+    // Iterate through all groups and matches - use uniqueGroups to avoid duplicates
+    if (uniqueGroups && uniqueGroups.length > 0) {
+      uniqueGroups.forEach(group => {
         if (group.matches) {
           group.matches.forEach(match => {
+            // Process all matches in the group - they should already be filtered by the database query
             processMatch(match);
           });
         }
@@ -1240,7 +1341,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const loadLiveMatches = async () => {
       try {
         // Get all group IDs for this tournament
-        const groupIds = tournament.groups?.map(g => g.id) || [];
+        const groupIds = uniqueGroups?.map(g => g.id) || [];
         
         // Get playoff matches for this tournament
         const playoffMatchIds = tournament.playoffMatches?.map(m => m.id) || [];
@@ -1364,7 +1465,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           // Check if this match belongs to this tournament
           const match = payload.new;
           const belongsToTournament = 
-            (tournament.groups?.some(g => g.id === match.group_id)) ||
+            (uniqueGroups?.some(g => g.id === match.group_id)) ||
             (tournament.playoffMatches?.some(m => m.id === match.id));
 
           if (!belongsToTournament) {
@@ -1419,7 +1520,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         async (payload) => {
           const match = payload.new;
           const belongsToTournament = 
-            (tournament.groups?.some(g => g.id === match.group_id)) ||
+            (uniqueGroups?.some(g => g.id === match.group_id)) ||
             (tournament.playoffMatches?.some(m => m.id === match.id));
 
           if (!belongsToTournament) {
@@ -1580,26 +1681,28 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <div className="qualifying-players">
                 <h4>{t('management.qualifyingPlayers')}:</h4>
                 <div className="players-grid">
-                  {tournament.groups && tournament.groups.length > 0 ? tournament.groups.map((group, groupIndex) => {
-                    const playersPerGroup = tournament.playoffSettings?.playersPerGroup || 2;
-                    const allPlayersValue = 9999; // Special value to represent "all players"
+                  {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map((group, groupIndex) => {
+                    // Show all qualifiers from this group (regardless of mode)
                     const groupQualifiers = qualifyingPlayers.filter(player => 
                       group.players.some(groupPlayer => groupPlayer.id === player.id)
                     );
-                    const displayedQualifiers = playersPerGroup === allPlayersValue 
-                      ? groupQualifiers 
-                      : groupQualifiers.slice(0, playersPerGroup);
                     
                     return (
                       <div key={group.id} className="group-qualifiers">
                         <h5>{group.name}</h5>
                         <div className="qualifiers-list">
-                          {displayedQualifiers.map((player, index) => (
-                            <div key={player.id} className="qualifier">
-                              <span className="position">{index + 1}</span>
-                              <span className="player-name">{player.name}</span>
+                          {groupQualifiers.length > 0 ? (
+                            groupQualifiers.map((player, index) => (
+                              <div key={player.id} className="qualifier">
+                                <span className="position">{index + 1}</span>
+                                <span className="player-name">{player.name}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                              No qualifiers
                             </div>
-                          ))}
+                          )}
                         </div>
                       </div>
                     );
@@ -1663,26 +1766,28 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             <div className="qualifying-players">
               <h4>Qualifying Players:</h4>
               <div className="players-grid">
-                {tournament.groups && tournament.groups.length > 0 ? tournament.groups.map((group, groupIndex) => {
-                  const playersPerGroup = tournament.playoffSettings?.playersPerGroup || 2;
-                  const allPlayersValue = 9999; // Special value to represent "all players"
+                {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map((group, groupIndex) => {
+                  // Show all qualifiers from this group (regardless of mode)
                   const groupQualifiers = qualifyingPlayers.filter(player => 
                     group.players.some(groupPlayer => groupPlayer.id === player.id)
                   );
-                  const displayedQualifiers = playersPerGroup === allPlayersValue 
-                    ? groupQualifiers 
-                    : groupQualifiers.slice(0, playersPerGroup);
                   
                   return (
                     <div key={group.id} className="group-qualifiers">
                       <h5>{group.name}</h5>
                       <div className="qualifiers-list">
-                        {displayedQualifiers.map((player, index) => (
-                          <div key={player.id} className="qualifier">
-                            <span className="position">{index + 1}</span>
-                            <span className="player-name">{player.name}</span>
+                        {groupQualifiers.length > 0 ? (
+                          groupQualifiers.map((player, index) => (
+                            <div key={player.id} className="qualifier">
+                              <span className="position">{index + 1}</span>
+                              <span className="player-name">{player.name}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                            No qualifiers
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
                   );
@@ -1770,15 +1875,26 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           </div>
                         )}
                       </div>
-                      {match.status === 'completed' && match.result && (
-                        <button
-                          className="view-statistics-btn"
-                          onClick={() => setMatchStatistics(match)}
-                          title={t('management.viewStatistics') || 'View Statistics'}
-                        >
-                          <BarChart3 size={16} />
-                        </button>
-                      )}
+                      <div className="match-header-actions">
+                        {isAdmin && match.status === 'pending' && !isMatchActuallyLive(match.id) && (
+                          <button 
+                            className="edit-match-icon-btn"
+                            onClick={() => setEditingMatch({ ...match, isThirdPlaceMatch: bracketMatch.isThirdPlaceMatch })}
+                            title={t('management.editMatchPlayers') || 'Edit match players'}
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        )}
+                        {match.status === 'completed' && match.result && (
+                          <button
+                            className="view-statistics-btn"
+                            onClick={() => setMatchStatistics(match)}
+                            title={t('management.viewStatistics') || 'View Statistics'}
+                          >
+                            <BarChart3 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="match-players">
                       <div className={`player ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
@@ -1801,16 +1917,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     </div>
                     
                     <div className="match-actions">
-                      {isAdmin && match.status === 'pending' && !isMatchActuallyLive(match.id) && (
-                        <button 
-                          className="edit-match-btn"
-                          onClick={() => setEditingMatch({ ...match, isThirdPlaceMatch: bracketMatch.isThirdPlaceMatch })}
-                          title={t('management.editMatchPlayers') || 'Edit match players'}
-                        >
-                          <Edit2 size={16} />
-                          {t('common.edit')}
-                        </button>
-                      )}
                       {match.status === 'pending' && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
                         user ? (
                           <button 
@@ -1821,6 +1927,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                               const legsToWin = getPlayoffLegsToWin(roundSize);
                               onMatchStart({ 
                                 ...match,
+                                tournamentId: tournament.id,
                                 legsToWin: legsToWin,
                                 startingScore: tournament.startingScore,
                                 isPlayoff: true
@@ -1919,10 +2026,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="tournament-overview">
           <div className="overview-stat">
             <Users size={20} />
-            <span>{tournament.players?.length || tournament.groups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0} {t('common.players')}</span>
+            <span>{tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0} {t('common.players')}</span>
           </div>
           <div className="overview-stat">
-            <span>{tournament.groups?.length || 0} {t('common.groups')}</span>
+            <span>{uniqueGroups?.length || 0} {t('common.groups')}</span>
           </div>
         </div>
         <div className="header-actions">
@@ -1936,7 +2043,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {t('registration.editSettings')}
             </button>
           )}
-          {isAdmin && (
+          {isAdmin && user && tournament.userId && user.id === tournament.userId && (
             <button 
               className="delete-tournament-btn"
               onClick={handleDeleteTournament}
@@ -2005,7 +2112,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h3>Edit Tournament Settings</h3>
+              <h3>{t('registration.editTournamentSettings')}</h3>
               <button 
                 className="close-btn"
                 onClick={() => setShowEditSettings(false)}
@@ -2015,9 +2122,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             </div>
             <div className="modal-content">
               <div className="group-settings">
-                <h4>Match Settings</h4>
+                <h4>{t('registration.matchSettings')}</h4>
                 <div className="input-group">
-                  <label>Legs to Win:</label>
+                  <label>{t('registration.legsToWin')}:</label>
                   <select 
                     value={tournamentSettings.legsToWin}
                     onChange={(e) => setTournamentSettings({
@@ -2025,17 +2132,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       legsToWin: parseInt(e.target.value)
                     })}
                   >
-                    <option value={1}>First to 1</option>
-                    <option value={2}>First to 2</option>
-                    <option value={3}>First to 3</option>
-                    <option value={4}>First to 4</option>
-                    <option value={5}>First to 5</option>
-                    <option value={7}>First to 7</option>
-                    <option value={9}>First to 9</option>
+                    <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
+                    <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
+                    <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
+                    <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
+                    <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
+                    <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
+                    <option value={9}>{t('tournaments.firstToLegs', { count: 9 })}</option>
                   </select>
                 </div>
                 <div className="input-group">
-                  <label>Starting Score:</label>
+                  <label>{t('tournaments.startingScore')}:</label>
                   <select 
                     value={tournamentSettings.startingScore}
                     onChange={(e) => setTournamentSettings({
@@ -2112,7 +2219,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               </div>
 
               <div className="group-settings">
-                <h4>Group Settings</h4>
+                <h4>{t('registration.groupSettings')}</h4>
                 <div className="radio-group">
                   <label>
                     <input
@@ -2128,7 +2235,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         }
                       })}
                     />
-                    Number of Groups
+                    {t('registration.numberOfGroups')}
                   </label>
                   <label>
                     <input
@@ -2144,12 +2251,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         }
                       })}
                     />
-                    Players per Group
+                    {t('registration.playersPerGroup')}
                   </label>
                 </div>
                 <div className="input-group">
                   <label>
-                    {tournamentSettings.groupSettings.type === 'groups' ? 'Number of Groups:' : 'Players per Group:'}
+                    {tournamentSettings.groupSettings.type === 'groups' ? t('registration.numberOfGroupsLabel') : t('registration.playersPerGroupLabel')}
                   </label>
                   <input
                     type="number"
@@ -2168,7 +2275,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               </div>
 
               <div className="group-settings">
-                <h4>Playoff Settings</h4>
+                <h4>{t('registration.playoffSettings')}</h4>
                 <div className="checkbox-group">
                   <label>
                     <input
@@ -2182,7 +2289,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         }
                       })}
                     />
-                    Enable Playoffs
+                    {t('registration.enablePlayoffs')}
                   </label>
                 </div>
                 
@@ -2208,23 +2315,83 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   return (
                     <div className="playoff-options">
                       <div className="input-group">
-                        <label>Players advancing per group:</label>
-                        <select 
-                          value={tournamentSettings.playoffSettings.playersPerGroup}
-                          onChange={(e) => setTournamentSettings({
-                            ...tournamentSettings,
-                            playoffSettings: {
-                              ...tournamentSettings.playoffSettings,
-                              playersPerGroup: parseInt(e.target.value)
-                            }
-                          })}
-                        >
-                          {Array.from({ length: maxPlayersPerGroup }, (_, i) => i + 1).map(num => (
-                            <option key={num} value={num}>{num}</option>
-                          ))}
-                          <option value={allPlayersValue}>All</option>
-                        </select>
+                        <label>{t('registration.qualificationMode')}</label>
+                        <div className="radio-group">
+                          <label>
+                            <input
+                              type="radio"
+                              name="qualificationMode"
+                              value="perGroup"
+                              checked={tournamentSettings.playoffSettings.qualificationMode === 'perGroup'}
+                              onChange={(e) => setTournamentSettings({
+                                ...tournamentSettings,
+                                playoffSettings: {
+                                  ...tournamentSettings.playoffSettings,
+                                  qualificationMode: e.target.value
+                                }
+                              })}
+                            />
+                            {t('registration.qualificationModePerGroup')}
+                          </label>
+                          <label>
+                            <input
+                              type="radio"
+                              name="qualificationMode"
+                              value="totalPlayers"
+                              checked={tournamentSettings.playoffSettings.qualificationMode === 'totalPlayers'}
+                              onChange={(e) => setTournamentSettings({
+                                ...tournamentSettings,
+                                playoffSettings: {
+                                  ...tournamentSettings.playoffSettings,
+                                  qualificationMode: e.target.value
+                                }
+                              })}
+                            />
+                            {t('registration.qualificationModeTotalPlayers')}
+                          </label>
+                        </div>
                       </div>
+                      
+                      {tournamentSettings.playoffSettings.qualificationMode === 'perGroup' ? (
+                        <div className="input-group">
+                          <label>{t('registration.playersAdvancingPerGroup')}</label>
+                          <select 
+                            value={tournamentSettings.playoffSettings.playersPerGroup}
+                            onChange={(e) => setTournamentSettings({
+                              ...tournamentSettings,
+                              playoffSettings: {
+                                ...tournamentSettings.playoffSettings,
+                                playersPerGroup: parseInt(e.target.value)
+                              }
+                            })}
+                          >
+                            {Array.from({ length: maxPlayersPerGroup }, (_, i) => i + 1).map(num => (
+                              <option key={num} value={num}>{num}</option>
+                            ))}
+                            <option value={allPlayersValue}>{t('registration.all')}</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="input-group">
+                          <label>{t('registration.totalPlayersToAdvance')}</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="64"
+                            value={tournamentSettings.playoffSettings.totalPlayersToAdvance || 8}
+                            onChange={(e) => setTournamentSettings({
+                              ...tournamentSettings,
+                              playoffSettings: {
+                                ...tournamentSettings.playoffSettings,
+                                totalPlayersToAdvance: parseInt(e.target.value) || 8
+                              }
+                            })}
+                          />
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                            {t('registration.totalPlayersDescription')}
+                          </p>
+                        </div>
+                      )}
                     <div className="playoff-legs-settings">
                       <h5>{t('registration.playoffLegsToWin')}:</h5>
                       <div className="input-group">
@@ -2326,13 +2493,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 className="cancel-btn"
                 onClick={() => setShowEditSettings(false)}
               >
-                Cancel
+                {t('registration.cancel')}
               </button>
               <button 
                 className="confirm-btn"
                 onClick={updateSettings}
               >
-                Update Settings
+                {t('registration.updateSettings')}
               </button>
             </div>
           </div>
@@ -2665,10 +2832,10 @@ function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onC
       </div>
       <div className="modal-actions">
         <button className="cancel-btn" onClick={onCancel}>
-          Cancel
+          {t('registration.cancel')}
         </button>
         <button className="confirm-btn" onClick={handleSave}>
-          Save Changes
+          {t('common.save')}
         </button>
       </div>
     </div>

@@ -519,11 +519,16 @@ export function TournamentProvider({ children }) {
               'completed'
             );
           }
+          
+          // Refresh tournament from database to get latest match results with full statistics
+          // This ensures statistics view shows the complete match data
+          const refreshedTournament = await tournamentService.getTournament(currentState.currentTournament.id);
+          dispatch({ type: ACTIONS.SELECT_TOURNAMENT, payload: refreshedTournament });
         }
       } catch (error) {
         console.error('Error updating tournament in database:', error);
       }
-    }, 200);
+    }, 500); // Increased timeout to ensure database write completes
   };
 
   const deleteTournament = async (tournamentId) => {
@@ -532,8 +537,8 @@ export function TournamentProvider({ children }) {
       dispatch({ type: ACTIONS.DELETE_TOURNAMENT, payload: tournamentId });
     } catch (error) {
       console.error('Error deleting tournament:', error);
-      // Still dispatch to remove from local state
-      dispatch({ type: ACTIONS.DELETE_TOURNAMENT, payload: tournamentId });
+      // Don't remove from local state if database update failed
+      throw error;
     }
   };
 

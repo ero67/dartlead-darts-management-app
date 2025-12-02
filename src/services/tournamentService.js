@@ -277,6 +277,7 @@ export const tournamentService = {
             .from('matches')
             .insert({
               id: matchId,
+              tournament_id: tournamentId,
               group_id: groupId,
               player1_id: player1Id,
               player2_id: player2Id,
@@ -363,10 +364,11 @@ export const tournamentService = {
   // Get all tournaments
   async getTournaments() {
     try {
-      // First, get all tournaments with basic info
+      // First, get all tournaments with basic info (excluding deleted ones)
       const { data: tournaments, error: tournamentsError } = await supabase
         .from('tournaments')
         .select('*')
+        .eq('deleted', false)
         .order('created_at', { ascending: false })
 
       if (tournamentsError) throw tournamentsError
@@ -582,6 +584,7 @@ export const tournamentService = {
           standingsCriteriaOrder: standingsCriteriaOrder,
           createdAt: tournament.created_at,
           updatedAt: tournament.updated_at,
+          userId: tournament.user_id,
           players: tournamentPlayersList,
           groups: tournamentGroups
         }
@@ -617,6 +620,7 @@ export const tournamentService = {
           )
         `)
         .eq('id', tournamentId)
+        .eq('deleted', false)
         .maybeSingle()
 
       if (error) {
@@ -640,9 +644,20 @@ export const tournamentService = {
         }
       }
 
+      // Deduplicate groups - Supabase nested queries can return duplicates
+      const uniqueGroupsMap = new Map();
+      if (tournament.groups) {
+        tournament.groups.forEach(group => {
+          if (!uniqueGroupsMap.has(group.id)) {
+            uniqueGroupsMap.set(group.id, group);
+          }
+        });
+      }
+      const uniqueGroups = Array.from(uniqueGroupsMap.values());
+
       // Transform data to match our app structure
         // Get match player stats for all matches in this tournament
-        const allMatchIds = tournament.groups.flatMap(group => 
+        const allMatchIds = uniqueGroups.flatMap(group => 
           group.matches.map(match => match.id)
         );
         
@@ -668,6 +683,7 @@ export const tournamentService = {
         }
         
         // Get playoff matches for this tournament
+        // Filter by tournament_id (direct relationship)
         const { data: playoffMatchesData, error: playoffMatchesError } = await supabase
           .from('matches')
           .select(`
@@ -675,7 +691,8 @@ export const tournamentService = {
             player1:players!matches_player1_id_fkey(*),
             player2:players!matches_player2_id_fkey(*)
           `)
-          .eq('is_playoff', true);
+          .eq('is_playoff', true)
+          .eq('tournament_id', tournamentId);
 
         if (playoffMatchesError) {
           console.error('Error fetching playoff matches:', playoffMatchesError);
@@ -728,8 +745,9 @@ export const tournamentService = {
           standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
           createdAt: tournament.created_at,
           updatedAt: tournament.updated_at,
+          userId: tournament.user_id,
           players: tournament.tournament_players.map(tp => tp.player),
-          groups: tournament.groups.map(group => {
+          groups: uniqueGroups.map(group => {
           const groupWithData = {
             id: group.id,
             name: group.name,
@@ -820,10 +838,26 @@ export const tournamentService = {
           )
         `)
         .eq('id', tournamentId)
+        .eq('deleted', false)
         .single();
 
       if (tournamentError) throw tournamentError;
       if (!tournament) throw new Error('Tournament not found');
+
+      // Check if groups already exist for this tournament
+      const { data: existingGroups, error: groupsCheckError } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('tournament_id', tournamentId);
+
+      if (groupsCheckError) throw groupsCheckError;
+      
+      if (existingGroups && existingGroups.length > 0) {
+        console.warn('Groups already exist for this tournament. Skipping group creation.');
+        // Return the existing tournament data instead of creating duplicates
+        const completeTournament = await this.getTournament(tournamentId);
+        return completeTournament;
+      }
 
       // Get all players for this tournament
       const players = tournament.tournament_players.map(tp => tp.player);
@@ -868,6 +902,7 @@ export const tournamentService = {
             .from('matches')
             .insert({
               id: match.id,
+              tournament_id: tournamentId,
               group_id: group.id,
               player1_id: match.player1.id,
               player2_id: match.player2.id,
@@ -1041,9 +1076,11 @@ export const tournamentService = {
         .from('tournaments')
         .select('status')
         .eq('id', tournamentId)
+        .eq('deleted', false)
         .single();
 
       if (tournamentError) throw tournamentError;
+      if (!tournament) throw new Error('Tournament not found or has been deleted');
       if (tournament.status !== 'open_for_registration') {
         throw new Error('Tournament is no longer accepting new players');
       }
@@ -1102,9 +1139,11 @@ export const tournamentService = {
         .from('tournaments')
         .select('status')
         .eq('id', tournamentId)
+        .eq('deleted', false)
         .single();
 
       if (tournamentError) throw tournamentError;
+      if (!tournament) throw new Error('Tournament not found or has been deleted');
       if (tournament.status !== 'open_for_registration') {
         throw new Error('Tournament is no longer accepting player changes');
       }
@@ -1148,59 +1187,97 @@ export const tournamentService = {
     }
   },
 
-  // Delete tournament
+  // Delete tournament (soft delete - sets deleted flag to true)
   async deleteTournament(tournamentId) {
     try {
-      // First, get the tournament to extract playoff match IDs
-      const { data: tournament, error: fetchError } = await supabase
+      console.log('Attempting to soft delete tournament:', tournamentId);
+      
+      // First, check if tournament exists and get user info
+      const { data: existingTournament, error: checkError } = await supabase
         .from('tournaments')
-        .select('id, playoffs')
+        .select('id, name, deleted, user_id')
         .eq('id', tournamentId)
-        .single();
+        .maybeSingle();
 
-      if (fetchError) throw fetchError;
-
-      // Extract playoff match IDs from the tournament's playoff bracket
-      // Playoff matches don't have a tournament_id foreign key, so we need to delete them explicitly
-      const playoffMatchIds = [];
-      if (tournament?.playoffs?.rounds) {
-        tournament.playoffs.rounds.forEach(round => {
-          if (round.matches) {
-            round.matches.forEach(match => {
-              if (match.id) {
-                playoffMatchIds.push(match.id);
-              }
-            });
-          }
-        });
+      if (checkError) {
+        console.error('Error checking tournament existence:', checkError);
+        throw checkError;
       }
 
-      // Delete playoff matches explicitly before deleting tournament
-      // (Group matches will be deleted via CASCADE when groups are deleted)
-      if (playoffMatchIds.length > 0) {
-        const { error: deletePlayoffMatchesError } = await supabase
-          .from('matches')
-          .delete()
-          .in('id', playoffMatchIds);
+      if (!existingTournament) {
+        console.warn('No tournament found with id:', tournamentId);
+        throw new Error(`Tournament not found with ID: ${tournamentId}`);
+      }
 
-        if (deletePlayoffMatchesError) {
-          console.error('Error deleting playoff matches:', deletePlayoffMatchesError);
-          // Continue with tournament deletion even if playoff match deletion fails
+      console.log('Tournament found:', existingTournament);
+
+      // Check current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('Error getting current user:', userError);
+      }
+      console.log('Current user ID:', user?.id);
+      console.log('Tournament user_id:', existingTournament.user_id);
+      
+      if (user && existingTournament.user_id && user.id !== existingTournament.user_id) {
+        throw new Error(`Permission denied: You can only delete tournaments you created. Tournament belongs to user ${existingTournament.user_id}, but you are ${user.id}`);
+      }
+
+      // Soft delete: set deleted = true instead of actually deleting
+      // Note: We don't filter by deleted=false because we want to allow updating even if already deleted
+      const { data, error } = await supabase
+        .from('tournaments')
+        .update({ 
+          deleted: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tournamentId)
+        .select();
+
+      if (error) {
+        console.error('Error updating tournament deleted flag:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+
+      // If select returns no data (due to RLS), verify the update worked
+      if (!data || data.length === 0) {
+        console.warn('Update query returned no data (possibly due to RLS). Verifying update...');
+        
+        // Wait a moment for the update to propagate
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Check if the update actually worked by querying again (without deleted filter to see current state)
+        const { data: verifyData, error: verifyError } = await supabase
+          .from('tournaments')
+          .select('id, deleted, name')
+          .eq('id', tournamentId)
+          .maybeSingle();
+        
+        if (verifyError) {
+          console.error('Verification query error:', verifyError);
+          throw new Error(`Update may have failed. Verification error: ${verifyError.message}`);
+        }
+        
+        if (!verifyData) {
+          throw new Error('Tournament not found during verification');
+        }
+        
+        console.log('Verification result:', verifyData);
+        
+        if (verifyData.deleted === true) {
+          console.log('Update verified - tournament is now deleted');
+          return true;
+        } else {
+          // The update didn't work - likely RLS blocking it
+          console.error('Update failed - tournament deleted flag is still false');
+          console.error('This is likely due to Row Level Security (RLS) policies blocking the update.');
+          console.error('Tournament data:', verifyData);
+          throw new Error('Update failed - Row Level Security policy may be blocking the update. Check if you have permission to update this tournament.');
         }
       }
 
-      // Delete the tournament (CASCADE will automatically delete:
-      // - groups (which will CASCADE delete group matches)
-      // - tournament_players
-      // - tournament_stats
-      // - group_standings
-      // etc.)
-      const { error } = await supabase
-        .from('tournaments')
-        .delete()
-        .eq('id', tournamentId);
-
-      if (error) throw error;
+      console.log('Successfully soft deleted tournament:', data);
       return true;
 
     } catch (error) {
@@ -1346,11 +1423,35 @@ export const matchService = {
 
       // If match doesn't exist and we have matchData (for playoff matches), create it
       if (matchData) {
+        // Get tournament_id for playoff matches
+        let tournamentId = matchData.tournamentId || matchData.tournament_id;
+        
+        // If tournament_id not provided and it's a playoff match, look it up from players
+        if (!tournamentId && matchData.isPlayoff && matchData.player1?.id && matchData.player2?.id) {
+          const { data: tournamentPlayers, error: tpError } = await supabase
+            .from('tournament_players')
+            .select('tournament_id')
+            .in('player_id', [matchData.player1.id, matchData.player2.id]);
+          
+          if (!tpError && tournamentPlayers) {
+            // Find tournament where both players are registered
+            const tournamentCounts = {};
+            tournamentPlayers.forEach(tp => {
+              tournamentCounts[tp.tournament_id] = (tournamentCounts[tp.tournament_id] || 0) + 1;
+            });
+            
+            // Find tournament where both players appear (count = 2)
+            tournamentId = Object.keys(tournamentCounts).find(
+              tid => tournamentCounts[tid] === 2
+            ) || null;
+          }
+        }
         
         const { data: newMatch, error: createError } = await supabase
           .from('matches')
           .insert({
             id: matchId,
+            tournament_id: tournamentId,
             player1_id: matchData.player1?.id,
             player2_id: matchData.player2?.id,
             status: 'in_progress',
