@@ -388,16 +388,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     startLiveMatch(match.id, matchData);
     
     // Update database with user who started the match (only if match is not completed)
-    console.log('User info:', user);
     if (user?.id && match.status !== 'completed') {
-      console.log('Updating match starter in database:', match.id, user.id);
       matchService.startMatch(match.id, user.id, match).catch(error => {
-        console.error('Error updating match starter in database:', error);
       });
-    } else if (match.status === 'completed') {
-      console.log('Match is already completed, skipping startMatch call');
-    } else {
-      console.log('No user ID available, cannot save match starter');
     }
     
     // Cleanup: end live match when component unmounts
@@ -480,11 +473,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     const newDartEntry = { value: scoreValue, label, number, multiplier: inputMode === 'double' ? 2 : inputMode === 'triple' ? 3 : 1 };
     const newScores = [...currentTurn.scores, newDartEntry];
     
-    console.log('=== ADD SCORE DEBUG ===');
-    console.log('Adding dart:', newDartEntry);
-    console.log('Current turn scores before adding:', currentTurn.scores);
-    console.log('New scores after adding:', newScores);
-
     // Update turn immediately
     setCurrentTurn({
       score: newScore,
@@ -543,6 +531,75 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       return; // Exit early to prevent auto-finish
     }
 
+    // Check if score reaches exactly 0 - must finish on double
+    if (newCurrentScore === 0) {
+      // Check if last dart was a double (proper finish)
+      if (newDartEntry.multiplier !== 2) {
+        // Not finished on double - bust
+        // Update turn to show the dart was thrown
+        setCurrentTurn({
+          score: newScore,
+          darts: newDarts,
+          scores: newScores,
+          dartCount: currentTurn.dartCount + 1,
+          turnStartScore: turnStartScore
+        });
+        
+        // Reset input mode
+        setInputMode('single');
+        
+        // Show red background for bust
+        setBustingPlayer(currentPlayer);
+        
+        // Show visual feedback, restore score to start of turn, add darts to count, and switch player
+        setTimeout(() => {
+          setCurrentTurn(prev => ({
+            ...prev,
+            score: 0,
+            darts: 0,
+            scores: [],
+            turnStartScore: null
+          }));
+          // Restore the score to what it was at the start of the turn
+          // But add the darts that were thrown (even though they resulted in a bust)
+          setLegScores(prev => ({
+            ...prev,
+            [`player${currentPlayer + 1}`]: {
+              ...prev[`player${currentPlayer + 1}`],
+              currentScore: turnStartScore,
+              totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + newDarts,
+              legDarts: prev[`player${currentPlayer + 1}`].legDarts + newDarts
+            }
+          }));
+          // Remove bust visual feedback
+          setBustingPlayer(null);
+          // Switch to next player after bust
+          setCurrentPlayer(prev => prev === 0 ? 1 : 0);
+        }, 1000);
+        return; // Exit early to prevent auto-finish
+      }
+      // Valid finish on double - update score and finish turn
+      setLegScores(prev => ({
+        ...prev,
+        [`player${currentPlayer + 1}`]: {
+          ...prev[`player${currentPlayer + 1}`],
+          currentScore: newCurrentScore
+        }
+      }));
+      setInputMode('single');
+      // Pass the updated turn data and current score directly to finishTurn
+      const updatedTurn = {
+        score: newScore,
+        darts: newDarts,
+        scores: newScores,
+        dartCount: currentTurn.dartCount + 1,
+        currentScore: newCurrentScore,
+        turnStartScore: turnStartScore
+      };
+      finishTurn(updatedTurn);
+      return;
+    }
+
     // Update player's current score (only if not a bust)
     setLegScores(prev => ({
       ...prev,
@@ -555,16 +612,16 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     // Reset input mode after each dart
     setInputMode('single');
 
-    // Auto-finish turn when 3 darts are thrown OR when score reaches 0
-    if (newDarts === 3 || newCurrentScore === 0) {
-      console.log('Auto-finishing turn - newDarts:', newDarts, 'newCurrentScore:', newCurrentScore);
+    // Auto-finish turn when 3 darts are thrown
+    if (newDarts === 3) {
       // Pass the updated turn data and current score directly to finishTurn
       const updatedTurn = {
         score: newScore,
         darts: newDarts,
         scores: newScores,
         dartCount: currentTurn.dartCount + 1,
-        currentScore: newCurrentScore // Pass the updated score
+        currentScore: newCurrentScore,
+        turnStartScore: turnStartScore
       };
       finishTurn(updatedTurn);
     }
@@ -574,7 +631,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (isViewOnly) return; // Non-logged-in users cannot modify scores
     // Prevent rapid clicks
     if (isRemovingDart) {
-      console.log('Remove dart already in progress, ignoring click');
       return;
     }
     
@@ -582,19 +638,10 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     
     // If current turn has darts, remove from current turn
     if (currentTurn.scores.length > 0) {
-      console.log('=== REMOVE LAST DART DEBUG ===');
-      console.log('Current turn scores BEFORE removal:', currentTurn.scores);
-      console.log('Current turn scores length:', currentTurn.scores.length);
-      
       const lastDart = currentTurn.scores[currentTurn.scores.length - 1];
       const newScores = currentTurn.scores.slice(0, -1);
       const newScore = newScores.reduce((sum, dart) => sum + dart.value, 0);
       const newDarts = newScores.length;
-
-      console.log('Last dart being removed:', lastDart);
-      console.log('New scores after removal:', newScores);
-      console.log('New score total:', newScore);
-      console.log('Adding back dart value:', lastDart.value);
 
       // Use functional state updates to ensure we're working with latest state
       setCurrentTurn(prev => ({
@@ -608,8 +655,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       setLegScores(prev => {
         const currentPlayerScore = prev[`player${currentPlayer + 1}`].currentScore;
         const restoredScore = currentPlayerScore + lastDart.value;
-        console.log('Current player score before removal:', currentPlayerScore);
-        console.log('Restored score:', restoredScore);
         
         return {
           ...prev,
@@ -629,10 +674,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (turnHistory.length > 0) {
       const lastTurn = turnHistory[turnHistory.length - 1];
       const lastDart = lastTurn.turn.scores[lastTurn.turn.scores.length - 1];
-      
-      console.log('Cross-turn undo - lastTurn:', lastTurn);
-      console.log('Cross-turn undo - lastDart:', lastDart);
-      console.log('Cross-turn undo - saved score:', lastTurn.legScores[`player${lastTurn.player + 1}`].currentScore);
       
       // Restore the previous turn's state
       setCurrentPlayer(lastTurn.player);
@@ -656,10 +697,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         const currentPlayerScore = prev[`player${lastTurn.player + 1}`].currentScore;
         const restoredScore = currentPlayerScore + lastDart.value;
         
-        console.log('Cross-turn undo - current score:', currentPlayerScore);
-        console.log('Cross-turn undo - adding back:', lastDart.value);
-        console.log('Cross-turn undo - restored score:', restoredScore);
-        
         return {
           ...prev,
           [`player${lastTurn.player + 1}`]: {
@@ -681,20 +718,13 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   };
 
   const finishTurn = (turnData = currentTurn) => {
-    console.log('finishTurn called with turnData:', turnData);
-    console.log('finishTurn - turnData.darts:', turnData.darts);
-    
     if (turnData.darts === 0) {
-      console.log('finishTurn: No darts thrown, returning');
       return;
     }
 
     // Get the current score (use passed score or fall back to state)
     const currentScore = turnData.currentScore !== undefined ? turnData.currentScore : currentPlayerData.currentScore;
-    console.log('finishTurn - currentPlayerData:', currentPlayerData);
-    console.log('finishTurn - turnData.currentScore:', turnData.currentScore);
-    console.log('finishTurn - currentScore (used):', currentScore);
-    
+
     // Get the starting score for this turn (for bust restoration)
     const turnStartScore = turnData.turnStartScore !== null && turnData.turnStartScore !== undefined
       ? turnData.turnStartScore
@@ -722,13 +752,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (currentScore === 0) {
       // Check if last dart was a double (proper finish)
       const lastDart = turnData.scores[turnData.scores.length - 1];
-      console.log('Checkout attempt - lastDart:', lastDart);
-      console.log('Checkout attempt - multiplier:', lastDart.multiplier);
-      console.log('Checkout attempt - turnData:', turnData);
       
       if (lastDart.multiplier !== 2) {
         // Not finished on double - bust
-        console.log('Bust: Not finished on double');
         setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: turnData.dartCount, turnStartScore: null });
         setLegScores(prev => ({
           ...prev,
@@ -744,7 +770,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         return;
       }
       
-      console.log('Valid checkout: Finished on double');
 
       // Calculate numeric checkout value (sum of all dart scores in the turn)
       const checkout = turnData.scores.reduce((sum, dart) => sum + (dart.value || 0), 0);
@@ -787,10 +812,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             remainingScore: opponentScoreRemaining
           }
         ];
-        
-        console.log('Awarding leg - player:', currentPlayer + 1, 'new legs:', newLegs);
-        console.log('Previous legs:', prev[`player${currentPlayer + 1}`].legs);
-        console.log('Leg average:', legAverage.toFixed(2), 'Darts used:', dartsUsed);
         
         const updated = {
           ...prev,
@@ -955,11 +976,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     const winner = finalLegScores.player1.legs > finalLegScores.player2.legs ? 
       currentMatch.player1?.id : 
       currentMatch.player2?.id;
-    
-    console.log('MatchInterface.completeMatch - currentMatch:', currentMatch);
-    console.log('MatchInterface.completeMatch - finalLegScores:', finalLegScores);
-    console.log('MatchInterface.completeMatch - winner:', winner);
-
     // Clean up saved match state
     if (currentMatch?.id) {
       localStorage.removeItem(`match-state-${currentMatch.id}`);
@@ -1004,8 +1020,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       ? (finalLegScores.player2.totalScore / finalLegScores.player2.totalDarts) * 3 
       : 0;
     
-    console.log('Player 1 totalScore:', finalLegScores.player1.totalScore, 'totalDarts:', finalLegScores.player1.totalDarts, 'Match average:', player1MatchAverage.toFixed(2));
-    console.log('Player 2 totalScore:', finalLegScores.player2.totalScore, 'totalDarts:', finalLegScores.player2.totalDarts, 'Match average:', player2MatchAverage.toFixed(2));
     
     const matchResult = {
       matchId: currentMatch.id,
