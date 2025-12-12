@@ -89,7 +89,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
-
+  
   // Sync ref with state whenever state changes
   useEffect(() => {
     liveMatchesRef.current = liveMatches;
@@ -501,18 +501,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       const helper = (size) => {
         if (size === 1) return [1];
         if (size === 2) return [1, 2];
-
-        const result = [];
+      
+      const result = [];
         const half = size / 2;
         const topHalf = helper(half);
         const bottomHalf = helper(half);
-
-        for (let i = 0; i < half; i++) {
-          result.push(topHalf[i]);
-          result.push(bottomHalf[i] + half);
-        }
-
-        return result;
+      
+      for (let i = 0; i < half; i++) {
+        result.push(topHalf[i]);
+        result.push(bottomHalf[i] + half);
+      }
+      
+      return result;
       };
 
       return helper(bracketSize);
@@ -2033,7 +2033,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         {bracketViewMode === 'compact' ? (
           <BracketVisualization rounds={rounds} playoffMatches={playoffMatches} />
         ) : (
-          <div className="bracket-container">
+        <div className="bracket-container">
           {rounds.map((round, index) => (
             <div key={round.id} className={`bracket-round ${index + 1 === currentRound ? 'current' : ''}`}>
               <div className="round-header">
@@ -2099,20 +2099,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <div className="player-result">
                           <div className="player-name-row">
                             <span className={`player-name ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
-                              {match.player1?.name || 'TBD'}
-                            </span>
+                          {match.player1?.name || 'TBD'}
+                        </span>
                             <span className="score">{match.result.player1Legs}</span>
-                          </div>
+                      </div>
                         </div>
                         <div className="score-divider">:</div>
                         <div className="player-result">
                           <div className="player-name-row">
                             <span className={`player-name ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
-                              {match.player2?.name || 'TBD'}
-                            </span>
+                          {match.player2?.name || 'TBD'}
+                        </span>
                             <span className="score">{match.result.player2Legs}</span>
-                          </div>
-                        </div>
+                      </div>
+                    </div>
                       </div>
                     ) : (
                       <div className="match-players-compact">

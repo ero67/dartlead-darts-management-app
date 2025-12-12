@@ -277,7 +277,7 @@ export function AdminPanel() {
       setMatchesForTournament([]);
     } finally {
       setLoadingMatches(false);
-    }
+  }
   };
 
   // Handle tournament selection for match reset
@@ -533,11 +533,11 @@ export function AdminPanel() {
               />
             </div>
 
-            <button
+        <button 
               className="admin-button primary"
               onClick={setManagerRole}
               disabled={loading || !email.trim()}
-            >
+        >
               {loading ? (
                 <>
                   <Loader size={16} className="spinning" />
@@ -549,8 +549,8 @@ export function AdminPanel() {
                   Assign Manager Role
                 </>
               )}
-            </button>
-          </div>
+        </button>
+      </div>
 
           {message.text && (
             <div className={`admin-message ${message.type}`}>
@@ -565,7 +565,7 @@ export function AdminPanel() {
         </div>
 
         {/* Managers List Section */}
-        <div className="admin-section">
+          <div className="admin-section">
           <div className="admin-section-header">
             <Crown size={20} />
             <h2>Current Managers</h2>
@@ -590,15 +590,15 @@ export function AdminPanel() {
                       <div className="manager-name">{manager.full_name}</div>
                     )}
                   </div>
-                  <button
+              <button 
                     className="admin-button danger small"
                     onClick={() => removeManagerRole(manager.email)}
                     disabled={loading}
                     title="Remove manager role"
-                  >
+              >
                     <X size={14} />
                     Remove
-                  </button>
+              </button>
                 </div>
               ))}
             </div>
@@ -614,8 +614,8 @@ export function AdminPanel() {
           <p className="admin-section-description">
             View all registered users and their roles.
           </p>
-
-          <button
+              
+              <button 
             className="admin-button primary"
             onClick={loadAllUsers}
             disabled={loadingUsers}
@@ -631,8 +631,8 @@ export function AdminPanel() {
                 Load All Users
               </>
             )}
-          </button>
-
+              </button>
+              
           {loadingUsers && allUsers.length === 0 ? (
             <div className="admin-loading">
               <Loader size={20} className="spinning" />
@@ -753,12 +753,12 @@ export function AdminPanel() {
                         <strong>Score:</strong> {matchInfo.player1_legs} - {matchInfo.player2_legs}
                       </div>
                     )}
-                    <button
+              <button 
                       className="admin-button danger"
                       onClick={resetMatchToPending}
                       disabled={loadingMatch || matchInfo.status === 'pending'}
                       style={{ marginTop: '1rem', width: '100%' }}
-                    >
+              >
                       {loadingMatch ? (
                         <>
                           <Loader size={16} className="spinning" />
@@ -770,8 +770,8 @@ export function AdminPanel() {
                           Reset to Pending
                         </>
                       )}
-                    </button>
-                  </div>
+              </button>
+            </div>
                 )}
               </>
             )}
@@ -813,8 +813,8 @@ export function AdminPanel() {
               <div className="admin-loading">
                 <Loader size={16} className="spinning" />
                 <span>Loading tournament...</span>
-              </div>
-            )}
+        </div>
+      )}
 
             {tournamentInfo && (
               <div style={{ marginTop: '1.5rem' }}>
@@ -865,8 +865,8 @@ export function AdminPanel() {
                       Update Status
                     </>
                   )}
-                </button>
-              </div>
+              </button>
+            </div>
             )}
           </div>
         </div>

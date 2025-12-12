@@ -135,7 +135,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
               {(!isCollapsed || isMobile) && (
                 <div className="user-details">
                   <div className="user-name-row">
-                    <span className="user-name">{user?.user_metadata?.full_name || user?.email || 'User'}</span>
+                  <span className="user-name">{user?.user_metadata?.full_name || user?.email || 'User'}</span>
                     {isAdmin && (
                       <Crown 
                         size={14} 
