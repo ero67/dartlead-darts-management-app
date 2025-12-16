@@ -1,5 +1,6 @@
 {
   "navigation": {
+    "home": "Domov",
     "dashboard": "Prehľad",
     "tournaments": "Turnaje",
     "liveMatches": "Live Zápasy",
@@ -276,6 +277,55 @@
     "onlySemifinalLosersAvailable": "Dostupní sú iba hráči, ktorí prehrali v semifinále",
     "onlyAdvancedPlayersAvailable": "Dostupní sú iba hráči, ktorí postúpili z {{roundName}}",
     "previousRound": "predchádzajúceho kola"
+  },
+  "landing": {
+    "heroBadge": "Pre šípkarské ligy a turnaje",
+    "heroTitle": "Veďte svoju šípkarskú ligu ako profík.",
+    "heroSubtitle": "DartLead spája vytváranie turnajov, live skórovanie, play-off pavúky a detailné štatistiky v jednej aplikácii.",
+    "ctaPrimary": "Požiadať o prístup",
+    "ctaMail": "Email:",
+    "check1": "Skupiny + play-off alebo len play-off",
+    "check2": "Live skórovanie na viacerých zariadeniach",
+    "check3": "Kompletné štatistiky a tabuľky",
+    "featuresEyebrow": "Čo získate",
+    "featuresTitle": "Vytvorené pre organizátorov a ligy.",
+    "featuresSub": "Všetko potrebné na vytvorenie turnajov, správu play-off, live zápasov a zdieľanie výsledkov.",
+    "features": {
+      "flexibleTitle": "Flexibilné turnaje",
+      "flexibleDesc": "Skupiny + play-off alebo len play-off pavúky s možnosťou úprav zápasov.",
+      "liveTitle": "Live skórovanie",
+      "liveDesc": "Skórovanie na viacerých zariadeniach s aktualizáciami v reálnom čase a prehľadom live zápasov.",
+      "statsTitle": "Bohaté štatistiky",
+      "statsDesc": "Priemery, checkouty, rozdiely legov, tabuľky a rebríčky.",
+      "playersTitle": "Správa hráčov",
+      "playersDesc": "Rýchla registrácia, až 64 hráčov na turnaj, priraďovanie do skupín."
+    },
+    "stepsEyebrow": "Ako to funguje",
+    "stepsTitle": "Od nastavenia k live hre v troch krokoch.",
+    "steps": {
+      "createTitle": "Vytvor",
+      "createDesc": "Nastav formát turnaja, legy na výhru a štartovacie skóre.",
+      "addTitle": "Pridaj hráčov",
+      "addDesc": "Rýchlo registruj účastníkov a seeduj ich do play-off.",
+      "runTitle": "Hraj naživo",
+      "runDesc": "Skóruj zápasy, posúvaj pavúk a zdieľaj live priebeh."
+    },
+    "contactEyebrow": "Kontaktujte nás",
+    "contactTitle": "Chcete vyskúšať DartLead?",
+    "contactSub": "Povedzte nám o svojej lige alebo podujatí. Ozveme sa vám s prístupom.",
+    "chip1": "Bez spamu",
+    "chip2": "Odpoveď do 24h",
+    "form": {
+      "name": "Meno",
+      "namePlaceholder": "Vaše meno",
+      "email": "Email",
+      "emailPlaceholder": "vy@example.com",
+      "org": "Organizácia / Liga",
+      "orgPlaceholder": "Vaša organizácia",
+      "message": "Správa",
+      "messagePlaceholder": "Opíšte svoje potreby",
+      "submit": "Kontaktujte nás na"
+    }
   },
   "auth": {
     "appTitle": "Správca Šípkových Turnajov",

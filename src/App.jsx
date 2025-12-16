@@ -17,6 +17,7 @@ import { MatchInterface } from './components/MatchInterface';
 import { Auth } from './components/Auth';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { AdminPanel } from './components/AdminPanel';
+import { LandingPage } from './components/LandingPage';
 import './App.css';
 
 function AppContent() {
@@ -263,7 +264,8 @@ function AppContent() {
       
       <main className="app-main">
         <Routes>
-          <Route path="/" element={
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/dashboard" element={
             <Dashboard 
               tournaments={tournaments}
               onCreateTournament={handleCreateTournament}
@@ -284,7 +286,7 @@ function AppContent() {
             user && canCreateTournaments ? (
               <TournamentCreation 
                 onTournamentCreated={handleTournamentCreated}
-                onBack={() => navigate('/')}
+                onBack={() => navigate('/dashboard')}
               />
             ) : user ? (
               <div className="unauthorized-container">

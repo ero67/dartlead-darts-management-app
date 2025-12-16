@@ -1,5 +1,6 @@
 {
   "navigation": {
+    "home": "Home",
     "dashboard": "Dashboard",
     "tournaments": "Tournaments",
     "liveMatches": "Live Matches",
@@ -282,6 +283,55 @@
     "onlySemifinalLosersAvailable": "Only players who lost in semifinals are available",
     "onlyAdvancedPlayersAvailable": "Only players who advanced from {{roundName}} are available",
     "previousRound": "previous round"
+  },
+  "landing": {
+    "heroBadge": "For darts leagues & tournaments",
+    "heroTitle": "Run your darts league like a pro.",
+    "heroSubtitle": "DartLead combines tournament creation, live scoring, playoff brackets, and detailed stats in one app.",
+    "ctaPrimary": "Request access",
+    "ctaMail": "Email:",
+    "check1": "Groups + playoffs or playoff-only",
+    "check2": "Live scoring across devices",
+    "check3": "Comprehensive stats & standings",
+    "featuresEyebrow": "What you get",
+    "featuresTitle": "Built for organizers and leagues.",
+    "featuresSub": "Everything you need to create tournaments, manage playoffs, track live matches, and share results.",
+    "features": {
+      "flexibleTitle": "Flexible tournaments",
+      "flexibleDesc": "Groups + playoffs or playoff-only brackets with editable matches.",
+      "liveTitle": "Live scoring",
+      "liveDesc": "Multi-device live scoring with real-time updates and live matches view.",
+      "statsTitle": "Rich statistics",
+      "statsDesc": "Averages, checkouts, leg differentials, standings, and leaderboards.",
+      "playersTitle": "Player management",
+      "playersDesc": "Quick registration, up to 64 players per tournament, group assignment."
+    },
+    "stepsEyebrow": "How it works",
+    "stepsTitle": "From setup to live play in three steps.",
+    "steps": {
+      "createTitle": "Create",
+      "createDesc": "Set up the tournament format, legs to win, and starting score.",
+      "addTitle": "Add players",
+      "addDesc": "Register participants quickly and seed them for playoffs.",
+      "runTitle": "Run live",
+      "runDesc": "Score matches, advance brackets, and share live progress."
+    },
+    "contactEyebrow": "Get in touch",
+    "contactTitle": "Ready to try DartLead?",
+    "contactSub": "Tell us about your league or event. We’ll get back to you to set up access.",
+    "chip1": "No spam",
+    "chip2": "Reply within 24h",
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Your name",
+      "email": "Email",
+      "emailPlaceholder": "you@example.com",
+      "org": "Organization / League",
+      "orgPlaceholder": "Your organization",
+      "message": "Message",
+      "messagePlaceholder": "Tell us about your needs",
+      "submit": "Contact us at"
+    }
   },
   "auth": {
     "appTitle": "Darts Tournament Manager",

@@ -27,8 +27,9 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
   }, []);
   
   const navItems = [
-    { id: '/', label: t('navigation.dashboard'), icon: Home },
-    { id: '/tournaments', label: t('navigation.tournaments'), icon: Trophy },
+    { id: '/', label: t('navigation.home'), icon: Home },
+    { id: '/dashboard', label: t('navigation.dashboard'), icon: Trophy },
+    { id: '/tournaments', label: t('navigation.tournaments'), icon: Users },
     // { id: '/privacy', label: 'Privacy', icon: Shield },
     // { id: '/players', label: t('navigation.players'), icon: Users },
     // { id: '/settings', label: t('navigation.settings'), icon: Settings }

@@ -45,7 +45,7 @@ export function Auth() {
           setError(error.message);
         } else {
           // Redirect to dashboard after successful login
-          navigate('/');
+          navigate('/dashboard');
         }
       } else {
         if (formData.password !== formData.confirmPassword) {
