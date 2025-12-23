@@ -3122,22 +3122,134 @@ body {
   min-height: 44px;
 }
 
-.turn-total-action {
-  font-size: 1rem;
-  font-weight: 700;
+.turn-total-clear {
+  background: var(--accent-danger);
+  color: white;
+  border-color: var(--accent-danger);
+  font-weight: 800;
+}
+
+.turn-total-backspace {
+  background: rgba(245, 158, 11, 0.2);
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.5);
+  font-weight: 800;
 }
 
 .turn-total-ok {
   grid-column: span 3;
-  background: var(--accent-primary);
+  background: var(--accent-success);
   color: white;
-  border-color: var(--accent-primary);
+  border-color: var(--accent-success);
   font-weight: 800;
+}
+
+.turn-total-desktop {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.turn-total-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.turn-total-input.invalid {
+  border-color: var(--accent-danger);
+}
+
+.turn-total-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .turn-total-footer {
   display: flex;
   justify-content: center;
+}
+
+/* Checkout modal (3-dart total finish) */
+.checkout-modal .checkout-btn-row {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.checkout-modal .mode-btn.checkout-darts-btn,
+.checkout-modal .mode-btn.checkout-outcome-btn,
+.checkout-modal .checkout-confirm-btn,
+.checkout-modal .mode-btn.checkout-cancel-btn {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  border-radius: 10px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Darts-used buttons (neutral/primary) */
+.checkout-modal .mode-btn.checkout-darts-btn {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.checkout-modal .mode-btn.checkout-darts-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+/* Outcome buttons (distinct colors) */
+.checkout-modal .mode-btn.checkout-outcome-btn {
+  font-weight: 800;
+}
+.checkout-modal .mode-btn.checkout-outcome-double {
+  border-color: rgba(16, 185, 129, 0.45);
+}
+.checkout-modal .mode-btn.checkout-outcome-double.active {
+  background: var(--accent-success);
+  border-color: var(--accent-success);
+  color: white;
+}
+.checkout-modal .mode-btn.checkout-outcome-bust {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+.checkout-modal .mode-btn.checkout-outcome-bust.active {
+  background: var(--accent-danger);
+  border-color: var(--accent-danger);
+  color: white;
+}
+
+/* Confirm / Cancel */
+.checkout-modal .checkout-confirm-btn {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+  font-weight: 900;
+}
+.checkout-modal .mode-btn.checkout-cancel-btn {
+  border-color: var(--border-color);
+}
+
+@media (max-width: 768px) {
+  .checkout-modal .mode-btn.checkout-darts-btn,
+  .checkout-modal .mode-btn.checkout-outcome-btn,
+  .checkout-modal .checkout-confirm-btn,
+  .checkout-modal .mode-btn.checkout-cancel-btn {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.85rem;
+    border-radius: 10px;
+  }
 }
 
 @media (max-width: 768px) {

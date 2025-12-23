@@ -87,7 +87,16 @@
     "miss": "Miss",
     "whoStarts": "Kto začína tento zápas?",
     "matchComplete": "Zápas Ukončený!",
-    "winner": "Víťaz"
+    "winner": "Víťaz",
+    "checkout": {
+      "title": "Checkout",
+      "prompt": "Zadal si {{total}}. Koľko šípok si použil na ukončenie?",
+      "dartsUsedOne": "{{count}} šípka",
+      "dartsUsedMany": "{{count}} šípky",
+      "doubleOut": "Double-out",
+      "bust": "Bust",
+      "confirm": "Potvrdiť"
+    }
   },
   "tournamentCreation": {
     "title": "Vytvoriť Turnaj",

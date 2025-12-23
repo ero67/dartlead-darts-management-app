@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Target, RotateCcw, CheckCircle, Eye } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { matchService } from '../services/tournamentService';
 
@@ -96,6 +97,39 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   const [bustingPlayer, setBustingPlayer] = useState(null); // Track which player is busting (0 or 1)
   const [turnTotalInput, setTurnTotalInput] = useState('');
   const [pendingCheckout, setPendingCheckout] = useState(null); // { total: number, dartsUsed: 1|2|3, finishedOnDouble: boolean } | null
+  const [useOnScreenKeypad, setUseOnScreenKeypad] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const isCoarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
+    const isTabletOrMobileWidth = window.innerWidth <= 1024;
+    return isCoarsePointer || isTabletOrMobileWidth;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const media = window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
+    const update = () => {
+      const isCoarsePointer = media ? media.matches : false;
+      const isTabletOrMobileWidth = window.innerWidth <= 1024;
+      setUseOnScreenKeypad(isCoarsePointer || isTabletOrMobileWidth);
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    if (media) {
+      // Safari uses addListener/removeListener
+      if (typeof media.addEventListener === 'function') media.addEventListener('change', update);
+      else if (typeof media.addListener === 'function') media.addListener(update);
+    }
+
+    return () => {
+      window.removeEventListener('resize', update);
+      if (media) {
+        if (typeof media.removeEventListener === 'function') media.removeEventListener('change', update);
+        else if (typeof media.removeListener === 'function') media.removeListener(update);
+      }
+    };
+  }, []);
 
   // Only show match starter dialog if it's a new match and no match starter has been chosen
   // This effect is now mainly for cases where the state changes after initial load
@@ -125,6 +159,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   
   const { startLiveMatch, endLiveMatch, updateLiveMatch, isMatchLiveOnThisDevice } = useLiveMatch();
   const { user } = useAuth();
+  const { t } = useLanguage();
   
   // Check if user is logged in - non-logged-in users can only view
   const isViewOnly = !user;
@@ -372,7 +407,10 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       const next = `${prev}${digit}`;
       // keep it to max 3 digits (max is 180 anyway)
       if (next.length > 3) return prev;
-      return next.replace(/^0+(?=\d)/, ''); // normalize leading zeros
+      const normalized = next.replace(/^0+(?=\d)/, ''); // normalize leading zeros
+      const n = normalized === '' ? 0 : Number(normalized);
+      if (!Number.isFinite(n) || n > 180) return prev;
+      return normalized;
     });
   };
 
@@ -381,9 +419,28 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
   const getTurnTotalValue = () => {
     if (!turnTotalInput) return null;
-    const n = Number(turnTotalInput);
-    if (!Number.isFinite(n)) return null;
+    const n = Number.parseInt(turnTotalInput, 10);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
+    if (n < 0 || n > 180) return null;
     return n;
+  };
+
+  const isTurnTotalInvalid = turnTotalInput.length > 0 && getTurnTotalValue() === null;
+
+  const onTurnTotalInputChange = (value) => {
+    // digits only, max 3 chars, clamp to 180
+    const digitsOnly = String(value).replace(/\D/g, '').slice(0, 3);
+    if (digitsOnly === '') {
+      setTurnTotalInput('');
+      return;
+    }
+    const n = Number.parseInt(digitsOnly, 10);
+    if (!Number.isFinite(n)) {
+      setTurnTotalInput('');
+      return;
+    }
+    // Don't auto-correct (e.g. to 180). Keep user input and just block submit + show warning.
+    setTurnTotalInput(digitsOnly.replace(/^0+(?=\d)/, ''));
   };
 
   const undoLastVisit = () => {
@@ -1345,46 +1402,46 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   return (
     <div className="match-interface mobile-optimized">
       {pendingCheckout !== null && (
-        <div className="leg-starter-dialog">
-          <div className="dialog-content">
-            <h2>Checkout</h2>
+        <div className="leg-starter-dialog checkout-modal">
+          <div className="dialog-content checkout-modal-content">
+            <h2>{t('match.checkout.title')}</h2>
             <p style={{ marginTop: '0.5rem' }}>
-              You entered <strong>{pendingCheckout.total}</strong>. How many darts did you use to finish?
+              {t('match.checkout.prompt', { total: pendingCheckout.total })}
             </p>
 
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+            <div className="checkout-btn-row checkout-darts-row">
               {[1, 2, 3].map(n => (
                 <button
                   key={n}
-                  className={`mode-btn ${pendingCheckout.dartsUsed === n ? 'active' : ''}`}
+                  className={`mode-btn checkout-darts-btn ${pendingCheckout.dartsUsed === n ? 'active' : ''}`}
                   onClick={() => setPendingCheckout(prev => ({ ...prev, dartsUsed: n }))}
                   type="button"
                 >
-                  {n} dart{n === 1 ? '' : 's'}
+                  {t(n === 1 ? 'match.checkout.dartsUsedOne' : 'match.checkout.dartsUsedMany', { count: n })}
                 </button>
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+            <div className="checkout-btn-row checkout-outcome-row">
               <button
-                className={`mode-btn ${pendingCheckout.finishedOnDouble ? 'active' : ''}`}
+                className={`mode-btn checkout-outcome-btn checkout-outcome-double ${pendingCheckout.finishedOnDouble ? 'active' : ''}`}
                 onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: true }))}
                 type="button"
               >
-                Double-out
+                {t('match.checkout.doubleOut')}
               </button>
               <button
-                className={`mode-btn ${!pendingCheckout.finishedOnDouble ? 'active' : ''}`}
+                className={`mode-btn checkout-outcome-btn checkout-outcome-bust ${!pendingCheckout.finishedOnDouble ? 'active' : ''}`}
                 onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: false }))}
                 type="button"
               >
-                Bust
+                {t('match.checkout.bust')}
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem', flexWrap: 'wrap' }}>
+            <div className="checkout-btn-row checkout-confirm-row">
               <button
-                className="create-tournament-btn"
+                className="create-tournament-btn checkout-confirm-btn"
                 onClick={() => {
                   applyTurnTotal(pendingCheckout.total, {
                     finishedOnDouble: pendingCheckout.finishedOnDouble,
@@ -1394,14 +1451,14 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
                 }}
                 type="button"
               >
-                Confirm
+                {t('match.checkout.confirm')}
               </button>
               <button
-                className="mode-btn"
+                className="mode-btn checkout-cancel-btn"
                 onClick={() => setPendingCheckout(null)}
                 type="button"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -1507,30 +1564,67 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
               <div className="turn-total-container">
                 <div className="turn-total-display">
                   <div className="turn-total-label">3-dart total</div>
-                  <div className={`turn-total-value ${getTurnTotalValue() !== null && getTurnTotalValue() > 180 ? 'invalid' : ''}`}>
+                  <div className={`turn-total-value ${isTurnTotalInvalid ? 'invalid' : ''}`}>
                     {turnTotalInput || '—'}
                   </div>
-                  <div className="turn-total-hint">Enter 0–180, then press OK</div>
+                  <div className="turn-total-hint">
+                    {isTurnTotalInvalid
+                      ? 'Invalid total (allowed: 0–180)'
+                      : (useOnScreenKeypad ? 'Enter 0–180, then press OK' : 'Type 0–180 and press Enter')}
+                  </div>
                 </div>
 
-                <div className="turn-total-keypad">
-                  {[1,2,3,4,5,6,7,8,9].map(n => (
-                    <button key={n} className="dart-btn" onClick={() => appendTurnTotalDigit(n)} type="button">
-                      {n}
+                {useOnScreenKeypad ? (
+                  <div className="turn-total-keypad">
+                    {[1,2,3,4,5,6,7,8,9].map(n => (
+                      <button key={n} className="dart-btn" onClick={() => appendTurnTotalDigit(n)} type="button">
+                        {n}
+                      </button>
+                    ))}
+                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button">Clear</button>
+                    <button className="dart-btn" onClick={() => appendTurnTotalDigit(0)} type="button">0</button>
+                    <button className="dart-btn turn-total-backspace" onClick={backspaceTurnTotal} type="button">⌫</button>
+                    <button
+                      className="dart-btn turn-total-ok"
+                      onClick={submitTurnTotal}
+                      disabled={getTurnTotalValue() === null}
+                      type="button"
+                    >
+                      OK
                     </button>
-                  ))}
-                  <button className="dart-btn turn-total-action" onClick={clearTurnTotal} type="button">Clear</button>
-                  <button className="dart-btn" onClick={() => appendTurnTotalDigit(0)} type="button">0</button>
-                  <button className="dart-btn turn-total-action" onClick={backspaceTurnTotal} type="button">⌫</button>
-                  <button
-                    className="dart-btn turn-total-ok"
-                    onClick={submitTurnTotal}
-                    disabled={getTurnTotalValue() === null || getTurnTotalValue() > 180}
-                    type="button"
-                  >
-                    OK
-                  </button>
-                </div>
+                  </div>
+                ) : (
+                  <div className="turn-total-desktop">
+                    <input
+                      className={`turn-total-input ${isTurnTotalInvalid ? 'invalid' : ''}`}
+                      value={turnTotalInput}
+                      onChange={(e) => onTurnTotalInputChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (!isTurnTotalInvalid) submitTurnTotal();
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          clearTurnTotal();
+                        }
+                      }}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="0–180"
+                    />
+                    <button
+                      className="dart-btn turn-total-ok"
+                      onClick={submitTurnTotal}
+                      disabled={getTurnTotalValue() === null}
+                      type="button"
+                    >
+                      OK
+                    </button>
+                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button">
+                      Clear
+                    </button>
+                  </div>
+                )}
 
                 <div className="turn-total-footer">
                   <button

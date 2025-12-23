@@ -87,7 +87,16 @@
     "miss": "Miss",
     "whoStarts": "Who starts this match?",
     "matchComplete": "Match Complete!",
-    "winner": "Winner"
+    "winner": "Winner",
+    "checkout": {
+      "title": "Checkout",
+      "prompt": "You entered {{total}}. How many darts did you use to finish?",
+      "dartsUsedOne": "{{count}} dart",
+      "dartsUsedMany": "{{count}} darts",
+      "doubleOut": "Double-out",
+      "bust": "Bust",
+      "confirm": "Confirm"
+    }
   },
   "tournamentCreation": {
     "title": "Create Tournament",
