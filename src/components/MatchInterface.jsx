@@ -1014,8 +1014,10 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             ...prev[winnerKey],
             legs: newLegs,
             currentScore: matchSettings.startingScore,
-            totalScore: prev[`player${currentPlayer + 1}`].totalScore + (matchSettings.startingScore - currentPlayerData.currentScore),
-            totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + dartsUsed, // Add to cumulative total
+            // Cumulative totals should only add THIS visit; previous visits are already counted.
+            // (Otherwise we double-count on checkout and averages become wrong, e.g. 9-darter shows ~144.)
+            totalScore: prev[winnerKey].totalScore + turnData.score,
+            totalDarts: prev[winnerKey].totalDarts + turnData.darts,
             legDarts: 0, // Reset leg darts for new leg
             legAverages: newLegAverages,
             legDetails: winnerLegDetails,
@@ -1081,8 +1083,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             ...legScores[winnerKey],
             legs: newLegs,
             currentScore: matchSettings.startingScore,
-            totalScore: legScores[winnerKey].totalScore + (matchSettings.startingScore - currentPlayerData.currentScore),
-            totalDarts: legScores[winnerKey].totalDarts + dartsUsed, // Add to cumulative total
+            // Same rule as above: add only this finishing visit to cumulative totals.
+            totalScore: legScores[winnerKey].totalScore + turnData.score,
+            totalDarts: legScores[winnerKey].totalDarts + turnData.darts,
             legDarts: 0, // Reset leg darts
             legAverages: newLegAverages,
             legDetails: finalWinnerLegDetails,

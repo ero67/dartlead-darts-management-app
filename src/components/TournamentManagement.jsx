@@ -2142,30 +2142,25 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       </div>
                     </div>
                     {match.status === 'completed' && match.result ? (
-                      <div className="match-result-compact">
-                        <div className="player-result">
-                          <div className="player-name-row">
-                            <span className={`player-name ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
-                          {match.player1?.name || 'TBD'}
-                        </span>
-                            <span className="score">{match.result.player1Legs}</span>
-                      </div>
+                      <div className="playoff-match-result">
+                        <div className={`playoff-player-row ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
+                          <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
+                          <span className="playoff-player-score">{match.result.player1Legs}</span>
                         </div>
-                        <div className="score-divider">:</div>
-                        <div className="player-result">
-                          <div className="player-name-row">
-                            <span className={`player-name ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
-                          {match.player2?.name || 'TBD'}
-                        </span>
-                            <span className="score">{match.result.player2Legs}</span>
-                      </div>
-                    </div>
+                        <div className={`playoff-player-row ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
+                          <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
+                          <span className="playoff-player-score">{match.result.player2Legs}</span>
+                        </div>
                       </div>
                     ) : (
-                      <div className="match-players-compact">
-                        <span className="player">{match.player1?.name || 'TBD'}</span>
-                        <span className="vs">vs</span>
-                        <span className="player">{match.player2?.name || 'TBD'}</span>
+                      <div className="playoff-match-players">
+                        <div className="playoff-player-row">
+                          <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
+                        </div>
+                        <div className="playoff-vs">vs</div>
+                        <div className="playoff-player-row">
+                          <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
+                        </div>
                       </div>
                     )}
                     
