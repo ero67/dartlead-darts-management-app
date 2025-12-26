@@ -404,145 +404,145 @@ export function TournamentRegistration({ tournament, onBack }) {
               </div>
 
               {tournamentSettings.tournamentType === 'groups_with_playoffs' && (
-                <div className="group-settings">
-                  <h4>{t('registration.standingsCriteriaOrder')}</h4>
-                  <p className="settings-description" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+              <div className="group-settings">
+                <h4>{t('registration.standingsCriteriaOrder')}</h4>
+                <p className="settings-description" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
                     {t('registration.standingsCriteriaOrderDescription') || 'Set the order of criteria for sorting in group standings.'}
-                  </p>
-                  <div className="criteria-order-list" style={{ marginBottom: '1.5rem' }}>
-                    {tournamentSettings.standingsCriteriaOrder.map((criterion, index) => {
-                      const criterionLabels = {
-                        matchesWon: t('registration.matchesWon'),
-                        legDifference: t('registration.legDifference'),
-                        average: t('registration.average'),
-                        headToHead: t('registration.headToHead')
-                      };
-                      return (
-                        <div key={criterion} className="criteria-order-item">
-                          <span className="criteria-number">{index + 1}.</span>
-                          <span className="criteria-label">{criterionLabels[criterion] || criterion}</span>
-                          <div className="criteria-actions">
-                            <button
-                              type="button"
-                              className={index === 0 ? 'move-btn disabled' : 'move-btn'}
-                              onClick={() => {
-                                if (index > 0) {
-                                  const newOrder = [...tournamentSettings.standingsCriteriaOrder];
-                                  [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-                                  setTournamentSettings({
-                                    ...tournamentSettings,
-                                    standingsCriteriaOrder: newOrder
-                                  });
-                                }
-                              }}
-                              disabled={index === 0}
-                              title={t('registration.moveUp')}
-                            >
-                              <ChevronUp size={16} />
-                            </button>
-                            <button
-                              type="button"
-                              className={index === tournamentSettings.standingsCriteriaOrder.length - 1 ? 'move-btn disabled' : 'move-btn'}
-                              onClick={() => {
-                                if (index < tournamentSettings.standingsCriteriaOrder.length - 1) {
-                                  const newOrder = [...tournamentSettings.standingsCriteriaOrder];
-                                  [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                                  setTournamentSettings({
-                                    ...tournamentSettings,
-                                    standingsCriteriaOrder: newOrder
-                                  });
-                                }
-                              }}
-                              disabled={index === tournamentSettings.standingsCriteriaOrder.length - 1}
-                              title={t('registration.moveDown')}
-                            >
-                              <ChevronDown size={16} />
-                            </button>
-                          </div>
+                </p>
+                <div className="criteria-order-list" style={{ marginBottom: '1.5rem' }}>
+                  {tournamentSettings.standingsCriteriaOrder.map((criterion, index) => {
+                    const criterionLabels = {
+                      matchesWon: t('registration.matchesWon'),
+                      legDifference: t('registration.legDifference'),
+                      average: t('registration.average'),
+                      headToHead: t('registration.headToHead')
+                    };
+                    return (
+                      <div key={criterion} className="criteria-order-item">
+                        <span className="criteria-number">{index + 1}.</span>
+                        <span className="criteria-label">{criterionLabels[criterion] || criterion}</span>
+                        <div className="criteria-actions">
+                          <button
+                            type="button"
+                            className={index === 0 ? 'move-btn disabled' : 'move-btn'}
+                            onClick={() => {
+                              if (index > 0) {
+                                const newOrder = [...tournamentSettings.standingsCriteriaOrder];
+                                [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                                setTournamentSettings({
+                                  ...tournamentSettings,
+                                  standingsCriteriaOrder: newOrder
+                                });
+                              }
+                            }}
+                            disabled={index === 0}
+                            title={t('registration.moveUp')}
+                          >
+                            <ChevronUp size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className={index === tournamentSettings.standingsCriteriaOrder.length - 1 ? 'move-btn disabled' : 'move-btn'}
+                            onClick={() => {
+                              if (index < tournamentSettings.standingsCriteriaOrder.length - 1) {
+                                const newOrder = [...tournamentSettings.standingsCriteriaOrder];
+                                [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                                setTournamentSettings({
+                                  ...tournamentSettings,
+                                  standingsCriteriaOrder: newOrder
+                                });
+                              }
+                            }}
+                            disabled={index === tournamentSettings.standingsCriteriaOrder.length - 1}
+                            title={t('registration.moveDown')}
+                          >
+                            <ChevronDown size={16} />
+                          </button>
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
+              </div>
               )}
 
               {tournamentSettings.tournamentType === 'groups_with_playoffs' && (
-                <div className="group-settings">
-                  <h4>{t('registration.groupSettings')}</h4>
-                  <div className="radio-group">
-                    <label>
-                      <input
-                        type="radio"
-                        name="groupType"
-                        value="groups"
-                        checked={tournamentSettings.groupSettings.type === 'groups'}
-                        onChange={(e) => setTournamentSettings({
-                          ...tournamentSettings,
-                          groupSettings: {
-                            ...tournamentSettings.groupSettings,
-                            type: e.target.value
-                          }
-                        })}
-                      />
-                      {t('registration.numberOfGroups')}
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="groupType"
-                        value="playersPerGroup"
-                        checked={tournamentSettings.groupSettings.type === 'playersPerGroup'}
-                        onChange={(e) => setTournamentSettings({
-                          ...tournamentSettings,
-                          groupSettings: {
-                            ...tournamentSettings.groupSettings,
-                            type: e.target.value
-                          }
-                        })}
-                      />
-                      {t('registration.playersPerGroup')}
-                    </label>
-                  </div>
-                  <div className="input-group">
-                    <label>
-                      {tournamentSettings.groupSettings.type === 'groups' ? t('registration.numberOfGroups') : t('registration.playersPerGroup')}:
-                    </label>
+              <div className="group-settings">
+                <h4>{t('registration.groupSettings')}</h4>
+                <div className="radio-group">
+                  <label>
                     <input
-                      type="number"
-                      min="1"
-                      max={tournamentSettings.groupSettings.type === 'groups' ? '16' : '8'}
-                      value={tournamentSettings.groupSettings.value}
+                      type="radio"
+                      name="groupType"
+                      value="groups"
+                      checked={tournamentSettings.groupSettings.type === 'groups'}
                       onChange={(e) => setTournamentSettings({
                         ...tournamentSettings,
                         groupSettings: {
                           ...tournamentSettings.groupSettings,
-                          value: parseInt(e.target.value) || 1
+                          type: e.target.value
                         }
                       })}
                     />
-                  </div>
+                    {t('registration.numberOfGroups')}
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="groupType"
+                      value="playersPerGroup"
+                      checked={tournamentSettings.groupSettings.type === 'playersPerGroup'}
+                      onChange={(e) => setTournamentSettings({
+                        ...tournamentSettings,
+                        groupSettings: {
+                          ...tournamentSettings.groupSettings,
+                          type: e.target.value
+                        }
+                      })}
+                    />
+                    {t('registration.playersPerGroup')}
+                  </label>
                 </div>
+                <div className="input-group">
+                  <label>
+                    {tournamentSettings.groupSettings.type === 'groups' ? t('registration.numberOfGroups') : t('registration.playersPerGroup')}:
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={tournamentSettings.groupSettings.type === 'groups' ? '16' : '8'}
+                    value={tournamentSettings.groupSettings.value}
+                    onChange={(e) => setTournamentSettings({
+                      ...tournamentSettings,
+                      groupSettings: {
+                        ...tournamentSettings.groupSettings,
+                        value: parseInt(e.target.value) || 1
+                      }
+                    })}
+                  />
+                </div>
+              </div>
               )}
 
               <div className="group-settings">
                 <h4>{t('registration.playoffSettings')}</h4>
                 {tournamentSettings.tournamentType === 'groups_with_playoffs' && (
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={tournamentSettings.playoffSettings.enabled}
-                        onChange={(e) => setTournamentSettings({
-                          ...tournamentSettings,
-                          playoffSettings: {
-                            ...tournamentSettings.playoffSettings,
-                            enabled: e.target.checked
-                          }
-                        })}
-                      />
-                      {t('registration.enablePlayoffs')}
-                    </label>
-                  </div>
+                <div className="checkbox-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={tournamentSettings.playoffSettings.enabled}
+                      onChange={(e) => setTournamentSettings({
+                        ...tournamentSettings,
+                        playoffSettings: {
+                          ...tournamentSettings.playoffSettings,
+                          enabled: e.target.checked
+                        }
+                      })}
+                    />
+                    {t('registration.enablePlayoffs')}
+                  </label>
+                </div>
                 )}
                 
                 {tournamentSettings.playoffSettings.enabled && (() => {
@@ -600,24 +600,24 @@ export function TournamentRegistration({ tournament, onBack }) {
                           </div>
 
                           {tournamentSettings.playoffSettings.qualificationMode === 'perGroup' ? (
-                            <div className="input-group">
-                              <label>{t('registration.playersAdvancingPerGroup')}:</label>
-                              <select
-                                value={tournamentSettings.playoffSettings.playersPerGroup}
-                                onChange={(e) => setTournamentSettings({
-                                  ...tournamentSettings,
-                                  playoffSettings: {
-                                    ...tournamentSettings.playoffSettings,
-                                    playersPerGroup: parseInt(e.target.value)
-                                  }
-                                })}
-                              >
-                                {Array.from({ length: maxPlayersPerGroup }, (_, i) => i + 1).map(num => (
-                                  <option key={num} value={num}>{num}</option>
-                                ))}
+                      <div className="input-group">
+                        <label>{t('registration.playersAdvancingPerGroup')}:</label>
+                        <select 
+                          value={tournamentSettings.playoffSettings.playersPerGroup}
+                          onChange={(e) => setTournamentSettings({
+                            ...tournamentSettings,
+                            playoffSettings: {
+                              ...tournamentSettings.playoffSettings,
+                              playersPerGroup: parseInt(e.target.value)
+                            }
+                          })}
+                        >
+                          {Array.from({ length: maxPlayersPerGroup }, (_, i) => i + 1).map(num => (
+                            <option key={num} value={num}>{num}</option>
+                          ))}
                                 <option value={allPlayersValue}>{t('registration.all') || 'All'}</option>
-                              </select>
-                            </div>
+                        </select>
+                      </div>
                           ) : (
                             <div className="input-group">
                               <label>{t('registration.totalPlayersToAdvance')}</label>
@@ -666,43 +666,43 @@ export function TournamentRegistration({ tournament, onBack }) {
                       )}
                       
                       {tournamentSettings.tournamentType === 'groups_with_playoffs' && (
-                        <div className="input-group">
-                          <label>{t('registration.seedingMethod') || 'Seeding Method'}</label>
-                          <div className="radio-group">
-                            <label>
-                              <input
-                                type="radio"
-                                name="seedingMethod"
-                                value="standard"
-                                checked={tournamentSettings.playoffSettings.seedingMethod === 'standard'}
-                                onChange={(e) => setTournamentSettings({
-                                  ...tournamentSettings,
-                                  playoffSettings: {
-                                    ...tournamentSettings.playoffSettings,
-                                    seedingMethod: e.target.value
-                                  }
-                                })}
-                              />
-                              {t('registration.seedingMethodStandard') || 'Standard Tournament Seeding'}
-                            </label>
-                            <label>
-                              <input
-                                type="radio"
-                                name="seedingMethod"
-                                value="groupBased"
-                                checked={tournamentSettings.playoffSettings.seedingMethod === 'groupBased'}
-                                onChange={(e) => setTournamentSettings({
-                                  ...tournamentSettings,
-                                  playoffSettings: {
-                                    ...tournamentSettings.playoffSettings,
-                                    seedingMethod: e.target.value
-                                  }
-                                })}
-                              />
-                              {t('registration.seedingMethodGroupBased') || 'Group-Based Seeding'}
-                            </label>
-                          </div>
+                      <div className="input-group">
+                        <label>{t('registration.seedingMethod') || 'Seeding Method'}</label>
+                        <div className="radio-group">
+                          <label>
+                            <input
+                              type="radio"
+                              name="seedingMethod"
+                              value="standard"
+                              checked={tournamentSettings.playoffSettings.seedingMethod === 'standard'}
+                              onChange={(e) => setTournamentSettings({
+                                ...tournamentSettings,
+                                playoffSettings: {
+                                  ...tournamentSettings.playoffSettings,
+                                  seedingMethod: e.target.value
+                                }
+                              })}
+                            />
+                            {t('registration.seedingMethodStandard') || 'Standard Tournament Seeding'}
+                          </label>
+                          <label>
+                            <input
+                              type="radio"
+                              name="seedingMethod"
+                              value="groupBased"
+                              checked={tournamentSettings.playoffSettings.seedingMethod === 'groupBased'}
+                              onChange={(e) => setTournamentSettings({
+                                ...tournamentSettings,
+                                playoffSettings: {
+                                  ...tournamentSettings.playoffSettings,
+                                  seedingMethod: e.target.value
+                                }
+                              })}
+                            />
+                            {t('registration.seedingMethodGroupBased') || 'Group-Based Seeding'}
+                          </label>
                         </div>
+                      </div>
                       )}
 
                       {tournamentSettings.playoffSettings.seedingMethod === 'groupBased' && (

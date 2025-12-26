@@ -264,6 +264,8 @@
     "playoffMatchUpdated": "Playoff match updated successfully",
     "failedToUpdatePlayoffMatch": "Failed to update playoff match",
     "statistics": "Statistics",
+    "most180s": "Most 180s",
+    "hit180s": "180s",
     "bestAverages": "Best Match Averages",
     "bestCheckouts": "Best Checkouts",
     "fewestDarts": "Legs with Fewest Darts",

@@ -55,8 +55,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       currentPlayer: null, // null means match hasn't started yet
       matchStarter: null,
       legScores: {
-        player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, legAverages: [], checkouts: [], legDetails: [] },
-        player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, legAverages: [], checkouts: [], legDetails: [] }
+        player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
+        player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
       },
       currentTurn: {
         score: 0,
@@ -78,8 +78,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   const [currentPlayer, setCurrentPlayer] = useState(initialState?.currentPlayer !== undefined ? initialState.currentPlayer : null);
   const [matchStarter, setMatchStarter] = useState(initialState?.matchStarter || null);
   const [legScores, setLegScores] = useState(initialState?.legScores || {
-    player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, legAverages: [], checkouts: [], legDetails: [] },
-    player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, legAverages: [], checkouts: [], legDetails: [] }
+    player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
+    player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
   });
   const [currentTurn, setCurrentTurn] = useState(initialState?.currentTurn || {
     score: 0,
@@ -198,6 +198,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
               totalScore: 0,
               totalDarts: 0,
               legDarts: 0,
+              oneEighties: 0,
               legAverages: [],
               checkouts: [],
               legDetails: []
@@ -208,6 +209,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
               totalScore: 0,
               totalDarts: 0,
               legDarts: 0,
+              oneEighties: 0,
               legAverages: [],
               checkouts: [],
               legDetails: []
@@ -489,7 +491,11 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         ),
         totalScore: Math.max(0, prev[playerKey].totalScore - turnScore),
         totalDarts: Math.max(0, prev[playerKey].totalDarts - turnDarts),
-        legDarts: Math.max(0, prev[playerKey].legDarts - turnDarts)
+        legDarts: Math.max(0, prev[playerKey].legDarts - turnDarts),
+        oneEighties: Math.max(
+          0,
+          (prev[playerKey].oneEighties || 0) - (turnScore === 180 ? 1 : 0)
+        )
       }
     }));
 
@@ -1135,7 +1141,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             ...prev[`player${currentPlayer + 1}`],
             totalScore: prev[`player${currentPlayer + 1}`].totalScore + turnData.score,
             totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + turnData.darts,
-            legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts
+            legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts,
+            oneEighties: (prev[`player${currentPlayer + 1}`].oneEighties || 0) + (turnData.score === 180 ? 1 : 0)
           }
         };
         
@@ -1234,6 +1241,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         totalScore: finalLegScores.player1.totalScore,
         totalDarts: finalLegScores.player1.totalDarts,
         average: player1MatchAverage,
+        oneEighties: finalLegScores.player1.oneEighties || 0,
         legAverages: player1LegAverages,
         checkouts: finalLegScores.player1.checkouts,
         legs: finalLegScores.player1.legDetails || []
@@ -1242,6 +1250,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         totalScore: finalLegScores.player2.totalScore,
         totalDarts: finalLegScores.player2.totalDarts,
         average: player2MatchAverage,
+        oneEighties: finalLegScores.player2.oneEighties || 0,
         legAverages: player2LegAverages,
         checkouts: finalLegScores.player2.checkouts,
         legs: finalLegScores.player2.legDetails || []
@@ -1288,8 +1297,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         updateMatchToDatabase(match.id, {
           currentLeg: 1,
           legScores: {
-            player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, legAverages: [], checkouts: [], legDetails: [] },
-            player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, legAverages: [], checkouts: [], legDetails: [] }
+            player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
+            player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
           },
           currentPlayer: playerIndex
         });

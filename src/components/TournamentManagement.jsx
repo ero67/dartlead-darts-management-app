@@ -1246,6 +1246,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const allAverages = [];
     const allCheckouts = [];
     const allLegs = [];
+    const player180s = new Map(); // playerId -> { player, count }
     const collectLegs = (playerStats, player, opponent, matchId) => {
       if (!playerStats?.legs?.length) {
         return false;
@@ -1313,6 +1314,22 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           opponent: match.player1?.name || 'Unknown'
         });
       }
+
+      // 180s (count per player across all matches)
+      const add180s = (player, playerStats) => {
+        const playerId = player?.id;
+        if (!playerId) return;
+        const count = Number(playerStats?.oneEighties || 0);
+        if (!Number.isFinite(count) || count <= 0) return;
+        const existing = player180s.get(playerId);
+        if (!existing) {
+          player180s.set(playerId, { player, count });
+        } else {
+          existing.count += count;
+        }
+      };
+      add180s(match.player1, match.result.player1Stats);
+      add180s(match.player2, match.result.player2Stats);
 
       // Best checkouts
       const addCheckoutEntries = (playerStats, player, opponent) => {
@@ -1456,6 +1473,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       .sort((a, b) => a.darts - b.darts)
       .slice(0, 10);
 
+    const most180s = Array.from(player180s.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
     return (
       <div className="statistics-view">
         <h3>{t('management.statistics') || 'Tournament Statistics'}</h3>
@@ -1525,6 +1546,29 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   <span className="player-name">{entry.player?.name || 'Unknown'}</span>
                   <span className="value">{entry.darts}</span>
                   <span className="opponent">{entry.opponent}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="no-stats">{t('management.noStatisticsYet') || 'No statistics available yet.'}</p>
+          )}
+        </div>
+
+        {/* 180s Leaderboard */}
+        <div className="statistics-section">
+          <h4>{t('management.most180s') || 'Most 180s'}</h4>
+          {most180s.length > 0 ? (
+            <div className="leaderboard">
+              <div className="leaderboard-header">
+                <span>#</span>
+                <span>{t('management.player')}</span>
+                <span>{t('management.hit180s') || '180s'}</span>
+              </div>
+              {most180s.map((entry, index) => (
+                <div key={`180-${entry.player?.id || index}`} className="leaderboard-row">
+                  <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
+                  <span className="player-name">{entry.player?.name || 'Unknown'}</span>
+                  <span className="value">{entry.count}</span>
                 </div>
               ))}
             </div>
@@ -2146,7 +2190,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <div className={`playoff-player-row ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
                           <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
                           <span className="playoff-player-score">{match.result.player1Legs}</span>
-                        </div>
+                      </div>
                         <div className={`playoff-player-row ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
                           <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
                           <span className="playoff-player-score">{match.result.player2Legs}</span>
@@ -2156,11 +2200,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       <div className="playoff-match-players">
                         <div className="playoff-player-row">
                           <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
-                        </div>
+                    </div>
                         <div className="playoff-vs">vs</div>
                         <div className="playoff-player-row">
                           <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
-                        </div>
+                      </div>
                       </div>
                     )}
                     

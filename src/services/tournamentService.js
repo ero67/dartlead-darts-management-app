@@ -1039,17 +1039,17 @@ export const tournamentService = {
     } else {
       // Legacy behavior: fixed players-per-group (last group may be smaller)
       playersPerGroup = Math.max(1, Number(playersPerGroup) || 1);
-      for (let i = 0; i < groupCount; i++) {
-        const groupPlayers = shuffledPlayers.slice(i * playersPerGroup, (i + 1) * playersPerGroup);
-        if (groupPlayers.length > 0) {
-          const group = {
-            id: generateId(),
-            name: `Group ${String.fromCharCode(65 + i)}`, // A, B, C, etc.
-            players: groupPlayers,
-            matches: this.generateGroupMatches(groupPlayers, i + 1),
-            standings: []
-          };
-          groups.push(group);
+    for (let i = 0; i < groupCount; i++) {
+      const groupPlayers = shuffledPlayers.slice(i * playersPerGroup, (i + 1) * playersPerGroup);
+      if (groupPlayers.length > 0) {
+        const group = {
+          id: generateId(),
+          name: `Group ${String.fromCharCode(65 + i)}`, // A, B, C, etc.
+          players: groupPlayers,
+          matches: this.generateGroupMatches(groupPlayers, i + 1),
+          standings: []
+        };
+        groups.push(group);
         }
       }
     }
@@ -1734,6 +1734,7 @@ export const matchService = {
             totalScore: matchResult.player1Stats?.totalScore || 0,
             totalDarts: matchResult.player1Stats?.totalDarts || 0,
             average: matchResult.player1Stats?.average || 0,
+            oneEighties: matchResult.player1Stats?.oneEighties || 0,
             legAverages: matchResult.player1Stats?.legAverages || [],
             checkouts: matchResult.player1Stats?.checkouts || [],
             legs: matchResult.player1Stats?.legs || []
@@ -1742,6 +1743,7 @@ export const matchService = {
             totalScore: matchResult.player2Stats?.totalScore || 0,
             totalDarts: matchResult.player2Stats?.totalDarts || 0,
             average: matchResult.player2Stats?.average || 0,
+            oneEighties: matchResult.player2Stats?.oneEighties || 0,
             legAverages: matchResult.player2Stats?.legAverages || [],
             checkouts: matchResult.player2Stats?.checkouts || [],
             legs: matchResult.player2Stats?.legs || []
