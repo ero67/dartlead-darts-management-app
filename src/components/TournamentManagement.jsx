@@ -2939,7 +2939,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
                           <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
                           <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
+                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
                           <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
+                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
                           <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
                         </select>
                       </div>
@@ -2961,7 +2963,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
                           <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
                           <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
+                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
                           <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
+                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
                           <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
                         </select>
                       </div>
@@ -2983,7 +2987,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
                           <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
                           <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
+                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
                           <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
+                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
                           <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
                         </select>
                       </div>
@@ -3005,7 +3011,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
                           <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
                           <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
+                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
                           <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
+                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
                           <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
                         </select>
                       </div>
@@ -3027,7 +3035,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
                           <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
                           <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
+                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
                           <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
+                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
                           <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
                         </select>
                       </div>
