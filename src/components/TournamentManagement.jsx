@@ -1107,17 +1107,47 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     )
                   )}
                   {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
-                    <button 
-                      className={`view-match-btn ${isAdmin && user ? 'continue-match-btn' : ''}`}
-                      onClick={() => onMatchStart({ 
+                    isAdmin && user ? (
+                      <button
+                        className="continue-match-btn admin-override-btn"
+                        onClick={() => {
+                          const ok = window.confirm(
+                            (t('management.adminTakeOverConfirm') || 'Admin takeover: this will let you continue scoring this match on this device. Continue?')
+                          );
+                          if (!ok) return;
+                          onMatchStart({
+                            ...match,
+                            adminOverride: true,
+                            legsToWin: match.legsToWin || tournament.legsToWin,
+                            startingScore: match.startingScore || tournament.startingScore
+                          });
+                        }}
+                      >
+                        <Play size={16} />
+                        {t('management.adminTakeOver') || 'Admin take over'}
+                      </button>
+                    ) : (
+                      <button className="view-match-btn" disabled>
+                        <Eye size={16} />
+                        {t('management.liveOtherDevice') || 'Live (Other Device)'}
+                      </button>
+                    )
+                  )}
+
+                  {/* Admin emergency: match is in progress but not detected as live on this device */}
+                  {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && isAdmin && user && (
+                    <button
+                      className="continue-match-btn admin-override-btn"
+                      onClick={() => onMatchStart({
                         ...match,
+                        adminOverride: true,
                         legsToWin: match.legsToWin || tournament.legsToWin,
                         startingScore: match.startingScore || tournament.startingScore
                       })}
-                      disabled={!isAdmin || !user}
+                      title={t('management.adminOverride') || 'Admin override'}
                     >
-                      <Eye size={16} />
-                      {isAdmin && user ? t('management.continueMatch') : t('management.viewLiveMatch')}
+                      <Play size={16} />
+                      {t('management.adminScore') || 'Admin score'}
                     </button>
                   )}
                   {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && (
@@ -2241,22 +2271,55 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         )
                       )}
                       {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
-                        <button 
-                          className={`view-match-btn ${isAdmin && user ? 'continue-match-btn' : ''}`}
+                        isAdmin && user ? (
+                          <button
+                            className="continue-match-btn admin-override-btn"
+                            onClick={() => {
+                              const ok = window.confirm(
+                                (t('management.adminTakeOverConfirm') || 'Admin takeover: this will let you continue scoring this match on this device. Continue?')
+                              );
+                              if (!ok) return;
+                              const roundSize = round.matches.length * 2;
+                              const legsToWin = getPlayoffLegsToWin(roundSize);
+                              onMatchStart({
+                                ...match,
+                                adminOverride: true,
+                                legsToWin: legsToWin,
+                                startingScore: tournament.startingScore,
+                                isPlayoff: true
+                              });
+                            }}
+                          >
+                            <Play size={16} />
+                            {t('management.adminTakeOver') || 'Admin take over'}
+                          </button>
+                        ) : (
+                          <button className="view-match-btn" disabled>
+                            <Eye size={16} />
+                            {t('management.liveOtherDevice') || 'Live (Other Device)'}
+                          </button>
+                        )
+                      )}
+
+                      {/* Admin emergency: playoff match is in progress but not detected as live on this device */}
+                      {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && isAdmin && user && (
+                        <button
+                          className="continue-match-btn admin-override-btn"
                           onClick={() => {
                             const roundSize = round.matches.length * 2;
                             const legsToWin = getPlayoffLegsToWin(roundSize);
-                            onMatchStart({ 
+                            onMatchStart({
                               ...match,
+                              adminOverride: true,
                               legsToWin: legsToWin,
                               startingScore: tournament.startingScore,
                               isPlayoff: true
                             });
                           }}
-                          disabled={!isAdmin || !user}
+                          title={t('management.adminOverride') || 'Admin override'}
                         >
-                          <Eye size={16} />
-                          {isAdmin && user ? t('management.continueMatch') : t('management.viewLiveMatch')}
+                          <Play size={16} />
+                          {t('management.adminScore') || 'Admin score'}
                         </button>
                       )}
                       {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && (

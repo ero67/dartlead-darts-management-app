@@ -157,7 +157,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }
   }, [currentLeg, matchStarter, matchComplete, legScores, turnHistory, matchSettings.startingScore, showMatchStarter, currentPlayer]);
   
-  const { startLiveMatch, endLiveMatch, updateLiveMatch, isMatchLiveOnThisDevice } = useLiveMatch();
+  const { startLiveMatch, endLiveMatch, updateLiveMatch, isMatchLiveOnThisDevice, deviceId } = useLiveMatch();
   const { user } = useAuth();
   const { t } = useLanguage();
   
@@ -590,6 +590,12 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     
     // Update database with user who started the match (only if match is not completed)
     if (user?.id && match.status !== 'completed') {
+      // Mark match as live on THIS device in DB (enables cross-device visibility + admin takeover)
+      if (deviceId) {
+        matchService.startLiveMatch(match.id, deviceId).catch(error => {
+          console.error('Error starting live match in database:', error);
+        });
+      }
       matchService.startMatch(match.id, user.id, match).catch(error => {
       });
     }
