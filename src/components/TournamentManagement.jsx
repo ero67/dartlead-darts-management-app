@@ -3591,42 +3591,20 @@ function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onC
     return previousRound.matches.every(m => m.status === 'completed');
   };
 
-  // Get all players already assigned in other matches in the same round
-  const getAssignedPlayers = () => {
-    if (!currentRound) return [];
-    
-    const assignedPlayerIds = new Set();
-    currentRound.matches.forEach(m => {
-      // Don't include players from the current match being edited
-      if (m.id !== match.id) {
-        if (m.player1?.id) assignedPlayerIds.add(m.player1.id);
-        if (m.player2?.id) assignedPlayerIds.add(m.player2.id);
-      }
-    });
-    
-    return Array.from(assignedPlayerIds);
-  };
-
-  const assignedPlayerIds = getAssignedPlayers();
-
-  // Filter out already assigned players, but keep currently selected players
-  // IMPORTANT: allow selecting from ALL playoff players (not only advanced players) to make manual repair possible.
+  // Allow selecting from ALL playoff players to make manual bracket editing possible.
+  // Players already in other matches are still selectable for flexibility.
   const getAvailablePlayers = (excludePlayerId = null) => {
     const basePlayers = playoffPlayersPool.length > 0
       ? playoffPlayersPool
       : (qualifyingPlayers || []).map(qp => qp.player || qp);
     
     return basePlayers.filter(player => {
-      // Always include currently selected players (for player1 and player2 dropdowns)
-      if (player.id === selectedPlayer1?.id || player.id === selectedPlayer2?.id) {
-        return true;
-      }
-      // Exclude the other selected player in the same dropdown
+      // Exclude the other selected player in the same dropdown (can't have same player twice in one match)
       if (excludePlayerId && player.id === excludePlayerId) {
         return false;
       }
-      // Exclude already assigned players in other matches
-      return !assignedPlayerIds.includes(player.id);
+      // Allow all playoff players to be selected - no exclusion based on other match assignments
+      return true;
     });
   };
 
