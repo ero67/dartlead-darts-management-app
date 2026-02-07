@@ -1642,13 +1642,15 @@ export const matchService = {
     }
   },
   // Start a live match
-  async startLiveMatch(matchId, deviceId) {
+  async startLiveMatch(matchId, deviceId, deviceName = null, boardNumber = null) {
     try {
       const { data, error } = await supabase
         .from('matches')
         .update({
           status: 'in_progress',
           live_device_id: deviceId,
+          live_device_name: deviceName,
+          live_board_number: boardNumber,
           live_started_at: new Date().toISOString(),
           started_at: new Date().toISOString()
         })
@@ -1672,6 +1674,8 @@ export const matchService = {
         .from('matches')
         .update({
           live_device_id: null,
+          live_device_name: null,
+          live_board_number: null,
           live_started_at: null
         })
         .eq('id', matchId)

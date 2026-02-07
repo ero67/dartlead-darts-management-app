@@ -230,6 +230,9 @@
     "playoffs": "Playoffs",
     "startMatch": "Start Match",
     "continueMatch": "Continue Match",
+    "confirmStartMatch": "Start Match?",
+    "confirmStartMatchMessage": "Are you sure you want to start this match?",
+    "playoffMatch": "Playoff Match",
     "adminScore": "Admin score",
     "adminTakeOver": "Admin take over",
     "adminTakeOverConfirm": "Admin takeover: this will let you continue scoring this match on this device. Continue?",
@@ -401,6 +404,7 @@
   },
   "common": {
     "save": "Save",
+    "saved": "Saved!",
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
@@ -424,6 +428,24 @@
     "pts": "pts",
     "saving": "Saving...",
     "resetting": "Resetting..."
+  },
+  "deviceSettings": {
+    "title": "Device Settings",
+    "deviceName": "Device Name",
+    "deviceNamePlaceholder": "e.g. Window tablet",
+    "deviceNameHint": "Custom name for easier identification",
+    "boardNumber": "Board Number",
+    "boardNumberPlaceholder": "e.g. 1, 2, 3...",
+    "boardNumberHint": "Board number where this device is located",
+    "preview": "Display preview",
+    "board": "Board"
+  },
+  "favorites": {
+    "favoriteGroups": "Favorite Groups",
+    "addToFavorites": "Add to favorites",
+    "removeFromFavorites": "Remove from favorites",
+    "showingFavorites": "Favorite groups are shown first",
+    "noFavorites": "No favorite groups"
   },
   "leagues": {
     "title": "Leagues",

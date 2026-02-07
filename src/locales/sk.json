@@ -224,6 +224,9 @@
     "playoffs": "Play-off",
     "startMatch": "Spustiť Zápas",
     "continueMatch": "Pokračovať v Zápase",
+    "confirmStartMatch": "Spustiť zápas?",
+    "confirmStartMatchMessage": "Ste si istý, že chcete spustiť tento zápas?",
+    "playoffMatch": "Playoff zápas",
     "adminScore": "Admin zapisovať",
     "adminTakeOver": "Admin prebrať zápas",
     "adminTakeOverConfirm": "Admin prebratie: umožní ti pokračovať v zapisovaní zápasu na tomto zariadení. Pokračovať?",
@@ -395,6 +398,7 @@
   },
   "common": {
     "save": "Uložiť",
+    "saved": "Uložené!",
     "cancel": "Zrušiť",
     "delete": "Vymazať",
     "edit": "Upraviť",
@@ -418,6 +422,24 @@
     "pts": "b.",
     "saving": "Ukladá sa...",
     "resetting": "Resetuje sa..."
+  },
+  "deviceSettings": {
+    "title": "Nastavenia zariadenia",
+    "deviceName": "Názov zariadenia",
+    "deviceNamePlaceholder": "napr. Tablet pri okne",
+    "deviceNameHint": "Vlastný názov pre ľahšiu identifikáciu",
+    "boardNumber": "Číslo terča",
+    "boardNumberPlaceholder": "napr. 1, 2, 3...",
+    "boardNumberHint": "Číslo terča pri ktorom je toto zariadenie",
+    "preview": "Náhľad zobrazenia",
+    "board": "Terč"
+  },
+  "favorites": {
+    "favoriteGroups": "Obľúbené skupiny",
+    "addToFavorites": "Pridať do obľúbených",
+    "removeFromFavorites": "Odstrániť z obľúbených",
+    "showingFavorites": "Obľúbené skupiny sú hore",
+    "noFavorites": "Žiadne obľúbené skupiny"
   },
   "leagues": {
     "title": "Ligy",

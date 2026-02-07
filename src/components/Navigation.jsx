@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Trophy, Users, Target, Settings, LogOut, User, Menu, X, Moon, Sun, Shield, Crown, Badge } from 'lucide-react';
+import { Home, Trophy, Users, Target, Settings, LogOut, User, Menu, X, Moon, Sun, Shield, Crown, Badge, Monitor } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useAdmin } from '../contexts/AdminContext';
+import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { DeviceSettings } from './DeviceSettings';
 import logo from '../assets/logo.png';
 
 export function Navigation({ currentView, onViewChange, tournament, isMobileOpen, onMobileClose }) {
   const { user, signOut } = useAuth();
   const { isAdmin, isManager } = useAdmin();
+  const { deviceName, boardNumber } = useLiveMatch();
   const { t } = useLanguage();
   const { isDarkMode, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
 
   // Detect if we're on mobile
   useEffect(() => {
@@ -170,6 +174,32 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
                 />
               )}
             </div>
+            <button 
+              className="device-settings-btn" 
+              onClick={() => setShowDeviceSettings(true)}
+              title={isCollapsed ? t('deviceSettings.title', 'Nastavenia zariadenia') : ''}
+            >
+              <Monitor size={16} />
+              {(!isCollapsed || isMobile) && (
+                <>
+                  {boardNumber ? (
+                    <span className="board-number">
+                      <Target size={12} />
+                      {boardNumber}
+                    </span>
+                  ) : (
+                    <span>{t('deviceSettings.title', 'Zariadenie')}</span>
+                  )}
+                </>
+              )}
+              {isCollapsed && boardNumber && (
+                <span className="board-number">
+                  <Target size={10} />
+                  {boardNumber}
+                </span>
+              )}
+            </button>
+
             <div className="language-section">
               <LanguageSwitcher />
             </div>
@@ -194,6 +224,26 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
           </>
         ) : (
           <>
+            <button 
+              className="device-settings-btn" 
+              onClick={() => setShowDeviceSettings(true)}
+              title={isCollapsed ? t('deviceSettings.title', 'Nastavenia zariadenia') : ''}
+            >
+              <Monitor size={16} />
+              {(!isCollapsed || isMobile) && (
+                <>
+                  {boardNumber ? (
+                    <span className="board-number">
+                      <Target size={12} />
+                      {boardNumber}
+                    </span>
+                  ) : (
+                    <span>{t('deviceSettings.title', 'Zariadenie')}</span>
+                  )}
+                </>
+              )}
+            </button>
+
             <div className="language-section">
               <LanguageSwitcher />
             </div>
@@ -218,6 +268,12 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
           </>
         )}
       </div>
+
+      {/* Device Settings Modal */}
+      <DeviceSettings 
+        isOpen={showDeviceSettings} 
+        onClose={() => setShowDeviceSettings(false)} 
+      />
     </nav>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -46,6 +46,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const [matchGroupFilter, setMatchGroupFilter] = useState('all'); // Filter by group
   const [matchPlayerFilter, setMatchPlayerFilter] = useState(''); // Filter by player name
   const [bracketViewMode, setBracketViewMode] = useState('detailed'); // 'detailed' or 'compact'
+  const [matchToConfirm, setMatchToConfirm] = useState(null); // Match waiting for start confirmation
   
   // Deduplicate groups - ensure each group appears only once
   const uniqueGroups = useMemo(() => {
@@ -101,8 +102,26 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   
   // Track modal state in ref so interval callback can check it
   useEffect(() => {
-    modalOpenRef.current = showEditSettings || !!editingMatch || !!matchStatistics;
-  }, [showEditSettings, editingMatch, matchStatistics]);
+    modalOpenRef.current = showEditSettings || !!editingMatch || !!matchStatistics || !!matchToConfirm;
+  }, [showEditSettings, editingMatch, matchStatistics, matchToConfirm]);
+
+  // Handler for starting a match - shows confirmation dialog first
+  const handleStartMatchRequest = (matchData) => {
+    setMatchToConfirm(matchData);
+  };
+
+  // Confirm and start the match
+  const confirmStartMatch = () => {
+    if (matchToConfirm) {
+      onMatchStart(matchToConfirm);
+      setMatchToConfirm(null);
+    }
+  };
+
+  // Cancel match start
+  const cancelStartMatch = () => {
+    setMatchToConfirm(null);
+  };
   
   const [tournamentSettings, setTournamentSettings] = useState({
     legsToWin: tournament.legsToWin || 3,
@@ -146,7 +165,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       };
     })()
   });
-  const { isMatchLive, isMatchLiveOnThisDevice, isMatchStartedByCurrentUser, getLiveMatchInfo } = useLiveMatch();
+  const { isMatchLive, isMatchLiveOnThisDevice, isMatchStartedByCurrentUser, getLiveMatchInfo, toggleFavoriteGroup, isGroupFavorite, hasFavoriteGroups, getFavoriteGroups } = useLiveMatch();
   const { isAdmin, isAdminMode } = useAdmin();
   const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament } = useTournament();
 
@@ -953,45 +972,84 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
 
-  const renderGroups = () => (
-    <div className="groups-view">
-      <h3>{t('management.tournamentGroups')}</h3>
-      <div className="groups-grid">
-        {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map(group => (
-          <div key={group.id} className="group-card">
-            <div className="group-header">
-              <h4>{group.name}</h4>
-              <span className="player-count">{group.players.length} {t('common.players')}</span>
+  const renderGroups = () => {
+    const favoriteGroupIds = getFavoriteGroups(tournament.id);
+    const hasFavorites = favoriteGroupIds.length > 0;
+    
+    // Sort groups - favorites first
+    const sortedGroups = [...(uniqueGroups || [])].sort((a, b) => {
+      const aIsFavorite = favoriteGroupIds.includes(a.id);
+      const bIsFavorite = favoriteGroupIds.includes(b.id);
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+      return 0;
+    });
+
+    return (
+      <div className="groups-view">
+        <div className="groups-header-row">
+          <h3>{t('management.tournamentGroups')}</h3>
+          {hasFavorites && (
+            <div className="favorites-indicator">
+              <Star size={14} className="filled" />
+              <span>{t('favorites.showingFavorites', 'Obľúbené skupiny sú hore')}</span>
             </div>
-            <div className="group-players">
-              {group.players.map(player => (
-                <div key={player.id} className="player-name">
-                  {player.name}
+          )}
+        </div>
+        <div className="groups-grid">
+          {sortedGroups && sortedGroups.length > 0 ? sortedGroups.map(group => {
+            const isFavorite = isGroupFavorite(tournament.id, group.id);
+            return (
+              <div key={group.id} className={`group-card ${isFavorite ? 'is-favorite' : ''}`}>
+                <div className="group-header">
+                  <h4>{group.name}</h4>
+                  <div className="group-header-actions">
+                    <button
+                      className={`favorite-btn ${isFavorite ? 'active' : ''}`}
+                      onClick={() => toggleFavoriteGroup(tournament.id, group.id)}
+                      title={isFavorite ? t('favorites.removeFromFavorites', 'Odstrániť z obľúbených') : t('favorites.addToFavorites', 'Pridať do obľúbených')}
+                    >
+                      <Star size={16} className={isFavorite ? 'filled' : ''} />
+                    </button>
+                    <span className="player-count">{group.players.length} {t('common.players')}</span>
+                  </div>
                 </div>
-              ))}
-            </div>
-            <div className="group-stats">
-              <div className="stat">
-                <Target size={16} />
-                <span>{group.matches.length} {t('common.matches')}</span>
+                <div className="group-players">
+                  {group.players.map(player => (
+                    <div key={player.id} className="player-name">
+                      {player.name}
+                    </div>
+                  ))}
+                </div>
+                <div className="group-stats">
+                  <div className="stat">
+                    <Target size={16} />
+                    <span>{group.matches.length} {t('common.matches')}</span>
+                  </div>
+                  <div className="stat">
+                    <span>
+                      {group.matches.filter(m => m.status === 'completed').length} {t('management.completed')}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="stat">
-                <span>
-                  {group.matches.filter(m => m.status === 'completed').length} {t('management.completed')}
-                </span>
-              </div>
+            );
+          }) : (
+            <div className="no-groups">
+              <p>{t('management.noGroupsYet') || 'No groups created yet. Start the tournament to create groups.'}</p>
             </div>
-          </div>
-        )) : (
-          <div className="no-groups">
-            <p>{t('management.noGroupsYet') || 'No groups created yet. Start the tournament to create groups.'}</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderMatches = () => {
+    // Get favorite groups for this tournament
+    const favoriteGroupIds = getFavoriteGroups(tournament.id);
+    const hasFavorites = favoriteGroupIds.length > 0;
+    const showOnlyFavorites = hasFavorites && matchGroupFilter === 'favorites';
+
     // Collect all matches from all groups
     const allMatches = uniqueGroups?.flatMap(group => 
       group.matches.map(match => ({ ...match, groupId: group.id, groupName: group.name }))
@@ -999,8 +1057,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
     // Filter matches
     const filteredMatches = allMatches.filter(match => {
-      // Filter by group
-      if (matchGroupFilter !== 'all' && match.groupId !== matchGroupFilter) {
+      // Filter by favorites
+      if (showOnlyFavorites) {
+        if (!favoriteGroupIds.includes(match.groupId)) {
+          return false;
+        }
+      } else if (matchGroupFilter !== 'all' && match.groupId !== matchGroupFilter) {
+        // Filter by specific group
         return false;
       }
 
@@ -1023,12 +1086,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         acc[match.groupId] = {
           groupId: match.groupId,
           groupName: match.groupName,
+          isFavorite: favoriteGroupIds.includes(match.groupId),
           matches: []
         };
       }
       acc[match.groupId].matches.push(match);
       return acc;
     }, {});
+
+    // Sort groups - favorites first
+    const sortedGroupData = Object.values(matchesByGroup).sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return 0;
+    });
 
     return (
       <div className="matches-view">
@@ -1044,9 +1115,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 onChange={(e) => setMatchGroupFilter(e.target.value)}
               >
                 <option value="all">{t('management.allGroups') || 'All Groups'}</option>
-                {uniqueGroups.map(group => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
+                {hasFavorites && (
+                  <option value="favorites">⭐ {t('favorites.favoriteGroups', 'Obľúbené skupiny')}</option>
+                )}
+                {uniqueGroups.map(group => {
+                  const isFav = favoriteGroupIds.includes(group.id);
+                  return (
+                    <option key={group.id} value={group.id}>
+                      {isFav ? '⭐ ' : ''}{group.name}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div className="filter-group">
@@ -1075,9 +1154,21 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           </div>
         </div>
         <div className="matches-list">
-          {Object.keys(matchesByGroup).length > 0 ? Object.values(matchesByGroup).map(groupData => (
-            <div key={groupData.groupId} className="group-matches">
-              <h4>{groupData.groupName}</h4>
+          {sortedGroupData.length > 0 ? sortedGroupData.map(groupData => (
+            <div key={groupData.groupId} className={`group-matches ${groupData.isFavorite ? 'is-favorite' : ''}`}>
+              <div className="group-matches-header">
+                <h4>
+                  {groupData.isFavorite && <Star size={14} className="filled" />}
+                  {groupData.groupName}
+                </h4>
+                <button
+                  className={`favorite-btn-small ${groupData.isFavorite ? 'active' : ''}`}
+                  onClick={() => toggleFavoriteGroup(tournament.id, groupData.groupId)}
+                  title={groupData.isFavorite ? t('favorites.removeFromFavorites', 'Odstrániť z obľúbených') : t('favorites.addToFavorites', 'Pridať do obľúbených')}
+                >
+                  <Star size={14} className={groupData.isFavorite ? 'filled' : ''} />
+                </button>
+              </div>
               <div className="matches-grid">
                 {groupData.matches.map(match => {
                 const isPlayer1Winner = match.status === 'completed' && match.result && match.result.winner === match.player1?.id;
@@ -1144,7 +1235,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     user ? (
                       <button 
                         className="start-match-btn"
-                        onClick={() => onMatchStart({ 
+                        onClick={() => handleStartMatchRequest({ 
                           ...match,
                           tournamentId: tournament.id,
                           groupId: match.groupId,
@@ -1960,10 +2051,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             {filteredLiveMatches.map(match => (
               <div key={match.id} className="live-match-card scoreboard-style">
                 <div className="scoreboard-header">
-                  <div className="match-format">First to {match.legs_to_win || 3}</div>
+                  {match.live_board_number ? (
+                    <div className="board-indicator">
+                      <Target size={14} />
+                      <span>{t('deviceSettings.board', 'Board')} {match.live_board_number}</span>
+                    </div>
+                  ) : (
+                    <div className="match-format">{t('management.firstTo', 'First to')} {match.legs_to_win || 3}</div>
+                  )}
                   <div className="live-badge">
                     <Activity size={12} />
-                    <span>LIVE</span>
+                    <span>{t('management.live', 'LIVE')}</span>
                   </div>
                 </div>
                 
@@ -1993,11 +2091,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   </div>
                 </div>
                 
-                {match.group && (
-                  <div className="scoreboard-footer">
+                <div className="scoreboard-footer">
+                  {match.group && (
                     <span className="group-name">{match.group.name || 'Group'}</span>
-                  </div>
-                )}
+                  )}
+                  {match.live_board_number && (
+                    <span className="match-format-footer">First to {match.legs_to_win || 3}</span>
+                  )}
+                  {match.live_device_name && (
+                    <span className="device-name-footer">{match.live_device_name}</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -2318,7 +2422,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                               // Calculate round size from number of matches (each match has 2 players)
                               const roundSize = round.matches.length * 2;
                               const legsToWin = getPlayoffLegsToWin(roundSize);
-                              onMatchStart({ 
+                              handleStartMatchRequest({ 
                                 ...match,
                                 tournamentId: tournament.id,
                                 legsToWin: legsToWin,
@@ -2328,7 +2432,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             }}
                           >
                             <Play size={16} />
-                            Start Match
+                            {t('management.startMatch')}
                           </button>
                         ) : (
                           <div className="login-required-message">
@@ -2537,6 +2641,61 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         {activeTab === 'statistics' && renderStatistics()}
         {activeTab === 'liveMatches' && renderLiveMatches()}
       </div>
+
+      {/* Match Start Confirmation Modal */}
+      {matchToConfirm && (
+        <div className="modal-overlay" onClick={cancelStartMatch}>
+          <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{t('management.confirmStartMatch') || 'Start Match?'}</h3>
+              <button 
+                className="close-btn"
+                onClick={cancelStartMatch}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-content confirm-modal-content">
+              <div className="confirm-match-info">
+                <div className="confirm-match-players">
+                  <span className="confirm-player">{matchToConfirm.player1?.name || 'Player 1'}</span>
+                  <span className="confirm-vs">vs</span>
+                  <span className="confirm-player">{matchToConfirm.player2?.name || 'Player 2'}</span>
+                </div>
+                {matchToConfirm.groupName && (
+                  <div className="confirm-match-group">
+                    {matchToConfirm.groupName}
+                  </div>
+                )}
+                {matchToConfirm.isPlayoff && (
+                  <div className="confirm-match-playoff">
+                    {t('management.playoffMatch') || 'Playoff Match'}
+                  </div>
+                )}
+              </div>
+              <p className="confirm-message">
+                {t('management.confirmStartMatchMessage') || 'Are you sure you want to start this match?'}
+              </p>
+            </div>
+            <div className="modal-actions confirm-modal-actions">
+              <button 
+                className="cancel-btn"
+                onClick={cancelStartMatch}
+              >
+                <X size={16} />
+                {t('common.cancel')}
+              </button>
+              <button 
+                className="confirm-btn start-match-confirm-btn"
+                onClick={confirmStartMatch}
+              >
+                <Play size={16} />
+                {t('management.startMatch')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Settings Modal */}
       {showEditSettings && user && (

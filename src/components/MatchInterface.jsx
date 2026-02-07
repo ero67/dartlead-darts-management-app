@@ -157,7 +157,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }
   }, [currentLeg, matchStarter, matchComplete, legScores, turnHistory, matchSettings.startingScore, showMatchStarter, currentPlayer]);
   
-  const { startLiveMatch, endLiveMatch, updateLiveMatch, isMatchLiveOnThisDevice, deviceId } = useLiveMatch();
+  const { startLiveMatch, endLiveMatch, updateLiveMatch, isMatchLiveOnThisDevice, deviceId, deviceName, boardNumber } = useLiveMatch();
   const { user } = useAuth();
   const { t } = useLanguage();
   
@@ -592,7 +592,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (user?.id && match.status !== 'completed') {
       // Mark match as live on THIS device in DB (enables cross-device visibility + admin takeover)
       if (deviceId) {
-        matchService.startLiveMatch(match.id, deviceId).catch(error => {
+        matchService.startLiveMatch(match.id, deviceId, deviceName, boardNumber).catch(error => {
           console.error('Error starting live match in database:', error);
         });
       }
