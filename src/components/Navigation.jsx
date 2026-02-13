@@ -41,6 +41,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
   ];
 
   const handleSignOut = async () => {
+    if (onMobileClose) onMobileClose();
     await signOut();
   };
 
@@ -176,7 +177,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             </div>
             <button 
               className="device-settings-btn" 
-              onClick={() => setShowDeviceSettings(true)}
+              onClick={() => { setShowDeviceSettings(true); if (onMobileClose) onMobileClose(); }}
               title={isCollapsed ? t('deviceSettings.title', 'Nastavenia zariadenia') : ''}
             >
               <Monitor size={16} />
@@ -226,7 +227,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
           <>
             <button 
               className="device-settings-btn" 
-              onClick={() => setShowDeviceSettings(true)}
+              onClick={() => { setShowDeviceSettings(true); if (onMobileClose) onMobileClose(); }}
               title={isCollapsed ? t('deviceSettings.title', 'Nastavenia zariadenia') : ''}
             >
               <Monitor size={16} />
@@ -259,7 +260,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             
             <button 
               className="login-btn" 
-              onClick={() => onViewChange('/login')}
+              onClick={() => { onViewChange('/login'); if (onMobileClose) onMobileClose(); }}
               title={isCollapsed ? t('navigation.login') : ''}
             >
               <User size={16} />

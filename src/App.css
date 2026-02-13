@@ -5204,8 +5204,23 @@ body {
   transition: color 0.3s ease;
 }
 
+/* Radio section: a heading label + radio-group beneath it (not inside input-group) */
+.radio-section {
+  margin-bottom: 1rem;
+}
+
+.radio-section-label {
+  display: block;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
+}
+
 .radio-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 1rem;
 }
@@ -5908,6 +5923,133 @@ body {
   /* Prevent zoom on input focus */
   input, select, textarea {
     font-size: 16px;
+  }
+
+  /* Registration header - stack on mobile */
+  .registration-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .registration-header h1 {
+    font-size: 1.5rem;
+    word-break: break-word;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .header-actions .edit-settings-btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .header-actions .tournament-status {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Add player form - stack on mobile */
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .add-player-form {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .add-player-form input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .add-player-form .add-player-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Radio groups - wrap on mobile */
+  .radio-group {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .radio-group label {
+    font-size: 0.9rem;
+  }
+
+  /* Input groups - stack on mobile */
+  .input-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .input-group label {
+    min-width: 0;
+  }
+
+  .input-group input,
+  .input-group select {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+  }
+
+  .input-group input {
+    flex: none;
+    width: 100%;
+  }
+
+  /* Checkbox group */
+  .checkbox-group label {
+    font-size: 0.9rem;
+  }
+
+  /* Playoff legs settings - compact on mobile */
+  .playoff-legs-settings .input-group {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .playoff-legs-settings .input-group label {
+    min-width: 80px;
+    flex: 0 0 auto;
+  }
+
+  .playoff-legs-settings .input-group select {
+    flex: 1;
+  }
+
+  /* Modal content - prevent overflow */
+  .modal-content {
+    overflow-x: hidden;
+    word-break: break-word;
+  }
+
+  .group-settings {
+    overflow: hidden;
+  }
+
+  /* Criteria order - compact on mobile */
+  .criteria-order-item {
+    padding: 0.5rem;
+  }
+
+  /* Tournament creation form */
+  .creation-form {
+    overflow-x: hidden;
+  }
+
+  .form-section {
+    overflow: hidden;
   }
 
   /* Better table handling */

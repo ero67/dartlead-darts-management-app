@@ -444,40 +444,47 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     
     const numMatches = firstRound.matches.length;
     const totalPlayers = qualifyingPlayers.length;
-    const seedingMethod = tournament?.playoffSettings?.seedingMethod || 'standard';
     
-    // Group-based seeding
-    if (seedingMethod === 'groupBased' && tournament?.groups && tournament.groups.length > 0) {
+    // For tournaments with groups, always use group-based seeding (Slovak Darts Association rules).
+    // This ensures the best players from different groups are kept apart until as late as possible.
+    // The seedingMethod setting is kept for backwards compatibility but no longer affects behavior
+    // for groups_with_playoffs tournaments.
+    const hasGroups = tournament?.groups && tournament.groups.length > 0;
+    
+    // Group-based seeding (automatic for all group tournaments)
+    if (hasGroups) {
       let groupMatchups = tournament.playoffSettings?.groupMatchups;
       const playersPerGroup = tournament.playoffSettings?.playersPerGroup || 1;
+      const numGroups = tournament.groups.length;
+      const isEvenGroups = numGroups % 2 === 0;
       
       // Auto-generate group matchups if not configured
+      // Only use cross-group pairing for even number of groups (2, 4, 6, ...)
+      // For odd groups (3, 5, ...) we use global seeding with group separation instead
       if (!groupMatchups || groupMatchups.length === 0) {
         const groupNames = tournament.groups.map(g => g.name);
         groupMatchups = [];
         
-        // For 2 groups: A vs B
-        // For 4 groups: A vs D, B vs C (crossover)
-        // For 6+ groups: pair them up with crossover pattern
-        if (groupNames.length === 2) {
-          groupMatchups.push({ group1: groupNames[0], group2: groupNames[1] });
-        } else if (groupNames.length >= 4) {
-          // Crossover: first half vs second half (reversed)
-          const halfLength = Math.floor(groupNames.length / 2);
-          for (let i = 0; i < halfLength; i++) {
-            groupMatchups.push({ 
-              group1: groupNames[i], 
-              group2: groupNames[groupNames.length - 1 - i] 
-            });
+        if (isEvenGroups) {
+          // For 2 groups: A vs B
+          // For 4 groups: A vs D, B vs C (crossover)
+          // For 6+ groups: pair them up with crossover pattern
+          if (groupNames.length === 2) {
+            groupMatchups.push({ group1: groupNames[0], group2: groupNames[1] });
+          } else {
+            // Crossover: first half vs second half (reversed)
+            const halfLength = Math.floor(groupNames.length / 2);
+            for (let i = 0; i < halfLength; i++) {
+              groupMatchups.push({ 
+                group1: groupNames[i], 
+                group2: groupNames[groupNames.length - 1 - i] 
+              });
+            }
           }
+          console.log('Auto-generated cross-group matchups:', groupMatchups);
         } else {
-          // For odd number of groups or 3 groups, just pair sequentially
-          for (let i = 0; i < groupNames.length - 1; i += 2) {
-            groupMatchups.push({ group1: groupNames[i], group2: groupNames[i + 1] });
-          }
+          console.log(`Odd number of groups (${numGroups}), using global seeding with group separation`);
         }
-        
-        console.log('Auto-generated group matchups:', groupMatchups);
       }
       
       // Get players organized by group
@@ -518,21 +525,105 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         }
       });
       
-      // Create matches based on group matchups
+      // Create matches based on group matchups using official Slovak Darts Association bracket seeding.
+      // The goal is to keep the best players from meeting each other until as late as possible
+      // in the playoff bracket.
+      //
+      // For 2 groups with 4 advancing each (8 players total - "Pavúk na 8 hráčov"):
+      //   Match 0: A1 vs B4  (top half)
+      //   Match 1: A3 vs B2  (top half)
+      //   Match 2: A2 vs B3  (bottom half)
+      //   Match 3: A4 vs B1  (bottom half)
+      //
+      // Semifinal progression (via standard bracket propagation):
+      //   SF 0 (top half): Winner(A1vB4) vs Winner(A3vB2)
+      //   SF 1 (bottom half): Winner(A2vB3) vs Winner(A4vB1)
+      // Final: Winner(SF0) vs Winner(SF1) -> A1 and B1 can only meet here
+      
+      // Generate bracket match order for N cross-group pairings.
+      // 
+      // The goal: ensure the best players from each group are on OPPOSITE halves of
+      // the bracket so they can only meet in the final.
+      //
+      // For N pairings (0-indexed by strength: 0=strongest, N-1=weakest):
+      //   - Pairing 0 (A1vB4) and Pairing 1 (A2vB3) go to opposite halves
+      //   - Within each half, the strongest pairing faces the weakest
+      //
+      // For 4 pairings, the official bracket order is [0, 2, 1, 3]:
+      //   Match 0: Pairing 0 (A1vB4) \
+      //   Match 1: Pairing 2 (A3vB2) / -> SF 0 (top half)
+      //   Match 2: Pairing 1 (A2vB3) \
+      //   Match 3: Pairing 3 (A4vB1) / -> SF 1 (bottom half)
+      //
+      // For 2 pairings: [0, 1] (A1vB2 vs A2vB1, winners meet in final)
+      //
+      // General algorithm for any power-of-2 number of pairings:
+      //   Recursively split into halves, placing seed i and seed (i+1) on opposite halves
+      //   (where seeds are consecutive pairs: (0,1), (2,3), (4,5), etc.)
+      const generateCrossGroupBracketOrder = (n) => {
+        if (n <= 0) return [];
+        if (n === 1) return [0];
+        if (n === 2) return [0, 1];
+        
+        // Round up to nearest power of 2
+        const bracketSize = Math.pow(2, Math.ceil(Math.log2(n)));
+        
+        // Recursive helper: produces bracket slot order for `size` seeds (0-indexed).
+        // Key property: seed 0 and seed 1 end up on opposite halves,
+        // seed 2 and seed 3 on opposite halves, etc.
+        const helper = (size) => {
+          if (size === 2) return [0, 1];
+          
+          const half = size / 2;
+          const subOrder = helper(half);
+          
+          // For each position in the sub-bracket, we place two seeds:
+          // - Seed (2*s) goes to the top half at position corresponding to subOrder
+          // - Seed (2*s+1) goes to the bottom half (mirrored position)
+          const topHalf = subOrder.map(s => s * 2);        // Even seeds: 0, 2, 4, ...
+          const bottomHalf = subOrder.map(s => s * 2 + 1); // Odd seeds: 1, 3, 5, ...
+          
+          return [...topHalf, ...bottomHalf];
+        };
+        
+        const positions = helper(bracketSize);
+        // Filter out positions that exceed our actual number of pairings
+        return positions.filter(p => p < n);
+      };
+      
       let matchIndex = 0;
       groupMatchups.forEach(matchup => {
         const group1Players = playersByGroup[matchup.group1] || [];
         const group2Players = playersByGroup[matchup.group2] || [];
-        
-        // Pair players: 1st from Group A vs last from Group D, 2nd from Group A vs second-to-last from Group D, etc.
         const maxPlayers = Math.min(group1Players.length, group2Players.length);
         
-        for (let i = 0; i < maxPlayers && matchIndex < numMatches; i++) {
+        if (maxPlayers <= 0) return;
+        
+        // Create all cross-pairings ordered by strength:
+        // Pairing 0 (strongest): A1 vs B_last
+        // Pairing 1: A2 vs B_(last-1)
+        // ...
+        // Pairing N-1 (weakest): A_last vs B1
+        const crossPairings = [];
+        for (let i = 0; i < maxPlayers; i++) {
+          crossPairings.push({ g1Idx: i, g2Idx: maxPlayers - 1 - i });
+        }
+        
+        // Get bracket order: which pairing goes into which match slot
+        const bracketOrder = generateCrossGroupBracketOrder(maxPlayers);
+        
+        console.log('Cross-group bracket order for', maxPlayers, 'pairings:', 
+          bracketOrder.map(idx => `A${idx+1}vB${maxPlayers-idx}`));
+        
+        // Assign players to matches in bracket order
+        bracketOrder.forEach(pairingIdx => {
+          if (matchIndex >= numMatches) return;
+          const pairing = crossPairings[pairingIdx];
+          if (!pairing) return;
+          
           const match = firstRound.matches[matchIndex];
-          // Group 1: position i (0 = 1st, 1 = 2nd, etc.)
-          // Group 2: position (maxPlayers - 1 - i) (last, second-to-last, etc.)
-          const player1 = group1Players[i];
-          const player2 = group2Players[maxPlayers - 1 - i];
+          const player1 = group1Players[pairing.g1Idx];
+          const player2 = group2Players[pairing.g2Idx];
           
           if (player1 && player2) {
             match.player1 = player1;
@@ -540,18 +631,188 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             match.status = 'pending';
             matchIndex++;
           }
+        });
+      });
+      
+      // Check if we successfully assigned players to all matches via cross-group pairing
+      const assignedMatches = firstRound.matches.filter(m => m.player1 && m.player2).length;
+      if (assignedMatches >= numMatches) {
+        console.log(`Cross-group bracket seeding assigned ${assignedMatches} matches`);
+        return firstRound;
+      }
+      
+      // Cross-group pairing didn't fill all matches (odd number of groups, or misconfigured matchups).
+      // Use global seeding with group separation instead:
+      // 1. Rank all qualifying players globally (they come pre-sorted from getQualifyingPlayers)
+      // 2. Place them in standard bracket positions (1v8, 4v5, 2v7, 3v6)
+      // 3. Detect same-group conflicts in first-round matchups
+      // 4. Swap players between matches to eliminate conflicts where possible
+      console.log(`Cross-group seeding assigned ${assignedMatches}/${numMatches}, using global seeding with group separation`);
+      
+      // Clear any partial assignments from the failed cross-group attempt
+      firstRound.matches.forEach(m => {
+        m.player1 = null;
+        m.player2 = null;
+        m.status = 'pending';
+      });
+      
+      // Build player-to-group lookup from tournament data
+      const playerGroupMap = {};
+      tournament.groups.forEach(group => {
+        if (group.standings) {
+          group.standings.forEach(s => {
+            if (s.player?.id) {
+              playerGroupMap[s.player.id] = group.id || group.name;
+            }
+          });
         }
       });
       
-      // Check if we successfully assigned players to all matches
-      const assignedMatches = firstRound.matches.filter(m => m.player1 && m.player2).length;
-      if (assignedMatches >= numMatches) {
-        console.log(`Group-based seeding assigned ${assignedMatches} matches`);
-        return firstRound;
-      } else {
-        console.log(`Group-based seeding only assigned ${assignedMatches}/${numMatches} matches, falling back to standard seeding`);
-        // Fall through to standard seeding below
+      // Use the standard bracket seeding algorithm (same as the one below for 'standard' method)
+      const genBracketPos = (n) => {
+        const bSize = Math.pow(2, Math.ceil(Math.log2(Math.max(1, n))));
+        const h = (size) => {
+          if (size === 1) return [1];
+          if (size === 2) return [1, 2];
+          const result = [];
+          const half = size / 2;
+          const top = h(half);
+          const bottom = h(half);
+          for (let i = 0; i < half; i++) {
+            result.push(top[i]);
+            result.push(bottom[i] + half);
+          }
+          return result;
+        };
+        return h(bSize);
+      };
+      
+      const bracketPos = genBracketPos(totalPlayers);
+      
+      // Create initial seeded bracket: pairs[i] = [seed1, seed2]
+      // Standard bracket: position[0] vs position[N-1], position[1] vs position[N-2], etc.
+      const seededSlots = []; // Array of { matchIdx, seed1, seed2, player1Idx, player2Idx }
+      for (let i = 0; i < numMatches; i++) {
+        const s1 = bracketPos[i];
+        const s2 = bracketPos[totalPlayers - 1 - i];
+        if (s1 >= 1 && s1 <= totalPlayers && s2 >= 1 && s2 <= totalPlayers && s1 !== s2) {
+          seededSlots.push({
+            matchIdx: i,
+            player1Idx: s1 - 1, // 0-based index into qualifyingPlayers
+            player2Idx: s2 - 1
+          });
+        }
       }
+      
+      // Detect same-group conflicts and try to resolve by swapping
+      // Strategy: for each match with a same-group conflict, try to swap one player
+      // with a player from another match (preferring swaps that don't create new conflicts)
+      const getGroup = (playerIdx) => {
+        const player = qualifyingPlayers[playerIdx];
+        return player?.id ? (playerGroupMap[player.id] || null) : null;
+      };
+      
+      const hasConflict = (slot) => {
+        const g1 = getGroup(slot.player1Idx);
+        const g2 = getGroup(slot.player2Idx);
+        return g1 && g2 && g1 === g2;
+      };
+      
+      // Try swapping players between conflicting and non-conflicting matches
+      let improved = true;
+      let maxIterations = seededSlots.length * seededSlots.length; // Prevent infinite loops
+      while (improved && maxIterations > 0) {
+        improved = false;
+        maxIterations--;
+        
+        for (let i = 0; i < seededSlots.length; i++) {
+          if (!hasConflict(seededSlots[i])) continue;
+          
+          // This match has a same-group conflict, try swapping player2 with player2 from another match
+          for (let j = 0; j < seededSlots.length; j++) {
+            if (i === j) continue;
+            
+            // Try swapping player2 of match i with player2 of match j
+            const origConflictsI = hasConflict(seededSlots[i]) ? 1 : 0;
+            const origConflictsJ = hasConflict(seededSlots[j]) ? 1 : 0;
+            const origTotal = origConflictsI + origConflictsJ;
+            
+            // Temporarily swap
+            const temp = seededSlots[i].player2Idx;
+            seededSlots[i].player2Idx = seededSlots[j].player2Idx;
+            seededSlots[j].player2Idx = temp;
+            
+            const newConflictsI = hasConflict(seededSlots[i]) ? 1 : 0;
+            const newConflictsJ = hasConflict(seededSlots[j]) ? 1 : 0;
+            const newTotal = newConflictsI + newConflictsJ;
+            
+            if (newTotal < origTotal) {
+              // Swap reduced conflicts, keep it
+              improved = true;
+              break;
+            } else {
+              // Swap didn't help, revert
+              seededSlots[j].player2Idx = seededSlots[i].player2Idx;
+              seededSlots[i].player2Idx = temp;
+            }
+          }
+          
+          if (improved) break; // Restart the outer loop after a successful swap
+        }
+      }
+      
+      // Also try swapping player1 with player1 if conflicts remain
+      improved = true;
+      maxIterations = seededSlots.length * seededSlots.length;
+      while (improved && maxIterations > 0) {
+        improved = false;
+        maxIterations--;
+        
+        for (let i = 0; i < seededSlots.length; i++) {
+          if (!hasConflict(seededSlots[i])) continue;
+          
+          for (let j = 0; j < seededSlots.length; j++) {
+            if (i === j) continue;
+            
+            const origTotal = (hasConflict(seededSlots[i]) ? 1 : 0) + (hasConflict(seededSlots[j]) ? 1 : 0);
+            
+            const temp = seededSlots[i].player1Idx;
+            seededSlots[i].player1Idx = seededSlots[j].player1Idx;
+            seededSlots[j].player1Idx = temp;
+            
+            const newTotal = (hasConflict(seededSlots[i]) ? 1 : 0) + (hasConflict(seededSlots[j]) ? 1 : 0);
+            
+            if (newTotal < origTotal) {
+              improved = true;
+              break;
+            } else {
+              seededSlots[j].player1Idx = seededSlots[i].player1Idx;
+              seededSlots[i].player1Idx = temp;
+            }
+          }
+          
+          if (improved) break;
+        }
+      }
+      
+      // Assign the (possibly swapped) seeding to matches
+      const remainingConflicts = seededSlots.filter(s => hasConflict(s)).length;
+      if (remainingConflicts > 0) {
+        console.log(`Global seeding with group separation: ${remainingConflicts} same-group matchups could not be avoided`);
+      } else {
+        console.log('Global seeding with group separation: all same-group conflicts resolved');
+      }
+      
+      seededSlots.forEach(slot => {
+        const match = firstRound.matches[slot.matchIdx];
+        match.player1 = qualifyingPlayers[slot.player1Idx] || null;
+        match.player2 = qualifyingPlayers[slot.player2Idx] || null;
+        match.seed1 = slot.player1Idx + 1;
+        match.seed2 = slot.player2Idx + 1;
+        match.status = 'pending';
+      });
+      
+      return firstRound;
     }
     
     // Standard tournament bracket seeding (default)

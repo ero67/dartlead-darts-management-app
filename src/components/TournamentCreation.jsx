@@ -41,7 +41,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     playersPerGroup: 1,
     totalPlayersToAdvance: 8,
     startingRoundPlayers: 8,
-    seedingMethod: 'standard',
+    seedingMethod: 'groupBased',
     groupMatchups: [],
     thirdPlaceMatch: true, // Whether to play a 3rd place match or both semifinal losers share 3rd
     legsToWinByRound: {
@@ -315,8 +315,8 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
             <div className="playoff-options">
               {tournamentType === 'groups_with_playoffs' ? (
                 <>
-                  <div className="input-group">
-                    <label>{t('registration.qualificationMode')}</label>
+                  <div className="radio-section">
+                    <label className="radio-section-label">{t('registration.qualificationMode')}</label>
                     <div className="radio-group">
                       <label>
                         <input
@@ -406,58 +406,10 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
                 </>
               )}
               
-              {tournamentType === 'groups_with_playoffs' && (
-              <>
-                <div className="input-group">
-                  <label>{t('registration.seedingMethod') || 'Seeding Method'}</label>
-                  <div className="radio-group">
-                    <label>
-                      <input
-                        type="radio"
-                        name="seedingMethod"
-                        value="standard"
-                        checked={playoffSettings.seedingMethod === 'standard'}
-                        onChange={(e) => setPlayoffSettings({
-                          ...playoffSettings,
-                          seedingMethod: e.target.value
-                        })}
-                      />
-                      {t('registration.seedingMethodStandard') || 'Standard Tournament Seeding'}
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="seedingMethod"
-                        value="groupBased"
-                        checked={playoffSettings.seedingMethod === 'groupBased'}
-                        onChange={(e) => setPlayoffSettings({
-                          ...playoffSettings,
-                          seedingMethod: e.target.value
-                        })}
-                      />
-                      {t('registration.seedingMethodGroupBased') || 'Group-Based Seeding'}
-                    </label>
-                  </div>
-                </div>
 
-                {playoffSettings.seedingMethod === 'groupBased' && (
-                  <div className="input-group">
-                    <label>{t('registration.groupMatchups') || 'Group Matchups'}</label>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                      {t('registration.groupMatchupsDescription') || 'Configure which groups play against each other. Groups will be created when tournament starts.'}
-                    </p>
-                    <div className="group-matchups-config" style={{ marginTop: '1rem' }}>
-                      <p style={{ fontSize: '0.9rem', fontStyle: 'italic', color: 'var(--text-secondary)' }}>
-                        {t('registration.groupMatchupsNote') || 'Note: Group matchups will be configured after groups are created during tournament start.'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </>
-              )}
 
-              <div className="input-group">
-                <label>{t('registration.thirdPlaceMatch') || '3rd Place Match'}</label>
+              <div className="radio-section">
+                <label className="radio-section-label">{t('registration.thirdPlaceMatch') || '3rd Place Match'}</label>
                 <div className="radio-group">
                   <label>
                     <input
