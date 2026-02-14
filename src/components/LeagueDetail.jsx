@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { leagueService } from '../services/leagueService';
 
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
@@ -45,6 +46,11 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [unlinkedTournaments, setUnlinkedTournaments] = useState([]);
   const [loadingUnlinked, setLoadingUnlinked] = useState(false);
   const [selectedTournamentToLink, setSelectedTournamentToLink] = useState('');
+
+  // League statistics state
+  const [leagueStats, setLeagueStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
   useEffect(() => {
     if (leagueId && (!currentLeague || currentLeague.id !== leagueId)) {
@@ -109,6 +115,29 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setTournamentDefaults(DEFAULT_TOURNAMENT_SETTINGS);
     }
   }, [currentLeague]);
+
+  // Load statistics lazily when the tab is first opened
+  useEffect(() => {
+    if (activeTab === 'statistics' && currentLeague && !statsLoaded && !loadingStats) {
+      setLoadingStats(true);
+      leagueService.getLeagueStatistics(currentLeague.id)
+        .then(data => {
+          setLeagueStats(data);
+          setStatsLoaded(true);
+        })
+        .catch(err => {
+          console.error('Error loading league statistics:', err);
+          setStatsLoaded(true); // don't retry forever
+        })
+        .finally(() => setLoadingStats(false));
+    }
+  }, [activeTab, currentLeague, statsLoaded, loadingStats]);
+
+  // Reset stats when league changes
+  useEffect(() => {
+    setStatsLoaded(false);
+    setLeagueStats(null);
+  }, [leagueId]);
 
   if (!currentLeague) {
     return (
@@ -438,6 +467,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
           {t('tournaments.title')}
         </button>
         <button
+          className={activeTab === 'statistics' ? 'active' : ''}
+          onClick={() => setActiveTab('statistics')}
+        >
+          <BarChart3 size={18} />
+          {t('leagues.statistics')}
+        </button>
+        <button
           className={activeTab === 'players' ? 'active' : ''}
           onClick={() => setActiveTab('players')}
         >
@@ -517,6 +553,104 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                 <p>{t('leagues.noResultsYet')}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'statistics' && (
+          <div>
+            <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>{t('leagues.leagueStatistics')}</h2>
+
+            {loadingStats && (
+              <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>{t('leagues.loadingStatistics')}</p>
+              </div>
+            )}
+
+            {!loadingStats && leagueStats && (() => {
+              const hasAny = leagueStats.most180s.length > 0 || leagueStats.bestCheckouts.length > 0 || leagueStats.bestMatchAverages.length > 0 || leagueStats.fewestDartsLegs.length > 0;
+              if (!hasAny) {
+                return (
+                  <div className="empty-state">
+                    <BarChart3 size={48} />
+                    <p>{t('leagues.noStatisticsYet')}</p>
+                  </div>
+                );
+              }
+
+              const StatTable = ({ title, icon, color, rows, valueFn, detailFn }) => {
+                if (!rows.length) return null;
+                return (
+                  <div className="league-stat-card">
+                    <div className="league-stat-card-header" style={{ '--stat-accent': color }}>
+                      <span className="league-stat-icon" style={{ background: color }}>{icon}</span>
+                      <h3>{title}</h3>
+                    </div>
+                    <div className="league-stat-table-wrap">
+                      <table className="league-stat-table">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>{t('leagues.statPlayer')}</th>
+                            <th>{t('leagues.statValue')}</th>
+                            <th className="ls-col-details">{t('leagues.statDetails')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row, idx) => (
+                            <tr key={row.player?.id || idx} className={idx < 3 ? 'ls-top-row' : ''}>
+                              <td>
+                                <span className={`lb-rank${idx < 3 ? ` rank-${idx + 1}` : ''}`}>{idx + 1}</span>
+                              </td>
+                              <td><span className="lb-player-name">{row.player?.name || '?'}</span></td>
+                              <td><span className="lb-points" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>{valueFn(row)}</span></td>
+                              <td className="ls-col-details"><span className="ls-detail-text">{detailFn(row)}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="league-stats-grid">
+                  <StatTable
+                    title={t('leagues.most180s')}
+                    icon={<Trophy size={20} />}
+                    color="#f59e0b"
+                    rows={leagueStats.most180s}
+                    valueFn={r => r.count}
+                    detailFn={() => ''}
+                  />
+                  <StatTable
+                    title={t('leagues.bestCheckouts')}
+                    icon={<Target size={20} />}
+                    color="#10b981"
+                    rows={leagueStats.bestCheckouts}
+                    valueFn={r => r.highest}
+                    detailFn={r => `${t('leagues.statVs')} ${r.opponent} · ${r.tournamentName}`}
+                  />
+                  <StatTable
+                    title={t('leagues.bestMatchAverages')}
+                    icon={<Zap size={20} />}
+                    color="#8b5cf6"
+                    rows={leagueStats.bestMatchAverages}
+                    valueFn={r => r.average.toFixed(1)}
+                    detailFn={r => `${t('leagues.statVs')} ${r.opponent} · ${r.tournamentName}`}
+                  />
+                  <StatTable
+                    title={t('leagues.fewestDartsLegs')}
+                    icon={<Hash size={20} />}
+                    color="#ef4444"
+                    rows={leagueStats.fewestDartsLegs}
+                    valueFn={r => `${r.darts} ${t('leagues.statDarts')}`}
+                    detailFn={r => `${t('leagues.statVs')} ${r.opponent} · ${r.tournamentName}`}
+                  />
+                </div>
+              );
+            })()}
           </div>
         )}
 

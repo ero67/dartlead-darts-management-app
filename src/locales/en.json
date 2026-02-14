@@ -546,6 +546,20 @@
     "defaultsSaveFailed": "Failed to save default tournament settings",
     "resetDefaults": "Reset to Defaults",
     "noDefaultsSet": "No default tournament settings configured yet. Configure defaults below so tournaments in this league start with pre-filled settings.",
-    "defaultSeedingMethod": "Default Seeding Method"
+    "defaultSeedingMethod": "Default Seeding Method",
+    "statistics": "Statistics",
+    "leagueStatistics": "League Statistics",
+    "loadingStatistics": "Loading statistics…",
+    "noStatisticsYet": "No statistics available yet. Complete some tournaments first.",
+    "most180s": "Most 180s",
+    "bestCheckouts": "Best Checkouts",
+    "bestMatchAverages": "Best Match Averages",
+    "fewestDartsLegs": "Fewest Darts (Leg)",
+    "statPlayer": "Player",
+    "statValue": "Value",
+    "statDetails": "Details",
+    "statVs": "vs",
+    "statIn": "in",
+    "statDarts": "darts"
   }
 }

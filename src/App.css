@@ -8268,4 +8268,149 @@ body {
   }
 }
 
+/* ===== League Statistics Tables ===== */
+.league-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 1.5rem;
+}
+
+.league-stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.league-stat-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 2px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.league-stat-card-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.league-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.league-stat-table-wrap {
+  overflow-x: auto;
+}
+
+.league-stat-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.league-stat-table thead th {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-color-light);
+  white-space: nowrap;
+}
+
+.league-stat-table thead th:first-child {
+  text-align: center;
+  width: 44px;
+  padding-left: 1rem;
+}
+
+.league-stat-table thead th:nth-child(3) {
+  text-align: center;
+}
+
+.league-stat-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.league-stat-table tbody tr:nth-child(even) {
+  background: var(--bg-tertiary);
+}
+
+.league-stat-table tbody tr:hover {
+  background: color-mix(in srgb, var(--accent-primary) 6%, transparent);
+}
+
+.league-stat-table tbody tr.ls-top-row {
+  background: color-mix(in srgb, var(--accent-warning) 4%, transparent);
+}
+
+.league-stat-table tbody tr.ls-top-row:hover {
+  background: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+}
+
+.league-stat-table tbody td {
+  padding: 0.6rem 0.85rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color-light);
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.league-stat-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.league-stat-table tbody td:first-child {
+  text-align: center;
+  width: 44px;
+  padding-left: 1rem;
+}
+
+.league-stat-table tbody td:nth-child(3) {
+  text-align: center;
+}
+
+.ls-detail-text {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+/* Responsive: hide details on small screens */
+@media (max-width: 640px) {
+  .league-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .league-stat-table thead th,
+  .league-stat-table tbody td {
+    padding: 0.5rem 0.55rem;
+    font-size: 0.82rem;
+  }
+
+  .league-stat-table .ls-col-details {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .league-stat-table thead th,
+  .league-stat-table tbody td {
+    padding: 0.45rem 0.4rem;
+    font-size: 0.78rem;
+  }
+}
+
 

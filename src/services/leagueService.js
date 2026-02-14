@@ -1451,6 +1451,166 @@ export const leagueService = {
     }
   },
 
+  // ── League-wide statistics (top 10 lists) ──────────────────────────
+  // Aggregates stats across all completed matches of all tournaments in
+  // the league.  Returns { most180s, bestCheckouts, bestMatchAverages, fewestDartsLegs }.
+  async getLeagueStatistics(leagueId) {
+    try {
+      const { tournamentService } = await import('./tournamentService.js');
+
+      // 1. Get all completed tournaments in the league
+      const { data: tournaments, error } = await supabase
+        .from('tournaments')
+        .select('id, name')
+        .eq('league_id', leagueId)
+        .eq('status', 'completed')
+        .eq('deleted', false);
+
+      if (error) throw error;
+      if (!tournaments?.length) return { most180s: [], bestCheckouts: [], bestMatchAverages: [], fewestDartsLegs: [] };
+
+      // 2. Fetch full tournament data for each (contains match results)
+      const fullTournaments = [];
+      for (const t of tournaments) {
+        try {
+          const full = await tournamentService.getTournament(t.id);
+          if (full) fullTournaments.push(full);
+        } catch (e) {
+          console.error(`Error fetching tournament ${t.id}:`, e);
+        }
+      }
+
+      // 3. Collect ALL completed matches across all tournaments
+      const allMatches = [];
+      for (const tourney of fullTournaments) {
+        const uniqueGroups = (() => {
+          if (!tourney.groups) return [];
+          const seen = new Set();
+          return tourney.groups.filter(g => { if (seen.has(g.id)) return false; seen.add(g.id); return true; });
+        })();
+        uniqueGroups.forEach(group => {
+          (group.matches || []).forEach(m => {
+            if (m.status === 'completed' && m.result) allMatches.push({ ...m, tournamentName: tourney.name });
+          });
+        });
+        (tourney.playoffMatches || []).forEach(m => {
+          if (m.status === 'completed' && m.result) allMatches.push({ ...m, tournamentName: tourney.name });
+        });
+      }
+
+      // 4. Helper – parse checkout string to numeric value
+      const getCheckoutValue = (checkout) => {
+        if (typeof checkout === 'number') return checkout;
+        if (typeof checkout === 'string') {
+          const parts = checkout.split('+').map(p => p.trim());
+          let total = 0;
+          parts.forEach(part => {
+            part = part.trim();
+            if (part.startsWith('T')) total += parseInt(part.substring(1)) * 3;
+            else if (part.startsWith('D')) total += parseInt(part.substring(1)) * 2;
+            else if (part.startsWith('S')) total += parseInt(part.substring(1));
+            else { const n = parseInt(part); if (!isNaN(n)) total += n; }
+          });
+          return total;
+        }
+        return 0;
+      };
+
+      // 5. Aggregate stats
+      // Maps: playerId → accumulated data
+      const player180s = new Map();          // { player, count }
+      const playerCheckouts = new Map();     // { player, highest, raw, tournamentName }
+      const playerMatchAvg = new Map();      // { player, average, opponent, tournamentName }
+      const playerBestLeg = new Map();       // { player, darts, opponent, tournamentName }
+
+      const processPlayerStats = (player, stats, opponent, tournamentName, startingScore) => {
+        if (!player?.id || !stats) return;
+        const pid = player.id;
+
+        // ── 180s (cumulative) ──
+        const count180 = Number(stats.oneEighties || 0);
+        if (count180 > 0) {
+          const existing = player180s.get(pid);
+          if (!existing) {
+            player180s.set(pid, { player, count: count180 });
+          } else {
+            existing.count += count180;
+          }
+        }
+
+        // ── Highest checkout (per player, keep the single best) ──
+        if (stats.checkouts?.length) {
+          stats.checkouts.forEach(co => {
+            const val = getCheckoutValue(co.checkout);
+            if (val > 0) {
+              const existing = playerCheckouts.get(pid);
+              if (!existing || val > existing.highest) {
+                playerCheckouts.set(pid, { player, highest: val, raw: co.checkout, tournamentName, opponent: opponent?.name || '?' });
+              }
+            }
+          });
+        }
+
+        // ── Best single-match average ──
+        if (stats.average > 0) {
+          const existing = playerMatchAvg.get(pid);
+          if (!existing || stats.average > existing.average) {
+            playerMatchAvg.set(pid, { player, average: stats.average, opponent: opponent?.name || '?', tournamentName });
+          }
+        }
+
+        // ── Fewest darts in a winning leg ──
+        if (stats.legs?.length) {
+          stats.legs.forEach(leg => {
+            if (!leg?.isWin || !leg.darts) return;
+            const existing = playerBestLeg.get(pid);
+            if (!existing || leg.darts < existing.darts) {
+              playerBestLeg.set(pid, { player, darts: leg.darts, opponent: opponent?.name || '?', tournamentName });
+            }
+          });
+        } else if (stats.checkouts?.length) {
+          stats.checkouts.forEach(co => {
+            let totalDarts = co.totalDarts || co.darts;
+            if ((!totalDarts || totalDarts <= 3) && stats.legAverages?.length >= co.leg) {
+              const legAvg = stats.legAverages[co.leg - 1];
+              if (legAvg > 0) {
+                const score = startingScore || 501;
+                totalDarts = Math.round((score / legAvg) * 3);
+              }
+            }
+            if (!totalDarts) return;
+            const existing = playerBestLeg.get(pid);
+            if (!existing || totalDarts < existing.darts) {
+              playerBestLeg.set(pid, { player, darts: totalDarts, opponent: opponent?.name || '?', tournamentName });
+            }
+          });
+        }
+      };
+
+      allMatches.forEach(match => {
+        processPlayerStats(match.player1, match.result?.player1Stats, match.player2, match.tournamentName, match.startingScore);
+        processPlayerStats(match.player2, match.result?.player2Stats, match.player1, match.tournamentName, match.startingScore);
+      });
+
+      // 6. Sort and return top 10 for each category
+      const toSortedArray = (map, valueFn, asc = false) => {
+        const arr = Array.from(map.values());
+        arr.sort((a, b) => asc ? valueFn(a) - valueFn(b) : valueFn(b) - valueFn(a));
+        return arr.slice(0, 10);
+      };
+
+      return {
+        most180s: toSortedArray(player180s, e => e.count),
+        bestCheckouts: toSortedArray(playerCheckouts, e => e.highest),
+        bestMatchAverages: toSortedArray(playerMatchAvg, e => e.average),
+        fewestDartsLegs: toSortedArray(playerBestLeg, e => e.darts, true),
+      };
+    } catch (error) {
+      console.error('Error fetching league statistics:', error);
+      throw error;
+    }
+  },
+
   // Transform league data from database format to app format
   transformLeague(league) {
     return {

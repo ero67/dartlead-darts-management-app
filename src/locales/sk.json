@@ -540,6 +540,20 @@
     "defaultsSaveFailed": "Nepodarilo sa uložiť predvolené nastavenia turnajov",
     "resetDefaults": "Resetovať na Predvolené",
     "noDefaultsSet": "Zatiaľ nie sú nakonfigurované žiadne predvolené nastavenia turnajov. Nakonfigurujte predvolené hodnoty nižšie, aby turnaje v tejto lige začínali s predvyplnenými nastaveniami.",
-    "defaultSeedingMethod": "Predvolená Metóda Nasadenia"
+    "defaultSeedingMethod": "Predvolená Metóda Nasadenia",
+    "statistics": "Štatistiky",
+    "leagueStatistics": "Štatistiky ligy",
+    "loadingStatistics": "Načítavanie štatistík…",
+    "noStatisticsYet": "Zatiaľ žiadne štatistiky. Najprv dokončite nejaké turnaje.",
+    "most180s": "Najviac 180",
+    "bestCheckouts": "Najlepšie Checkouty",
+    "bestMatchAverages": "Najlepšie Priemery v Zápase",
+    "fewestDartsLegs": "Najmenej Šípok (Leg)",
+    "statPlayer": "Hráč",
+    "statValue": "Hodnota",
+    "statDetails": "Detaily",
+    "statVs": "vs",
+    "statIn": "v",
+    "statDarts": "šípok"
   }
 }
