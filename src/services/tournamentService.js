@@ -501,7 +501,9 @@ export const tournamentService = {
                         }
                       }
                       if (parsedResult) {
-                        return parsedResult;
+                        // ALWAYS use match.winner_id as the authoritative winner.
+                        // The JSONB result.winner can become stale after player merges.
+                        return { ...parsedResult, winner: match.winner_id };
                       }
                     }
                     // Fallback to basic stats if result doesn't exist
@@ -577,7 +579,9 @@ export const tournamentService = {
                     }
                   }
                   if (parsedResult) {
-                    return parsedResult;
+                    // ALWAYS use match.winner_id as the authoritative winner.
+                    // The JSONB result.winner can become stale after player merges.
+                    return { ...parsedResult, winner: match.winner_id };
                   }
                 }
                 // Fallback to basic stats if result doesn't exist
@@ -742,7 +746,12 @@ export const tournamentService = {
                   parsedResult = null;
                 }
               }
-              return parsedResult;
+              if (parsedResult) {
+                // ALWAYS use match.winner_id as the authoritative winner.
+                // The JSONB result.winner can become stale after player merges
+                // (merge updates winner_id column but not the JSONB blob).
+                return { ...parsedResult, winner: match.winner_id };
+              }
             }
             // Fallback to basic stats if result doesn't exist
             return {
@@ -813,7 +822,9 @@ export const tournamentService = {
                     if (parsedResult && parsedResult.player2Stats && !parsedResult.player2Stats.checkouts) {
                       console.warn('Match result missing checkouts for player2:', match.id);
                     }
-                    return parsedResult;
+                    // ALWAYS use match.winner_id as the authoritative winner.
+                    // The JSONB result.winner can become stale after player merges.
+                    return parsedResult ? { ...parsedResult, winner: match.winner_id } : parsedResult;
                   }
                   // Fallback to basic stats if result doesn't exist
                   return {

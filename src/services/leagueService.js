@@ -1221,7 +1221,7 @@ export const leagueService = {
         }
       }
 
-      // 3. matches — player1_id, player2_id, winner_id
+      // 3. matches — player1_id, player2_id, winner_id  AND  result JSONB winner
       {
         const updates = [
           { col: 'player1_id', label: 'matches.player1_id' },
@@ -1236,6 +1236,34 @@ export const leagueService = {
             .select('id');
           if (error) console.error(`Error updating ${label}:`, error);
           if (data?.length) log.push(`${label}: ${data.length} row(s)`);
+        }
+
+        // Also update the result JSONB blob so result.winner stays in sync
+        // with the winner_id column. Fetch matches whose JSONB result→winner
+        // still references the source player and patch them.
+        const { data: staleResultMatches, error: staleErr } = await supabase
+          .from('matches')
+          .select('id, result')
+          .eq('winner_id', targetPlayerId)          // winner_id already updated above
+          .not('result', 'is', null);
+
+        if (!staleErr && staleResultMatches?.length) {
+          let fixedCount = 0;
+          for (const m of staleResultMatches) {
+            let parsed = m.result;
+            if (typeof parsed === 'string') {
+              try { parsed = JSON.parse(parsed); } catch { continue; }
+            }
+            if (parsed && parsed.winner === sourcePlayerId) {
+              parsed.winner = targetPlayerId;
+              const { error: patchErr } = await supabase
+                .from('matches')
+                .update({ result: parsed })
+                .eq('id', m.id);
+              if (!patchErr) fixedCount++;
+            }
+          }
+          if (fixedCount) log.push(`matches.result JSONB winner: ${fixedCount} row(s)`);
         }
       }
 
