@@ -13,7 +13,9 @@ const ACTIONS = {
   ADD_MEMBERS: 'ADD_MEMBERS',
   UPDATE_MEMBER: 'UPDATE_MEMBER',
   REMOVE_MEMBER: 'REMOVE_MEMBER',
-  UPDATE_LEADERBOARD: 'UPDATE_LEADERBOARD'
+  UPDATE_LEADERBOARD: 'UPDATE_LEADERBOARD',
+  LINK_TOURNAMENT: 'LINK_TOURNAMENT',
+  UNLINK_TOURNAMENT: 'UNLINK_TOURNAMENT'
 };
 
 // Initial state
@@ -106,6 +108,26 @@ function leagueReducer(state, action) {
         currentLeague: {
           ...state.currentLeague,
           leaderboard: action.payload
+        }
+      };
+
+    case ACTIONS.LINK_TOURNAMENT:
+      if (!state.currentLeague) return state;
+      return {
+        ...state,
+        currentLeague: {
+          ...state.currentLeague,
+          tournaments: [...(state.currentLeague.tournaments || []), action.payload]
+        }
+      };
+
+    case ACTIONS.UNLINK_TOURNAMENT:
+      if (!state.currentLeague) return state;
+      return {
+        ...state,
+        currentLeague: {
+          ...state.currentLeague,
+          tournaments: (state.currentLeague.tournaments || []).filter(t => t.id !== action.payload)
         }
       };
 
@@ -231,6 +253,46 @@ export function LeagueProvider({ children }) {
     }
   };
 
+  const getUnlinkedTournaments = async () => {
+    try {
+      return await leagueService.getUnlinkedTournaments();
+    } catch (error) {
+      console.error('Error fetching unlinked tournaments:', error);
+      throw error;
+    }
+  };
+
+  const linkTournamentToLeague = async (leagueId, tournamentId) => {
+    try {
+      const tournament = await leagueService.linkTournamentToLeague(leagueId, tournamentId);
+      if (tournament && state.currentLeague?.id === leagueId) {
+        dispatch({ type: ACTIONS.LINK_TOURNAMENT, payload: tournament });
+        // Refresh leaderboard since points may have been calculated
+        const leaderboard = await leagueService.getLeaderboard(leagueId);
+        dispatch({ type: ACTIONS.UPDATE_LEADERBOARD, payload: leaderboard });
+      }
+      return tournament;
+    } catch (error) {
+      console.error('Error linking tournament to league:', error);
+      throw error;
+    }
+  };
+
+  const unlinkTournamentFromLeague = async (leagueId, tournamentId) => {
+    try {
+      await leagueService.unlinkTournamentFromLeague(leagueId, tournamentId);
+      if (state.currentLeague?.id === leagueId) {
+        dispatch({ type: ACTIONS.UNLINK_TOURNAMENT, payload: tournamentId });
+        // Refresh leaderboard
+        const leaderboard = await leagueService.getLeaderboard(leagueId);
+        dispatch({ type: ACTIONS.UPDATE_LEADERBOARD, payload: leaderboard });
+      }
+    } catch (error) {
+      console.error('Error unlinking tournament from league:', error);
+      throw error;
+    }
+  };
+
   const refreshLeaderboard = async (leagueId) => {
     try {
       await leagueService.updateLeaderboard(leagueId);
@@ -255,7 +317,10 @@ export function LeagueProvider({ children }) {
     updateMemberStatus,
     removeMember,
     calculateTournamentResults,
-    refreshLeaderboard
+    refreshLeaderboard,
+    getUnlinkedTournaments,
+    linkTournamentToLeague,
+    unlinkTournamentFromLeague
   };
 
   return (

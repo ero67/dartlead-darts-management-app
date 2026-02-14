@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,7 +26,7 @@ const DEFAULT_TOURNAMENT_SETTINGS = {
 export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard } = useLeague();
+  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague } = useLeague();
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '' });
@@ -39,6 +39,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   // Default tournament settings state
   const [tournamentDefaults, setTournamentDefaults] = useState(DEFAULT_TOURNAMENT_SETTINGS);
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
+
+  // Add existing tournament state
+  const [isLinkingTournament, setIsLinkingTournament] = useState(false);
+  const [unlinkedTournaments, setUnlinkedTournaments] = useState([]);
+  const [loadingUnlinked, setLoadingUnlinked] = useState(false);
+  const [selectedTournamentToLink, setSelectedTournamentToLink] = useState('');
 
   useEffect(() => {
     if (leagueId && (!currentLeague || currentLeague.id !== leagueId)) {
@@ -60,14 +66,20 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     if (currentLeague?.scoringRules?.placementPoints) {
       const points = currentLeague.scoringRules.placementPoints;
       const rulesArray = Object.entries(points)
-        .filter(([key]) => key !== 'default')
+        .filter(([key]) => key !== 'default' && key !== 'playoffDefault')
         .map(([position, pts]) => ({ position: parseInt(position), points: pts }))
         .sort((a, b) => a.position - b.position);
       
-      // Add default if exists
-      if (points.default !== undefined) {
-        rulesArray.push({ position: 'default', points: points.default });
-      }
+      // Always show playoffDefault (default to 1 if not stored yet)
+      rulesArray.push({
+        position: 'playoffDefault',
+        points: points.playoffDefault !== undefined ? points.playoffDefault : 1
+      });
+      // Always show default / non-playoff (default to 0 if not stored yet)
+      rulesArray.push({
+        position: 'default',
+        points: points.default !== undefined ? points.default : 0
+      });
       
       setScoringRules(rulesArray);
     }
@@ -180,10 +192,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   };
 
   const handleAddPlacement = () => {
-    const position = newPlacement.position === 'default' ? 'default' : parseInt(newPlacement.position);
+    const position = (newPlacement.position === 'default' || newPlacement.position === 'playoffDefault')
+      ? newPlacement.position
+      : parseInt(newPlacement.position);
     const points = parseInt(newPlacement.points) || 0;
     
-    if (position === '' || (position !== 'default' && (isNaN(position) || position < 1))) {
+    if (position === '' || (position !== 'default' && position !== 'playoffDefault' && (isNaN(position) || position < 1))) {
       alert(t('leagues.invalidPosition'));
       return;
     }
@@ -195,10 +209,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     }
     
     const updated = [...scoringRules, { position, points }];
-    // Sort: numeric positions first, then default
+    // Sort: numeric positions first, then playoffDefault, then default
     updated.sort((a, b) => {
       if (a.position === 'default') return 1;
       if (b.position === 'default') return -1;
+      if (a.position === 'playoffDefault') return 1;
+      if (b.position === 'playoffDefault') return -1;
       return a.position - b.position;
     });
     
@@ -255,8 +271,47 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     setTournamentDefaults(DEFAULT_TOURNAMENT_SETTINGS);
   };
 
+  const handleOpenLinkTournament = async () => {
+    setIsLinkingTournament(true);
+    setLoadingUnlinked(true);
+    try {
+      const tournaments = await getUnlinkedTournaments();
+      setUnlinkedTournaments(tournaments);
+    } catch (error) {
+      console.error('Error loading unlinked tournaments:', error);
+    } finally {
+      setLoadingUnlinked(false);
+    }
+  };
+
+  const handleLinkTournament = async () => {
+    if (!selectedTournamentToLink || !currentLeague) return;
+    try {
+      await linkTournamentToLeague(currentLeague.id, selectedTournamentToLink);
+      // Refresh the league to get updated tournament list
+      await selectLeague(currentLeague.id);
+      setIsLinkingTournament(false);
+      setSelectedTournamentToLink('');
+      setUnlinkedTournaments([]);
+    } catch (error) {
+      console.error('Error linking tournament:', error);
+    }
+  };
+
+  const handleUnlinkTournament = async (tournamentId, tournamentName) => {
+    if (!window.confirm(t('leagues.confirmUnlinkTournament') || `Remove "${tournamentName}" from this league?`)) return;
+    try {
+      await unlinkTournamentFromLeague(currentLeague.id, tournamentId);
+      // Refresh the league to get updated tournament list
+      await selectLeague(currentLeague.id);
+    } catch (error) {
+      console.error('Error unlinking tournament:', error);
+    }
+  };
+
   const getPlacementLabel = (position) => {
-    if (position === 'default') return t('leagues.defaultOtherPlacements');
+    if (position === 'playoffDefault') return t('leagues.playoffParticipant') || '🏟️ Other Playoff Participants';
+    if (position === 'default') return t('leagues.nonPlayoffParticipant') || '👥 Non-Playoff Participants';
     if (position === 1) return `${t('leagues.1stPlace')} 🥇`;
     if (position === 2) return `${t('leagues.2ndPlace')} 🥈`;
     if (position === 3) return `${t('leagues.3rdPlace')} 🥉`;
@@ -462,33 +517,128 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
 
         {activeTab === 'tournaments' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h2 style={{ color: 'var(--text-primary)' }}>{t('tournaments.title')}</h2>
-              {isManager && onCreateTournament && (
-                <button className="create-tournament-btn" onClick={() => onCreateTournament(currentLeague)}>
-                  <Plus size={18} />
-                  {t('leagues.createTournament')}
-                </button>
+              {isManager && (
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button className="create-tournament-btn" onClick={handleOpenLinkTournament} style={{ background: 'var(--accent-secondary)', color: '#fff' }}>
+                    <Link size={18} />
+                    {t('leagues.addExistingTournament') || 'Add Existing'}
+                  </button>
+                  {onCreateTournament && (
+                    <button className="create-tournament-btn" onClick={() => onCreateTournament(currentLeague)}>
+                      <Plus size={18} />
+                      {t('leagues.createTournament')}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
+
+            {/* Link existing tournament picker */}
+            {isLinkingTournament && (
+              <div style={{
+                marginBottom: '1.5rem',
+                padding: '1rem',
+                background: 'var(--card-bg)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1rem' }}>
+                    {t('leagues.selectTournamentToLink') || 'Select a tournament to add to this league'}
+                  </h3>
+                  <button
+                    className="action-btn delete"
+                    onClick={() => { setIsLinkingTournament(false); setSelectedTournamentToLink(''); }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                {loadingUnlinked ? (
+                  <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0' }}>{t('common.loading') || 'Loading...'}</p>
+                ) : unlinkedTournaments.length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0' }}>
+                    {t('leagues.noUnlinkedTournaments') || 'No unlinked tournaments found. All your tournaments are already in a league.'}
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select
+                      value={selectedTournamentToLink}
+                      onChange={(e) => setSelectedTournamentToLink(e.target.value)}
+                      style={{
+                        flex: 1,
+                        minWidth: '200px',
+                        padding: '0.5rem',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text-primary)',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      <option value="">{t('leagues.chooseTournament') || '-- Choose tournament --'}</option>
+                      {unlinkedTournaments.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.status}) — {new Date(t.created_at).toLocaleDateString()}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="action-btn play"
+                      onClick={handleLinkTournament}
+                      disabled={!selectedTournamentToLink}
+                      style={{ opacity: selectedTournamentToLink ? 1 : 0.5 }}
+                    >
+                      <Check size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {currentLeague.tournaments && currentLeague.tournaments.length > 0 ? (
               <div className="tournaments-grid">
                 {currentLeague.tournaments.map(tournament => (
-                  <div key={tournament.id} className="tournament-card" onClick={() => onSelectTournament && onSelectTournament(tournament)}>
-                    <div className="card-header">
-                      <div className="tournament-info">
-                        <h3>{tournament.name}</h3>
-                        <span className={`status-badge ${tournament.status}`}>
-                          {tournament.status}
-                        </span>
+                  <div key={tournament.id} className="tournament-card" style={{ position: 'relative' }}>
+                    <div onClick={() => onSelectTournament && onSelectTournament(tournament)} style={{ cursor: 'pointer' }}>
+                      <div className="card-header">
+                        <div className="tournament-info">
+                          <h3>{tournament.name}</h3>
+                          <span className={`status-badge ${tournament.status}`}>
+                            {tournament.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="tournament-stats">
+                        <div className="stat">
+                          <Calendar size={16} />
+                          <span>{new Date(tournament.created_at).toLocaleDateString()}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="tournament-stats">
-                      <div className="stat">
-                        <Calendar size={16} />
-                        <span>{new Date(tournament.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
+                    {isManager && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleUnlinkTournament(tournament.id, tournament.name); }}
+                        title={t('leagues.unlinkTournament') || 'Remove from league'}
+                        style={{
+                          position: 'absolute',
+                          top: '0.5rem',
+                          right: '0.5rem',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--text-secondary)',
+                          padding: '0.25rem',
+                          borderRadius: '6px',
+                          transition: 'color 0.2s, background 0.2s'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-danger)'; e.currentTarget.style.background = 'var(--card-bg)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'none'; }}
+                      >
+                        <Unlink size={16} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -496,11 +646,19 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               <div className="empty-state">
                 <Trophy size={48} />
                 <p>{t('leagues.noTournamentsYet')}</p>
-                {isManager && onCreateTournament && (
-                  <button className="create-first-btn" onClick={() => onCreateTournament(currentLeague)}>
-                    <Plus size={20} />
-                    {t('leagues.createTournament')}
-                  </button>
+                {isManager && (
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button className="create-first-btn" onClick={handleOpenLinkTournament}>
+                      <Link size={20} />
+                      {t('leagues.addExistingTournament') || 'Add Existing'}
+                    </button>
+                    {onCreateTournament && (
+                      <button className="create-first-btn" onClick={() => onCreateTournament(currentLeague)}>
+                        <Plus size={20} />
+                        {t('leagues.createTournament')}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}

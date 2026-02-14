@@ -21,7 +21,7 @@ export const leagueService = {
           created_by: user.id,
           default_tournament_settings: leagueData.defaultTournamentSettings || null,
           scoring_rules: leagueData.scoringRules || {
-            placementPoints: { "1": 12, "2": 9, "3": 7, "4": 5, "5": 3, "default": 1 },
+            placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
             allowManualOverride: true
           }
         })
@@ -428,7 +428,7 @@ export const leagueService = {
       if (!league) throw new Error('League not found');
 
       const scoringRules = league.scoring_rules || {
-        placementPoints: { "1": 12, "2": 9, "3": 7, "4": 5, "5": 3, "default": 1 },
+        placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
         allowManualOverride: true
       };
 
@@ -444,102 +444,8 @@ export const leagueService = {
   // Calculate placements from tournament data and award points
   async calculateTournamentPlacements(leagueId, tournamentId, tournamentData) {
     try {
-      const placements = [];
-
-      // Determine placements based on tournament structure
-      if (tournamentData.playoffs && tournamentData.playoffs.rounds && tournamentData.playoffs.rounds.length > 0) {
-        // Tournament has playoffs - use playoff results
-        const finalRound = tournamentData.playoffs.rounds[tournamentData.playoffs.rounds.length - 1];
-        const finalMatch = finalRound.matches.find(m => !m.isThirdPlaceMatch && m.status === 'completed');
-        const thirdPlaceMatch = finalRound.matches.find(m => m.isThirdPlaceMatch && m.status === 'completed');
-
-        // Get all playoff participants and their final positions
-        const playoffPlayers = new Set();
-        tournamentData.playoffs.rounds.forEach(round => {
-          round.matches.forEach(match => {
-            if (match.player1) playoffPlayers.add(match.player1.id);
-            if (match.player2) playoffPlayers.add(match.player2.id);
-          });
-        });
-
-        // Assign placements
-        if (finalMatch && finalMatch.result) {
-          placements.push({
-            playerId: finalMatch.result.winner,
-            placement: 1
-          });
-          const loserId = finalMatch.result.winner === finalMatch.player1?.id 
-            ? finalMatch.player2?.id 
-            : finalMatch.player1?.id;
-          if (loserId) {
-            placements.push({
-              playerId: loserId,
-              placement: 2
-            });
-          }
-        }
-
-        if (thirdPlaceMatch && thirdPlaceMatch.result) {
-          placements.push({
-            playerId: thirdPlaceMatch.result.winner,
-            placement: 3
-          });
-        }
-
-        // For other players, rank by round eliminated (simplified - would need more logic for full bracket)
-        // For MVP, we'll assign default placement for non-top-3
-        const placedPlayerIds = new Set(placements.map(p => p.playerId));
-        let currentPlacement = 4;
-        tournamentData.playoffs.rounds.forEach((round, roundIndex) => {
-          round.matches.forEach(match => {
-            if (match.status === 'completed' && match.result) {
-              const loserId = match.result.winner === match.player1?.id 
-                ? match.player2?.id 
-                : match.player1?.id;
-              if (loserId && !placedPlayerIds.has(loserId)) {
-                placements.push({
-                  playerId: loserId,
-                  placement: currentPlacement++
-                });
-                placedPlayerIds.add(loserId);
-              }
-            }
-          });
-        });
-      } else {
-        // Group-only tournament - use group standings
-        const allStandings = [];
-        tournamentData.groups.forEach(group => {
-          if (group.standings && group.standings.length > 0) {
-            group.standings.forEach((standing, index) => {
-              allStandings.push({
-                playerId: standing.player.id,
-                groupName: group.name,
-                position: index + 1,
-                points: standing.points,
-                legDifference: standing.legsWon - standing.legsLost,
-                average: standing.average
-              });
-            });
-          }
-        });
-
-        // Sort all players across groups by performance
-        allStandings.sort((a, b) => {
-          if (b.points !== a.points) return b.points - a.points;
-          if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
-          if (b.average !== a.average) return b.average - a.average;
-          return 0;
-        });
-
-        // Assign placements
-        allStandings.forEach((standing, index) => {
-          placements.push({
-            playerId: standing.playerId,
-            placement: index + 1
-          });
-        });
-      }
+      // Use the shared extractPlacements helper (includes inPlayoff flag)
+      const placements = this.extractPlacements(tournamentData);
 
       // Get league scoring rules
       const { data: league } = await supabase
@@ -551,15 +457,15 @@ export const leagueService = {
       if (!league) throw new Error('League not found');
 
       const scoringRules = league.scoring_rules || {
-        placementPoints: { "1": 12, "2": 9, "3": 7, "4": 5, "5": 3, "default": 1 },
+        placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
         allowManualOverride: true
       };
 
-      const placementPoints = scoringRules.placementPoints || { "1": 12, "2": 9, "3": 7, "4": 5, "5": 3, "default": 1 };
+      const placementPoints = scoringRules.placementPoints || { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 };
 
       // Award points and create results records
       const resultsToInsert = placements.map(p => {
-        const points = placementPoints[p.placement.toString()] || placementPoints.default || 1;
+        const points = this.resolvePoints(placementPoints, p);
         return {
           league_id: leagueId,
           tournament_id: tournamentId,
@@ -632,15 +538,15 @@ export const leagueService = {
                 .single();
 
               const scoringRules = league?.scoring_rules || {
-                placementPoints: { "1": 12, "2": 9, "3": 7, "4": 5, "5": 3, "default": 1 },
+                placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
                 allowManualOverride: true
               };
 
-              const placementPoints = scoringRules.placementPoints || { "1": 12, "2": 9, "3": 7, "4": 5, "5": 3, "default": 1 };
+              const placementPoints = scoringRules.placementPoints || { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 };
 
               // Award points and create results records
               const resultsToInsert = placements.map(p => {
-                const points = placementPoints[p.placement.toString()] || placementPoints.default || 1;
+                const points = this.resolvePoints(placementPoints, p);
                 return {
                   league_id: leagueId,
                   tournament_id: tournament.id,
@@ -687,12 +593,42 @@ export const leagueService = {
     }
   },
 
-  // Extract placements from tournament data structure
+  // Resolve points for a placement entry given the scoring rules.
+  // Priority: explicit placement number → playoffDefault (if in playoff) → default → 0
+  resolvePoints(placementPoints, placement) {
+    const explicitKey = placement.placement.toString();
+    if (placementPoints[explicitKey] !== undefined) {
+      return placementPoints[explicitKey];
+    }
+    // Playoff participant without an explicit placement entry
+    if (placement.inPlayoff && placementPoints.playoffDefault !== undefined) {
+      return placementPoints.playoffDefault;
+    }
+    // Fallback for everyone else
+    if (placementPoints.default !== undefined) {
+      return placementPoints.default;
+    }
+    return 0;
+  },
+
+  // Extract placements from tournament data structure.
+  // Each entry: { playerId, placement, inPlayoff }
   extractPlacements(tournamentData) {
     const placements = [];
     
     // Check if tournament has playoffs
-    if (tournamentData.playoffs && tournamentData.playoffs.rounds && tournamentData.playoffs.rounds.length > 0) {
+    const hasPlayoffs = tournamentData.playoffs && tournamentData.playoffs.rounds && tournamentData.playoffs.rounds.length > 0;
+
+    if (hasPlayoffs) {
+      // ── Collect the set of ALL playoff participant IDs ──────────────
+      const playoffPlayerIds = new Set();
+      tournamentData.playoffs.rounds.forEach(round => {
+        (round.matches || []).forEach(match => {
+          if (match.player1?.id) playoffPlayerIds.add(match.player1.id);
+          if (match.player2?.id) playoffPlayerIds.add(match.player2.id);
+        });
+      });
+
       // Tournament has playoffs - use playoff results
       const rounds = tournamentData.playoffs.rounds;
       const finalRound = rounds[rounds.length - 1];
@@ -704,7 +640,8 @@ export const leagueService = {
       if (finalMatch && finalMatch.result) {
         placements.push({
           playerId: finalMatch.result.winner,
-          placement: 1
+          placement: 1,
+          inPlayoff: true
         });
         const loserId = finalMatch.result.winner === finalMatch.player1?.id 
           ? finalMatch.player2?.id 
@@ -712,31 +649,30 @@ export const leagueService = {
         if (loserId) {
           placements.push({
             playerId: loserId,
-            placement: 2
+            placement: 2,
+            inPlayoff: true
           });
         }
       }
 
       // Handle 3rd place - either from 3rd place match or shared by semifinal losers
       if (thirdPlaceMatch && thirdPlaceMatchCompleted && thirdPlaceMatch.result) {
-        // 3rd place match was played
         placements.push({
           playerId: thirdPlaceMatch.result.winner,
-          placement: 3
+          placement: 3,
+          inPlayoff: true
         });
-        // Also add the 4th place (loser of third place match)
         const fourthId = thirdPlaceMatch.result.winner === thirdPlaceMatch.player1?.id 
           ? thirdPlaceMatch.player2?.id 
           : thirdPlaceMatch.player1?.id;
         if (fourthId) {
           placements.push({
             playerId: fourthId,
-            placement: 4
+            placement: 4,
+            inPlayoff: true
           });
         }
       } else if (!thirdPlaceMatch && rounds.length >= 2) {
-        // No 3rd place match - both semifinal losers share 3rd place
-        // Find the semifinal round (second to last)
         const semiFinalRound = rounds[rounds.length - 2];
         if (semiFinalRound && semiFinalRound.matches) {
           semiFinalRound.matches.forEach(match => {
@@ -747,7 +683,8 @@ export const leagueService = {
               if (loserId) {
                 placements.push({
                   playerId: loserId,
-                  placement: 3 // Both share 3rd place
+                  placement: 3,
+                  inPlayoff: true
                 });
               }
             }
@@ -755,14 +692,10 @@ export const leagueService = {
         }
       }
 
-      // For other players, rank by round eliminated
+      // For other playoff players, rank by round eliminated
       const placedPlayerIds = new Set(placements.map(p => p.playerId));
-      let currentPlacement = thirdPlaceMatch ? 5 : 5; // Start from 5th (after 1st, 2nd, and 3rd/3rd or 3rd/4th)
+      let currentPlacement = Math.max(...placements.map(p => p.placement), 0) + 1;
       
-      // Recalculate starting placement based on what we've already placed
-      currentPlacement = Math.max(...placements.map(p => p.placement)) + 1;
-      
-      // Process rounds from earliest (most eliminated) to latest, excluding final and semifinal (already processed)
       for (let i = 0; i < rounds.length - 2; i++) {
         const round = rounds[i];
         round.matches?.forEach(match => {
@@ -773,15 +706,67 @@ export const leagueService = {
             if (loserId && !placedPlayerIds.has(loserId)) {
               placements.push({
                 playerId: loserId,
-                placement: currentPlacement++
+                placement: currentPlacement++,
+                inPlayoff: true
               });
               placedPlayerIds.add(loserId);
             }
           }
         });
       }
+
+      // ── Add non-playoff participants from group standings ──────────
+      // Collect all tournament players from groups and rank remaining ones
+      const allGroupPlayers = [];
+      (tournamentData.groups || []).forEach(group => {
+        if (group.standings && group.standings.length > 0) {
+          group.standings.forEach((standing, index) => {
+            if (standing.player?.id && !placedPlayerIds.has(standing.player.id)) {
+              allGroupPlayers.push({
+                playerId: standing.player.id,
+                points: standing.points || 0,
+                legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
+                average: standing.average || 0,
+                inPlayoff: playoffPlayerIds.has(standing.player.id)
+              });
+            }
+          });
+        }
+      });
+
+      // Sort non-placed players by group performance
+      allGroupPlayers.sort((a, b) => {
+        // Playoff participants first
+        if (a.inPlayoff !== b.inPlayoff) return a.inPlayoff ? -1 : 1;
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
+        if (b.average !== a.average) return b.average - a.average;
+        return 0;
+      });
+
+      allGroupPlayers.forEach(gp => {
+        placements.push({
+          playerId: gp.playerId,
+          placement: currentPlacement++,
+          inPlayoff: gp.inPlayoff
+        });
+        placedPlayerIds.add(gp.playerId);
+      });
+
+      // Also try tournament.players for any players we may have missed
+      (tournamentData.players || []).forEach(player => {
+        if (player?.id && !placedPlayerIds.has(player.id)) {
+          placements.push({
+            playerId: player.id,
+            placement: currentPlacement++,
+            inPlayoff: playoffPlayerIds.has(player.id)
+          });
+          placedPlayerIds.add(player.id);
+        }
+      });
+
     } else if (tournamentData.groups && tournamentData.groups.length > 0) {
-      // Group-only tournament - use group standings
+      // Group-only tournament - use group standings (no playoff distinction)
       const allStandings = [];
       
       tournamentData.groups.forEach(group => {
@@ -801,7 +786,6 @@ export const leagueService = {
         }
       });
 
-      // Sort all players across groups by performance
       allStandings.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
@@ -809,11 +793,11 @@ export const leagueService = {
         return 0;
       });
 
-      // Assign placements
       allStandings.forEach((standing, index) => {
         placements.push({
           playerId: standing.playerId,
-          placement: index + 1
+          placement: index + 1,
+          inPlayoff: false
         });
       });
     }
@@ -925,6 +909,91 @@ export const leagueService = {
     }
   },
 
+  // Get tournaments NOT linked to any league (for "add existing tournament" UI)
+  async getUnlinkedTournaments() {
+    try {
+      const { data, error } = await supabase
+        .from('tournaments')
+        .select('id, name, status, created_at')
+        .is('league_id', null)
+        .eq('deleted', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching unlinked tournaments:', error);
+      throw error;
+    }
+  },
+
+  // Link an existing tournament to a league (set league_id) and recalculate points
+  async linkTournamentToLeague(leagueId, tournamentId) {
+    try {
+      // Set the league_id on the tournament
+      const { error: updateError } = await supabase
+        .from('tournaments')
+        .update({ league_id: leagueId, league_points_calculated: false })
+        .eq('id', tournamentId)
+        .is('league_id', null); // safety: only link if not already linked
+
+      if (updateError) throw updateError;
+
+      // If the tournament is completed, calculate points right away
+      const { data: tournament } = await supabase
+        .from('tournaments')
+        .select('id, name, status')
+        .eq('id', tournamentId)
+        .single();
+
+      if (tournament?.status === 'completed') {
+        const { tournamentService } = await import('./tournamentService.js');
+        const fullTournament = await tournamentService.getTournament(tournamentId);
+        if (fullTournament) {
+          await this.calculateTournamentPlacements(leagueId, tournamentId, fullTournament);
+        }
+        // Update leaderboard cache
+        await this.updateLeaderboardCache(leagueId);
+      }
+
+      return tournament;
+    } catch (error) {
+      console.error('Error linking tournament to league:', error);
+      throw error;
+    }
+  },
+
+  // Unlink a tournament from a league (remove league_id) and recalculate leaderboard
+  async unlinkTournamentFromLeague(leagueId, tournamentId) {
+    try {
+      // Remove the league_id from the tournament
+      const { error: updateError } = await supabase
+        .from('tournaments')
+        .update({ league_id: null, league_points_calculated: false })
+        .eq('id', tournamentId)
+        .eq('league_id', leagueId);
+
+      if (updateError) throw updateError;
+
+      // Remove the league_tournament_results for this tournament
+      const { error: deleteError } = await supabase
+        .from('league_tournament_results')
+        .delete()
+        .eq('league_id', leagueId)
+        .eq('tournament_id', tournamentId);
+
+      if (deleteError) throw deleteError;
+
+      // Recalculate leaderboard cache
+      await this.updateLeaderboardCache(leagueId);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error unlinking tournament from league:', error);
+      throw error;
+    }
+  },
+
   // Transform league data from database format to app format
   transformLeague(league) {
     return {
@@ -936,7 +1005,7 @@ export const leagueService = {
       createdBy: league.created_by,
       defaultTournamentSettings: league.default_tournament_settings,
       scoringRules: league.scoring_rules || {
-        placementPoints: { "1": 12, "2": 9, "3": 7, "4": 5, "5": 3, "default": 1 },
+        placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
         allowManualOverride: true
       },
       createdAt: league.created_at,
