@@ -994,6 +994,79 @@ export const leagueService = {
     }
   },
 
+  // ── Admin: get all leagues (minimal info) for dropdowns ────────────
+  async getAllLeaguesAdmin() {
+    try {
+      const { data, error } = await supabase
+        .from('leagues')
+        .select('id, name, status')
+        .eq('deleted', false)
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching leagues for admin:', error);
+      throw error;
+    }
+  },
+
+  // ── Admin: get leaderboard entries with player names for a league ──
+  async getLeaderboardAdmin(leagueId) {
+    try {
+      const { data, error } = await supabase
+        .from('league_leaderboard')
+        .select(`
+          id,
+          league_id,
+          player_id,
+          total_points,
+          tournaments_played,
+          best_placement,
+          worst_placement,
+          avg_placement,
+          player:players(id, name)
+        `)
+        .eq('league_id', leagueId)
+        .order('total_points', { ascending: false });
+
+      if (error) throw error;
+      return (data || []).map(entry => ({
+        id: entry.id,
+        playerId: entry.player_id,
+        playerName: entry.player?.name || 'Unknown',
+        totalPoints: entry.total_points || 0,
+        tournamentsPlayed: entry.tournaments_played || 0,
+        bestPlacement: entry.best_placement,
+        worstPlacement: entry.worst_placement,
+        avgPlacement: entry.avg_placement
+      }));
+    } catch (error) {
+      console.error('Error fetching leaderboard for admin:', error);
+      throw error;
+    }
+  },
+
+  // ── Admin: manually set total points for a player in a league ─────
+  async setPlayerPoints(leagueId, playerId, newTotalPoints) {
+    try {
+      const { error } = await supabase
+        .from('league_leaderboard')
+        .update({
+          total_points: newTotalPoints,
+          updated_at: new Date().toISOString()
+        })
+        .eq('league_id', leagueId)
+        .eq('player_id', playerId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting player points:', error);
+      throw error;
+    }
+  },
+
   // Transform league data from database format to app format
   transformLeague(league) {
     return {

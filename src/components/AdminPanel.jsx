@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, RotateCcw, Settings, Search } from 'lucide-react';
+import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, RotateCcw, Settings, Search, Trophy, Save } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { tournamentService } from '../services/tournamentService';
+import { leagueService } from '../services/leagueService';
 
 export function AdminPanel() {
   const { t } = useLanguage();
@@ -32,6 +33,15 @@ export function AdminPanel() {
   const [newStatus, setNewStatus] = useState('active');
   const [loadingTournament, setLoadingTournament] = useState(false);
   const [loadingTournaments, setLoadingTournaments] = useState(false);
+
+  // League Points Management
+  const [leaguesForPoints, setLeaguesForPoints] = useState([]);
+  const [selectedLeagueForPoints, setSelectedLeagueForPoints] = useState('');
+  const [leaderboardEntries, setLeaderboardEntries] = useState([]);
+  const [editedPoints, setEditedPoints] = useState({});
+  const [loadingLeagues, setLoadingLeagues] = useState(false);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [savingPoints, setSavingPoints] = useState(false);
 
   const setManagerRole = async () => {
     if (!email.trim()) {
@@ -512,11 +522,97 @@ export function AdminPanel() {
     }
   };
 
-  // Load managers and tournaments on mount
+  // ── League Points Management ──────────────────────────────────────
+  const loadLeaguesForPoints = async () => {
+    setLoadingLeagues(true);
+    try {
+      const leagues = await leagueService.getAllLeaguesAdmin();
+      setLeaguesForPoints(leagues || []);
+    } catch (err) {
+      console.error('Error loading leagues:', err);
+      setMessage({ type: 'error', text: 'Failed to load leagues.' });
+    } finally {
+      setLoadingLeagues(false);
+    }
+  };
+
+  const handleLeagueSelectForPoints = async (leagueId) => {
+    setSelectedLeagueForPoints(leagueId);
+    setLeaderboardEntries([]);
+    setEditedPoints({});
+    if (!leagueId) return;
+
+    setLoadingLeaderboard(true);
+    try {
+      const entries = await leagueService.getLeaderboardAdmin(leagueId);
+      setLeaderboardEntries(entries);
+      // Pre-fill edited points with current values
+      const initial = {};
+      entries.forEach(e => { initial[e.playerId] = e.totalPoints; });
+      setEditedPoints(initial);
+    } catch (err) {
+      console.error('Error loading leaderboard:', err);
+      setMessage({ type: 'error', text: 'Failed to load leaderboard.' });
+    } finally {
+      setLoadingLeaderboard(false);
+    }
+  };
+
+  const handlePointChange = (playerId, value) => {
+    setEditedPoints(prev => ({ ...prev, [playerId]: parseInt(value) || 0 }));
+  };
+
+  const saveAllPoints = async () => {
+    if (!selectedLeagueForPoints) return;
+    setSavingPoints(true);
+    setMessage({ type: '', text: '' });
+    try {
+      let changedCount = 0;
+      for (const entry of leaderboardEntries) {
+        const newPoints = editedPoints[entry.playerId];
+        if (newPoints !== undefined && newPoints !== entry.totalPoints) {
+          await leagueService.setPlayerPoints(selectedLeagueForPoints, entry.playerId, newPoints);
+          changedCount++;
+        }
+      }
+      setMessage({ type: 'success', text: `Updated points for ${changedCount} player(s).` });
+      // Reload to reflect changes
+      await handleLeagueSelectForPoints(selectedLeagueForPoints);
+    } catch (err) {
+      console.error('Error saving points:', err);
+      setMessage({ type: 'error', text: 'Failed to save points.' });
+    } finally {
+      setSavingPoints(false);
+    }
+  };
+
+  const saveSinglePlayerPoints = async (playerId, playerName) => {
+    if (!selectedLeagueForPoints) return;
+    const newPoints = editedPoints[playerId];
+    const entry = leaderboardEntries.find(e => e.playerId === playerId);
+    if (newPoints === undefined || newPoints === entry?.totalPoints) return;
+
+    setSavingPoints(true);
+    setMessage({ type: '', text: '' });
+    try {
+      await leagueService.setPlayerPoints(selectedLeagueForPoints, playerId, newPoints);
+      setMessage({ type: 'success', text: `Updated ${playerName} to ${newPoints} pts.` });
+      // Reload
+      await handleLeagueSelectForPoints(selectedLeagueForPoints);
+    } catch (err) {
+      console.error('Error saving points:', err);
+      setMessage({ type: 'error', text: `Failed to update ${playerName}.` });
+    } finally {
+      setSavingPoints(false);
+    }
+  };
+
+  // Load managers, tournaments, and leagues on mount
   React.useEffect(() => {
     loadManagers();
     loadTournamentsForMatch();
     loadTournamentsForStatus();
+    loadLeaguesForPoints();
   }, []);
 
   return (
@@ -891,6 +987,155 @@ export function AdminPanel() {
                   )}
               </button>
             </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── League Points Management ─────────────────────────────── */}
+        <div className="admin-section">
+          <div className="admin-section-header">
+            <Trophy size={20} />
+            <h2>League Points Management</h2>
+          </div>
+          <p className="admin-section-description">
+            Manually adjust player points in a league leaderboard. Changes are saved directly to the leaderboard cache.
+          </p>
+
+          <div className="admin-form">
+            <div className="form-group">
+              <label>Select League</label>
+              <select
+                value={selectedLeagueForPoints}
+                onChange={(e) => handleLeagueSelectForPoints(e.target.value)}
+                disabled={loadingLeagues}
+              >
+                <option value="">-- Choose a league --</option>
+                {leaguesForPoints.map(league => (
+                  <option key={league.id} value={league.id}>
+                    {league.name} ({league.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {loadingLeaderboard && (
+              <div className="admin-loading">
+                <Loader size={16} className="spinning" />
+                <span>Loading leaderboard...</span>
+              </div>
+            )}
+
+            {selectedLeagueForPoints && !loadingLeaderboard && leaderboardEntries.length === 0 && (
+              <p style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
+                No leaderboard entries found. Recalculate the leaderboard from the league settings first.
+              </p>
+            )}
+
+            {leaderboardEntries.length > 0 && (
+              <div style={{ marginTop: '1rem' }}>
+                <div style={{ 
+                  overflowX: 'auto',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px'
+                }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-tertiary)' }}>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>#</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Player</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Current Pts</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>New Pts</th>
+                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Save</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboardEntries.map((entry, index) => {
+                        const isChanged = editedPoints[entry.playerId] !== undefined && editedPoints[entry.playerId] !== entry.totalPoints;
+                        return (
+                          <tr 
+                            key={entry.playerId}
+                            style={{ 
+                              borderTop: '1px solid var(--border-color)',
+                              background: isChanged ? 'var(--accent-primary-light, rgba(59, 130, 246, 0.08))' : 'transparent'
+                            }}
+                          >
+                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              {index + 1}
+                            </td>
+                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-primary)', fontWeight: '500' }}>
+                              {entry.playerName}
+                            </td>
+                            <td style={{ padding: '0.6rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                              {entry.totalPoints}
+                            </td>
+                            <td style={{ padding: '0.6rem 1rem', textAlign: 'center' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                value={editedPoints[entry.playerId] ?? entry.totalPoints}
+                                onChange={(e) => handlePointChange(entry.playerId, e.target.value)}
+                                style={{
+                                  width: '70px',
+                                  padding: '0.35rem 0.5rem',
+                                  border: `1px solid ${isChanged ? 'var(--accent-primary, #3b82f6)' : 'var(--border-color)'}`,
+                                  borderRadius: '6px',
+                                  background: 'var(--input-bg)',
+                                  color: 'var(--text-primary)',
+                                  textAlign: 'center',
+                                  fontSize: '0.9rem',
+                                  fontWeight: isChanged ? '700' : '400'
+                                }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.6rem 1rem', textAlign: 'center' }}>
+                              <button
+                                onClick={() => saveSinglePlayerPoints(entry.playerId, entry.playerName)}
+                                disabled={!isChanged || savingPoints}
+                                style={{
+                                  padding: '0.3rem 0.5rem',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  background: isChanged ? 'var(--accent-primary, #3b82f6)' : 'var(--bg-tertiary)',
+                                  color: isChanged ? '#fff' : 'var(--text-muted)',
+                                  cursor: isChanged ? 'pointer' : 'default',
+                                  opacity: isChanged ? 1 : 0.4,
+                                  transition: 'all 0.2s'
+                                }}
+                                title={isChanged ? `Save ${entry.playerName}` : 'No changes'}
+                              >
+                                <Check size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Save All button */}
+                <button
+                  className="admin-button primary"
+                  onClick={saveAllPoints}
+                  disabled={savingPoints || !Object.entries(editedPoints).some(([pid, pts]) => {
+                    const entry = leaderboardEntries.find(e => e.playerId === pid);
+                    return entry && pts !== entry.totalPoints;
+                  })}
+                  style={{ marginTop: '1rem', width: '100%' }}
+                >
+                  {savingPoints ? (
+                    <>
+                      <Loader size={16} className="spinning" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Save All Changes
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
         </div>
