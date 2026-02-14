@@ -40,6 +40,26 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     const matchId = match?.id;
     if (!matchId) return null;
     
+    // If match has been reset to pending, clear any stale localStorage state
+    if (match?.status === 'pending') {
+      localStorage.removeItem(`match-state-${matchId}`);
+      return {
+        currentLeg: 1,
+        currentPlayer: null,
+        matchStarter: null,
+        legScores: {
+          player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
+          player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
+        },
+        currentTurn: { score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null },
+        turnHistory: [],
+        matchComplete: false,
+        inputMode: 'single',
+        scoringMode: 'dart',
+        showMatchStarter: false
+      };
+    }
+    
     const savedState = localStorage.getItem(`match-state-${matchId}`);
     if (savedState) {
       try {
@@ -261,6 +281,24 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   useEffect(() => {
     const loadMatchState = async () => {
       if (!match?.id) return;
+
+      // If match has been reset to pending, clear stale localStorage and start fresh
+      if (match?.status === 'pending') {
+        localStorage.removeItem(`match-state-${match.id}`);
+        const startingScore = match?.startingScore || matchSettings.startingScore || 501;
+        setCurrentLeg(1);
+        setCurrentPlayer(null);
+        setMatchStarter(null);
+        setLegScores({
+          player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
+          player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
+        });
+        setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
+        setTurnHistory([]);
+        setMatchComplete(false);
+        setShowMatchStarter(true);
+        return;
+      }
 
       const stored = localStorage.getItem(`match-state-${match.id}`);
       let hasLocalState = false;

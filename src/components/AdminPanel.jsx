@@ -349,7 +349,7 @@ export function AdminPanel() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to reset match ${matchInfo.id} to pending? This will clear all match data.`)) {
+    if (!confirm(`Are you sure you want to reset match ${matchInfo.id} to pending? This will clear ALL match data including scores, averages, legs, and statistics. The match will be completely clean as if it never happened.`)) {
       return;
     }
 
@@ -357,6 +357,29 @@ export function AdminPanel() {
     setMessage({ type: '', text: '' });
 
     try {
+      // 1. Delete match_player_stats records for this match
+      const { error: statsDeleteError } = await supabase
+        .from('match_player_stats')
+        .delete()
+        .eq('match_id', matchInfo.id);
+
+      if (statsDeleteError) {
+        console.error('Error deleting match_player_stats:', statsDeleteError);
+        // Continue even if this fails (records might not exist)
+      }
+
+      // 2. Delete legs records for this match (dart_throws cascade-delete from legs)
+      const { error: legsDeleteError } = await supabase
+        .from('legs')
+        .delete()
+        .eq('match_id', matchInfo.id);
+
+      if (legsDeleteError) {
+        console.error('Error deleting legs:', legsDeleteError);
+        // Continue even if this fails (records might not exist)
+      }
+
+      // 3. Reset the match record itself to a clean pending state
       const { data, error } = await supabase
         .from('matches')
         .update({
@@ -370,6 +393,7 @@ export function AdminPanel() {
           current_player: 0,
           live_device_id: null,
           live_started_at: null,
+          last_activity_at: null,
           winner_id: null,
           result: null,
           updated_at: new Date().toISOString()
@@ -384,7 +408,7 @@ export function AdminPanel() {
 
       setMessage({ 
         type: 'success', 
-        text: `Match ${matchInfo.id} has been reset to pending` 
+        text: `Match ${matchInfo.id} has been fully reset to pending. All scores, legs, and statistics have been cleared.` 
       });
       setMatchInfo(null);
       setSelectedMatchId('');

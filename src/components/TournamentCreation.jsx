@@ -61,13 +61,32 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     }
   }, [leagueId, currentLeague, selectLeague]);
 
-  // Auto-select active league members when league is loaded
+  // Apply league defaults when league is loaded asynchronously
   useEffect(() => {
-    if (currentLeague && currentLeague.members && leagueId) {
-      const activeMembers = currentLeague.members
-        .filter(m => m.isActive)
-        .map(m => m.player);
-      setSelectedPlayers(activeMembers);
+    if (currentLeague && leagueId && currentLeague.id === leagueId) {
+      const defaults = currentLeague.defaultTournamentSettings;
+      if (defaults) {
+        if (defaults.legsToWin !== undefined) setLegsToWin(defaults.legsToWin);
+        if (defaults.startingScore !== undefined) setStartingScore(defaults.startingScore);
+        if (defaults.tournamentType !== undefined) setTournamentType(defaults.tournamentType);
+        if (defaults.groupSettings) setGroupSettings(prev => ({ ...prev, ...defaults.groupSettings }));
+        if (defaults.standingsCriteriaOrder) setStandingsCriteriaOrder(defaults.standingsCriteriaOrder);
+        if (defaults.playoffSettings) setPlayoffSettings(prev => ({
+          ...prev,
+          ...defaults.playoffSettings,
+          legsToWinByRound: {
+            ...prev.legsToWinByRound,
+            ...(defaults.playoffSettings.legsToWinByRound || {})
+          }
+        }));
+      }
+      // Auto-select active league members
+      if (currentLeague.members) {
+        const activeMembers = currentLeague.members
+          .filter(m => m.isActive)
+          .map(m => m.player);
+        setSelectedPlayers(activeMembers);
+      }
     }
   }, [currentLeague, leagueId]);
 

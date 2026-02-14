@@ -322,6 +322,24 @@
     "playoffsResetSuccess": "Playoffs have been reset. You can now start them again.",
     "failedToResetPlayoffs": "Failed to reset playoffs. Please try again."
   },
+  "summary": {
+    "tab": "Summary",
+    "title": "Tournament Summary",
+    "finalStandings": "Final Standings",
+    "tournamentCompleted": "Tournament Completed",
+    "noPodiumAvailable": "No playoff results available for podium display.",
+    "tournamentAwards": "Tournament Awards",
+    "noAwardsAvailable": "No statistics available for awards.",
+    "firstPlace": "1st Place",
+    "secondPlace": "2nd Place",
+    "thirdPlace": "3rd Place",
+    "bestTournamentAverage": "Best Tournament Average",
+    "bestMatchAverage": "Best Match Average",
+    "highestCheckout": "Highest Checkout",
+    "most180s": "Most 180s",
+    "fewestDartsLeg": "Fewest Darts (Single Leg)",
+    "poweredBy": "Powered by"
+  },
   "landing": {
     "heroBadge": "For darts leagues & tournaments",
     "heroTitle": "Run your darts league like a pro.",
@@ -500,6 +518,26 @@
     "confirmRemovePlayer": "Remove this player from the league?",
     "invalidPosition": "Please enter a valid placement position (1, 2, 3, etc. or \"default\")",
     "placementExists": "This placement already exists",
-    "loading": "Loading league..."
+    "loading": "Loading league...",
+    "defaultTournamentSettingsDescription": "Pre-configure default settings for tournaments created in this league. Managers can still change settings when creating each tournament.",
+    "tournamentDefaults": "Tournament Defaults",
+    "defaultTournamentType": "Default Tournament Type",
+    "defaultLegsToWin": "Default Legs to Win (Group Stage)",
+    "defaultStartingScore": "Default Starting Score",
+    "defaultGroupSettings": "Default Group Settings",
+    "defaultStandingsCriteria": "Default Standings Criteria Order",
+    "defaultPlayoffSettings": "Default Playoff Settings",
+    "defaultPlayoffEnabled": "Playoffs Enabled by Default",
+    "defaultQualificationMode": "Default Qualification Mode",
+    "defaultPlayersPerGroup": "Default Players Advancing per Group",
+    "defaultTotalPlayersToAdvance": "Default Total Players to Advance",
+    "defaultThirdPlaceMatch": "Default 3rd Place Match",
+    "defaultPlayoffLegs": "Default Playoff Legs by Round",
+    "defaultStartingRoundPlayers": "Default Starting Round",
+    "defaultsSaved": "Default tournament settings saved successfully!",
+    "defaultsSaveFailed": "Failed to save default tournament settings",
+    "resetDefaults": "Reset to Defaults",
+    "noDefaultsSet": "No default tournament settings configured yet. Configure defaults below so tournaments in this league start with pre-filled settings.",
+    "defaultSeedingMethod": "Default Seeding Method"
   }
 }

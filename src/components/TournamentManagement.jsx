@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { BracketVisualization } from './BracketVisualization';
+import { TournamentSummary } from './TournamentSummary';
 
   // Generate unique ID for playoff matches (using crypto.randomUUID for proper UUIDs)
   const generateId = () => {
@@ -20,13 +21,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Valid tabs (will be filtered for playoff-only tournaments)
-  const validTabs = ['groups', 'matches', 'standings', 'playoffs', 'statistics', 'liveMatches'];
+  const validTabs = ['groups', 'matches', 'standings', 'playoffs', 'statistics', 'liveMatches', 'summary'];
   
   // Initialize activeTab from URL or default
   const getInitialTab = () => {
     const tabFromUrl = searchParams.get('tab');
     if (tabFromUrl && validTabs.includes(tabFromUrl)) {
       return tabFromUrl;
+    }
+    // For completed tournaments, default to summary tab
+    if (tournament?.status === 'completed') {
+      return 'summary';
     }
     // For playoff-only tournaments, default to playoffs tab
     if (tournament?.tournamentType === 'playoff_only') {
@@ -104,6 +109,19 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   useEffect(() => {
     modalOpenRef.current = showEditSettings || !!editingMatch || !!matchStatistics || !!matchToConfirm;
   }, [showEditSettings, editingMatch, matchStatistics, matchToConfirm]);
+
+  // Auto-switch to summary tab when tournament is completed
+  const prevTournamentStatusRef = useRef(tournament?.status);
+  useEffect(() => {
+    const prev = prevTournamentStatusRef.current;
+    const current = tournament?.status;
+    prevTournamentStatusRef.current = current;
+    // Only auto-switch if status just changed to 'completed' (not on initial load)
+    if (current === 'completed' && prev && prev !== 'completed') {
+      handleTabChange('summary');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournament?.status]);
 
   // Handler for starting a match - shows confirmation dialog first
   const handleStartMatchRequest = (matchData) => {
@@ -294,7 +312,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const playoffMatch = tournament?.playoffMatches?.find(m => m.id === matchId);
     const match = groupMatch || playoffMatch;
     
-    if (match?.status === 'completed') {
+    if (match?.status === 'completed' || match?.status === 'pending') {
+      // If match was reset to pending, also clean up any stale localStorage
+      if (match?.status === 'pending') {
+        localStorage.removeItem(`match-state-${matchId}`);
+      }
       return false;
     }
     
@@ -929,6 +951,36 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     );
   };
 
+  // Shared sorting function that uses the tournament's standingsCriteriaOrder
+  // This ensures standings are sorted the SAME way everywhere (UI display, qualifying players, seeding)
+  const sortStandingsByCriteria = (standings, criteriaOrder) => {
+    return [...standings].sort((a, b) => {
+      for (const criterion of criteriaOrder) {
+        let comparison = 0;
+        switch (criterion) {
+          case 'matchesWon':
+            comparison = (b.matchesWon || b.points / 3 || 0) - (a.matchesWon || a.points / 3 || 0);
+            break;
+          case 'legDifference':
+            const legDiffA = (a.legsWon || 0) - (a.legsLost || 0);
+            const legDiffB = (b.legsWon || 0) - (b.legsLost || 0);
+            comparison = legDiffB - legDiffA;
+            break;
+          case 'average':
+            comparison = (b.average || 0) - (a.average || 0);
+            break;
+          case 'headToHead':
+            const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
+            const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
+            comparison = bWinsVsA - aWinsVsB;
+            break;
+        }
+        if (comparison !== 0) return comparison;
+      }
+      return 0;
+    });
+  };
+
   // Get qualifying players based on group standings, sorted by performance for seeding
   const getQualifyingPlayers = () => {
     if (!tournament) return [];
@@ -942,6 +994,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     
     if (!tournament.groups) return [];
     
+    // Use the same criteria order as the UI standings display
+    const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
     const qualificationMode = tournament.playoffSettings?.qualificationMode || 'perGroup';
     const allQualifyingPlayers = [];
     const allPlayersValue = 9999; // Special value to represent "all players"
@@ -958,24 +1012,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       
       tournament.groups.forEach(group => {
         if (group.standings && group.standings.length > 0) {
-          // Sort standings by points (descending), then by leg difference, then by average
-          const sortedStandings = [...group.standings].sort((a, b) => {
-            if (b.points !== a.points) return b.points - a.points;
-            const legDiffA = a.legsWon - a.legsLost;
-            const legDiffB = b.legsWon - b.legsLost;
-            if (legDiffB !== legDiffA) return legDiffB - legDiffA;
-            return (b.average || 0) - (a.average || 0);
-          });
+          // Sort using the same criteria as the UI standings
+          const sortedStandings = sortStandingsByCriteria(group.standings, criteriaOrder);
           
           // Take playersPerGroup players from this group
           for (let i = 0; i < playersPerGroup && i < sortedStandings.length; i++) {
             const standing = sortedStandings[i];
             allQualifyingPlayers.push({
-              player: standing.player,
+              ...standing,
               groupPosition: i + 1,
-              points: standing.points,
-              legDifference: standing.legsWon - standing.legsLost,
-              average: standing.average || 0,
+              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
               groupId: group.id
             });
           }
@@ -988,11 +1034,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               playersByPosition[position] = [];
             }
             playersByPosition[position].push({
-              player: standing.player,
+              ...standing,
               groupPosition: position,
-              points: standing.points,
-              legDifference: standing.legsWon - standing.legsLost,
-              average: standing.average || 0,
+              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
               groupId: group.id
             });
           }
@@ -1003,13 +1047,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       if (remainder > 0) {
         const nextPosition = playersPerGroup + 1;
         if (playersByPosition[nextPosition]) {
-          // Sort by performance criteria
-          const candidates = [...playersByPosition[nextPosition]].sort((a, b) => {
-            if (b.points !== a.points) return b.points - a.points;
-            if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
-            if (b.average !== a.average) return b.average - a.average;
-            return 0;
-          });
+          // Sort remainder candidates using the same criteria
+          const candidates = sortStandingsByCriteria(playersByPosition[nextPosition], criteriaOrder);
           
           // Take top 'remainder' players
           for (let i = 0; i < remainder && i < candidates.length; i++) {
@@ -1023,14 +1062,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       
       tournament.groups.forEach(group => {
         if (group.standings && group.standings.length > 0) {
-          // Sort standings by points (descending), then by leg difference, then by average
-          const sortedStandings = [...group.standings].sort((a, b) => {
-            if (b.points !== a.points) return b.points - a.points;
-            const legDiffA = a.legsWon - a.legsLost;
-            const legDiffB = b.legsWon - b.legsLost;
-            if (legDiffB !== legDiffA) return legDiffB - legDiffA;
-            return (b.average || 0) - (a.average || 0);
-          });
+          // Sort using the same criteria as the UI standings
+          const sortedStandings = sortStandingsByCriteria(group.standings, criteriaOrder);
           
           // Take top N players from each group with their position info
           // If playersPerGroup is 9999 (all players), take all players
@@ -1039,27 +1072,40 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             : sortedStandings.slice(0, playersPerGroup);
           topPlayers.forEach((standing, index) => {
             allQualifyingPlayers.push({
-              player: standing.player,
+              ...standing,
               groupPosition: index + 1, // 1st, 2nd, etc. in group
-              points: standing.points,
-              legDifference: standing.legsWon - standing.legsLost,
-              average: standing.average || 0
+              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0)
             });
           });
         }
       });
     }
     
-    // Sort all qualifying players by performance for seeding:
-    // 1. Points (descending)
-    // 2. Leg difference (descending)
-    // 3. Average (descending)
-    // 4. Group position (1st place in group is better than 2nd place)
+    // Sort all qualifying players globally for seeding using the same criteria as UI standings,
+    // with group position as final tiebreaker (1st in group > 2nd in group)
     allQualifyingPlayers.sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.legDifference !== a.legDifference) return b.legDifference - a.legDifference;
-      if (b.average !== a.average) return b.average - a.average;
-      return a.groupPosition - b.groupPosition; // Lower position number is better
+      for (const criterion of criteriaOrder) {
+        let comparison = 0;
+        switch (criterion) {
+          case 'matchesWon':
+            comparison = (b.matchesWon || b.points / 3 || 0) - (a.matchesWon || a.points / 3 || 0);
+            break;
+          case 'legDifference':
+            comparison = ((b.legsWon || 0) - (b.legsLost || 0)) - ((a.legsWon || 0) - (a.legsLost || 0));
+            break;
+          case 'average':
+            comparison = (b.average || 0) - (a.average || 0);
+            break;
+          case 'headToHead':
+            const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
+            const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
+            comparison = bWinsVsA - aWinsVsB;
+            break;
+        }
+        if (comparison !== 0) return comparison;
+      }
+      // All criteria equal — prefer better group position
+      return (a.groupPosition || 0) - (b.groupPosition || 0);
     });
     
     return allQualifyingPlayers.map(qp => qp.player);
@@ -2892,6 +2938,15 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           <Activity size={16} />
           {t('management.liveMatches') || 'Live Matches'}
         </button>
+        {tournament.status === 'completed' && (
+          <button 
+            className={`summary-tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
+            onClick={() => handleTabChange('summary')}
+          >
+            <Trophy size={16} />
+            {t('summary.tab') || 'Summary'}
+          </button>
+        )}
       </div>
 
       <div className="management-content">
@@ -2901,6 +2956,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         {activeTab === 'playoffs' && renderPlayoffs()}
         {activeTab === 'statistics' && renderStatistics()}
         {activeTab === 'liveMatches' && renderLiveMatches()}
+        {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}
       </div>
 
       {/* Match Start Confirmation Modal */}

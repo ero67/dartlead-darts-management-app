@@ -1,8 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+
+// Default tournament settings shape (matches TournamentCreation defaults)
+const DEFAULT_TOURNAMENT_SETTINGS = {
+  tournamentType: 'groups_with_playoffs',
+  legsToWin: 3,
+  startingScore: 501,
+  groupSettings: { type: 'groups', value: 2 },
+  standingsCriteriaOrder: ['matchesWon', 'legDifference', 'average', 'headToHead'],
+  playoffSettings: {
+    enabled: true,
+    qualificationMode: 'perGroup',
+    playersPerGroup: 1,
+    totalPlayersToAdvance: 8,
+    startingRoundPlayers: 8,
+    seedingMethod: 'groupBased',
+    thirdPlaceMatch: true,
+    legsToWinByRound: { 32: 3, 16: 3, 8: 3, 4: 3, 2: 3 }
+  }
+};
 
 export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTournament }) {
   const { t } = useLanguage();
@@ -16,6 +35,10 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [scoringRules, setScoringRules] = useState([]);
   const [isSavingScoring, setIsSavingScoring] = useState(false);
   const [newPlacement, setNewPlacement] = useState({ position: '', points: '' });
+
+  // Default tournament settings state
+  const [tournamentDefaults, setTournamentDefaults] = useState(DEFAULT_TOURNAMENT_SETTINGS);
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
 
   useEffect(() => {
     if (leagueId && (!currentLeague || currentLeague.id !== leagueId)) {
@@ -47,6 +70,31 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       }
       
       setScoringRules(rulesArray);
+    }
+  }, [currentLeague]);
+
+  // Load default tournament settings when league changes
+  useEffect(() => {
+    if (currentLeague?.defaultTournamentSettings) {
+      setTournamentDefaults({
+        ...DEFAULT_TOURNAMENT_SETTINGS,
+        ...currentLeague.defaultTournamentSettings,
+        groupSettings: {
+          ...DEFAULT_TOURNAMENT_SETTINGS.groupSettings,
+          ...(currentLeague.defaultTournamentSettings.groupSettings || {})
+        },
+        playoffSettings: {
+          ...DEFAULT_TOURNAMENT_SETTINGS.playoffSettings,
+          ...(currentLeague.defaultTournamentSettings.playoffSettings || {}),
+          legsToWinByRound: {
+            ...DEFAULT_TOURNAMENT_SETTINGS.playoffSettings.legsToWinByRound,
+            ...(currentLeague.defaultTournamentSettings.playoffSettings?.legsToWinByRound || {})
+          }
+        },
+        standingsCriteriaOrder: currentLeague.defaultTournamentSettings.standingsCriteriaOrder || DEFAULT_TOURNAMENT_SETTINGS.standingsCriteriaOrder
+      });
+    } else {
+      setTournamentDefaults(DEFAULT_TOURNAMENT_SETTINGS);
     }
   }, [currentLeague]);
 
@@ -186,6 +234,25 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     } finally {
       setIsSavingScoring(false);
     }
+  };
+
+  const handleSaveTournamentDefaults = async () => {
+    setIsSavingDefaults(true);
+    try {
+      await updateLeague(currentLeague.id, {
+        default_tournament_settings: tournamentDefaults
+      });
+      alert(t('leagues.defaultsSaved'));
+    } catch (error) {
+      console.error('Error saving tournament defaults:', error);
+      alert(t('leagues.defaultsSaveFailed'));
+    } finally {
+      setIsSavingDefaults(false);
+    }
+  };
+
+  const handleResetTournamentDefaults = () => {
+    setTournamentDefaults(DEFAULT_TOURNAMENT_SETTINGS);
   };
 
   const getPlacementLabel = (position) => {
@@ -673,22 +740,444 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               </div>
             </div>
             
-            {/* Default Tournament Settings (read-only for now) */}
-            {currentLeague.defaultTournamentSettings && (
-              <div className="group-card">
-                <h3 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>{t('leagues.defaultTournamentSettings')}</h3>
-                <pre style={{ 
-                  background: 'var(--bg-secondary)', 
-                  padding: '1rem', 
-                  borderRadius: '8px', 
-                  overflow: 'auto',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.875rem'
-                }}>
-                  {JSON.stringify(currentLeague.defaultTournamentSettings, null, 2)}
-                </pre>
+            {/* Default Tournament Settings Editor */}
+            <div className="group-card" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h3 style={{ color: 'var(--text-primary)', margin: 0 }}>{t('leagues.defaultTournamentSettings')}</h3>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className="action-btn delete"
+                    onClick={handleResetTournamentDefaults}
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    {t('leagues.resetDefaults')}
+                  </button>
+                  <button
+                    className="create-tournament-btn"
+                    onClick={handleSaveTournamentDefaults}
+                    disabled={isSavingDefaults}
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    <Save size={16} />
+                    {isSavingDefaults ? t('common.saving') : t('leagues.saveChanges')}
+                  </button>
               </div>
-            )}
+              </div>
+
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+                {t('leagues.defaultTournamentSettingsDescription')}
+              </p>
+
+              {/* Tournament Type */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  {t('leagues.defaultTournamentType')}
+                </label>
+                <div className="radio-group">
+                  <label>
+                    <input
+                      type="radio"
+                      name="defaultTournamentType"
+                      value="groups_with_playoffs"
+                      checked={tournamentDefaults.tournamentType === 'groups_with_playoffs'}
+                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, tournamentType: e.target.value })}
+                    />
+                    {t('registration.tournamentTypeGroupsWithPlayoffs') || 'Group stage with optional playoffs'}
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="defaultTournamentType"
+                      value="playoff_only"
+                      checked={tournamentDefaults.tournamentType === 'playoff_only'}
+                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, tournamentType: e.target.value })}
+                    />
+                    {t('registration.tournamentTypePlayoffOnly') || 'Playoff only (no group stage)'}
+                  </label>
+                </div>
+              </div>
+
+              {/* Match Settings */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  {t('registration.matchSettings')}
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                  <div className="input-group">
+                    <label>{t('leagues.defaultLegsToWin')}</label>
+                    <select
+                      value={tournamentDefaults.legsToWin}
+                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, legsToWin: parseInt(e.target.value) })}
+                      className="legs-selector"
+                    >
+                      <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
+                      <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
+                      <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
+                      <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
+                      <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
+                      <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
+                      <option value={9}>{t('tournaments.firstToLegs', { count: 9 })}</option>
+                    </select>
+                  </div>
+                  <div className="input-group">
+                    <label>{t('leagues.defaultStartingScore')}</label>
+                    <select
+                      value={tournamentDefaults.startingScore}
+                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, startingScore: parseInt(e.target.value) })}
+                    >
+                      <option value={301}>301</option>
+                      <option value={501}>501</option>
+                      <option value={701}>701</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Group Settings - only for groups_with_playoffs */}
+              {tournamentDefaults.tournamentType === 'groups_with_playoffs' && (
+                <>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+                      {t('leagues.defaultGroupSettings')}
+                    </label>
+                    <div className="radio-group" style={{ marginBottom: '0.75rem' }}>
+                      <label>
+                        <input
+                          type="radio"
+                          name="defaultGroupType"
+                          value="groups"
+                          checked={tournamentDefaults.groupSettings.type === 'groups'}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            groupSettings: { ...tournamentDefaults.groupSettings, type: e.target.value }
+                          })}
+                        />
+                        {t('registration.numberOfGroups')}
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="defaultGroupType"
+                          value="playersPerGroup"
+                          checked={tournamentDefaults.groupSettings.type === 'playersPerGroup'}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            groupSettings: { ...tournamentDefaults.groupSettings, type: e.target.value }
+                          })}
+                        />
+                        {t('registration.playersPerGroup')}
+                      </label>
+                    </div>
+                    <div className="input-group">
+                      <label>
+                        {tournamentDefaults.groupSettings.type === 'groups' ? t('registration.numberOfGroupsLabel') : t('registration.playersPerGroupLabel')}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={tournamentDefaults.groupSettings.type === 'groups' ? '16' : '8'}
+                        value={tournamentDefaults.groupSettings.value}
+                        onChange={(e) => setTournamentDefaults({
+                          ...tournamentDefaults,
+                          groupSettings: { ...tournamentDefaults.groupSettings, value: parseInt(e.target.value) || 1 }
+                        })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Standings Criteria Order */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+                      {t('leagues.defaultStandingsCriteria')}
+                    </label>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                      {t('registration.standingsCriteriaOrderDescription') || 'Set the order of criteria for sorting in group standings.'}
+                    </p>
+                    <div className="criteria-order-list">
+                      {tournamentDefaults.standingsCriteriaOrder.map((criterion, index) => {
+                        const criterionLabels = {
+                          matchesWon: t('registration.matchesWon'),
+                          legDifference: t('registration.legDifference'),
+                          average: t('registration.average'),
+                          headToHead: t('registration.headToHead')
+                        };
+                        return (
+                          <div key={criterion} className="criteria-order-item">
+                            <span className="criteria-number" style={{ marginRight: '0.75rem', fontWeight: 'bold', minWidth: '2rem' }}>{index + 1}.</span>
+                            <span className="criteria-label" style={{ flex: 1 }}>{criterionLabels[criterion] || criterion}</span>
+                            <div className="criteria-actions" style={{ display: 'flex', gap: '0.25rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (index > 0) {
+                                    const newOrder = [...tournamentDefaults.standingsCriteriaOrder];
+                                    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                                    setTournamentDefaults({ ...tournamentDefaults, standingsCriteriaOrder: newOrder });
+                                  }
+                                }}
+                                className={index === 0 ? 'move-btn disabled' : 'move-btn'}
+                                disabled={index === 0}
+                              >
+                                <ChevronUp size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (index < tournamentDefaults.standingsCriteriaOrder.length - 1) {
+                                    const newOrder = [...tournamentDefaults.standingsCriteriaOrder];
+                                    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                                    setTournamentDefaults({ ...tournamentDefaults, standingsCriteriaOrder: newOrder });
+                                  }
+                                }}
+                                className={index === tournamentDefaults.standingsCriteriaOrder.length - 1 ? 'move-btn disabled' : 'move-btn'}
+                                disabled={index === tournamentDefaults.standingsCriteriaOrder.length - 1}
+                              >
+                                <ChevronDown size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Playoff Settings */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+                  {t('leagues.defaultPlayoffSettings')}
+                </label>
+
+                {tournamentDefaults.tournamentType === 'groups_with_playoffs' && (
+                  <div className="checkbox-group" style={{ marginBottom: '0.75rem' }}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={tournamentDefaults.playoffSettings.enabled}
+                        onChange={(e) => setTournamentDefaults({
+                          ...tournamentDefaults,
+                          playoffSettings: { ...tournamentDefaults.playoffSettings, enabled: e.target.checked }
+                        })}
+                      />
+                      {t('registration.enablePlayoffs')}
+                    </label>
+                  </div>
+                )}
+
+                {tournamentDefaults.playoffSettings.enabled && (
+                  <div className="playoff-options">
+                    {tournamentDefaults.tournamentType === 'groups_with_playoffs' ? (
+                      <>
+                        <div className="radio-section" style={{ marginBottom: '0.75rem' }}>
+                          <label className="radio-section-label">{t('leagues.defaultQualificationMode')}</label>
+                          <div className="radio-group">
+                            <label>
+                              <input
+                                type="radio"
+                                name="defaultQualificationMode"
+                                value="perGroup"
+                                checked={tournamentDefaults.playoffSettings.qualificationMode === 'perGroup'}
+                                onChange={(e) => setTournamentDefaults({
+                                  ...tournamentDefaults,
+                                  playoffSettings: { ...tournamentDefaults.playoffSettings, qualificationMode: e.target.value }
+                                })}
+                              />
+                              {t('registration.qualificationModePerGroup')}
+                            </label>
+                            <label>
+                              <input
+                                type="radio"
+                                name="defaultQualificationMode"
+                                value="totalPlayers"
+                                checked={tournamentDefaults.playoffSettings.qualificationMode === 'totalPlayers'}
+                                onChange={(e) => setTournamentDefaults({
+                                  ...tournamentDefaults,
+                                  playoffSettings: { ...tournamentDefaults.playoffSettings, qualificationMode: e.target.value }
+                                })}
+                              />
+                              {t('registration.qualificationModeTotalPlayers')}
+                            </label>
+                          </div>
+                        </div>
+
+                        {tournamentDefaults.playoffSettings.qualificationMode === 'perGroup' ? (
+                          <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                            <label>{t('leagues.defaultPlayersPerGroup')}</label>
+                            <select
+                              value={tournamentDefaults.playoffSettings.playersPerGroup}
+                              onChange={(e) => setTournamentDefaults({
+                                ...tournamentDefaults,
+                                playoffSettings: { ...tournamentDefaults.playoffSettings, playersPerGroup: parseInt(e.target.value) }
+                              })}
+                            >
+                              {Array.from({ length: 8 }, (_, i) => i + 1).map(num => (
+                                <option key={num} value={num}>{num}</option>
+                              ))}
+                              <option value={9999}>{t('registration.all')}</option>
+                            </select>
+                          </div>
+                        ) : (
+                          <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                            <label>{t('leagues.defaultTotalPlayersToAdvance')}</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="64"
+                              value={tournamentDefaults.playoffSettings.totalPlayersToAdvance || 8}
+                              onChange={(e) => setTournamentDefaults({
+                                ...tournamentDefaults,
+                                playoffSettings: { ...tournamentDefaults.playoffSettings, totalPlayersToAdvance: parseInt(e.target.value) || 8 }
+                              })}
+                            />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                        <label>{t('leagues.defaultStartingRoundPlayers')}</label>
+                        <select
+                          value={tournamentDefaults.playoffSettings.startingRoundPlayers}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            playoffSettings: { ...tournamentDefaults.playoffSettings, startingRoundPlayers: parseInt(e.target.value) }
+                          })}
+                        >
+                          <option value={2}>{t('management.final') || 'Final (2 players)'}</option>
+                          <option value={4}>{t('management.semiFinals') || 'Semi-finals (4 players)'}</option>
+                          <option value={8}>{t('management.quarterFinals') || 'Quarter-finals (8 players)'}</option>
+                          <option value={16}>{t('management.top16') || 'Round of 16 (16 players)'}</option>
+                          <option value={32}>{t('management.top32') || 'Round of 32 (32 players)'}</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* 3rd Place Match */}
+                    <div className="radio-section" style={{ marginBottom: '0.75rem' }}>
+                      <label className="radio-section-label">{t('leagues.defaultThirdPlaceMatch')}</label>
+                      <div className="radio-group">
+                        <label>
+                          <input
+                            type="radio"
+                            name="defaultThirdPlaceMatch"
+                            value="true"
+                            checked={tournamentDefaults.playoffSettings.thirdPlaceMatch === true}
+                            onChange={() => setTournamentDefaults({
+                              ...tournamentDefaults,
+                              playoffSettings: { ...tournamentDefaults.playoffSettings, thirdPlaceMatch: true }
+                            })}
+                          />
+                          {t('registration.thirdPlaceMatchYes') || 'Yes - Semifinal losers play for 3rd/4th place'}
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            name="defaultThirdPlaceMatch"
+                            value="false"
+                            checked={tournamentDefaults.playoffSettings.thirdPlaceMatch === false}
+                            onChange={() => setTournamentDefaults({
+                              ...tournamentDefaults,
+                              playoffSettings: { ...tournamentDefaults.playoffSettings, thirdPlaceMatch: false }
+                            })}
+                          />
+                          {t('registration.thirdPlaceMatchNo') || 'No - Both semifinal losers share 3rd place'}
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Playoff Legs by Round */}
+                    <div className="playoff-legs-settings">
+                      <h5>{t('leagues.defaultPlayoffLegs')}:</h5>
+                      <div className="input-group">
+                        <label>{t('management.top32')}:</label>
+                        <select
+                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[32] || 3}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            playoffSettings: {
+                              ...tournamentDefaults.playoffSettings,
+                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 32: parseInt(e.target.value) }
+                            }
+                          })}
+                        >
+                          {[1,2,3,4,5,6,7].map(v => (
+                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label>{t('management.top16')}:</label>
+                        <select
+                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[16] || 3}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            playoffSettings: {
+                              ...tournamentDefaults.playoffSettings,
+                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 16: parseInt(e.target.value) }
+                            }
+                          })}
+                        >
+                          {[1,2,3,4,5,6,7].map(v => (
+                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label>{t('management.quarterFinals')}:</label>
+                        <select
+                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[8] || 3}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            playoffSettings: {
+                              ...tournamentDefaults.playoffSettings,
+                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 8: parseInt(e.target.value) }
+                            }
+                          })}
+                        >
+                          {[1,2,3,4,5,6,7].map(v => (
+                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label>{t('management.semiFinals')}:</label>
+                        <select
+                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[4] || 3}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            playoffSettings: {
+                              ...tournamentDefaults.playoffSettings,
+                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 4: parseInt(e.target.value) }
+                            }
+                          })}
+                        >
+                          {[1,2,3,4,5,6,7].map(v => (
+                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label>{t('management.final')}:</label>
+                        <select
+                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[2] || 3}
+                          onChange={(e) => setTournamentDefaults({
+                            ...tournamentDefaults,
+                            playoffSettings: {
+                              ...tournamentDefaults.playoffSettings,
+                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 2: parseInt(e.target.value) }
+                            }
+                          })}
+                        >
+                          {[1,2,3,4,5,6,7].map(v => (
+                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -316,6 +316,24 @@
     "playoffsResetSuccess": "Playoff bol resetovaný. Teraz ho môžete spustiť znova.",
     "failedToResetPlayoffs": "Nepodarilo sa resetovať playoff. Skúste to prosím znova."
   },
+  "summary": {
+    "tab": "Súhrn",
+    "title": "Súhrn Turnaja",
+    "finalStandings": "Konečné Poradie",
+    "tournamentCompleted": "Turnaj Ukončený",
+    "noPodiumAvailable": "Výsledky play-off nie sú k dispozícii pre zobrazenie pódia.",
+    "tournamentAwards": "Ocenenia Turnaja",
+    "noAwardsAvailable": "Žiadne štatistiky nie sú k dispozícii pre ocenenia.",
+    "firstPlace": "1. miesto",
+    "secondPlace": "2. miesto",
+    "thirdPlace": "3. miesto",
+    "bestTournamentAverage": "Najlepší Turnajový Priemer",
+    "bestMatchAverage": "Najlepší Priemer v Zápase",
+    "highestCheckout": "Najvyšší Checkout",
+    "most180s": "Najviac 180",
+    "fewestDartsLeg": "Najmenej Šípok (Jeden Leg)",
+    "poweredBy": "Vytvorené pomocou"
+  },
   "landing": {
     "heroBadge": "Pre šípkarské ligy a turnaje",
     "heroTitle": "Veďte svoju šípkarskú ligu ako profík.",
@@ -494,6 +512,26 @@
     "confirmRemovePlayer": "Odstrániť tohto hráča z ligy?",
     "invalidPosition": "Prosím zadajte platnú pozíciu umiestnenia (1, 2, 3, atď. alebo \"default\")",
     "placementExists": "Toto umiestnenie už existuje",
-    "loading": "Načítava sa liga..."
+    "loading": "Načítava sa liga...",
+    "defaultTournamentSettingsDescription": "Prednastavte predvolené nastavenia pre turnaje vytvorené v tejto lige. Správcovia môžu nastavenia zmeniť pri vytváraní každého turnaja.",
+    "tournamentDefaults": "Predvolené Nastavenia Turnajov",
+    "defaultTournamentType": "Predvolený Typ Turnaja",
+    "defaultLegsToWin": "Predvolený Počet Legov na Výhru (Skupiny)",
+    "defaultStartingScore": "Predvolené Štartovacie Skóre",
+    "defaultGroupSettings": "Predvolené Nastavenia Skupín",
+    "defaultStandingsCriteria": "Predvolené Poradie Kritérií Poradia",
+    "defaultPlayoffSettings": "Predvolené Nastavenia Playoff",
+    "defaultPlayoffEnabled": "Playoff Predvolene Zapnuté",
+    "defaultQualificationMode": "Predvolený Režim Kvalifikácie",
+    "defaultPlayersPerGroup": "Predvolený Počet Postupujúcich zo Skupiny",
+    "defaultTotalPlayersToAdvance": "Predvolený Celkový Počet Postupujúcich",
+    "defaultThirdPlaceMatch": "Predvolený Zápas o 3. Miesto",
+    "defaultPlayoffLegs": "Predvolené Legy Playoff podľa Kola",
+    "defaultStartingRoundPlayers": "Predvolené Štartovacie Kolo",
+    "defaultsSaved": "Predvolené nastavenia turnajov boli úspešne uložené!",
+    "defaultsSaveFailed": "Nepodarilo sa uložiť predvolené nastavenia turnajov",
+    "resetDefaults": "Resetovať na Predvolené",
+    "noDefaultsSet": "Zatiaľ nie sú nakonfigurované žiadne predvolené nastavenia turnajov. Nakonfigurujte predvolené hodnoty nižšie, aby turnaje v tejto lige začínali s predvyplnenými nastaveniami.",
+    "defaultSeedingMethod": "Predvolená Metóda Nasadenia"
   }
 }
