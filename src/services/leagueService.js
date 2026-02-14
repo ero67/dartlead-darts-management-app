@@ -613,6 +613,12 @@ export const leagueService = {
 
   // Extract placements from tournament data structure.
   // Each entry: { playerId, placement, inPlayoff }
+  //
+  // IMPORTANT: playoffs.rounds is a JSONB snapshot stored on the tournament row
+  // and can be STALE (e.g. 3rd-place match completed but JSONB not refreshed).
+  // We use playoffs.rounds only for structural info (which rounds / matches exist)
+  // and overlay live results from tournamentData.playoffMatches (fetched from the
+  // matches table, always up-to-date).
   extractPlacements(tournamentData) {
     const placements = [];
     
@@ -620,30 +626,62 @@ export const leagueService = {
     const hasPlayoffs = tournamentData.playoffs && tournamentData.playoffs.rounds && tournamentData.playoffs.rounds.length > 0;
 
     if (hasPlayoffs) {
+      // ── Build a lookup map from playoffMatches (live DB data) ──────
+      const liveMatchMap = new Map();
+      (tournamentData.playoffMatches || []).forEach(pm => {
+        liveMatchMap.set(pm.id, pm);
+      });
+
+      // Helper: overlay live data onto a bracket match from the JSONB snapshot
+      const freshen = (bracketMatch) => {
+        if (!bracketMatch) return bracketMatch;
+        const live = liveMatchMap.get(bracketMatch.id);
+        if (live) {
+          return {
+            ...bracketMatch,
+            status: live.status,
+            result: live.result || bracketMatch.result,
+            player1: live.player1 || bracketMatch.player1,
+            player2: live.player2 || bracketMatch.player2,
+          };
+        }
+        return bracketMatch;
+      };
+
       // ── Collect the set of ALL playoff participant IDs ──────────────
       const playoffPlayerIds = new Set();
+      // From JSONB rounds (structural)
       tournamentData.playoffs.rounds.forEach(round => {
         (round.matches || []).forEach(match => {
           if (match.player1?.id) playoffPlayerIds.add(match.player1.id);
           if (match.player2?.id) playoffPlayerIds.add(match.player2.id);
         });
       });
+      // Also from live playoffMatches (in case JSONB is missing players)
+      (tournamentData.playoffMatches || []).forEach(pm => {
+        if (pm.player1?.id) playoffPlayerIds.add(pm.player1.id);
+        if (pm.player2?.id) playoffPlayerIds.add(pm.player2.id);
+      });
 
       // Tournament has playoffs - use playoff results
       const rounds = tournamentData.playoffs.rounds;
       const finalRound = rounds[rounds.length - 1];
-      const finalMatch = finalRound?.matches?.find(m => !m.isThirdPlaceMatch && m.status === 'completed');
-      const thirdPlaceMatch = finalRound?.matches?.find(m => m.isThirdPlaceMatch);
-      const thirdPlaceMatchCompleted = thirdPlaceMatch?.status === 'completed';
+
+      // Get fresh (live) versions of the final and 3rd-place matches
+      const rawFinalMatch = finalRound?.matches?.find(m => !m.isThirdPlaceMatch);
+      const rawThirdPlaceMatch = finalRound?.matches?.find(m => m.isThirdPlaceMatch);
+      const finalMatch = freshen(rawFinalMatch);
+      const thirdPlaceMatch = freshen(rawThirdPlaceMatch);
 
       // Assign placements for top positions
-      if (finalMatch && finalMatch.result) {
+      if (finalMatch && finalMatch.status === 'completed' && finalMatch.result) {
+        const winnerId = finalMatch.result.winner;
         placements.push({
-          playerId: finalMatch.result.winner,
+          playerId: winnerId,
           placement: 1,
           inPlayoff: true
         });
-        const loserId = finalMatch.result.winner === finalMatch.player1?.id 
+        const loserId = winnerId === finalMatch.player1?.id 
           ? finalMatch.player2?.id 
           : finalMatch.player1?.id;
         if (loserId) {
@@ -656,13 +694,14 @@ export const leagueService = {
       }
 
       // Handle 3rd place - either from 3rd place match or shared by semifinal losers
-      if (thirdPlaceMatch && thirdPlaceMatchCompleted && thirdPlaceMatch.result) {
+      if (thirdPlaceMatch && thirdPlaceMatch.status === 'completed' && thirdPlaceMatch.result) {
+        const thirdWinner = thirdPlaceMatch.result.winner;
         placements.push({
-          playerId: thirdPlaceMatch.result.winner,
+          playerId: thirdWinner,
           placement: 3,
           inPlayoff: true
         });
-        const fourthId = thirdPlaceMatch.result.winner === thirdPlaceMatch.player1?.id 
+        const fourthId = thirdWinner === thirdPlaceMatch.player1?.id 
           ? thirdPlaceMatch.player2?.id 
           : thirdPlaceMatch.player1?.id;
         if (fourthId) {
@@ -672,10 +711,12 @@ export const leagueService = {
             inPlayoff: true
           });
         }
-      } else if (!thirdPlaceMatch && rounds.length >= 2) {
+      } else if (!rawThirdPlaceMatch && rounds.length >= 2) {
+        // No 3rd place match at all – assign shared 3rd to semifinal losers
         const semiFinalRound = rounds[rounds.length - 2];
         if (semiFinalRound && semiFinalRound.matches) {
-          semiFinalRound.matches.forEach(match => {
+          semiFinalRound.matches.forEach(m => {
+            const match = freshen(m);
             if (match.status === 'completed' && match.result && !match.isThirdPlaceMatch) {
               const loserId = match.result.winner === match.player1?.id 
                 ? match.player2?.id 
@@ -692,13 +733,21 @@ export const leagueService = {
         }
       }
 
-      // For other playoff players, rank by round eliminated
+      // For other playoff players, rank by round eliminated (earlier rounds first = worse)
       const placedPlayerIds = new Set(placements.map(p => p.playerId));
       let currentPlacement = Math.max(...placements.map(p => p.placement), 0) + 1;
       
-      for (let i = 0; i < rounds.length - 2; i++) {
+      // Iterate rounds from earliest to second-to-last (skip final round which is already handled)
+      // Also skip the semifinal round (rounds.length - 2) since those losers are
+      // either in the 3rd-place match (handled above) or shared-3rd.
+      for (let i = 0; i < rounds.length - 1; i++) {
+        // Skip the semifinal round if a 3rd place match exists,
+        // because SF losers are the 3rd-place-match participants (already handled or will be)
+        if (rawThirdPlaceMatch && i === rounds.length - 2) continue;
+
         const round = rounds[i];
-        round.matches?.forEach(match => {
+        (round.matches || []).forEach(m => {
+          const match = freshen(m);
           if (match.status === 'completed' && match.result && !match.isThirdPlaceMatch) {
             const loserId = match.result.winner === match.player1?.id 
               ? match.player2?.id 
