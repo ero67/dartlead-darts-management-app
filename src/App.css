@@ -4217,6 +4217,32 @@ body {
   transition: color 0.3s ease;
 }
 
+.summary-branding-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.summary-branding-inline .summary-branding-logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.summary-branding-inline .summary-branding-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+
+.summary-branding-inline .summary-branding-text strong {
+  color: var(--text-primary);
+  font-weight: 700;
+  transition: color 0.3s ease;
+}
+
 /* ── Section titles ─────────────────────────────────────────────────── */
 .summary-section-title {
   text-align: center;

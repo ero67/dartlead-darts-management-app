@@ -356,11 +356,17 @@ export function TournamentSummary({ tournament }) {
 
   return (
     <div className="tournament-summary">
-      {/* Title */}
+      {/* Title + branding */}
       <div className="summary-header">
         <Trophy size={32} className="summary-trophy-icon" />
         <h2>{t('summary.title') || 'Tournament Summary'}</h2>
         <p className="summary-tournament-name">{tournament.name}</p>
+        <div className="summary-branding-inline">
+          <img src={logo} alt="DartLead" className="summary-branding-logo" />
+          <span className="summary-branding-text">
+            {t('summary.poweredBy') || 'Powered by'} <strong>DartLead</strong>
+          </span>
+        </div>
       </div>
 
       {/* Podium */}
@@ -425,7 +431,7 @@ export function TournamentSummary({ tournament }) {
         </div>
       )}
 
-      {/* Powered by DartLead branding */}
+      {/* Bottom branding (repeat for screenshots that crop to bottom) */}
       <div className="summary-branding">
         <img src={logo} alt="DartLead" className="summary-branding-logo" />
         <span className="summary-branding-text">
