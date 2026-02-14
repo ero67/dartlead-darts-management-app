@@ -129,8 +129,12 @@ body {
   top: 0;
   left: 0;
   height: 100vh;
+  height: 100dvh; /* iOS dynamic viewport – fallback to 100vh above */
   transform: translateX(-100%);
   z-index: 1001;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .navigation.mobile-overlay.open {
@@ -6340,10 +6344,16 @@ body {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    flex: 0 0 auto; /* don't grow; let footer flow right after */
   }
 
   .nav-items::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Move footer closer to nav items instead of pushing to bottom */
+  .nav-footer {
+    margin-top: 1rem;
   }
 
   /* Better modal handling on mobile */
