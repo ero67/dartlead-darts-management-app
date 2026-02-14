@@ -497,14 +497,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       <tr key={entry.player?.id || index} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.75rem', color: 'var(--text-primary)', fontWeight: '600' }}>{index + 1}</td>
                         <td style={{ padding: '0.75rem', color: 'var(--text-primary)' }}>{entry.player?.name || t('common.unknown')}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--text-primary)', fontWeight: '600' }}>
-                          {entry.totalPoints || 0}
-                          {entry.manualPoints > 0 && (
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '0.3rem' }} title={`${entry.totalPoints - entry.manualPoints} from tournaments + ${entry.manualPoints} bonus`}>
-                              (+{entry.manualPoints})
-                            </span>
-                          )}
-                        </td>
+                        <td style={{ padding: '0.75rem', color: 'var(--text-primary)', fontWeight: '600' }}>{entry.totalPoints || 0}</td>
                         <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{entry.tournamentsPlayed || 0}</td>
                         <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{entry.bestPlacement || '-'}</td>
                         <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{entry.avgPlacement ? entry.avgPlacement.toFixed(1) : '-'}</td>
