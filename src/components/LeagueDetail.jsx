@@ -480,29 +480,34 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               )}
             </div>
             {currentLeague.leaderboard && currentLeague.leaderboard.length > 0 ? (
-              <div className="group-card" style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="league-leaderboard-wrap" style={{ overflowX: 'auto' }}>
+                <table className="league-leaderboard-table">
                   <thead>
-                    <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600' }}>{t('leagues.rank')}</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600' }}>{t('leagues.player')}</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600' }}>{t('leagues.points')}</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600' }}>{t('tournaments.title')}</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600' }}>{t('leagues.best')}</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600' }}>{t('leagues.avgPlacement')}</th>
+                    <tr>
+                      <th>#</th>
+                      <th>{t('leagues.player')}</th>
+                      <th>{t('leagues.points')}</th>
+                      <th className="lb-col-tournaments">{t('tournaments.title')}</th>
+                      <th className="lb-col-best">{t('leagues.best')}</th>
+                      <th className="lb-col-avg">{t('leagues.avgPlacement')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {currentLeague.leaderboard.map((entry, index) => (
-                      <tr key={entry.player?.id || index} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.75rem', color: 'var(--text-primary)', fontWeight: '600' }}>{index + 1}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--text-primary)' }}>{entry.player?.name || t('common.unknown')}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--text-primary)', fontWeight: '600' }}>{entry.totalPoints || 0}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{entry.tournamentsPlayed || 0}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{entry.bestPlacement || '-'}</td>
-                        <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>{entry.avgPlacement ? entry.avgPlacement.toFixed(1) : '-'}</td>
-                      </tr>
-                    ))}
+                    {currentLeague.leaderboard.map((entry, index) => {
+                      const rank = index + 1;
+                      return (
+                        <tr key={entry.player?.id || index} className={rank <= 3 ? 'lb-top-row' : ''}>
+                          <td>
+                            <span className={`lb-rank${rank <= 3 ? ` rank-${rank}` : ''}`}>{rank}</span>
+                          </td>
+                          <td><span className="lb-player-name">{entry.player?.name || t('common.unknown')}</span></td>
+                          <td><span className="lb-points">{entry.totalPoints || 0}</span></td>
+                          <td className="lb-col-tournaments">{entry.tournamentsPlayed || 0}</td>
+                          <td className="lb-col-best">{entry.bestPlacement || '-'}</td>
+                          <td className="lb-col-avg">{entry.avgPlacement ? entry.avgPlacement.toFixed(1) : '-'}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
