@@ -555,9 +555,9 @@ export function AdminPanel() {
     try {
       const entries = await leagueService.getLeaderboardAdmin(leagueId);
       setLeaderboardEntries(entries);
-      // Pre-fill edited points with current values
+      // Pre-fill edited bonus points with current manual values
       const initial = {};
-      entries.forEach(e => { initial[e.playerId] = e.totalPoints; });
+      entries.forEach(e => { initial[e.playerId] = e.manualPoints; });
       setEditedPoints(initial);
     } catch (err) {
       console.error('Error loading leaderboard:', err);
@@ -578,13 +578,13 @@ export function AdminPanel() {
     try {
       let changedCount = 0;
       for (const entry of leaderboardEntries) {
-        const newPoints = editedPoints[entry.playerId];
-        if (newPoints !== undefined && newPoints !== entry.totalPoints) {
-          await leagueService.setPlayerPoints(selectedLeagueForPoints, entry.playerId, newPoints);
+        const newManual = editedPoints[entry.playerId];
+        if (newManual !== undefined && newManual !== entry.manualPoints) {
+          await leagueService.setManualPoints(selectedLeagueForPoints, entry.playerId, newManual);
           changedCount++;
         }
       }
-      setMessage({ type: 'success', text: `Updated points for ${changedCount} player(s).` });
+      setMessage({ type: 'success', text: `Updated bonus points for ${changedCount} player(s).` });
       // Reload to reflect changes
       await handleLeagueSelectForPoints(selectedLeagueForPoints);
     } catch (err) {
@@ -597,15 +597,16 @@ export function AdminPanel() {
 
   const saveSinglePlayerPoints = async (playerId, playerName) => {
     if (!selectedLeagueForPoints) return;
-    const newPoints = editedPoints[playerId];
+    const newManual = editedPoints[playerId];
     const entry = leaderboardEntries.find(e => e.playerId === playerId);
-    if (newPoints === undefined || newPoints === entry?.totalPoints) return;
+    if (newManual === undefined || newManual === entry?.manualPoints) return;
 
     setSavingPoints(true);
     setMessage({ type: '', text: '' });
     try {
-      await leagueService.setPlayerPoints(selectedLeagueForPoints, playerId, newPoints);
-      setMessage({ type: 'success', text: `Updated ${playerName} to ${newPoints} pts.` });
+      await leagueService.setManualPoints(selectedLeagueForPoints, playerId, newManual);
+      const newTotal = entry.tournamentPoints + newManual;
+      setMessage({ type: 'success', text: `Updated ${playerName} bonus to ${newManual} pts (total: ${newTotal}).` });
       // Reload
       await handleLeagueSelectForPoints(selectedLeagueForPoints);
     } catch (err) {
@@ -1076,7 +1077,7 @@ export function AdminPanel() {
             <h2>League Points Management</h2>
           </div>
           <p className="admin-section-description">
-            Manually adjust player points in a league leaderboard. Changes are saved directly to the leaderboard cache.
+            Add bonus points for tournaments played outside the app. These bonus points are preserved when the leaderboard is recalculated. The total is always: Tournament Points + Bonus Points.
           </p>
 
           <div className="admin-form">
@@ -1119,16 +1120,18 @@ export function AdminPanel() {
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'var(--bg-tertiary)' }}>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>#</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Player</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Current Pts</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>New Pts</th>
-                        <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Save</th>
+                        <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>#</th>
+                        <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Player</th>
+                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.8rem' }}>From Tournaments</th>
+                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.8rem' }}>Bonus Pts</th>
+                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.8rem' }}>Total</th>
+                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {leaderboardEntries.map((entry, index) => {
-                        const isChanged = editedPoints[entry.playerId] !== undefined && editedPoints[entry.playerId] !== entry.totalPoints;
+                        const isChanged = editedPoints[entry.playerId] !== undefined && editedPoints[entry.playerId] !== entry.manualPoints;
+                        const previewTotal = entry.tournamentPoints + (editedPoints[entry.playerId] ?? entry.manualPoints);
                         return (
                           <tr 
                             key={entry.playerId}
@@ -1137,20 +1140,20 @@ export function AdminPanel() {
                               background: isChanged ? 'var(--accent-primary-light, rgba(59, 130, 246, 0.08))' : 'transparent'
                             }}
                           >
-                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                            <td style={{ padding: '0.6rem 0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                               {index + 1}
                             </td>
-                            <td style={{ padding: '0.6rem 1rem', color: 'var(--text-primary)', fontWeight: '500' }}>
+                            <td style={{ padding: '0.6rem 0.75rem', color: 'var(--text-primary)', fontWeight: '500' }}>
                               {entry.playerName}
                             </td>
-                            <td style={{ padding: '0.6rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                              {entry.totalPoints}
+                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                              {entry.tournamentPoints}
                             </td>
-                            <td style={{ padding: '0.6rem 1rem', textAlign: 'center' }}>
+                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
                               <input
                                 type="number"
                                 min="0"
-                                value={editedPoints[entry.playerId] ?? entry.totalPoints}
+                                value={editedPoints[entry.playerId] ?? entry.manualPoints}
                                 onChange={(e) => handlePointChange(entry.playerId, e.target.value)}
                                 style={{
                                   width: '70px',
@@ -1165,7 +1168,10 @@ export function AdminPanel() {
                                 }}
                               />
                             </td>
-                            <td style={{ padding: '0.6rem 1rem', textAlign: 'center' }}>
+                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600' }}>
+                              {isChanged ? previewTotal : entry.totalPoints}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
                               <button
                                 onClick={() => saveSinglePlayerPoints(entry.playerId, entry.playerName)}
                                 disabled={!isChanged || savingPoints}
@@ -1197,7 +1203,7 @@ export function AdminPanel() {
                   onClick={saveAllPoints}
                   disabled={savingPoints || !Object.entries(editedPoints).some(([pid, pts]) => {
                     const entry = leaderboardEntries.find(e => e.playerId === pid);
-                    return entry && pts !== entry.totalPoints;
+                    return entry && pts !== entry.manualPoints;
                   })}
                   style={{ marginTop: '1rem', width: '100%' }}
                 >

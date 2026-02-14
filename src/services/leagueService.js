@@ -381,6 +381,7 @@ export const leagueService = {
       return (data || []).map(l => ({
         player: l.player,
         totalPoints: l.total_points || 0,
+        manualPoints: l.manual_points || 0,
         tournamentsPlayed: l.tournaments_played || 0,
         bestPlacement: l.best_placement,
         worstPlacement: l.worst_placement,
@@ -855,9 +856,21 @@ export const leagueService = {
   },
 
   // Update leaderboard cache from league_tournament_results
+  // manual_points are preserved across recalculations and added on top
   async updateLeaderboardCache(leagueId) {
     try {
-      // Get all tournament results for this league
+      // ── 1. Read existing manual_points so we can preserve them ──────
+      const { data: existingRows } = await supabase
+        .from('league_leaderboard')
+        .select('player_id, manual_points')
+        .eq('league_id', leagueId);
+
+      const existingManual = {};
+      (existingRows || []).forEach(row => {
+        existingManual[row.player_id] = row.manual_points || 0;
+      });
+
+      // ── 2. Get all tournament results for this league ──────────────
       const { data: results, error: resultsError } = await supabase
         .from('league_tournament_results')
         .select(`
@@ -877,21 +890,21 @@ export const leagueService = {
         });
       }
 
-      // Aggregate by player
+      // ── 3. Aggregate by player ─────────────────────────────────────
       const playerStats = {};
       results.forEach(result => {
         const playerId = result.player_id;
         if (!playerStats[playerId]) {
           playerStats[playerId] = {
             playerId,
-            totalPoints: 0,
+            tournamentPoints: 0,
             tournamentsPlayed: 0,
             placements: [],
             lastTournamentAt: null
           };
         }
 
-        playerStats[playerId].totalPoints += result.points_awarded || 0;
+        playerStats[playerId].tournamentPoints += result.points_awarded || 0;
         playerStats[playerId].tournamentsPlayed += 1;
         playerStats[playerId].placements.push(result.placement);
         if (result.tournament && result.tournament.created_at) {
@@ -902,17 +915,32 @@ export const leagueService = {
         }
       });
 
-      // Calculate stats for each player
+      // ── 4. Also include players who have manual_points but no tournament results
+      for (const [playerId, manual] of Object.entries(existingManual)) {
+        if (manual > 0 && !playerStats[playerId]) {
+          playerStats[playerId] = {
+            playerId,
+            tournamentPoints: 0,
+            tournamentsPlayed: 0,
+            placements: [],
+            lastTournamentAt: null
+          };
+        }
+      }
+
+      // ── 5. Build leaderboard entries (tournament + manual) ─────────
       const leaderboardEntries = Object.values(playerStats).map(stats => {
         const placements = stats.placements.sort((a, b) => a - b);
         const avgPlacement = placements.length > 0
           ? placements.reduce((sum, p) => sum + p, 0) / placements.length
           : null;
+        const manualPts = existingManual[stats.playerId] || 0;
 
         return {
           league_id: leagueId,
           player_id: stats.playerId,
-          total_points: stats.totalPoints,
+          total_points: stats.tournamentPoints + manualPts,
+          manual_points: manualPts,
           tournaments_played: stats.tournamentsPlayed,
           best_placement: placements.length > 0 ? placements[0] : null,
           worst_placement: placements.length > 0 ? placements[placements.length - 1] : null,
@@ -1070,6 +1098,7 @@ export const leagueService = {
           league_id,
           player_id,
           total_points,
+          manual_points,
           tournaments_played,
           best_placement,
           worst_placement,
@@ -1080,38 +1109,60 @@ export const leagueService = {
         .order('total_points', { ascending: false });
 
       if (error) throw error;
-      return (data || []).map(entry => ({
-        id: entry.id,
-        playerId: entry.player_id,
-        playerName: entry.player?.name || 'Unknown',
-        totalPoints: entry.total_points || 0,
-        tournamentsPlayed: entry.tournaments_played || 0,
-        bestPlacement: entry.best_placement,
-        worstPlacement: entry.worst_placement,
-        avgPlacement: entry.avg_placement
-      }));
+      return (data || []).map(entry => {
+        const manual = entry.manual_points || 0;
+        const total = entry.total_points || 0;
+        return {
+          id: entry.id,
+          playerId: entry.player_id,
+          playerName: entry.player?.name || 'Unknown',
+          totalPoints: total,
+          manualPoints: manual,
+          tournamentPoints: total - manual,
+          tournamentsPlayed: entry.tournaments_played || 0,
+          bestPlacement: entry.best_placement,
+          worstPlacement: entry.worst_placement,
+          avgPlacement: entry.avg_placement
+        };
+      });
     } catch (error) {
       console.error('Error fetching leaderboard for admin:', error);
       throw error;
     }
   },
 
-  // ── Admin: manually set total points for a player in a league ─────
-  async setPlayerPoints(leagueId, playerId, newTotalPoints) {
+  // ── Admin: set the manual (bonus) points for a player in a league ──
+  // total_points is recalculated as (tournament points) + manual_points
+  async setManualPoints(leagueId, playerId, newManualPoints) {
     try {
+      // First get the current row to calculate tournament points
+      const { data: current, error: fetchErr } = await supabase
+        .from('league_leaderboard')
+        .select('total_points, manual_points')
+        .eq('league_id', leagueId)
+        .eq('player_id', playerId)
+        .single();
+
+      if (fetchErr) throw fetchErr;
+
+      const oldManual = current?.manual_points || 0;
+      const tournamentPoints = (current?.total_points || 0) - oldManual;
+      const newTotal = tournamentPoints + newManualPoints;
+
       const { error } = await supabase
         .from('league_leaderboard')
         .update({
-          total_points: newTotalPoints,
+          manual_points: newManualPoints,
+          total_points: newTotal,
           updated_at: new Date().toISOString()
         })
         .eq('league_id', leagueId)
         .eq('player_id', playerId);
 
       if (error) throw error;
-      return { success: true };
+      return { success: true, newTotal };
     } catch (error) {
-      console.error('Error setting player points:', error);
+      console.error('Error setting manual points:', error);
       throw error;
     }
   },
