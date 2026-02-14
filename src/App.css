@@ -4236,7 +4236,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  gap: 1rem;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
 }
 
 .podium-card {
@@ -4245,12 +4246,14 @@ body {
   align-items: center;
   background: var(--card-bg);
   border-radius: 16px;
-  padding: 1.5rem 1.25rem 0;
+  padding: 1.5rem 1rem 0;
   box-shadow: 0 4px 20px var(--shadow-md);
   transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
   position: relative;
   overflow: hidden;
-  min-width: 120px;
+  flex: 1 1 0;
+  max-width: 180px;
+  min-width: 0;
 }
 
 .podium-card:hover {
@@ -4260,18 +4263,17 @@ body {
 
 /* Place-specific sizing */
 .podium-place-1 {
-  min-width: 150px;
+  flex: 1.2 1 0;
+  max-width: 200px;
   padding-top: 2rem;
   border: 2px solid #f59e0b;
 }
 
 .podium-place-2 {
-  min-width: 130px;
   border: 2px solid #94a3b8;
 }
 
 .podium-place-3 {
-  min-width: 130px;
   border: 2px solid #cd7f32;
 }
 
@@ -4302,6 +4304,11 @@ body {
   text-align: center;
   margin-bottom: 1rem;
   transition: color 0.3s ease;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  width: 100%;
+  padding: 0 0.15rem;
 }
 
 .podium-place-1 .podium-player-name {
@@ -4417,6 +4424,7 @@ body {
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────── */
+/* Tablet / small laptop */
 @media (max-width: 640px) {
   .tournament-summary {
     padding: 1rem 0.5rem;
@@ -4428,15 +4436,15 @@ body {
 
   .summary-podium {
     gap: 0.5rem;
+    padding: 0 0.25rem;
   }
 
   .podium-card {
-    min-width: 90px;
-    padding: 1rem 0.75rem 0;
+    padding: 1rem 0.5rem 0;
+    border-radius: 12px;
   }
 
   .podium-place-1 {
-    min-width: 110px;
     padding-top: 1.25rem;
   }
 
@@ -4445,15 +4453,20 @@ body {
   }
 
   .podium-place-1 .podium-emoji {
-    font-size: 2.5rem;
+    font-size: 2.4rem;
   }
 
   .podium-player-name {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
   }
 
   .podium-place-1 .podium-player-name {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
+  }
+
+  .podium-place-label {
+    font-size: 0.7rem;
   }
 
   .podium-bar-1 { height: 48px; }
@@ -4471,6 +4484,63 @@ body {
   .award-icon {
     width: 44px;
     height: 44px;
+  }
+}
+
+/* Small phones (< 400px) */
+@media (max-width: 400px) {
+  .summary-podium {
+    gap: 0.35rem;
+    padding: 0;
+  }
+
+  .podium-card {
+    padding: 0.75rem 0.35rem 0;
+    border-radius: 10px;
+  }
+
+  .podium-place-1 {
+    padding-top: 1rem;
+  }
+
+  .podium-emoji {
+    font-size: 1.6rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .podium-place-1 .podium-emoji {
+    font-size: 2rem;
+  }
+
+  .podium-player-name {
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .podium-place-1 .podium-player-name {
+    font-size: 0.9rem;
+  }
+
+  .podium-place-label {
+    font-size: 0.65rem;
+    letter-spacing: 0;
+    margin-bottom: 0.2rem;
+  }
+
+  .podium-bar-1 { height: 36px; }
+  .podium-bar-2 { height: 24px; }
+  .podium-bar-3 { height: 16px; }
+
+  .summary-section-title {
+    font-size: 1.1rem;
+  }
+
+  .summary-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .summary-tournament-name {
+    font-size: 0.95rem;
   }
 }
 

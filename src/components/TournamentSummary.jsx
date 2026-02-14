@@ -49,6 +49,32 @@ export function TournamentSummary({ tournament }) {
     return matches;
   }, [tournament]);
 
+  // ── Build a lookup from playoffMatches (DB source of truth) ────────
+  // playoffs.rounds (JSONB) can be stale if the save raced; playoffMatches
+  // always come fresh from the matches table.
+  const playoffMatchMap = useMemo(() => {
+    const map = new Map();
+    (tournament?.playoffMatches || []).forEach(m => map.set(m.id, m));
+    return map;
+  }, [tournament?.playoffMatches]);
+
+  // Helper: given a match from playoffs.rounds, return the freshest data
+  // by overlaying the DB version if available.
+  const getFreshMatch = (bracketMatch) => {
+    if (!bracketMatch) return bracketMatch;
+    const dbMatch = playoffMatchMap.get(bracketMatch.id);
+    if (dbMatch) {
+      return {
+        ...bracketMatch,                       // keep structural flags (isThirdPlaceMatch etc.)
+        status: dbMatch.status,                 // actual status from DB
+        result: dbMatch.result || bracketMatch.result,
+        player1: dbMatch.player1 || bracketMatch.player1,
+        player2: dbMatch.player2 || bracketMatch.player2,
+      };
+    }
+    return bracketMatch;
+  };
+
   // ── Determine Top 3 ─────────────────────────────────────────────────
   const podium = useMemo(() => {
     const playoffs = tournament?.playoffs;
@@ -58,11 +84,13 @@ export function TournamentSummary({ tournament }) {
     const finalRound = rounds[rounds.length - 1];
     if (!finalRound?.matches) return [];
 
-    const finalMatch = finalRound.matches.find(m => !m.isThirdPlaceMatch);
-    const thirdPlaceMatch = finalRound.matches.find(m => m.isThirdPlaceMatch);
+    // Use structural info from rounds but overlay fresh DB results
+    const finalMatch = getFreshMatch(finalRound.matches.find(m => !m.isThirdPlaceMatch));
+    const thirdPlaceMatch = getFreshMatch(finalRound.matches.find(m => m.isThirdPlaceMatch));
 
     const result = [];
 
+    // 1st and 2nd from the final
     if (finalMatch?.status === 'completed' && finalMatch.result) {
       const winnerId = finalMatch.result.winner;
       const first = winnerId === finalMatch.player1?.id ? finalMatch.player1 : finalMatch.player2;
@@ -71,14 +99,17 @@ export function TournamentSummary({ tournament }) {
       if (second) result.push({ place: 2, player: second });
     }
 
+    // 3rd from 3rd-place match
     if (thirdPlaceMatch?.status === 'completed' && thirdPlaceMatch.result) {
       const winnerId = thirdPlaceMatch.result.winner;
       const third = winnerId === thirdPlaceMatch.player1?.id ? thirdPlaceMatch.player1 : thirdPlaceMatch.player2;
       if (third) result.push({ place: 3, player: third });
     } else if (!thirdPlaceMatch && rounds.length >= 2) {
+      // No 3rd place match – find semifinal losers
       const semiRound = rounds[rounds.length - 2];
       if (semiRound?.matches) {
-        semiRound.matches.forEach(m => {
+        semiRound.matches.forEach(bm => {
+          const m = getFreshMatch(bm);
           if (m.status === 'completed' && m.result) {
             const loserId = m.result.winner === m.player1?.id ? m.player2?.id : m.player1?.id;
             const loser = loserId === m.player1?.id ? m.player1 : m.player2;
@@ -89,6 +120,7 @@ export function TournamentSummary({ tournament }) {
     }
 
     return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournament]);
 
   // ── Compute stat awards (with tie support) ───────────────────────────
