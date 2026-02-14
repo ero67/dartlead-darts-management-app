@@ -1067,6 +1067,262 @@ export const leagueService = {
     }
   },
 
+  // ── Admin: merge two player records (source → target) ──────────
+  // Moves all references from sourcePlayerId to targetPlayerId and deletes source.
+  async mergePlayers(sourcePlayerId, targetPlayerId) {
+    try {
+      // Helper: for tables with unique constraints involving player_id,
+      // we delete the source row if a target row already exists, otherwise update.
+      const upsertOrDelete = async (table, playerCol, uniqueCols) => {
+        // Get all source rows
+        const { data: sourceRows, error: fetchErr } = await supabase
+          .from(table)
+          .select('*')
+          .eq(playerCol, sourcePlayerId);
+        if (fetchErr) throw fetchErr;
+        if (!sourceRows?.length) return 0;
+
+        let updated = 0;
+        for (const row of sourceRows) {
+          // Build the "match" filter for the unique columns (excluding the player column)
+          const conflictFilter = {};
+          for (const col of uniqueCols) {
+            if (col !== playerCol) conflictFilter[col] = row[col];
+          }
+          conflictFilter[playerCol] = targetPlayerId;
+
+          // Check if target already has a row with the same unique combo
+          let query = supabase.from(table).select('id').limit(1);
+          for (const [k, v] of Object.entries(conflictFilter)) {
+            query = query.eq(k, v);
+          }
+          const { data: existing } = await query.maybeSingle();
+
+          if (existing) {
+            // Conflict: delete source row (target already has data for this combo)
+            await supabase.from(table).delete().eq('id', row.id);
+          } else {
+            // No conflict: update source row's player_id to target
+            await supabase.from(table).update({ [playerCol]: targetPlayerId }).eq('id', row.id);
+          }
+          updated++;
+        }
+        return updated;
+      };
+
+      const log = [];
+
+      // 1. tournament_players (PK: tournament_id + player_id — no id column, use composite)
+      {
+        const { data: srcTP } = await supabase
+          .from('tournament_players')
+          .select('tournament_id, player_id')
+          .eq('player_id', sourcePlayerId);
+        if (srcTP?.length) {
+          for (const row of srcTP) {
+            const { data: existing } = await supabase
+              .from('tournament_players')
+              .select('player_id')
+              .eq('tournament_id', row.tournament_id)
+              .eq('player_id', targetPlayerId)
+              .maybeSingle();
+            // Always delete source
+            await supabase
+              .from('tournament_players')
+              .delete()
+              .eq('tournament_id', row.tournament_id)
+              .eq('player_id', sourcePlayerId);
+            if (!existing) {
+              // Insert for target
+              await supabase
+                .from('tournament_players')
+                .insert({ tournament_id: row.tournament_id, player_id: targetPlayerId });
+            }
+          }
+          log.push(`tournament_players: ${srcTP.length} row(s)`);
+        }
+      }
+
+      // 2. group_players (PK: group_id + player_id — no id column)
+      {
+        const { data: srcGP } = await supabase
+          .from('group_players')
+          .select('group_id, player_id')
+          .eq('player_id', sourcePlayerId);
+        if (srcGP?.length) {
+          for (const row of srcGP) {
+            const { data: existing } = await supabase
+              .from('group_players')
+              .select('player_id')
+              .eq('group_id', row.group_id)
+              .eq('player_id', targetPlayerId)
+              .maybeSingle();
+            await supabase
+              .from('group_players')
+              .delete()
+              .eq('group_id', row.group_id)
+              .eq('player_id', sourcePlayerId);
+            if (!existing) {
+              await supabase
+                .from('group_players')
+                .insert({ group_id: row.group_id, player_id: targetPlayerId });
+            }
+          }
+          log.push(`group_players: ${srcGP.length} row(s)`);
+        }
+      }
+
+      // 3. matches — player1_id, player2_id, winner_id
+      {
+        const updates = [
+          { col: 'player1_id', label: 'matches.player1_id' },
+          { col: 'player2_id', label: 'matches.player2_id' },
+          { col: 'winner_id', label: 'matches.winner_id' }
+        ];
+        for (const { col, label } of updates) {
+          const { data, error } = await supabase
+            .from('matches')
+            .update({ [col]: targetPlayerId })
+            .eq(col, sourcePlayerId)
+            .select('id');
+          if (error) console.error(`Error updating ${label}:`, error);
+          if (data?.length) log.push(`${label}: ${data.length} row(s)`);
+        }
+      }
+
+      // 4. legs — player1_id, player2_id, winner_id
+      {
+        const updates = [
+          { col: 'player1_id', label: 'legs.player1_id' },
+          { col: 'player2_id', label: 'legs.player2_id' },
+          { col: 'winner_id', label: 'legs.winner_id' }
+        ];
+        for (const { col, label } of updates) {
+          const { data, error } = await supabase
+            .from('legs')
+            .update({ [col]: targetPlayerId })
+            .eq(col, sourcePlayerId)
+            .select('id');
+          if (error) console.error(`Error updating ${label}:`, error);
+          if (data?.length) log.push(`${label}: ${data.length} row(s)`);
+        }
+      }
+
+      // 5. dart_throws — player_id
+      {
+        const { data, error } = await supabase
+          .from('dart_throws')
+          .update({ player_id: targetPlayerId })
+          .eq('player_id', sourcePlayerId)
+          .select('id');
+        if (error) console.error('Error updating dart_throws:', error);
+        if (data?.length) log.push(`dart_throws: ${data.length} row(s)`);
+      }
+
+      // 6. match_player_stats — player_id (has id column)
+      {
+        const { data, error } = await supabase
+          .from('match_player_stats')
+          .update({ player_id: targetPlayerId })
+          .eq('player_id', sourcePlayerId)
+          .select('id');
+        if (error) console.error('Error updating match_player_stats:', error);
+        if (data?.length) log.push(`match_player_stats: ${data.length} row(s)`);
+      }
+
+      // 7. group_standings — player_id (has id column)
+      {
+        const { data, error } = await supabase
+          .from('group_standings')
+          .update({ player_id: targetPlayerId })
+          .eq('player_id', sourcePlayerId)
+          .select('id');
+        if (error) console.error('Error updating group_standings:', error);
+        if (data?.length) log.push(`group_standings: ${data.length} row(s)`);
+      }
+
+      // 8. tournament_stats — player_id (has id column)
+      {
+        const { data, error } = await supabase
+          .from('tournament_stats')
+          .update({ player_id: targetPlayerId })
+          .eq('player_id', sourcePlayerId)
+          .select('id');
+        if (error) console.error('Error updating tournament_stats:', error);
+        if (data?.length) log.push(`tournament_stats: ${data.length} row(s)`);
+      }
+
+      // 9. league_members (unique: league_id + player_id, has id)
+      {
+        const count = await upsertOrDelete('league_members', 'player_id', ['league_id', 'player_id']);
+        if (count) log.push(`league_members: ${count} row(s)`);
+      }
+
+      // 10. league_tournament_results (unique: league_id + tournament_id + player_id, has id)
+      {
+        const count = await upsertOrDelete('league_tournament_results', 'player_id', ['league_id', 'tournament_id', 'player_id']);
+        if (count) log.push(`league_tournament_results: ${count} row(s)`);
+      }
+
+      // 11. league_leaderboard (unique: league_id + player_id, has id)
+      {
+        const count = await upsertOrDelete('league_leaderboard', 'player_id', ['league_id', 'player_id']);
+        if (count) log.push(`league_leaderboard: ${count} row(s)`);
+      }
+
+      // 12. Finally — delete the source player record
+      const { error: deleteErr } = await supabase
+        .from('players')
+        .delete()
+        .eq('id', sourcePlayerId);
+      if (deleteErr) {
+        console.error('Error deleting source player:', deleteErr);
+        log.push(`⚠ Could not delete source player: ${deleteErr.message}`);
+      } else {
+        log.push('Source player deleted');
+      }
+
+      return { success: true, log };
+    } catch (error) {
+      console.error('Error merging players:', error);
+      throw error;
+    }
+  },
+
+  // ── Admin: search players by name ─────────────────────────────────
+  async searchPlayers(searchTerm) {
+    try {
+      const { data, error } = await supabase
+        .from('players')
+        .select('id, name')
+        .ilike('name', `%${searchTerm}%`)
+        .order('name')
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error searching players:', error);
+      throw error;
+    }
+  },
+
+  // ── Admin: get all players ────────────────────────────────────────
+  async getAllPlayers() {
+    try {
+      const { data, error } = await supabase
+        .from('players')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching all players:', error);
+      throw error;
+    }
+  },
+
   // Transform league data from database format to app format
   transformLeague(league) {
     return {

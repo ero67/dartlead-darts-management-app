@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, RotateCcw, Settings, Search, Trophy, Save } from 'lucide-react';
+import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, RotateCcw, Settings, Search, Trophy, Save, GitMerge, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { tournamentService } from '../services/tournamentService';
@@ -42,6 +42,15 @@ export function AdminPanel() {
   const [loadingLeagues, setLoadingLeagues] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [savingPoints, setSavingPoints] = useState(false);
+
+  // Player Merge
+  const [allPlayers, setAllPlayers] = useState([]);
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [sourcePlayerId, setSourcePlayerId] = useState('');
+  const [targetPlayerId, setTargetPlayerId] = useState('');
+  const [merging, setMerging] = useState(false);
+  const [mergeLog, setMergeLog] = useState([]);
 
   const setManagerRole = async () => {
     if (!email.trim()) {
@@ -607,12 +616,63 @@ export function AdminPanel() {
     }
   };
 
-  // Load managers, tournaments, and leagues on mount
+  // ── Player Merge ─────────────────────────────────────────────────
+  const loadAllPlayers = async () => {
+    setLoadingPlayers(true);
+    try {
+      const players = await leagueService.getAllPlayers();
+      setAllPlayers(players || []);
+    } catch (err) {
+      console.error('Error loading players:', err);
+      setMessage({ type: 'error', text: 'Failed to load players.' });
+    } finally {
+      setLoadingPlayers(false);
+    }
+  };
+
+  const handleMergePlayers = async () => {
+    if (!sourcePlayerId || !targetPlayerId) {
+      setMessage({ type: 'error', text: 'Select both a source and target player.' });
+      return;
+    }
+    if (sourcePlayerId === targetPlayerId) {
+      setMessage({ type: 'error', text: 'Source and target must be different players.' });
+      return;
+    }
+    const sourceName = allPlayers.find(p => p.id === sourcePlayerId)?.name || sourcePlayerId;
+    const targetName = allPlayers.find(p => p.id === targetPlayerId)?.name || targetPlayerId;
+
+    if (!confirm(
+      `⚠️ MERGE PLAYERS\n\nAll data from "${sourceName}" will be moved to "${targetName}". ` +
+      `"${sourceName}" will be DELETED permanently.\n\nThis cannot be undone. Continue?`
+    )) return;
+
+    setMerging(true);
+    setMergeLog([]);
+    setMessage({ type: '', text: '' });
+    try {
+      const result = await leagueService.mergePlayers(sourcePlayerId, targetPlayerId);
+      setMergeLog(result.log || []);
+      setMessage({ type: 'success', text: `Merged "${sourceName}" → "${targetName}" successfully.` });
+      setSourcePlayerId('');
+      setTargetPlayerId('');
+      // Reload players list
+      await loadAllPlayers();
+    } catch (err) {
+      console.error('Error merging players:', err);
+      setMessage({ type: 'error', text: `Merge failed: ${err.message}` });
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  // Load managers, tournaments, leagues, and players on mount
   React.useEffect(() => {
     loadManagers();
     loadTournamentsForMatch();
     loadTournamentsForStatus();
     loadLeaguesForPoints();
+    loadAllPlayers();
   }, []);
 
   return (
@@ -1136,6 +1196,176 @@ export function AdminPanel() {
                   )}
                 </button>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Player Merge ─────────────────────────────────────────── */}
+        <div className="admin-section">
+          <div className="admin-section-header">
+            <GitMerge size={20} />
+            <h2>Merge Players</h2>
+          </div>
+          <p className="admin-section-description">
+            Merge duplicate player records. All tournament data, matches, statistics and league results from the <strong>source</strong> player will be transferred to the <strong>target</strong> player. The source player will be deleted. <span style={{ color: 'var(--accent-danger, #ef4444)', fontWeight: 600 }}>This cannot be undone!</span>
+          </p>
+
+          <div className="admin-form">
+            {loadingPlayers ? (
+              <div className="admin-loading">
+                <Loader size={16} className="spinning" />
+                <span>Loading players...</span>
+              </div>
+            ) : (
+              <>
+                {/* Search filter */}
+                <div className="form-group">
+                  <label>
+                    <Search size={16} />
+                    Filter Players
+                  </label>
+                  <input
+                    type="text"
+                    value={playerSearch}
+                    onChange={(e) => setPlayerSearch(e.target.value)}
+                    placeholder="Type to filter player names..."
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  {/* Source player (will be deleted) */}
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label style={{ color: 'var(--accent-danger, #ef4444)' }}>
+                      Source (will be deleted)
+                    </label>
+                    <select
+                      value={sourcePlayerId}
+                      onChange={(e) => setSourcePlayerId(e.target.value)}
+                    >
+                      <option value="">-- Select source player --</option>
+                      {allPlayers
+                        .filter(p => {
+                          if (!playerSearch) return true;
+                          return p.name.toLowerCase().includes(playerSearch.toLowerCase());
+                        })
+                        .filter(p => p.id !== targetPlayerId)
+                        .map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '0 0.5rem', paddingBottom: '0.5rem' }}>
+                    <ArrowRight size={24} style={{ color: 'var(--text-secondary)' }} />
+                  </div>
+
+                  {/* Target player (will be kept) */}
+                  <div className="form-group" style={{ flex: '1 1 200px' }}>
+                    <label style={{ color: 'var(--accent-success, #22c55e)' }}>
+                      Target (will be kept)
+                    </label>
+                    <select
+                      value={targetPlayerId}
+                      onChange={(e) => setTargetPlayerId(e.target.value)}
+                    >
+                      <option value="">-- Select target player --</option>
+                      {allPlayers
+                        .filter(p => {
+                          if (!playerSearch) return true;
+                          return p.name.toLowerCase().includes(playerSearch.toLowerCase());
+                        })
+                        .filter(p => p.id !== sourcePlayerId)
+                        .map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                {/* Preview */}
+                {sourcePlayerId && targetPlayerId && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    background: 'var(--bg-tertiary)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <span style={{
+                        padding: '0.4rem 0.8rem',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        color: 'var(--accent-danger, #ef4444)',
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        fontSize: '0.9rem',
+                        textDecoration: 'line-through'
+                      }}>
+                        {allPlayers.find(p => p.id === sourcePlayerId)?.name}
+                      </span>
+                      <ArrowRight size={18} style={{ color: 'var(--text-secondary)' }} />
+                      <span style={{
+                        padding: '0.4rem 0.8rem',
+                        background: 'rgba(34, 197, 94, 0.12)',
+                        color: 'var(--accent-success, #22c55e)',
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        fontSize: '0.9rem'
+                      }}>
+                        {allPlayers.find(p => p.id === targetPlayerId)?.name}
+                      </span>
+                    </div>
+                    <p style={{ textAlign: 'center', marginTop: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                      All matches, stats, tournament entries, and league data will be transferred.
+                    </p>
+                  </div>
+                )}
+
+                {/* Merge button */}
+                <button
+                  className="admin-button primary"
+                  onClick={handleMergePlayers}
+                  disabled={!sourcePlayerId || !targetPlayerId || sourcePlayerId === targetPlayerId || merging}
+                  style={{
+                    marginTop: '1rem',
+                    width: '100%',
+                    background: sourcePlayerId && targetPlayerId ? 'var(--accent-danger, #ef4444)' : undefined
+                  }}
+                >
+                  {merging ? (
+                    <>
+                      <Loader size={16} className="spinning" />
+                      Merging...
+                    </>
+                  ) : (
+                    <>
+                      <GitMerge size={16} />
+                      Merge Players
+                    </>
+                  )}
+                </button>
+
+                {/* Merge Log */}
+                {mergeLog.length > 0 && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    background: 'var(--bg-tertiary)',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontFamily: 'monospace'
+                  }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Merge Log:</strong>
+                    {mergeLog.map((line, i) => (
+                      <div key={i} style={{ color: 'var(--text-secondary)', padding: '0.15rem 0' }}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
