@@ -4957,6 +4957,49 @@ body {
   color: #374151;
 }
 
+.qualifying-hint {
+  text-align: center;
+  margin: -0.5rem 0 1.5rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.qualifying-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.qualifying-summary {
+  display: flex;
+  gap: 1rem;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.qualifiers-reset-btn {
+  background: #e5e7eb;
+  color: #1f2937;
+  border: none;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.qualifiers-reset-btn:hover {
+  background: #d1d5db;
+}
+
+.qualifiers-reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .players-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -4997,6 +5040,29 @@ body {
   transition: all 0.2s ease;
 }
 
+.qualifier.selectable {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.qualifier.unselected {
+  opacity: 0.6;
+  background: #f9fafb;
+}
+
+.qualifier.selected {
+  border-color: #93c5fd;
+}
+
+.qualifier-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b82f6;
+}
+
 .qualifier:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -5017,6 +5083,16 @@ body {
 .qualifier .player-name {
   font-weight: 500;
   color: #374151;
+}
+
+.qualifier-tag {
+  margin-left: auto;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
 }
 
 .start-playoffs-actions {
@@ -5080,6 +5156,24 @@ body {
   color: var(--text-primary);
 }
 
+.dark-mode .qualifying-hint {
+  color: var(--text-tertiary);
+}
+
+.dark-mode .qualifying-summary {
+  color: var(--text-secondary);
+}
+
+.dark-mode .qualifiers-reset-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.dark-mode .qualifiers-reset-btn:hover {
+  background: var(--bg-secondary);
+}
+
 .dark-mode .group-qualifiers {
   background: var(--bg-secondary);
   border-color: var(--border-color);
@@ -5095,6 +5189,15 @@ body {
   border-color: var(--border-color);
 }
 
+.dark-mode .qualifier.unselected {
+  background: var(--bg-secondary);
+  opacity: 0.7;
+}
+
+.dark-mode .qualifier.selected {
+  border-color: #60a5fa;
+}
+
 .dark-mode .qualifier:hover {
   box-shadow: 0 2px 8px var(--shadow-md);
   background: var(--bg-secondary);
@@ -5102,6 +5205,11 @@ body {
 
 .dark-mode .qualifier .player-name {
   color: var(--text-primary);
+}
+
+.dark-mode .qualifier-tag {
+  background: rgba(14, 116, 144, 0.3);
+  color: #7dd3fc;
 }
 
 .dark-mode .playoffs-note {
@@ -8422,5 +8530,4 @@ body {
     font-size: 0.78rem;
   }
 }
-
 

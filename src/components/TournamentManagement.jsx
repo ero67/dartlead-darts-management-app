@@ -52,6 +52,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const [matchPlayerFilter, setMatchPlayerFilter] = useState(''); // Filter by player name
   const [bracketViewMode, setBracketViewMode] = useState('detailed'); // 'detailed' or 'compact'
   const [matchToConfirm, setMatchToConfirm] = useState(null); // Match waiting for start confirmation
+  const [selectedQualifierIds, setSelectedQualifierIds] = useState([]);
+  const [qualifiersTouched, setQualifiersTouched] = useState(false);
   
   // Deduplicate groups - ensure each group appears only once
   const uniqueGroups = useMemo(() => {
@@ -109,6 +111,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   useEffect(() => {
     modalOpenRef.current = showEditSettings || !!editingMatch || !!matchStatistics || !!matchToConfirm;
   }, [showEditSettings, editingMatch, matchStatistics, matchToConfirm]);
+
+  useEffect(() => {
+    setQualifiersTouched(false);
+    setSelectedQualifierIds([]);
+  }, [tournament?.id]);
 
   // Auto-switch to summary tab when tournament is completed
   const prevTournamentStatusRef = useRef(tournament?.status);
@@ -981,6 +988,30 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     });
   };
 
+  const comparePlayersByCriteria = (a, b, criteriaOrder) => {
+    for (const criterion of criteriaOrder) {
+      let comparison = 0;
+      switch (criterion) {
+        case 'matchesWon':
+          comparison = (b.matchesWon || b.points / 3 || 0) - (a.matchesWon || a.points / 3 || 0);
+          break;
+        case 'legDifference':
+          comparison = ((b.legsWon || 0) - (b.legsLost || 0)) - ((a.legsWon || 0) - (a.legsLost || 0));
+          break;
+        case 'average':
+          comparison = (b.average || 0) - (a.average || 0);
+          break;
+        case 'headToHead':
+          const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
+          const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
+          comparison = bWinsVsA - aWinsVsB;
+          break;
+      }
+      if (comparison !== 0) return comparison;
+    }
+    return (a.groupPosition || 0) - (b.groupPosition || 0);
+  };
+
   // Get qualifying players based on group standings, sorted by performance for seeding
   const getQualifyingPlayers = () => {
     if (!tournament) return [];
@@ -1083,32 +1114,119 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     
     // Sort all qualifying players globally for seeding using the same criteria as UI standings,
     // with group position as final tiebreaker (1st in group > 2nd in group)
-    allQualifyingPlayers.sort((a, b) => {
-      for (const criterion of criteriaOrder) {
-        let comparison = 0;
-        switch (criterion) {
-          case 'matchesWon':
-            comparison = (b.matchesWon || b.points / 3 || 0) - (a.matchesWon || a.points / 3 || 0);
-            break;
-          case 'legDifference':
-            comparison = ((b.legsWon || 0) - (b.legsLost || 0)) - ((a.legsWon || 0) - (a.legsLost || 0));
-            break;
-          case 'average':
-            comparison = (b.average || 0) - (a.average || 0);
-            break;
-          case 'headToHead':
-            const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
-            const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
-            comparison = bWinsVsA - aWinsVsB;
-            break;
-        }
-        if (comparison !== 0) return comparison;
-      }
-      // All criteria equal — prefer better group position
-      return (a.groupPosition || 0) - (b.groupPosition || 0);
-    });
+    allQualifyingPlayers.sort((a, b) => comparePlayersByCriteria(a, b, criteriaOrder));
     
     return allQualifyingPlayers.map(qp => qp.player);
+  };
+
+  const getRankedPlayersForSeeding = () => {
+    if (!tournament) return [];
+
+    if (tournament.tournamentType === 'playoff_only') {
+      const players = tournament.players || [];
+      return [...players].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    if (!tournament.groups) return [];
+
+    const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
+    const allPlayers = [];
+
+    tournament.groups.forEach(group => {
+      if (group.standings && group.standings.length > 0) {
+        const sortedStandings = sortStandingsByCriteria(group.standings, criteriaOrder);
+        sortedStandings.forEach((standing, index) => {
+          allPlayers.push({
+            ...standing,
+            groupPosition: index + 1,
+            legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
+            groupId: group.id
+          });
+        });
+      } else if (group.players && group.players.length > 0) {
+        group.players.forEach((player, index) => {
+          allPlayers.push({
+            player,
+            groupPosition: index + 1,
+            legsWon: 0,
+            legsLost: 0,
+            matchesWon: 0,
+            average: 0
+          });
+        });
+      }
+    });
+
+    allPlayers.sort((a, b) => comparePlayersByCriteria(a, b, criteriaOrder));
+
+    const seen = new Set();
+    return allPlayers
+      .filter(entry => {
+        const playerId = entry.player?.id;
+        if (!playerId || seen.has(playerId)) return false;
+        seen.add(playerId);
+        return true;
+      })
+      .map(entry => entry.player);
+  };
+
+  const areArraysEqual = (a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  };
+
+  const defaultQualifyingPlayers = getQualifyingPlayers();
+  const defaultQualifierIds = defaultQualifyingPlayers.map(player => player.id);
+  const defaultQualifierIdSet = new Set(defaultQualifierIds);
+  const rankedPlayersForSeeding = getRankedPlayersForSeeding();
+  const activeQualifierIds = qualifiersTouched ? selectedQualifierIds : defaultQualifierIds;
+  const activeQualifierIdSet = new Set(activeQualifierIds);
+  const allTournamentPlayers = tournament?.players?.length
+    ? tournament.players
+    : (uniqueGroups?.flatMap(group => group.players || []) || []);
+
+  const manualSelectedPlayers = (() => {
+    if (selectedQualifierIds.length === 0) return [];
+    const selectedSet = new Set(selectedQualifierIds);
+    const rankedSelected = rankedPlayersForSeeding.filter(player => selectedSet.has(player.id));
+    if (rankedSelected.length === selectedQualifierIds.length) {
+      return rankedSelected;
+    }
+    const rankedIds = new Set(rankedSelected.map(player => player.id));
+    const fallbackPlayers = allTournamentPlayers.filter(player => selectedSet.has(player.id) && !rankedIds.has(player.id));
+    return [...rankedSelected, ...fallbackPlayers];
+  })();
+
+  const activeQualifyingPlayers = qualifiersTouched ? manualSelectedPlayers : defaultQualifyingPlayers;
+
+  useEffect(() => {
+    if (qualifiersTouched) return;
+    setSelectedQualifierIds(prev => {
+      if (areArraysEqual(prev, defaultQualifierIds)) return prev;
+      return defaultQualifierIds;
+    });
+  }, [defaultQualifierIds, qualifiersTouched]);
+
+  const toggleQualifierSelection = (playerId) => {
+    setQualifiersTouched(true);
+    setSelectedQualifierIds(prev => {
+      const base = qualifiersTouched ? prev : defaultQualifierIds;
+      const next = new Set(base);
+      if (next.has(playerId)) {
+        next.delete(playerId);
+      } else {
+        next.add(playerId);
+      }
+      return Array.from(next);
+    });
+  };
+
+  const resetQualifierSelection = () => {
+    setQualifiersTouched(false);
+    setSelectedQualifierIds(defaultQualifierIds);
   };
 
   // Start playoffs by populating the bracket with qualifying players
@@ -1123,7 +1241,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
     }
 
-    const qualifyingPlayers = getQualifyingPlayers();
+    const qualifyingPlayers = activeQualifyingPlayers;
     if (qualifyingPlayers.length === 0) {
       alert(t('management.noQualifyingPlayers'));
       return;
@@ -2417,6 +2535,134 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     );
   };
 
+  const renderStartPlayoffsSection = () => {
+    const selectedCount = activeQualifierIds.length;
+    const autoQualifiedCount = defaultQualifierIds.length;
+    const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
+
+    const renderQualifierRow = (player, position) => {
+      if (!player) return null;
+      const isSelected = activeQualifierIdSet.has(player.id);
+      const isAutoQualified = defaultQualifierIdSet.has(player.id);
+      return (
+        <label
+          key={player.id}
+          className={`qualifier selectable ${isSelected ? 'selected' : 'unselected'}`}
+        >
+          <input
+            type="checkbox"
+            className="qualifier-checkbox"
+            checked={isSelected}
+            onChange={() => toggleQualifierSelection(player.id)}
+          />
+          <span className="position">{position}</span>
+          <span className="player-name">{player.name}</span>
+          {isAutoQualified && (
+            <span className="qualifier-tag">
+              {t('management.autoQualifiedTag') || 'Auto'}
+            </span>
+          )}
+        </label>
+      );
+    };
+
+    const renderGroupQualifiers = (group) => {
+      const groupPlayers = group.standings && group.standings.length > 0
+        ? sortStandingsByCriteria(group.standings, criteriaOrder)
+            .map((standing, index) => ({ player: standing.player, position: index + 1 }))
+        : (group.players || []).map((player, index) => ({ player, position: index + 1 }));
+
+      return (
+        <div key={group.id} className="group-qualifiers">
+          <h5>{group.name}</h5>
+          <div className="qualifiers-list">
+            {groupPlayers.length > 0 ? (
+              groupPlayers.map(({ player, position }) => renderQualifierRow(player, position))
+            ) : (
+              <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                {t('management.noPlayersInGroup') || 'No players in this group'}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const playoffOnlyPlayers = tournament.tournamentType === 'playoff_only'
+      ? rankedPlayersForSeeding
+      : [];
+
+    return (
+      <div className="start-playoffs-section">
+        <div className="playoffs-header">
+          <h3>{t('management.readyToStartPlayoffs')}</h3>
+          <div className="playoff-info">
+            <span>{t('management.groupStageCompleted')}</span>
+            <span>{selectedCount} {t('management.playersQualified')}</span>
+          </div>
+        </div>
+
+        <div className="qualifying-controls">
+          <div className="qualifying-summary">
+            <span>{t('management.selectedPlayers', { count: selectedCount })}</span>
+            <span>{t('management.autoQualified', { count: autoQualifiedCount })}</span>
+          </div>
+          <button
+            className="qualifiers-reset-btn"
+            onClick={resetQualifierSelection}
+            disabled={!qualifiersTouched}
+          >
+            {t('management.resetQualifiers') || 'Reset to automatic'}
+          </button>
+        </div>
+
+        <div className="qualifying-players">
+          <h4>{t('management.qualifyingPlayers')}:</h4>
+          <p className="qualifying-hint">
+            {t('management.qualifyingAdjustHint') || 'Select which players advance. You can change this list before starting playoffs.'}
+          </p>
+          <div className="players-grid">
+            {tournament.tournamentType === 'playoff_only' ? (
+              <div className="group-qualifiers">
+                <h5>{t('management.allPlayers') || 'All Players'}</h5>
+                <div className="qualifiers-list">
+                  {playoffOnlyPlayers.length > 0 ? (
+                    playoffOnlyPlayers.map((player, index) => renderQualifierRow(player, index + 1))
+                  ) : (
+                    <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                      {t('management.noPlayersInGroup') || 'No players in this group'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              uniqueGroups && uniqueGroups.length > 0 ? (
+                uniqueGroups.map(group => renderGroupQualifiers(group))
+              ) : (
+                <div className="no-groups">
+                  <p>{t('management.noGroupsYet') || 'No groups created yet.'}</p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        <div className="start-playoffs-actions">
+          <button
+            className="start-playoffs-btn"
+            onClick={startPlayoffs}
+          >
+            <Trophy size={20} />
+            {t('management.startPlayoffs')}
+          </button>
+          <p className="playoffs-note">
+            {t('management.playoffsNote')}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const renderPlayoffs = () => {
     // Check if playoffs are enabled
     if (!tournament.playoffSettings?.enabled) {
@@ -2435,67 +2681,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     if (!tournament.playoffs) {
       const groupStageComplete = isGroupStageComplete();
       if (groupStageComplete) {
-        const qualifyingPlayers = getQualifyingPlayers();
         return (
           <div className="playoffs-view">
-            <div className="start-playoffs-section">
-              <div className="playoffs-header">
-                <h3>{t('management.readyToStartPlayoffs')}</h3>
-                <div className="playoff-info">
-                  <span>{t('management.groupStageCompleted')}</span>
-                  <span>{qualifyingPlayers.length} {t('management.playersQualified')}</span>
-                </div>
-              </div>
-
-              <div className="qualifying-players">
-                <h4>{t('management.qualifyingPlayers')}:</h4>
-                <div className="players-grid">
-                  {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map((group, groupIndex) => {
-                    // Show all qualifiers from this group (regardless of mode)
-                    const groupQualifiers = qualifyingPlayers.filter(player => 
-                      group.players.some(groupPlayer => groupPlayer.id === player.id)
-                    );
-                    
-                    return (
-                      <div key={group.id} className="group-qualifiers">
-                        <h5>{group.name}</h5>
-                        <div className="qualifiers-list">
-                          {groupQualifiers.length > 0 ? (
-                            groupQualifiers.map((player, index) => (
-                              <div key={player.id} className="qualifier">
-                                <span className="position">{index + 1}</span>
-                                <span className="player-name">{player.name}</span>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                              No qualifiers
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }) : (
-                    <div className="no-groups">
-                      <p>{t('management.noGroupsYet') || 'No groups created yet.'}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="start-playoffs-actions">
-                <button 
-                  className="start-playoffs-btn"
-                  onClick={startPlayoffs}
-                >
-                  <Trophy size={20} />
-                  {t('management.startPlayoffs')}
-                </button>
-                <p className="playoffs-note">
-                  {t('management.playoffsNote')}
-                </p>
-              </div>
-            </div>
+            {renderStartPlayoffsSection()}
           </div>
         );
       } else {
@@ -2520,67 +2708,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     
 
     if (groupStageComplete && !playoffsStarted) {
-      const qualifyingPlayers = getQualifyingPlayers();
       return (
         <div className="playoffs-view">
-          <div className="start-playoffs-section">
-            <div className="playoffs-header">
-              <h3>Ready to Start Playoffs!</h3>
-              <div className="playoff-info">
-                <span>{t('management.groupStageCompleted')}</span>
-                <span>{qualifyingPlayers.length} {t('management.playersQualified')}</span>
-              </div>
-            </div>
-
-            <div className="qualifying-players">
-              <h4>Qualifying Players:</h4>
-              <div className="players-grid">
-                {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map((group, groupIndex) => {
-                  // Show all qualifiers from this group (regardless of mode)
-                  const groupQualifiers = qualifyingPlayers.filter(player => 
-                    group.players.some(groupPlayer => groupPlayer.id === player.id)
-                  );
-                  
-                  return (
-                    <div key={group.id} className="group-qualifiers">
-                      <h5>{group.name}</h5>
-                      <div className="qualifiers-list">
-                        {groupQualifiers.length > 0 ? (
-                          groupQualifiers.map((player, index) => (
-                            <div key={player.id} className="qualifier">
-                              <span className="position">{index + 1}</span>
-                              <span className="player-name">{player.name}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                            No qualifiers
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <div className="no-groups">
-                    <p>{t('management.noGroupsYet') || 'No groups created yet.'}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="start-playoffs-actions">
-              <button 
-                className="start-playoffs-btn"
-                onClick={startPlayoffs}
-              >
-                <Trophy size={20} />
-                Start Playoffs
-              </button>
-              <p className="playoffs-note">
-                Players will be randomly seeded in the bracket
-              </p>
-            </div>
-          </div>
+          {renderStartPlayoffsSection()}
         </div>
       );
     }
