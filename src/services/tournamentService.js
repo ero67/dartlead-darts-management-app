@@ -1655,21 +1655,40 @@ export const matchService = {
   // Start a live match
   async startLiveMatch(matchId, deviceId, deviceName = null, boardNumber = null) {
     try {
+      // Try with all columns first (including live_board_number)
+      const updateData = {
+        status: 'in_progress',
+        live_device_id: deviceId,
+        live_device_name: deviceName,
+        live_board_number: boardNumber,
+        live_started_at: new Date().toISOString(),
+        started_at: new Date().toISOString()
+      };
+
       const { data, error } = await supabase
         .from('matches')
-        .update({
-          status: 'in_progress',
-          live_device_id: deviceId,
-          live_device_name: deviceName,
-          live_board_number: boardNumber,
-          live_started_at: new Date().toISOString(),
-          started_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', matchId)
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        // If the error is about a missing column, retry without that column
+        if (error.code === 'PGRST204' || (error.message && error.message.includes('column'))) {
+          console.warn('Retrying startLiveMatch without missing column:', error.message);
+          const { live_board_number, ...fallbackData } = updateData;
+          const { data: fallbackResult, error: fallbackError } = await supabase
+            .from('matches')
+            .update(fallbackData)
+            .eq('id', matchId)
+            .select()
+            .single()
+
+          if (fallbackError) throw fallbackError;
+          return fallbackResult;
+        }
+        throw error;
+      }
       return data
 
     } catch (error) {
@@ -1681,18 +1700,35 @@ export const matchService = {
   // End a live match
   async endLiveMatch(matchId) {
     try {
+      const updateData = {
+        live_device_id: null,
+        live_device_name: null,
+        live_board_number: null,
+        live_started_at: null
+      };
+
       const { data, error } = await supabase
         .from('matches')
-        .update({
-          live_device_id: null,
-          live_device_name: null,
-          live_board_number: null,
-          live_started_at: null
-        })
+        .update(updateData)
         .eq('id', matchId)
         .select()
 
-      if (error) throw error
+      if (error) {
+        // Retry without missing column if needed
+        if (error.code === 'PGRST204' || (error.message && error.message.includes('column'))) {
+          console.warn('Retrying endLiveMatch without missing column:', error.message);
+          const { live_board_number, ...fallbackData } = updateData;
+          const { data: fallbackResult, error: fallbackError } = await supabase
+            .from('matches')
+            .update(fallbackData)
+            .eq('id', matchId)
+            .select()
+
+          if (fallbackError) throw fallbackError;
+          return fallbackResult && fallbackResult.length > 0 ? fallbackResult[0] : null;
+        }
+        throw error;
+      }
       // Return first match if found, or null if not found (match might already be completed)
       return data && data.length > 0 ? data[0] : null
 

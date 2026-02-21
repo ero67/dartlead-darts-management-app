@@ -35,39 +35,51 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       });
     }
   }, [match]);
+  // Helper: check if a saved localStorage state has real match progress
+  const savedStateHasProgress = (parsed, startingScore) => {
+    if (!parsed) return false;
+    if (parsed.currentPlayer !== null && parsed.currentPlayer !== undefined) return true;
+    if (parsed.matchStarter !== null && parsed.matchStarter !== undefined) return true;
+    if (parsed.legScores) {
+      const p1 = parsed.legScores.player1;
+      const p2 = parsed.legScores.player2;
+      if (p1 && (p1.legs > 0 || p1.currentScore !== startingScore || p1.totalDarts > 0)) return true;
+      if (p2 && (p2.legs > 0 || p2.currentScore !== startingScore || p2.totalDarts > 0)) return true;
+    }
+    if (parsed.turnHistory && parsed.turnHistory.length > 0) return true;
+    return false;
+  };
+
   // Initialize state with persisted data or defaults
   const getInitialState = () => {
     const matchId = match?.id;
     if (!matchId) return null;
+
+    const startingScore = matchSettings.startingScore || 501;
     
-    // If match has been reset to pending, clear any stale localStorage state
-    if (match?.status === 'pending') {
-      localStorage.removeItem(`match-state-${matchId}`);
-      return {
-        currentLeg: 1,
-        currentPlayer: null,
-        matchStarter: null,
-        legScores: {
-          player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
-          player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
-        },
-        currentTurn: { score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null },
-        turnHistory: [],
-        matchComplete: false,
-        inputMode: 'single',
-        scoringMode: 'dart',
-        showMatchStarter: false
-      };
-    }
-    
+    // Always try localStorage first – it has the most complete state
     const savedState = localStorage.getItem(`match-state-${matchId}`);
     if (savedState) {
       try {
         const parsed = JSON.parse(savedState);
-        return parsed;
+
+        // If match was explicitly reset to pending by an admin AND localStorage
+        // has NO real progress, clear it. But if localStorage shows the match
+        // was actively being played (has a currentPlayer, scores, etc.), keep
+        // the local state – the DB status may simply be stale due to a failed
+        // startLiveMatch call or a race with the visibility-change reload.
+        if (match?.status === 'pending' && !savedStateHasProgress(parsed, startingScore)) {
+          localStorage.removeItem(`match-state-${matchId}`);
+          // fall through to default state below
+        } else {
+          return parsed;
+        }
       } catch (error) {
         console.error('Error parsing saved match state:', error);
       }
+    } else if (match?.status === 'pending') {
+      // No saved state and match is pending – truly a fresh match
+      // (no need to removeItem, there's nothing to remove)
     }
     
     return {
@@ -75,8 +87,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       currentPlayer: null, // null means match hasn't started yet
       matchStarter: null,
       legScores: {
-        player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
-        player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
+        player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
+        player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
       },
       currentTurn: {
         score: 0,
@@ -282,10 +294,34 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     const loadMatchState = async () => {
       if (!match?.id) return;
 
-      // If match has been reset to pending, clear stale localStorage and start fresh
+      const startingScore = match?.startingScore || matchSettings.startingScore || 501;
+
+      // If match DB status is pending, only reset if localStorage has no real progress.
+      // The DB status can be stale (e.g. startLiveMatch failed due to a missing column,
+      // or the tournament reloaded before the PATCH completed).
       if (match?.status === 'pending') {
+        const stored = localStorage.getItem(`match-state-${match.id}`);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (savedStateHasProgress(parsed, startingScore)) {
+              // localStorage has real progress – keep it, don't reset
+              if (parsed.currentPlayer !== null && parsed.currentPlayer !== undefined) {
+                setCurrentPlayer(parsed.currentPlayer);
+              }
+              if (parsed.matchStarter !== null && parsed.matchStarter !== undefined) {
+                setMatchStarter(parsed.matchStarter);
+              }
+              setShowMatchStarter(false);
+              return;
+            }
+          } catch (e) {
+            // ignore parse errors, fall through to reset
+          }
+        }
+
+        // No local progress – this is truly a fresh/reset match
         localStorage.removeItem(`match-state-${match.id}`);
-        const startingScore = match?.startingScore || matchSettings.startingScore || 501;
         setCurrentLeg(1);
         setCurrentPlayer(null);
         setMatchStarter(null);
@@ -329,7 +365,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
       // If localStorage doesn't have currentPlayer or matchStarter, check database
       if (!hasLocalState) {
-        const startingScore = match?.startingScore || matchSettings.startingScore || 501;
         const dbState = await loadMatchStateFromDatabase(match.id, startingScore);
         if (dbState) {
           if (dbState.isInProgress) {
