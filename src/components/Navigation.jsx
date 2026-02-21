@@ -114,6 +114,16 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             </button>
           );
         })}
+        {(isAdmin || isManager) && (
+          <button
+            className={`nav-item ${currentView === '/manager' ? 'active' : ''}`}
+            onClick={() => handleNavItemClick('/manager')}
+            title={isCollapsed ? t('navigation.managerPanel') : ''}
+          >
+            <Badge size={18} />
+            {(!isCollapsed || isMobile) && <span>{t('navigation.managerPanel') || 'Manager'}</span>}
+          </button>
+        )}
         {isAdmin && (
           <button
             className={`nav-item ${currentView === '/admin' ? 'active' : ''}`}

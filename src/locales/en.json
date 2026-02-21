@@ -9,6 +9,7 @@
     "login": "Login",
     "logout": "Logout",
     "adminPanel": "Admin Panel",
+    "managerPanel": "Manager Panel",
     "privacy": "Privacy",
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",

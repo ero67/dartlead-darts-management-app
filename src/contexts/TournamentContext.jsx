@@ -18,6 +18,39 @@ const ACTIONS = {
   START_PLAYOFFS: 'START_PLAYOFFS'
 };
 
+// Session persistence helpers – keep tournament/match IDs across re-mounts
+// caused by auth token refreshes, visibility changes, or screen rotation.
+const SESSION_TOURNAMENT_KEY = 'darts-current-tournament-id';
+const SESSION_MATCH_KEY = 'darts-current-match-id';
+
+function saveSessionIds(tournamentId, matchId) {
+  try {
+    if (tournamentId) {
+      sessionStorage.setItem(SESSION_TOURNAMENT_KEY, tournamentId);
+    } else {
+      sessionStorage.removeItem(SESSION_TOURNAMENT_KEY);
+    }
+    if (matchId) {
+      sessionStorage.setItem(SESSION_MATCH_KEY, matchId);
+    } else {
+      sessionStorage.removeItem(SESSION_MATCH_KEY);
+    }
+  } catch (e) {
+    // sessionStorage may be unavailable in some contexts
+  }
+}
+
+function getSavedSessionIds() {
+  try {
+    return {
+      tournamentId: sessionStorage.getItem(SESSION_TOURNAMENT_KEY),
+      matchId: sessionStorage.getItem(SESSION_MATCH_KEY)
+    };
+  } catch (e) {
+    return { tournamentId: null, matchId: null };
+  }
+}
+
 // Initial state
 const initialState = {
   tournaments: [],
@@ -31,26 +64,63 @@ const initialState = {
 function tournamentReducer(state, action) {
   switch (action.type) {
     case ACTIONS.CREATE_TOURNAMENT:
+      saveSessionIds(action.payload?.id || null, null);
       return {
         ...state,
         tournaments: [...state.tournaments, action.payload],
         currentTournament: action.payload
       };
 
-    case ACTIONS.LOAD_TOURNAMENTS:
+    case ACTIONS.LOAD_TOURNAMENTS: {
+      // When tournaments reload (e.g. after auth token refresh / visibility change),
+      // restore the previously-active tournament and match from sessionStorage
+      // so ongoing matches are not lost.
+      const loaded = action.payload;
+      const saved = getSavedSessionIds();
+      let restoredTournament = state.currentTournament;
+      let restoredMatch = state.currentMatch;
+
+      if (!restoredTournament && saved.tournamentId) {
+        restoredTournament = loaded.find(t => t.id === saved.tournamentId) || null;
+      }
+
+      if (!restoredMatch && saved.matchId && restoredTournament) {
+        // Search group matches
+        const allMatches = (restoredTournament.groups || []).flatMap(g => g.matches || []);
+        restoredMatch = allMatches.find(m => m.id === saved.matchId) || null;
+
+        // Also search playoff matches if not found in groups
+        if (!restoredMatch && restoredTournament.playoffs?.rounds) {
+          for (const round of restoredTournament.playoffs.rounds) {
+            const found = (round.matches || []).find(m => m.id === saved.matchId);
+            if (found) {
+              restoredMatch = found;
+              break;
+            }
+          }
+        }
+      }
+
       return {
         ...state,
-        tournaments: action.payload,
+        tournaments: loaded,
+        currentTournament: restoredTournament,
+        currentMatch: restoredMatch,
         loading: false
       };
+    }
 
     case ACTIONS.SELECT_TOURNAMENT:
+      saveSessionIds(action.payload?.id || null, action.payload ? state.currentMatch?.id || null : null);
       return {
         ...state,
-        currentTournament: action.payload
+        currentTournament: action.payload,
+        // Clear current match if tournament is deselected
+        currentMatch: action.payload ? state.currentMatch : null
       };
 
     case ACTIONS.START_MATCH:
+      saveSessionIds(state.currentTournament?.id || null, action.payload?.id || null);
       return {
         ...state,
         currentMatch: action.payload
@@ -502,6 +572,9 @@ export function TournamentProvider({ children }) {
   };
 
   const completeMatch = async (matchResult) => {
+    // Clear match from session – the match is done, no need to restore it
+    saveSessionIds(state.currentTournament?.id || null, null);
+
     try {
       // Save to Supabase first
       await matchService.saveMatchResult(matchResult);

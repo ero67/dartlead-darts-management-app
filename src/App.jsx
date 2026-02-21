@@ -21,12 +21,13 @@ import { LeagueCreation } from './components/LeagueCreation';
 import { Auth } from './components/Auth';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { AdminPanel } from './components/AdminPanel';
+import { ManagerPanel } from './components/ManagerPanel';
 import { LandingPage } from './components/LandingPage';
 import './App.css';
 
 function AppContent() {
   const { user, loading } = useAuth();
-  const { isAdmin, canCreateTournaments } = useAdmin();
+  const { isAdmin, isManager, canCreateTournaments } = useAdmin();
   const {
     tournaments,
     currentTournament,
@@ -156,21 +157,35 @@ function AppContent() {
       if (id && (!currentMatch || currentMatch.id !== id)) {
         // Find match in current tournament
         if (currentTournament) {
-          const match = currentTournament.groups
+          // Search in group matches
+          let match = currentTournament.groups
             .flatMap(group => group.matches)
             .find(m => m.id === id);
+          
+          // Also search playoff matches
+          if (!match && currentTournament.playoffs?.rounds) {
+            for (const round of currentTournament.playoffs.rounds) {
+              match = (round.matches || []).find(m => m.id === id);
+              if (match) break;
+            }
+          }
+
           if (match) {
             startMatch(match);
           } else {
             // Match not found, redirect to tournament
             navigate(`/tournament/${currentTournament.id}`);
           }
-        } else {
-          // No tournament loaded, redirect to tournaments list
+        } else if (tournaments.length > 0) {
+          // Tournaments have loaded but currentTournament is null and wasn't restored
+          // from sessionStorage – this means the user navigated here without a valid
+          // tournament context. Redirect to tournaments list.
           navigate('/tournaments');
         }
+        // If tournaments.length === 0, we're still loading – don't redirect yet,
+        // the LOAD_TOURNAMENTS action will restore currentTournament from sessionStorage.
       }
-    }, [id, currentTournament, currentMatch, startMatch, navigate]);
+    }, [id, currentTournament, currentMatch, startMatch, navigate, tournaments.length]);
 
     return (
       <MatchInterface 
@@ -350,6 +365,16 @@ function AppContent() {
               <div className="unauthorized-container">
                 <h2>Access Denied</h2>
                 <p>You must be an administrator to access this page.</p>
+              </div>
+            )
+          } />
+          <Route path="/manager" element={
+            isAdmin || isManager ? (
+              <ManagerPanel />
+            ) : (
+              <div className="unauthorized-container">
+                <h2>Access Denied</h2>
+                <p>You must be a manager or administrator to access this page.</p>
               </div>
             )
           } />
