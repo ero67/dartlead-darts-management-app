@@ -1766,6 +1766,32 @@ export const matchService = {
     }
   },
 
+  // Manually update match result (for manager override)
+  async updateMatchResult(matchId, matchResult) {
+    try {
+      const updateData = {
+        status: 'completed',
+        winner_id: matchResult.winner,
+        player1_legs: matchResult.player1Legs,
+        player2_legs: matchResult.player2Legs,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('matches')
+        .update(updateData)
+        .eq('id', matchId)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Error updating match result:', error)
+      throw error
+    }
+  },
+
   // Get live matches
   async getLiveMatches() {
     try {

@@ -523,6 +523,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (turnHistory.length === 0) return;
 
     const last = turnHistory[turnHistory.length - 1];
+    // Only allow undo if the last turn is from the current leg
+    if (last.leg !== currentLeg) return;
     // Only undo normal turns (not checkouts / busts) – those aren't added to history by finishTurn
     const playerIndex = last.player;
     const turnScore = last.turn?.score || 0;
@@ -953,6 +955,13 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     // If current turn is empty, restore from history
     if (turnHistory.length > 0) {
       const lastTurn = turnHistory[turnHistory.length - 1];
+      
+      // Only allow undo if the last turn is from the current leg
+      if (lastTurn.leg !== currentLeg) {
+        setIsRemovingDart(false);
+        return;
+      }
+      
       const lastDart = lastTurn.turn.scores[lastTurn.turn.scores.length - 1];
       
       // Restore the previous turn's state
@@ -968,20 +977,39 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         score: restoredScore,
         darts: restoredDarts,
         scores: restoredScores,
-        dartCount: lastTurn.turn.dartCount - 1
+        dartCount: Math.max(0, (lastTurn.turn.dartCount || 0) - 1),
+        turnStartScore: lastTurn.turn.turnStartScore
       });
 
-      // Restore the leg scores with the removed dart's value added back
-      // Use current leg scores instead of saved ones to avoid stale data
+      // Restore the leg scores properly using turnStartScore
+      // This prevents incorrectly adding dart value to 501 when undoing after a new leg starts
       setLegScores(prev => {
-        const currentPlayerScore = prev[`player${lastTurn.player + 1}`].currentScore;
-        const restoredScore = currentPlayerScore + lastDart.value;
+        const playerKey = `player${lastTurn.player + 1}`;
+        const turnStartScore = lastTurn.turn.turnStartScore;
+        
+        // Use turnStartScore if available (most reliable), otherwise calculate
+        let restoredCurrentScore;
+        if (turnStartScore !== null && turnStartScore !== undefined) {
+          // Score at start of that turn minus the darts we're keeping
+          restoredCurrentScore = turnStartScore - restoredScore;
+        } else {
+          // Fallback: add back the removed dart's value
+          restoredCurrentScore = prev[playerKey].currentScore + lastDart.value;
+        }
+        
+        // Clamp to valid range
+        restoredCurrentScore = Math.min(
+          matchSettings.startingScore,
+          Math.max(0, restoredCurrentScore)
+        );
         
         return {
           ...prev,
-          [`player${lastTurn.player + 1}`]: {
-            ...prev[`player${lastTurn.player + 1}`],
-            currentScore: restoredScore
+          [playerKey]: {
+            ...prev[playerKey],
+            currentScore: restoredCurrentScore,
+            // Restore legDarts if this was a checkout (new leg had started)
+            legDarts: lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts
           }
         };
       });
@@ -1392,15 +1420,21 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
   // Get the last turn's throws for a player
   const getLastTurnThrows = (playerIndex) => {
+    const getDisplayLabel = (label) => {
+      if (!label) return '';
+      // Remove 'S' prefix for single hits, keep D and T prefixes
+      return label.startsWith('S') ? label.slice(1) : label;
+    };
+
     // First check if it's the current player's turn - show current turn throws
     if (currentPlayer === playerIndex && currentTurn.scores.length > 0) {
-      return currentTurn.scores.map(s => s.label).filter(Boolean);
+      return currentTurn.scores.map(s => getDisplayLabel(s.label)).filter(Boolean);
     }
     
     // Otherwise, find the last completed turn for this player from history
     for (let i = turnHistory.length - 1; i >= 0; i--) {
       if (turnHistory[i].player === playerIndex && turnHistory[i].turn.scores.length > 0) {
-        return turnHistory[i].turn.scores.map(s => s.label).filter(Boolean);
+        return turnHistory[i].turn.scores.map(s => getDisplayLabel(s.label)).filter(Boolean);
       }
     }
     
@@ -1641,11 +1675,11 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
                   >
                     Triple
                   </button>
-                  {/* Remove button */}
+                  {/* Remove button - only allow undoing darts in current leg */}
                   <button 
                     className="remove-last-btn dart-btn"
                     onClick={removeLastDart}
-                    disabled={(currentTurn.scores.length === 0 && turnHistory.length === 0) || isRemovingDart}
+                    disabled={currentTurn.scores.length === 0 && turnHistory.length === 0 || isRemovingDart}
                   >
                     <ArrowLeft size={20} />
                   </button>
@@ -1721,7 +1755,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
                   <button
                     className="remove-last-btn"
                     onClick={undoLastVisit}
-                    disabled={turnHistory.length === 0}
+                    disabled={turnHistory.length === 0 || currentTurn.score > 0}
                     type="button"
                   >
                     Undo last visit
