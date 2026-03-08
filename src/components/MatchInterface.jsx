@@ -1589,14 +1589,14 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           </div>
         </div>
       )}
-      <div className="match-scoreboard">
+      {/* Desktop scoreboard */}
+      <div className="match-scoreboard desktop-scoreboard">
         <div className={`player-score player1 ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
           <div className="player-header">
             <div className="player-name">{match.player1?.name || 'Player 1'}</div>
             <div className="legs-won">{legScores.player1.legs}</div>
           </div>
           <div className="current-score">{legScores.player1.currentScore}</div>
-          {/* Show individual throws */}
           {player1LastThrows.length > 0 && (
             <div className="last-throws">
               {player1LastThrows.map((throwLabel, idx) => (
@@ -1604,8 +1604,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
               ))}
             </div>
           )}
-          {/* Show stats */}
-          <div className="player-stats">
+          <div className="player-stats-row">
             <span>Avg: {getAverage('player1').toFixed(1)}</span>
             <span>Darts: {legScores.player1.legDarts}</span>
           </div>
@@ -1622,7 +1621,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             <div className="legs-won">{legScores.player2.legs}</div>
           </div>
           <div className="current-score">{legScores.player2.currentScore}</div>
-          {/* Show individual throws */}
           {player2LastThrows.length > 0 && (
             <div className="last-throws">
               {player2LastThrows.map((throwLabel, idx) => (
@@ -1630,11 +1628,73 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
               ))}
             </div>
           )}
-          {/* Show stats */}
-          <div className="player-stats">
+          <div className="player-stats-row">
             <span>Avg: {getAverage('player2').toFixed(1)}</span>
             <span>Darts: {legScores.player2.legDarts}</span>
           </div>
+        </div>
+      </div>
+
+      {/* Mobile scoreboard */}
+      <div className="mobile-scoreboard">
+        <div className={`mobile-player-card ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
+          <div className="mobile-player-card__top">
+            <div className="mobile-player-name">{match.player1?.name || 'Player 1'}</div>
+            <div className="mobile-legs-won">{legScores.player1.legs}</div>
+          </div>
+          <div className="mobile-current-score">{legScores.player1.currentScore}</div>
+        </div>
+
+        <div className={`mobile-player-card ${currentPlayer === 1 ? 'active-player' : ''} ${bustingPlayer === 1 ? 'bust' : ''}`}>
+          <div className="mobile-player-card__top">
+            <div className="mobile-player-name">{match.player2?.name || 'Player 2'}</div>
+            <div className="mobile-legs-won">{legScores.player2.legs}</div>
+          </div>
+          <div className="mobile-current-score">{legScores.player2.currentScore}</div>
+        </div>
+      </div>
+
+      {/* Stats Section - Individual darts */}
+      <div className="match-stats-section">
+        <div className={`player-stats-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
+          {player1LastThrows.length > 0 && (
+            <div className="last-throws">
+              {player1LastThrows.map((throwLabel, idx) => (
+                <span key={idx} className="throw-label">{throwLabel}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="vs-divider mobile-hidden">
+          <span>vs</span>
+        </div>
+
+        <div className={`player-stats-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
+          {player2LastThrows.length > 0 && (
+            <div className="last-throws">
+              {player2LastThrows.map((throwLabel, idx) => (
+                <span key={idx} className="throw-label">{throwLabel}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Average and Darts Section */}
+      <div className="match-avg-section">
+        <div className={`player-avg-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
+          <span className="avg-text">Avg: {getAverage('player1').toFixed(1)}</span>
+          <span className="darts-text">{legScores.player1.legDarts} darts</span>
+        </div>
+
+        <div className="vs-divider mobile-hidden">
+          <span>vs</span>
+        </div>
+
+        <div className={`player-avg-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
+          <span className="avg-text">Avg: {getAverage('player2').toFixed(1)}</span>
+          <span className="darts-text">{legScores.player2.legDarts} darts</span>
         </div>
       </div>
 
