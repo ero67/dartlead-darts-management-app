@@ -3809,21 +3809,28 @@ body {
 @media (max-width: 768px) {
   .mode-btn-inline {
     padding: 0;
-    font-size: 1rem;
-    min-height: 52px;
+    font-size: 1.4rem;
+    min-height: 70px;
     font-weight: 700;
     border-radius: 0;
     grid-column: span 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
 @media (max-width: 380px) {
   .mode-btn-inline {
     padding: 0;
-    font-size: 0.9rem;
-    min-height: 48px;
+    font-size: 1.2rem;
+    min-height: 65px;
     font-weight: 700;
+    border-radius: 0;
     grid-column: span 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
@@ -3835,19 +3842,78 @@ body {
 
 @media (max-width: 768px) {
   .dart-numbers {
-    grid-template-columns: repeat(7, 1fr);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
     gap: 0;
     padding: 0;
     width: 100%;
+  }
+  
+  .mode-buttons-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    width: 100%;
+  }
+  
+  .remove-last-row {
+    display: flex;
+    width: 100%;
+  }
+  
+  .remove-last-row .remove-last-btn {
+    flex: 1;
+    height: 70px;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .dart-btn {
+    padding: 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    border-radius: 0;
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    margin: 0;
   }
 }
 
 @media (max-width: 380px) {
   .dart-numbers {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 0;
     padding: 0;
     width: 100%;
+  }
+  
+  .mode-buttons-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    width: 100%;
+  }
+  
+  .remove-last-row .remove-last-btn {
+    height: 65px;
+    font-size: 1.2rem;
+  }
+  
+  .dart-btn {
+    padding: 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+    border-radius: 0;
+    min-height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
@@ -3870,9 +3936,9 @@ body {
 @media (max-width: 768px) {
   .remove-last-btn.dart-btn {
     padding: 0;
-    font-size: 1.3rem;
+    font-size: 1.6rem;
     font-weight: 700;
-    min-height: 52px;
+    min-height: 70px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3883,9 +3949,9 @@ body {
 @media (max-width: 380px) {
   .remove-last-btn.dart-btn {
     padding: 0;
-    font-size: 1.1rem;
+    font-size: 1.4rem;
     font-weight: 700;
-    min-height: 48px;
+    min-height: 65px;
     display: flex;
     align-items: center;
     justify-content: center;

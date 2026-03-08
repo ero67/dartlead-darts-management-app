@@ -1710,7 +1710,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           <>
             {scoringMode === 'dart' ? (
               <>
-                {/* Number Selection, Mode Selection, and Remove Last */}
+                {/* Number buttons grid */}
                 <div className="dart-numbers">
                   {dartNumbers.map((number, index) => (
                     <button
@@ -1722,7 +1722,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
                       {number === 0 ? '0' : number === 25 ? '25' : number}
                     </button>
                   ))}
-                  {/* Mode buttons in same row */}
+                </div>
+                {/* Mode buttons */}
+                <div className="mode-buttons-row">
                   <button 
                     className={`mode-btn-inline ${inputMode === 'double' ? 'active' : ''}`}
                     onClick={() => setInputMode(inputMode === 'double' ? 'single' : 'double')}
@@ -1735,13 +1737,16 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
                   >
                     Triple
                   </button>
-                  {/* Remove button - only allow undoing darts in current leg */}
+                </div>
+                {/* Remove button - separate row */}
+                <div className="remove-last-row">
                   <button 
                     className="remove-last-btn dart-btn"
                     onClick={removeLastDart}
                     disabled={currentTurn.scores.length === 0 && turnHistory.length === 0 || isRemovingDart}
                   >
                     <ArrowLeft size={20} />
+                    <span>Undo</span>
                   </button>
                 </div>
               </>
