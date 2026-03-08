@@ -3792,7 +3792,7 @@ body {
   justify-content: center;
   text-align: center;
   white-space: nowrap;
-  grid-column: span 2;
+  flex: 1;
 }
 
 .mode-btn-inline.active {
@@ -3806,6 +3806,17 @@ body {
   border-color: var(--border-color-dark);
 }
 
+.mode-buttons-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.remove-last-row {
+  display: flex;
+  margin-top: 0.5rem;
+}
+
 @media (max-width: 768px) {
   .mode-btn-inline {
     padding: 0;
@@ -3813,7 +3824,7 @@ body {
     min-height: 70px;
     font-weight: 700;
     border-radius: 0;
-    grid-column: span 1;
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3827,7 +3838,7 @@ body {
     min-height: 65px;
     font-weight: 700;
     border-radius: 0;
-    grid-column: span 1;
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
