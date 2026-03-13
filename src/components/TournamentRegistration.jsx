@@ -9,6 +9,7 @@ export function TournamentRegistration({ tournament, onBack }) {
   // Ensure players is always an array
   const players = tournament.players || [];
   const [newPlayerName, setNewPlayerName] = useState('');
+  const [bulkPlayerNames, setBulkPlayerNames] = useState('');
   const [showEditSettings, setShowEditSettings] = useState(false);
   const [showGroupsPreview, setShowGroupsPreview] = useState(false);
   const [draftGroups, setDraftGroups] = useState([]);
@@ -126,6 +127,55 @@ export function TournamentRegistration({ tournament, onBack }) {
       setNewPlayerName('');
     } catch (error) {
       console.error('Error adding player:', error);
+      alert(t('registration.failedToAddPlayer'));
+    }
+  };
+
+  const parseBulkPlayerNames = (value) => {
+    return value
+      .split(/[;\n]+/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+  };
+
+  const addBulkPlayers = async () => {
+    const parsedNames = parseBulkPlayerNames(bulkPlayerNames);
+
+    if (parsedNames.length === 0) {
+      alert(t('registration.pleaseEnterPlayerName'));
+      return;
+    }
+
+    if (players.length >= 64) {
+      alert(t('registration.tournamentFull'));
+      return;
+    }
+
+    const existingNames = new Set(players.map((player) => player.name.trim().toLowerCase()));
+    const uniqueNames = parsedNames.filter((name, index) => {
+      const normalized = name.toLowerCase();
+      return !existingNames.has(normalized) && parsedNames.findIndex((item) => item.toLowerCase() === normalized) === index;
+    });
+
+    if (uniqueNames.length === 0) {
+      setBulkPlayerNames('');
+      return;
+    }
+
+    const availableSlots = Math.max(0, 64 - players.length);
+    const namesToAdd = uniqueNames.slice(0, availableSlots);
+
+    try {
+      for (const name of namesToAdd) {
+        await addPlayerToTournament(name);
+      }
+      setBulkPlayerNames('');
+
+      if (namesToAdd.length < uniqueNames.length) {
+        alert(t('registration.tournamentFull'));
+      }
+    } catch (error) {
+      console.error('Error adding players in bulk:', error);
       alert(t('registration.failedToAddPlayer'));
     }
   };
@@ -269,6 +319,26 @@ export function TournamentRegistration({ tournament, onBack }) {
                 {t('registration.addPlayer')}
               </button>
             </div>
+            <div className="add-player-form add-player-form--bulk">
+              <textarea
+                placeholder={t('registration.playersBulkPlaceholder') || 'Name Surname; Name Surname; Name Surname'}
+                value={bulkPlayerNames}
+                onChange={(e) => setBulkPlayerNames(e.target.value)}
+                rows={3}
+                maxLength={1000}
+              />
+              <button
+                className="add-player-btn"
+                onClick={addBulkPlayers}
+                disabled={!bulkPlayerNames.trim() || players.length >= 64}
+              >
+                <Plus size={16} />
+                {t('registration.addPlayers') || 'Add players'}
+              </button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              {t('registration.playersBulkHelp') || 'Separate players with semicolons or new lines.'}
+            </p>
           </div>
 
           <div className="players-list">

@@ -210,7 +210,10 @@
     "groupPreviewTitle": "Groups preview (edit before start)",
     "groupPreviewHint": "You can move players between groups. Groups + matches will be created only after you confirm Start.",
     "regenerateGroups": "Shuffle / regenerate",
-    "moveToGroup": "Move to group"
+    "moveToGroup": "Move to group",
+    "playersBulkPlaceholder": "Name Surname; Name Surname; Name Surname",
+    "playersBulkHelp": "Separate players with semicolons or new lines.",
+    "addPlayers": "Add players"
   },
   "management": {
     "tournamentGroups": "Tournament Groups",

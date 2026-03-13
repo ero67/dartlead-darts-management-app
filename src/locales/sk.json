@@ -204,7 +204,10 @@
     "groupPreviewTitle": "Náhľad skupín (úprava pred štartom)",
     "groupPreviewHint": "Hráčov môžeš presúvať medzi skupinami. Skupiny a zápasy sa vytvoria až po potvrdení štartu.",
     "regenerateGroups": "Zamiešať / vygenerovať znova",
-    "moveToGroup": "Presunúť do skupiny"
+    "moveToGroup": "Presunúť do skupiny",
+    "playersBulkPlaceholder": "Meno Priezvisko; Meno Priezvisko; Meno Priezvisko",
+    "playersBulkHelp": "Hráčov oddeľte bodkočiarkou alebo novým riadkom.",
+    "addPlayers": "Pridať hráčov"
   },
   "management": {
     "tournamentGroups": "Skupiny Turnaja",

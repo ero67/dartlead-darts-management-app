@@ -525,7 +525,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     const last = turnHistory[turnHistory.length - 1];
     // Only allow undo if the last turn is from the current leg
     if (last.leg !== currentLeg) return;
-    // Only undo normal turns (not checkouts / busts) – those aren't added to history by finishTurn
     const playerIndex = last.player;
     const turnScore = last.turn?.score || 0;
     const turnDarts = last.turn?.darts || 0;
@@ -575,6 +574,19 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }));
 
     setTurnHistory(prev => prev.slice(0, -1));
+  };
+
+  const recordBustTurn = ({ playerIndex, turnData, turnScore = 0, legScoresSnapshot }) => {
+    setTurnHistory(prev => [...prev, {
+      player: playerIndex,
+      turn: {
+        ...turnData,
+        score: turnScore,
+        isBust: true
+      },
+      legScores: legScoresSnapshot,
+      leg: currentLeg
+    }]);
   };
 
   const applyTurnTotal = (total, { finishedOnDouble = false, dartsUsed = 3 } = {}) => {
@@ -786,7 +798,23 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       setBustingPlayer(currentPlayer);
       
       // Show visual feedback, restore score to start of turn, add darts to count, and switch player
+      const bustingPlayerIndex = currentPlayer;
+      const bustTurnData = {
+        score: newScore,
+        darts: newDarts,
+        scores: newScores,
+        dartCount: currentTurn.dartCount + 1,
+        turnStartScore: turnStartScore,
+        currentScore: turnStartScore
+      };
+
       setTimeout(() => {
+        recordBustTurn({
+          playerIndex: bustingPlayerIndex,
+          turnData: bustTurnData,
+          turnScore: 0,
+          legScoresSnapshot: structuredClone(legScores)
+        });
         setCurrentTurn(prev => ({
           ...prev,
           score: 0,
@@ -834,7 +862,23 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         setBustingPlayer(currentPlayer);
         
         // Show visual feedback, restore score to start of turn, add darts to count, and switch player
+        const bustingPlayerIndex = currentPlayer;
+        const bustTurnData = {
+          score: newScore,
+          darts: newDarts,
+          scores: newScores,
+          dartCount: currentTurn.dartCount + 1,
+          turnStartScore: turnStartScore,
+          currentScore: turnStartScore
+        };
+
         setTimeout(() => {
+          recordBustTurn({
+            playerIndex: bustingPlayerIndex,
+            turnData: bustTurnData,
+            turnScore: 0,
+            legScoresSnapshot: structuredClone(legScores)
+          });
           setCurrentTurn(prev => ({
             ...prev,
             score: 0,
@@ -963,6 +1007,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       }
       
       const lastDart = lastTurn.turn.scores[lastTurn.turn.scores.length - 1];
+      const wasBustTurn = Boolean(lastTurn.turn?.isBust);
       
       // Restore the previous turn's state
       setCurrentPlayer(lastTurn.player);
@@ -1008,8 +1053,10 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           [playerKey]: {
             ...prev[playerKey],
             currentScore: restoredCurrentScore,
+            totalDarts: Math.max(0, prev[playerKey].totalDarts - (wasBustTurn ? 1 : 0)),
+            legDarts: Math.max(0, (lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts) - (wasBustTurn ? 1 : 0)),
             // Restore legDarts if this was a checkout (new leg had started)
-            legDarts: lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts
+            ...(wasBustTurn ? {} : { legDarts: lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts })
           }
         };
       });
@@ -1141,7 +1188,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             legDetails: opponentLegDetails
           }
         };
-        
+
         // Update database immediately after leg completion
         setTimeout(() => {
           updateMatchToDatabase(match.id, {
@@ -1239,6 +1286,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
       // Clear turn history for new leg
       setTurnHistory([]);
+
     } else {
       // Update total score and dart count (current score already updated by addScore)
       setLegScores(prev => {
