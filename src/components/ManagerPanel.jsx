@@ -3,11 +3,23 @@ import { Badge, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save } fro
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 
+const MATCH_STATE_OPTIONS = [
+  { value: 'all', label: 'All states' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' }
+];
+
+const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
+
 export function ManagerPanel() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [tournamentsForMatch, setTournamentsForMatch] = useState([]);
   const [selectedTournamentForMatch, setSelectedTournamentForMatch] = useState('');
   const [matchesForTournament, setMatchesForTournament] = useState([]);
+  const [matchSearchTerm, setMatchSearchTerm] = useState('');
+  const [matchStateFilter, setMatchStateFilter] = useState('all');
   const [selectedMatchId, setSelectedMatchId] = useState('');
   const [matchInfo, setMatchInfo] = useState(null);
   const [loadingMatch, setLoadingMatch] = useState(false);
@@ -133,8 +145,33 @@ export function ManagerPanel() {
 
   const handleTournamentSelectForMatch = async (tournamentId) => {
     setSelectedTournamentForMatch(tournamentId);
+    setMatchSearchTerm('');
+    setMatchStateFilter('all');
     await loadMatchesForTournament(tournamentId);
   };
+
+  const filteredMatchesForTournament = matchesForTournament.filter((match) => {
+    const player1Name = match.player1?.name || 'Unknown';
+    const player2Name = match.player2?.name || 'Unknown';
+    const matchType = match.is_playoff ? 'Playoff' : (match.group?.name || 'Group');
+    const statusLabel = formatMatchStateLabel(match.status);
+    const score = match.player1_legs !== null ? `${match.player1_legs} - ${match.player2_legs}` : '';
+    const searchHaystack = [
+      player1Name,
+      player2Name,
+      matchType,
+      statusLabel,
+      score,
+      String(match.id)
+    ]
+      .join(' ')
+      .toLowerCase();
+
+    const matchesSearch = searchHaystack.includes(matchSearchTerm.trim().toLowerCase());
+    const matchesState = matchStateFilter === 'all' || match.status === matchStateFilter;
+
+    return matchesSearch && matchesState;
+  });
 
   const handleMatchSelect = async (matchId) => {
     if (!matchId) {
@@ -384,6 +421,28 @@ export function ManagerPanel() {
                     <Search size={16} />
                     Select Match
                   </label>
+                  <div className="manager-match-filters">
+                    <input
+                      id="matchSearch"
+                      type="text"
+                      value={matchSearchTerm}
+                      onChange={(e) => setMatchSearchTerm(e.target.value)}
+                      placeholder="Search by player, group, score, match ID..."
+                      disabled={loadingMatches || matchesForTournament.length === 0}
+                    />
+                    <select
+                      id="matchStateFilter"
+                      value={matchStateFilter}
+                      onChange={(e) => setMatchStateFilter(e.target.value)}
+                      disabled={loadingMatches || matchesForTournament.length === 0}
+                    >
+                      {MATCH_STATE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   {loadingMatches ? (
                     <div className="admin-loading">
                       <Loader size={16} className="spinning" />
@@ -394,17 +453,17 @@ export function ManagerPanel() {
                       id="matchSelect"
                       value={selectedMatchId}
                       onChange={(e) => handleMatchSelect(e.target.value)}
-                      disabled={loadingMatch || matchesForTournament.length === 0}
+                      disabled={loadingMatch || filteredMatchesForTournament.length === 0}
                     >
                       <option value="">-- Select a match --</option>
-                      {matchesForTournament.map((match) => {
+                      {filteredMatchesForTournament.map((match) => {
                         const player1Name = match.player1?.name || 'Unknown';
                         const player2Name = match.player2?.name || 'Unknown';
                         const matchType = match.is_playoff ? 'Playoff' : (match.group?.name || 'Group');
                         const score = match.player1_legs !== null ? `${match.player1_legs} - ${match.player2_legs}` : '';
                         return (
                           <option key={match.id} value={match.id}>
-                            {matchType}: {player1Name} vs {player2Name} {score && `(${score})`} - {match.status}
+                            {matchType}: {player1Name} vs {player2Name} {score && `(${score})`} - {formatMatchStateLabel(match.status)}
                           </option>
                         );
                       })}
@@ -415,6 +474,12 @@ export function ManagerPanel() {
                 {matchesForTournament.length === 0 && !loadingMatches && (
                   <div className="admin-empty" style={{ marginTop: '1rem' }}>
                     <p>No matches found for this tournament.</p>
+                  </div>
+                )}
+
+                {matchesForTournament.length > 0 && filteredMatchesForTournament.length === 0 && !loadingMatches && (
+                  <div className="admin-empty" style={{ marginTop: '1rem' }}>
+                    <p>No matches match the current search and state filter.</p>
                   </div>
                 )}
 

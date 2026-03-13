@@ -22,7 +22,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
   // Detect if we're on mobile
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
+      setIsMobile(window.innerWidth <= 1024);
     };
     
     checkMobile();

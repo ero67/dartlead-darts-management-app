@@ -1589,8 +1589,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           </div>
         </div>
       )}
-      {/* Desktop scoreboard */}
-      <div className="match-scoreboard desktop-scoreboard">
+      <div className="match-scoreboard match-scoreboard--compact">
         <div className={`player-score player1 ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
           <div className="player-header">
             <div className="player-name">{match.player1?.name || 'Player 1'}</div>
@@ -1632,25 +1631,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             <span>Avg: {getAverage('player2').toFixed(1)}</span>
             <span>Darts: {legScores.player2.legDarts}</span>
           </div>
-        </div>
-      </div>
-
-      {/* Mobile scoreboard */}
-      <div className="mobile-scoreboard">
-        <div className={`mobile-player-card ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
-          <div className="mobile-player-card__top">
-            <div className="mobile-player-name">{match.player1?.name || 'Player 1'}</div>
-            <div className="mobile-legs-won">{legScores.player1.legs}</div>
-          </div>
-          <div className="mobile-current-score">{legScores.player1.currentScore}</div>
-        </div>
-
-        <div className={`mobile-player-card ${currentPlayer === 1 ? 'active-player' : ''} ${bustingPlayer === 1 ? 'bust' : ''}`}>
-          <div className="mobile-player-card__top">
-            <div className="mobile-player-name">{match.player2?.name || 'Player 2'}</div>
-            <div className="mobile-legs-won">{legScores.player2.legs}</div>
-          </div>
-          <div className="mobile-current-score">{legScores.player2.currentScore}</div>
         </div>
       </div>
 
