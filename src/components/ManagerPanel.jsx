@@ -2,18 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Badge, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
-
-const MATCH_STATE_OPTIONS = [
-  { value: 'all', label: 'All states' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' }
-];
+import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../contexts/AdminContext';
 
 const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
 
 export function ManagerPanel() {
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const [message, setMessage] = useState({ type: '', text: '' });
   const [tournamentsForMatch, setTournamentsForMatch] = useState([]);
   const [selectedTournamentForMatch, setSelectedTournamentForMatch] = useState('');
@@ -25,7 +23,7 @@ export function ManagerPanel() {
   const [loadingMatch, setLoadingMatch] = useState(false);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [loadingTournaments, setLoadingTournaments] = useState(false);
-  
+
   const [editMode, setEditMode] = useState(false);
   const [manualResult, setManualResult] = useState({
     winner: null,
@@ -34,16 +32,27 @@ export function ManagerPanel() {
   });
   const [savingResult, setSavingResult] = useState(false);
 
+  const MATCH_STATE_OPTIONS = [
+    { value: 'all', label: t('manager.allStates') },
+    { value: 'pending', label: t('manager.pending') },
+    { value: 'in_progress', label: t('manager.inProgress') },
+    { value: 'completed', label: t('manager.completed') },
+    { value: 'cancelled', label: t('manager.cancelled') }
+  ];
+
   const loadTournamentsForMatch = async () => {
     setLoadingTournaments(true);
     try {
-      const tournaments = await tournamentService.getTournaments();
+      const allTournaments = await tournamentService.getTournaments();
+      const tournaments = isAdmin
+        ? allTournaments
+        : (allTournaments || []).filter(t => user && t.userId === user.id);
       setTournamentsForMatch(tournaments || []);
     } catch (err) {
       console.error('Error loading tournaments:', err);
       setMessage({
         type: 'error',
-        text: 'Failed to load tournaments.'
+        text: t('manager.failedToLoadTournaments')
       });
     } finally {
       setLoadingTournaments(false);
@@ -135,7 +144,7 @@ export function ManagerPanel() {
       console.error('Error loading matches:', err);
       setMessage({
         type: 'error',
-        text: err.message || 'Failed to load matches.'
+        text: err.message || t('manager.failedToLoadMatches')
       });
       setMatchesForTournament([]);
     } finally {
@@ -151,9 +160,9 @@ export function ManagerPanel() {
   };
 
   const filteredMatchesForTournament = matchesForTournament.filter((match) => {
-    const player1Name = match.player1?.name || 'Unknown';
-    const player2Name = match.player2?.name || 'Unknown';
-    const matchType = match.is_playoff ? 'Playoff' : (match.group?.name || 'Group');
+    const player1Name = match.player1?.name || t('common.unknown');
+    const player2Name = match.player2?.name || t('common.unknown');
+    const matchType = match.is_playoff ? t('manager.playoff') : (match.group?.name || t('manager.group'));
     const statusLabel = formatMatchStateLabel(match.status);
     const score = match.player1_legs !== null ? `${match.player1_legs} - ${match.player2_legs}` : '';
     const searchHaystack = [
@@ -211,7 +220,7 @@ export function ManagerPanel() {
       }
 
       if (!data) {
-        setMessage({ type: 'error', text: 'Match not found' });
+        setMessage({ type: 'error', text: t('manager.matchNotFound') });
         setMatchInfo(null);
       } else {
         setMatchInfo(data);
@@ -220,7 +229,7 @@ export function ManagerPanel() {
       console.error('Error loading match:', err);
       setMessage({
         type: 'error',
-        text: err.message || 'Failed to load match.'
+        text: err.message || t('manager.failedToLoadMatch')
       });
       setMatchInfo(null);
     } finally {
@@ -230,11 +239,11 @@ export function ManagerPanel() {
 
   const resetMatchToPending = async () => {
     if (!matchInfo) {
-      setMessage({ type: 'error', text: 'Please search for a match first' });
+      setMessage({ type: 'error', text: t('manager.searchFirstError') });
       return;
     }
 
-    if (!confirm(`Are you sure you want to reset match ${matchInfo.id} to pending? This will clear ALL match data including scores, averages, legs, and statistics. The match will be completely clean as if it never happened.`)) {
+    if (!confirm(t('manager.confirmReset', { matchId: matchInfo.id }))) {
       return;
     }
 
@@ -288,7 +297,7 @@ export function ManagerPanel() {
 
       setMessage({
         type: 'success',
-        text: `Match ${matchInfo.id} has been fully reset to pending. All scores, legs, and statistics have been cleared.`
+        text: t('manager.resetSuccess', { matchId: matchInfo.id })
       });
       setMatchInfo(null);
       setSelectedMatchId('');
@@ -297,7 +306,7 @@ export function ManagerPanel() {
       console.error('Error resetting match:', err);
       setMessage({
         type: 'error',
-        text: err.message || 'Failed to reset match.'
+        text: err.message || t('manager.failedToResetMatch')
       });
     } finally {
       setLoadingMatch(false);
@@ -317,20 +326,20 @@ export function ManagerPanel() {
 
   const saveManualResult = async () => {
     if (!matchInfo || !manualResult.winner) {
-      setMessage({ type: 'error', text: 'Please select a winner' });
+      setMessage({ type: 'error', text: t('manager.selectWinnerError') });
       return;
     }
 
     if (manualResult.player1Legs < 0 || manualResult.player2Legs < 0) {
-      setMessage({ type: 'error', text: 'Legs cannot be negative' });
+      setMessage({ type: 'error', text: t('manager.legsNegativeError') });
       return;
     }
 
     const winnerLegs = manualResult.winner === matchInfo.player1_id ? manualResult.player1Legs : manualResult.player2Legs;
     const loserLegs = manualResult.winner === matchInfo.player1_id ? manualResult.player2Legs : manualResult.player1Legs;
-    
+
     if (winnerLegs <= loserLegs) {
-      setMessage({ type: 'error', text: 'Winner must have more legs than loser' });
+      setMessage({ type: 'error', text: t('manager.winnerMoreLegsError') });
       return;
     }
 
@@ -346,9 +355,14 @@ export function ManagerPanel() {
 
       setMessage({
         type: 'success',
-        text: `Match result updated: ${matchInfo.player1?.name || 'Player 1'} ${manualResult.player1Legs} - ${manualResult.player2Legs} ${matchInfo.player2?.name || 'Player 2'}`
+        text: t('manager.resultUpdated', {
+          player1: matchInfo.player1?.name || 'Player 1',
+          score1: manualResult.player1Legs,
+          score2: manualResult.player2Legs,
+          player2: matchInfo.player2?.name || 'Player 2'
+        })
       });
-      
+
       setEditMode(false);
       await loadMatchesForTournament(selectedTournamentForMatch);
       await handleMatchSelect(matchInfo.id);
@@ -356,7 +370,7 @@ export function ManagerPanel() {
       console.error('Error saving manual result:', err);
       setMessage({
         type: 'error',
-        text: err.message || 'Failed to save match result.'
+        text: err.message || t('manager.failedToSaveResult')
       });
     } finally {
       setSavingResult(false);
@@ -378,26 +392,26 @@ export function ManagerPanel() {
       <div className="admin-panel-header">
         <div className="admin-panel-title">
           <Badge size={24} />
-          <h1>Manager Panel</h1>
+          <h1>{t('manager.title')}</h1>
         </div>
-        <p className="admin-panel-subtitle">Reset completed matches and correct mistakes</p>
+        <p className="admin-panel-subtitle">{t('manager.subtitle')}</p>
       </div>
 
       <div className="admin-panel-content">
         <div className="admin-section">
           <div className="admin-section-header">
                     <RotateCcw size={20} />
-                    <h2>Manage Match State</h2>
+                    <h2>{t('manager.manageMatchState')}</h2>
                   </div>
                   <p className="admin-section-description">
-                    Select a tournament and match to either reset it to pending or manually set the final result when recovery is needed.
+                    {t('manager.manageMatchStateDescription')}
                   </p>
 
           <div className="admin-form">
             <div className="form-group">
               <label htmlFor="tournamentForMatch">
                 <Search size={16} />
-                Select Tournament
+                {t('manager.selectTournament')}
               </label>
               <select
                 id="tournamentForMatch"
@@ -405,7 +419,7 @@ export function ManagerPanel() {
                 onChange={(e) => handleTournamentSelectForMatch(e.target.value)}
                 disabled={loadingTournaments}
               >
-                <option value="">-- Select a tournament --</option>
+                <option value="">{t('manager.selectTournamentPlaceholder')}</option>
                 {tournamentsForMatch.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
                     {tournament.name} ({tournament.status})
@@ -419,7 +433,7 @@ export function ManagerPanel() {
                 <div className="form-group">
                   <label htmlFor="matchSelect">
                     <Search size={16} />
-                    Select Match
+                    {t('manager.selectMatch')}
                   </label>
                   <div className="manager-match-filters">
                     <input
@@ -427,7 +441,7 @@ export function ManagerPanel() {
                       type="text"
                       value={matchSearchTerm}
                       onChange={(e) => setMatchSearchTerm(e.target.value)}
-                      placeholder="Search by player, group, score, match ID..."
+                      placeholder={t('manager.searchPlaceholder')}
                       disabled={loadingMatches || matchesForTournament.length === 0}
                     />
                     <select
@@ -446,7 +460,7 @@ export function ManagerPanel() {
                   {loadingMatches ? (
                     <div className="admin-loading">
                       <Loader size={16} className="spinning" />
-                      <span>Loading matches...</span>
+                      <span>{t('manager.loadingMatches')}</span>
                     </div>
                   ) : (
                     <select
@@ -455,11 +469,11 @@ export function ManagerPanel() {
                       onChange={(e) => handleMatchSelect(e.target.value)}
                       disabled={loadingMatch || filteredMatchesForTournament.length === 0}
                     >
-                      <option value="">-- Select a match --</option>
+                      <option value="">{t('manager.selectMatchPlaceholder')}</option>
                       {filteredMatchesForTournament.map((match) => {
-                        const player1Name = match.player1?.name || 'Unknown';
-                        const player2Name = match.player2?.name || 'Unknown';
-                        const matchType = match.is_playoff ? 'Playoff' : (match.group?.name || 'Group');
+                        const player1Name = match.player1?.name || t('common.unknown');
+                        const player2Name = match.player2?.name || t('common.unknown');
+                        const matchType = match.is_playoff ? t('manager.playoff') : (match.group?.name || t('manager.group'));
                         const score = match.player1_legs !== null ? `${match.player1_legs} - ${match.player2_legs}` : '';
                         return (
                           <option key={match.id} value={match.id}>
@@ -473,13 +487,13 @@ export function ManagerPanel() {
 
                 {matchesForTournament.length === 0 && !loadingMatches && (
                   <div className="admin-empty" style={{ marginTop: '1rem' }}>
-                    <p>No matches found for this tournament.</p>
+                    <p>{t('manager.noMatchesForTournament')}</p>
                   </div>
                 )}
 
                 {matchesForTournament.length > 0 && filteredMatchesForTournament.length === 0 && !loadingMatches && (
                   <div className="admin-empty" style={{ marginTop: '1rem' }}>
-                    <p>No matches match the current search and state filter.</p>
+                    <p>{t('manager.noMatchesMatchingFilter')}</p>
                   </div>
                 )}
 
@@ -488,10 +502,10 @@ export function ManagerPanel() {
                     <div className="manager-match-card__header">
                       <div>
                         <div className="manager-match-card__title">
-                          {matchInfo.player1?.name || 'Unknown'} vs {matchInfo.player2?.name || 'Unknown'}
+                          {matchInfo.player1?.name || t('common.unknown')} vs {matchInfo.player2?.name || t('common.unknown')}
                         </div>
                         <div className="manager-match-card__meta">
-                          {matchInfo.tournaments?.name || matchInfo.group?.tournament?.name || 'N/A'} - {matchInfo.is_playoff ? 'Playoff' : (matchInfo.group?.name || 'Group')}
+                          {matchInfo.tournaments?.name || matchInfo.group?.tournament?.name || 'N/A'} - {matchInfo.is_playoff ? t('manager.playoff') : (matchInfo.group?.name || t('manager.group'))}
                         </div>
                       </div>
                       <span className={`status-badge ${matchInfo.status}`}>{matchInfo.status}</span>
@@ -499,13 +513,13 @@ export function ManagerPanel() {
 
                     <div className="manager-match-card__stats">
                       <div className="manager-stat-pill">
-                        <span className="manager-stat-pill__label">Match ID</span>
+                        <span className="manager-stat-pill__label">{t('manager.matchId')}</span>
                         <span className="manager-stat-pill__value">{matchInfo.id}</span>
                       </div>
                       <div className="manager-stat-pill">
-                        <span className="manager-stat-pill__label">Current score</span>
+                        <span className="manager-stat-pill__label">{t('manager.currentScore')}</span>
                         <span className="manager-stat-pill__value">
-                          {matchInfo.player1_legs !== null ? `${matchInfo.player1_legs} - ${matchInfo.player2_legs}` : 'Not set'}
+                          {matchInfo.player1_legs !== null ? `${matchInfo.player1_legs} - ${matchInfo.player2_legs}` : t('manager.notSet')}
                         </span>
                       </div>
                     </div>
@@ -514,10 +528,10 @@ export function ManagerPanel() {
                       <div className="manager-tool-card">
                         <div className="manager-tool-card__header">
                           <Edit3 size={16} />
-                          <h4>Manual Match Result</h4>
+                          <h4>{t('manager.manualMatchResult')}</h4>
                         </div>
                         <p className="manager-tool-card__description">
-                          Use this when a match cannot be completed normally and the final score needs to be entered manually.
+                          {t('manager.manualMatchResultDescription')}
                         </p>
 
                         {!editMode && (
@@ -527,20 +541,20 @@ export function ManagerPanel() {
                             style={{ width: '100%' }}
                           >
                             <Edit3 size={16} />
-                            Open Result Editor
+                            {t('manager.openResultEditor')}
                           </button>
                         )}
 
                         {editMode && (
                           <div className="manager-manual-result-form">
                             <div className="form-group">
-                              <label htmlFor="manualWinner">Winner</label>
+                              <label htmlFor="manualWinner">{t('manager.winner')}</label>
                               <select
                                 id="manualWinner"
                                 value={manualResult.winner || ''}
                                 onChange={(e) => setManualResult({ ...manualResult, winner: e.target.value })}
                               >
-                                <option value="">-- Select winner --</option>
+                                <option value="">{t('manager.selectWinner')}</option>
                                 <option value={matchInfo.player1_id}>{matchInfo.player1?.name || 'Player 1'}</option>
                                 <option value={matchInfo.player2_id}>{matchInfo.player2?.name || 'Player 2'}</option>
                               </select>
@@ -548,7 +562,7 @@ export function ManagerPanel() {
 
                             <div className="manager-score-grid">
                               <div className="form-group">
-                                <label htmlFor="manualPlayer1Legs">{matchInfo.player1?.name || 'Player 1'} legs</label>
+                                <label htmlFor="manualPlayer1Legs">{matchInfo.player1?.name || 'Player 1'} {t('manager.legs')}</label>
                                 <input
                                   id="manualPlayer1Legs"
                                   type="number"
@@ -558,7 +572,7 @@ export function ManagerPanel() {
                                 />
                               </div>
                               <div className="form-group">
-                                <label htmlFor="manualPlayer2Legs">{matchInfo.player2?.name || 'Player 2'} legs</label>
+                                <label htmlFor="manualPlayer2Legs">{matchInfo.player2?.name || 'Player 2'} {t('manager.legs')}</label>
                                 <input
                                   id="manualPlayer2Legs"
                                   type="number"
@@ -578,12 +592,12 @@ export function ManagerPanel() {
                                 {savingResult ? (
                                   <>
                                     <Loader size={16} className="spinning" />
-                                    Saving...
+                                    {t('manager.saving')}
                                   </>
                                 ) : (
                                   <>
                                     <Save size={16} />
-                                    Save Result
+                                    {t('manager.saveResult')}
                                   </>
                                 )}
                               </button>
@@ -592,7 +606,7 @@ export function ManagerPanel() {
                                 onClick={cancelEdit}
                                 disabled={savingResult}
                               >
-                                Cancel
+                                {t('manager.cancel')}
                               </button>
                             </div>
                           </div>
@@ -602,10 +616,10 @@ export function ManagerPanel() {
                       <div className="manager-tool-card manager-tool-card--danger">
                         <div className="manager-tool-card__header">
                           <RotateCcw size={16} />
-                          <h4>Reset Match to Pending</h4>
+                          <h4>{t('manager.resetMatchToPending')}</h4>
                         </div>
                         <p className="manager-tool-card__description">
-                          Clear the stored state and return the match to a clean pending state so it can be replayed from scratch.
+                          {t('manager.resetMatchDescription')}
                         </p>
                         <button
                           className="admin-button danger"
@@ -616,12 +630,12 @@ export function ManagerPanel() {
                           {loadingMatch ? (
                             <>
                               <Loader size={16} className="spinning" />
-                              Resetting...
+                              {t('manager.resetting')}
                             </>
                           ) : (
                             <>
                               <RotateCcw size={16} />
-                              Reset to Pending
+                              {t('manager.resetToPending')}
                             </>
                           )}
                         </button>

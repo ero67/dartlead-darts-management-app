@@ -13,6 +13,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
 
   const filteredTournaments = tournaments.filter(tournament => {
     if (filter === 'all') return true;
+    if (filter === 'mine') return user && tournament.userId && user.id === tournament.userId;
     return tournament.status === filter;
   });
 
@@ -62,12 +63,20 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
           >
             {t('common.active')} ({tournaments.filter(t => t.status === 'active').length})
           </button>
-          <button 
+          <button
             className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
             onClick={() => setFilter('completed')}
           >
             {t('common.completed')} ({tournaments.filter(t => t.status === 'completed').length})
           </button>
+          {user && canCreateTournaments && (
+            <button
+              className={`filter-btn ${filter === 'mine' ? 'active' : ''}`}
+              onClick={() => setFilter('mine')}
+            >
+              {t('tournaments.myTournaments')} ({tournaments.filter(t => user && t.userId && user.id === t.userId).length})
+            </button>
+          )}
         </div>
 
         <div className="sort-controls">

@@ -370,7 +370,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   // Update playoff match players
   const updatePlayoffMatchPlayers = async (matchId, player1, player2) => {
     if (!tournament || !tournament.playoffs || !tournament.playoffs.rounds) return;
-    
+
     const updatedRounds = tournament.playoffs.rounds.map(round => ({
       ...round,
       matches: round.matches.map(match => {
@@ -392,6 +392,30 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     };
 
     try {
+      // Also update the matches DB record so player IDs stay in sync
+      // This prevents bracket propagation from breaking after tournament refresh
+      if (player1?.id && player2?.id) {
+        const { error: matchUpdateError } = await supabase
+          .from('matches')
+          .update({
+            player1_id: player1.id,
+            player2_id: player2.id,
+            status: 'pending',
+            // Clear any stale result data from a previous play
+            winner_id: null,
+            player1_legs: 0,
+            player2_legs: 0,
+            result: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', matchId);
+
+        if (matchUpdateError) {
+          console.warn('Could not update matches table (match may not exist in DB yet):', matchUpdateError);
+          // Not fatal — the match row is created on first startMatch call
+        }
+      }
+
       await contextStartPlayoffs(updatedPlayoffs);
       setEditingMatch(null);
       alert(t('management.playoffMatchUpdated') || 'Playoff match updated successfully');

@@ -165,14 +165,18 @@ function tournamentReducer(state, action) {
             foundMatch.result = matchResult;
             
             // Get the winner and loser player objects
+            // Prefer names from matchResult (comes from the actual match) over foundMatch
+            // (bracket JSON which may be stale after manual player edits)
             const winnerId = matchResult.winner;
-            const winnerPlayer = matchResult.winner === matchResult.player1Id 
-              ? { id: matchResult.player1Id, name: foundMatch.player1?.name }
-              : { id: matchResult.player2Id, name: foundMatch.player2?.name };
-            
-            const loserPlayer = matchResult.winner === matchResult.player1Id 
-              ? { id: matchResult.player2Id, name: foundMatch.player2?.name }
-              : { id: matchResult.player1Id, name: foundMatch.player1?.name };
+            const p1Name = matchResult.player1Name || foundMatch.player1?.name;
+            const p2Name = matchResult.player2Name || foundMatch.player2?.name;
+            const winnerPlayer = matchResult.winner === matchResult.player1Id
+              ? { id: matchResult.player1Id, name: p1Name }
+              : { id: matchResult.player2Id, name: p2Name };
+
+            const loserPlayer = matchResult.winner === matchResult.player1Id
+              ? { id: matchResult.player2Id, name: p2Name }
+              : { id: matchResult.player1Id, name: p1Name };
             
             // Check if this is a semifinal match (round with 2 matches = 4 players)
             const currentRound = rounds[foundRoundIndex];

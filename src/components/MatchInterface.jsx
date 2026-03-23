@@ -72,6 +72,25 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           localStorage.removeItem(`match-state-${matchId}`);
           // fall through to default state below
         } else {
+          // Sanitize numeric fields to prevent NaN from corrupted localStorage
+          if (parsed.legScores) {
+            ['player1', 'player2'].forEach(key => {
+              const p = parsed.legScores[key];
+              if (p) {
+                p.currentScore = Number.isFinite(p.currentScore) ? p.currentScore : startingScore;
+                p.totalScore = Number.isFinite(p.totalScore) ? p.totalScore : 0;
+                p.totalDarts = Number.isFinite(p.totalDarts) ? p.totalDarts : 0;
+                p.legDarts = Number.isFinite(p.legDarts) ? p.legDarts : 0;
+                p.legs = Number.isFinite(p.legs) ? p.legs : 0;
+                p.oneEighties = Number.isFinite(p.oneEighties) ? p.oneEighties : 0;
+              }
+            });
+          }
+          if (parsed.currentTurn) {
+            parsed.currentTurn.score = Number.isFinite(parsed.currentTurn.score) ? parsed.currentTurn.score : 0;
+            parsed.currentTurn.darts = Number.isFinite(parsed.currentTurn.darts) ? parsed.currentTurn.darts : 0;
+            parsed.currentTurn.dartCount = Number.isFinite(parsed.currentTurn.dartCount) ? parsed.currentTurn.dartCount : 0;
+          }
           return parsed;
         }
       } catch (error) {
@@ -266,12 +285,19 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (!matchId) return;
     
     try {
+      const p1Score = matchState.legScores.player1.currentScore;
+      const p2Score = matchState.legScores.player2.currentScore;
+      // Never write NaN to the database — skip the sync if scores are corrupted
+      if (!Number.isFinite(p1Score) || !Number.isFinite(p2Score)) {
+        console.warn('⚠️ Skipping DB sync: invalid scores detected', { p1Score, p2Score });
+        return;
+      }
       const { error } = await supabase
         .from('matches')
         .update({
           current_leg: matchState.currentLeg,
-          player1_current_score: matchState.legScores.player1.currentScore,
-          player2_current_score: matchState.legScores.player2.currentScore,
+          player1_current_score: p1Score,
+          player2_current_score: p2Score,
           player1_legs: matchState.legScores.player1.legs,
           player2_legs: matchState.legScores.player2.legs,
           current_player: matchState.currentPlayer,
@@ -451,6 +477,11 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   // Save match state to localStorage whenever it changes
   useEffect(() => {
     if (match?.id && !matchComplete) {
+      // Never persist NaN scores to localStorage — they would corrupt future loads
+      if (!Number.isFinite(legScores.player1.currentScore) || !Number.isFinite(legScores.player2.currentScore)) {
+        console.warn('⚠️ Skipping localStorage save: invalid scores detected');
+        return;
+      }
       const matchState = {
         currentLeg,
         currentPlayer,
@@ -474,6 +505,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   const currentPlayerData = currentPlayer !== null && currentPlayer !== undefined 
     ? legScores[`player${currentPlayer + 1}`] 
     : null;
+
+  // Helper: ensure a score value is a finite number, falling back to a safe default
+  const safeScore = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
 
   const dartNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 0]; // Ascending order: 1-20, 25 (bull), 0 (miss)
 
@@ -560,7 +594,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           matchSettings.startingScore,
           Math.max(
             0,
-            restoredScoreRaw !== null ? restoredScoreRaw : (prev[playerKey].currentScore + turnScore)
+            restoredScoreRaw !== null ? restoredScoreRaw : (safeScore(prev[playerKey].currentScore, matchSettings.startingScore) + safeScore(turnScore))
           )
         ),
         totalScore: Math.max(0, prev[playerKey].totalScore - turnScore),
@@ -595,7 +629,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (!Number.isInteger(total) || total < 0 || total > 180) return;
     if (![1, 2, 3].includes(dartsUsed)) return;
 
-    const turnStartScore = currentPlayerData.currentScore;
+    const turnStartScore = safeScore(currentPlayerData.currentScore, matchSettings.startingScore);
     const newCurrentScore = turnStartScore - total;
     const isBust = newCurrentScore < 0 || newCurrentScore === 1 || (newCurrentScore === 0 && !finishedOnDouble);
 
@@ -638,7 +672,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     const total = getTurnTotalValue();
     if (total === null) return;
     if (!currentPlayerData) return;
-    const remainingAfter = currentPlayerData.currentScore - total;
+    const remainingAfter = safeScore(currentPlayerData.currentScore, matchSettings.startingScore) - total;
 
     // If it hits exactly 0, we need a quick confirmation for double-out
     if (remainingAfter === 0) {
@@ -719,9 +753,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (currentPlayer === null || currentPlayer === undefined || !currentPlayerData) return;
 
     // Capture starting score on first dart of turn
-    const turnStartScore = currentTurn.turnStartScore !== null 
-      ? currentTurn.turnStartScore 
-      : currentPlayerData.currentScore;
+    const turnStartScore = currentTurn.turnStartScore !== null
+      ? currentTurn.turnStartScore
+      : safeScore(currentPlayerData.currentScore, matchSettings.startingScore);
 
     let scoreValue = 0;
     let label = '';
@@ -777,7 +811,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     });
 
     // Calculate new score but don't update if it would be a bust
-    const newCurrentScore = currentPlayerData.currentScore - scoreValue;
+    const newCurrentScore = safeScore(currentPlayerData.currentScore, matchSettings.startingScore) - scoreValue;
     
     // Check for bust BEFORE updating the score display
     if (newCurrentScore < 0 || newCurrentScore === 1) {
@@ -979,8 +1013,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
       // Restore the score by adding back the removed dart's value
       setLegScores(prev => {
-        const currentPlayerScore = prev[`player${currentPlayer + 1}`].currentScore;
-        const restoredScore = currentPlayerScore + lastDart.value;
+        const currentPlayerScore = safeScore(prev[`player${currentPlayer + 1}`].currentScore, matchSettings.startingScore);
+        const restoredScore = currentPlayerScore + safeScore(lastDart.value);
         
         return {
           ...prev,
@@ -1039,7 +1073,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           restoredCurrentScore = turnStartScore - restoredScore;
         } else {
           // Fallback: add back the removed dart's value
-          restoredCurrentScore = prev[playerKey].currentScore + lastDart.value;
+          restoredCurrentScore = safeScore(prev[playerKey].currentScore, matchSettings.startingScore) + safeScore(lastDart?.value);
         }
         
         // Clamp to valid range
@@ -1078,12 +1112,14 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }
 
     // Get the current score (use passed score or fall back to state)
-    const currentScore = turnData.currentScore !== undefined ? turnData.currentScore : currentPlayerData.currentScore;
+    const currentScore = turnData.currentScore !== undefined
+      ? safeScore(turnData.currentScore, matchSettings.startingScore)
+      : safeScore(currentPlayerData.currentScore, matchSettings.startingScore);
 
     // Get the starting score for this turn (for bust restoration)
     const turnStartScore = turnData.turnStartScore !== null && turnData.turnStartScore !== undefined
       ? turnData.turnStartScore
-      : currentPlayerData.currentScore + turnData.score; // Calculate from current score + turn score
+      : safeScore(currentPlayerData.currentScore, matchSettings.startingScore) + safeScore(turnData.score); // Calculate from current score + turn score
     
     // Check for bust (score goes below 0 or to 1)
     if (currentScore < 0 || currentScore === 1) {
@@ -1387,6 +1423,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       winner: winner,
       player1Id: currentMatch.player1?.id,
       player2Id: currentMatch.player2?.id,
+      player1Name: currentMatch.player1?.name,
+      player2Name: currentMatch.player2?.name,
       player1Legs: finalLegScores.player1.legs,
       player2Legs: finalLegScores.player2.legs,
       isPlayoff: currentMatch.isPlayoff || false,
@@ -1463,7 +1501,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
   const getAverage = (playerKey) => {
     const player = legScores[playerKey];
-    return player.totalDarts > 0 ? (player.totalScore / player.totalDarts) * 3 : 0;
+    if (!player || !player.totalDarts || player.totalDarts <= 0) return 0;
+    const avg = (safeScore(player.totalScore) / player.totalDarts) * 3;
+    return Number.isFinite(avg) ? avg : 0;
   };
 
   // Get the last turn's throws for a player
@@ -1643,7 +1683,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             <div className="player-name">{match.player1?.name || 'Player 1'}</div>
             <div className="legs-won">{legScores.player1.legs}</div>
           </div>
-          <div className="current-score">{legScores.player1.currentScore}</div>
+          <div className="current-score">{safeScore(legScores.player1.currentScore, matchSettings.startingScore)}</div>
           {player1LastThrows.length > 0 && (
             <div className="last-throws">
               {player1LastThrows.map((throwLabel, idx) => (
@@ -1667,7 +1707,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             <div className="player-name">{match.player2?.name || 'Player 2'}</div>
             <div className="legs-won">{legScores.player2.legs}</div>
           </div>
-          <div className="current-score">{legScores.player2.currentScore}</div>
+          <div className="current-score">{safeScore(legScores.player2.currentScore, matchSettings.startingScore)}</div>
           {player2LastThrows.length > 0 && (
             <div className="last-throws">
               {player2LastThrows.map((throwLabel, idx) => (
