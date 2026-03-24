@@ -746,6 +746,49 @@ export function TournamentProvider({ children }) {
     }
   };
 
+  // === Tournament Self-Registration ===
+
+  const registerForTournament = async (tournamentId, playerName) => {
+    try {
+      return await tournamentService.registerForTournament(tournamentId, playerName);
+    } catch (error) {
+      console.error('Error registering for tournament:', error);
+      throw error;
+    }
+  };
+
+  const getTournamentRegistrations = async (tournamentId) => {
+    try {
+      return await tournamentService.getTournamentRegistrations(tournamentId);
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
+      throw error;
+    }
+  };
+
+  const approveRegistration = async (registrationId) => {
+    try {
+      const result = await tournamentService.approveRegistration(registrationId);
+      if (state.currentTournament) {
+        const updatedTournament = await tournamentService.getTournament(state.currentTournament.id);
+        dispatch({ type: ACTIONS.SELECT_TOURNAMENT, payload: updatedTournament });
+      }
+      return result;
+    } catch (error) {
+      console.error('Error approving registration:', error);
+      throw error;
+    }
+  };
+
+  const rejectRegistration = async (registrationId) => {
+    try {
+      return await tournamentService.rejectRegistration(registrationId);
+    } catch (error) {
+      console.error('Error rejecting registration:', error);
+      throw error;
+    }
+  };
+
   const value = {
     ...state,
     createTournament,
@@ -760,7 +803,11 @@ export function TournamentProvider({ children }) {
     startTournament,
     addPlayerToTournament,
     removePlayerFromTournament,
-    updateTournamentSettings
+    updateTournamentSettings,
+    registerForTournament,
+    getTournamentRegistrations,
+    approveRegistration,
+    rejectRegistration
   };
 
 

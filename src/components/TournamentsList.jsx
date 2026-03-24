@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Trophy, Users, Target, Calendar, Trash2, Play, MoreVertical } from 'lucide-react';
+import { Plus, Trophy, Users, Target, Calendar, Trash2, Play, Crown } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useLeague } from '../contexts/LeagueContext';
 
 export function TournamentsList({ tournaments, onCreateTournament, onSelectTournament, onDeleteTournament }) {
   const { t } = useLanguage();
@@ -10,6 +11,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed'
   const [sortBy, setSortBy] = useState('updated'); // 'updated', 'created', 'name'
   const { isAdmin, canCreateTournaments } = useAdmin();
+  const { leagues } = useLeague();
 
   const filteredTournaments = tournaments.filter(tournament => {
     if (filter === 'all') return true;
@@ -103,14 +105,17 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
             <div key={tournament.id} className="tournament-card">
               <div className="card-header">
                 <div className="tournament-info">
-                  <h3>{tournament.name}</h3>
+                  <h3>
+                    {tournament.name}
+                    {isOwner && <span className="owner-badge">{t('tournaments.yours')}</span>}
+                  </h3>
                   <span className={`status-badge ${tournament.status}`}>
                     {tournament.status}
                   </span>
                 </div>
                 <div className="card-actions">
                   {hasActiveMatches && (
-                    <button 
+                    <button
                       className="action-btn play"
                       onClick={() => onSelectTournament(tournament)}
                       title="Continue Tournament"
@@ -118,17 +123,27 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       <Play size={16} />
                     </button>
                   )}
-                  {isAdmin && (
-                    <button 
+                  {(isAdmin || isOwner) && (
+                    <button
                       className="action-btn delete"
                       onClick={() => onDeleteTournament(tournament.id)}
-                      title="Delete Tournament (Admin)"
+                      title={t('management.deleteTournament')}
                     >
                       <Trash2 size={16} />
                     </button>
                   )}
                 </div>
               </div>
+
+              {tournament.leagueId && (() => {
+                const linkedLeague = leagues.find(l => l.id === tournament.leagueId);
+                return linkedLeague ? (
+                  <div className="league-badge">
+                    <Crown size={12} />
+                    <span>{linkedLeague.name}</span>
+                  </div>
+                ) : null;
+              })()}
 
               <div className="tournament-stats">
                 <div className="stat">
@@ -159,12 +174,15 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
               </div>
 
               <div className="card-footer">
-                <button 
+                <button
                   className="view-tournament-btn"
                   onClick={() => onSelectTournament(tournament)}
                 >
                   {tournament.status === 'active' ? t('tournaments.continue') : t('tournaments.view')} {t('tournaments.tournament')}
                 </button>
+                {tournament.status === 'open_for_registration' && user && !isOwner && (
+                  <span className="registration-open-badge">{t('registration.openForRegistration')}</span>
+                )}
               </div>
             </div>
           );
