@@ -34,6 +34,11 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [newPlayerName, setNewPlayerName] = useState('');
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
   const [scoringRules, setScoringRules] = useState([]);
+  const [roundPointsRules, setRoundPointsRules] = useState([
+    { round: 32, points: 0, enabled: false },
+    { round: 16, points: 0, enabled: false },
+    { round: 8, points: 0, enabled: false }
+  ]);
   const [isSavingScoring, setIsSavingScoring] = useState(false);
   const [newPlacement, setNewPlacement] = useState({ position: '', points: '' });
 
@@ -72,22 +77,27 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     if (currentLeague?.scoringRules?.placementPoints) {
       const points = currentLeague.scoringRules.placementPoints;
       const rulesArray = Object.entries(points)
-        .filter(([key]) => key !== 'default' && key !== 'playoffDefault')
+        .filter(([key]) => key !== 'default' && key !== 'playoffDefault' && key !== 'roundPoints')
         .map(([position, pts]) => ({ position: parseInt(position), points: pts }))
         .sort((a, b) => a.position - b.position);
-      
-      // Always show playoffDefault (default to 1 if not stored yet)
+
       rulesArray.push({
         position: 'playoffDefault',
         points: points.playoffDefault !== undefined ? points.playoffDefault : 1
       });
-      // Always show default / non-playoff (default to 0 if not stored yet)
       rulesArray.push({
         position: 'default',
         points: points.default !== undefined ? points.default : 0
       });
-      
+
       setScoringRules(rulesArray);
+
+      const rp = points.roundPoints || {};
+      setRoundPointsRules([
+        { round: 32, points: rp['32'] || 0, enabled: rp['32'] !== undefined },
+        { round: 16, points: rp['16'] || 0, enabled: rp['16'] !== undefined },
+        { round: 8, points: rp['8'] || 0, enabled: rp['8'] !== undefined }
+      ]);
     }
   }, [currentLeague]);
 
@@ -259,12 +269,21 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const handleSaveScoringRules = async () => {
     setIsSavingScoring(true);
     try {
-      // Convert array back to object format
       const placementPoints = {};
       scoringRules.forEach(rule => {
         placementPoints[rule.position.toString()] = rule.points;
       });
-      
+
+      const roundPoints = {};
+      roundPointsRules.forEach(rule => {
+        if (rule.enabled) {
+          roundPoints[rule.round.toString()] = rule.points;
+        }
+      });
+      if (Object.keys(roundPoints).length > 0) {
+        placementPoints.roundPoints = roundPoints;
+      }
+
       await updateLeague(currentLeague.id, {
         scoring_rules: {
           ...currentLeague.scoringRules,
@@ -973,9 +992,85 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                   </div>
                 ))}
               </div>
-              
+
+              {/* Points by Playoff Round */}
+              <div style={{
+                padding: '1rem',
+                background: 'var(--bg-tertiary)',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                marginBottom: '1.5rem'
+              }}>
+                <h4 style={{ color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>
+                  {t('leagues.roundPointsTitle') || 'Points by Playoff Round'}
+                </h4>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
+                  {t('leagues.roundPointsDescription') || 'Set points for reaching each playoff round'}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {roundPointsRules.map((rule, index) => {
+                    const roundLabel = rule.round === 32
+                      ? (t('leagues.roundOf32') || 'Round of 32')
+                      : rule.round === 16
+                        ? (t('leagues.roundOf16') || 'Round of 16')
+                        : (t('leagues.quarterfinals') || 'Quarterfinals');
+                    return (
+                      <div key={rule.round} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        padding: '0.5rem 0.75rem',
+                        background: rule.enabled ? 'var(--bg-secondary)' : 'transparent',
+                        borderRadius: '6px',
+                        border: rule.enabled ? '1px solid var(--border-color)' : '1px solid transparent',
+                        opacity: rule.enabled ? 1 : 0.6
+                      }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={rule.enabled}
+                            onChange={(e) => {
+                              const updated = [...roundPointsRules];
+                              updated[index] = { ...updated[index], enabled: e.target.checked };
+                              setRoundPointsRules(updated);
+                            }}
+                          />
+                          <span style={{ color: 'var(--text-primary)', fontWeight: rule.enabled ? '500' : '400', minWidth: '120px' }}>
+                            {roundLabel}
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={rule.points}
+                          disabled={!rule.enabled}
+                          onChange={(e) => {
+                            const updated = [...roundPointsRules];
+                            updated[index] = { ...updated[index], points: parseInt(e.target.value) || 0 };
+                            setRoundPointsRules(updated);
+                          }}
+                          style={{
+                            width: '70px',
+                            padding: '0.4rem',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            background: 'var(--input-bg)',
+                            color: 'var(--text-primary)',
+                            textAlign: 'center',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            opacity: rule.enabled ? 1 : 0.4
+                          }}
+                        />
+                        <span style={{ color: 'var(--text-secondary)' }}>{t('common.pts')}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Add New Placement */}
-              <div style={{ 
+              <div style={{
                 padding: '1rem',
                 background: 'var(--bg-tertiary)',
                 borderRadius: '8px',

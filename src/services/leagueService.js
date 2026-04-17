@@ -595,17 +595,21 @@ export const leagueService = {
   },
 
   // Resolve points for a placement entry given the scoring rules.
-  // Priority: explicit placement number → playoffDefault (if in playoff) → default → 0
+  // Priority: explicit placement → round-based → playoffDefault → default → 0
   resolvePoints(placementPoints, placement) {
     const explicitKey = placement.placement.toString();
     if (placementPoints[explicitKey] !== undefined) {
       return placementPoints[explicitKey];
     }
-    // Playoff participant without an explicit placement entry
+    if (placement.eliminatedInRound && placementPoints.roundPoints) {
+      const roundKey = placement.eliminatedInRound.toString();
+      if (placementPoints.roundPoints[roundKey] !== undefined) {
+        return placementPoints.roundPoints[roundKey];
+      }
+    }
     if (placement.inPlayoff && placementPoints.playoffDefault !== undefined) {
       return placementPoints.playoffDefault;
     }
-    // Fallback for everyone else
     if (placementPoints.default !== undefined) {
       return placementPoints.default;
     }
@@ -747,17 +751,19 @@ export const leagueService = {
         if (rawThirdPlaceMatch && i === rounds.length - 2) continue;
 
         const round = rounds[i];
+        const roundSize = (round.matches || []).length * 2;
         (round.matches || []).forEach(m => {
           const match = freshen(m);
           if (match.status === 'completed' && match.result && !match.isThirdPlaceMatch) {
-            const loserId = match.result.winner === match.player1?.id 
-              ? match.player2?.id 
+            const loserId = match.result.winner === match.player1?.id
+              ? match.player2?.id
               : match.player1?.id;
             if (loserId && !placedPlayerIds.has(loserId)) {
               placements.push({
                 playerId: loserId,
                 placement: currentPlacement++,
-                inPlayoff: true
+                inPlayoff: true,
+                eliminatedInRound: roundSize
               });
               placedPlayerIds.add(loserId);
             }
