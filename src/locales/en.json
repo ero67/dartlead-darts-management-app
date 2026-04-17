@@ -214,7 +214,10 @@
     "moveToGroup": "Move to group",
     "playersBulkPlaceholder": "Name Surname; Name Surname; Name Surname",
     "playersBulkHelp": "Separate players with semicolons or new lines.",
-    "addPlayers": "Add players"
+    "addPlayers": "Add players",
+    "seeded": "Seeded",
+    "toggleSeeded": "Toggle seeded",
+    "seededHint": "Seeded players will be placed into different groups"
   },
   "management": {
     "tournamentGroups": "Tournament Groups",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { tournamentService } from '../services/tournamentService';
@@ -60,6 +60,7 @@ export function TournamentRegistration({ tournament, onBack }) {
       };
     })()
   });
+  const [seededPlayerIds, setSeededPlayerIds] = useState(new Set());
   const { addPlayerToTournament, removePlayerFromTournament, startTournament, updateTournamentSettings } = useTournament();
 
   // Update tournamentSettings when tournament prop changes (e.g., after reload from DB)
@@ -198,6 +199,18 @@ export function TournamentRegistration({ tournament, onBack }) {
     }
   };
 
+  const toggleSeeded = (playerId) => {
+    setSeededPlayerIds(prev => {
+      const next = new Set(prev);
+      if (next.has(playerId)) {
+        next.delete(playerId);
+      } else {
+        next.add(playerId);
+      }
+      return next;
+    });
+  };
+
   const handleStartTournament = async () => {
     if (players.length < 2) {
       alert(t('registration.needsAtLeast2Players'));
@@ -214,7 +227,7 @@ export function TournamentRegistration({ tournament, onBack }) {
         });
       } else {
         // Show preview + allow edits before we officially start (create groups + matches in DB)
-        const generated = tournamentService.generateGroups(players, tournamentSettings.groupSettings);
+        const generated = tournamentService.generateGroups(players, tournamentSettings.groupSettings, seededPlayerIds);
         setDraftGroups(generated);
         setShowGroupsPreview(true);
       }
@@ -246,7 +259,7 @@ export function TournamentRegistration({ tournament, onBack }) {
   };
 
   const regenerateGroupsPreview = () => {
-    const generated = tournamentService.generateGroups(players, tournamentSettings.groupSettings);
+    const generated = tournamentService.generateGroups(players, tournamentSettings.groupSettings, seededPlayerIds);
     setDraftGroups(generated);
   };
 
@@ -339,6 +352,17 @@ export function TournamentRegistration({ tournament, onBack }) {
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
               {t('registration.playersBulkHelp') || 'Separate players with semicolons or new lines.'}
             </p>
+            {tournament.tournamentType !== 'playoff_only' && (
+              <p className="seeded-hint">
+                <Star size={14} />
+                {t('registration.seededHint') || 'Seeded players will be placed into different groups'}
+                {seededPlayerIds.size > 0 && (
+                  <span className="seeded-count">
+                    {' — '}{seededPlayerIds.size} {t('registration.seeded') || 'Seeded'}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
 
           <div className="players-list">
@@ -349,9 +373,18 @@ export function TournamentRegistration({ tournament, onBack }) {
             ) : (
               <div className="players-grid">
                 {players.map((player, index) => (
-                  <div key={player.id} className="player-card">
+                  <div key={player.id} className={`player-card${seededPlayerIds.has(player.id) ? ' player-card--seeded' : ''}`}>
                     <span className="player-number">{index + 1}</span>
                     <span className="player-name">{player.name}</span>
+                    {tournament.status === 'open_for_registration' && tournament.tournamentType !== 'playoff_only' && (
+                      <button
+                        className={`seed-toggle-btn${seededPlayerIds.has(player.id) ? ' seed-toggle-btn--active' : ''}`}
+                        onClick={() => toggleSeeded(player.id)}
+                        title={t('registration.toggleSeeded') || 'Toggle seeded'}
+                      >
+                        <Star size={16} fill={seededPlayerIds.has(player.id) ? 'currentColor' : 'none'} />
+                      </button>
+                    )}
                     {tournament.status === 'open_for_registration' && (
                       <button
                         className="remove-player-btn"
@@ -918,6 +951,7 @@ export function TournamentRegistration({ tournament, onBack }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                       {(group.players || []).map(player => (
                         <div key={player.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          {seededPlayerIds.has(player.id) && <Star size={14} className="seeded-star-indicator" />}
                           <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{player.name}</span>
                           <select
                             value={group.id}

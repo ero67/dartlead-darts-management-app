@@ -5792,6 +5792,61 @@ body {
   transform: scale(0.95);
 }
 
+.seed-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.seed-toggle-btn:hover {
+  color: #eab308;
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.seed-toggle-btn--active {
+  color: #eab308;
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.15);
+}
+
+.player-card--seeded {
+  border-color: rgba(234, 179, 8, 0.4);
+  background: rgba(234, 179, 8, 0.05);
+}
+
+.player-card--seeded:hover {
+  border-color: rgba(234, 179, 8, 0.6);
+}
+
+.seeded-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #eab308;
+  margin-top: 0.5rem;
+}
+
+.seeded-count {
+  font-weight: 600;
+}
+
+.seeded-star-indicator {
+  color: #eab308;
+  flex-shrink: 0;
+}
+
 .start-tournament-section {
   text-align: center;
   padding: 2rem;

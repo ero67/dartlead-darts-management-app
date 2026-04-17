@@ -208,7 +208,10 @@
     "moveToGroup": "Presunúť do skupiny",
     "playersBulkPlaceholder": "Meno Priezvisko; Meno Priezvisko; Meno Priezvisko",
     "playersBulkHelp": "Hráčov oddeľte bodkočiarkou alebo novým riadkom.",
-    "addPlayers": "Pridať hráčov"
+    "addPlayers": "Pridať hráčov",
+    "seeded": "Nasadený",
+    "toggleSeeded": "Prepnúť nasadenie",
+    "seededHint": "Nasadení hráči budú rozdelení do rôznych skupín"
   },
   "management": {
     "tournamentGroups": "Skupiny Turnaja",

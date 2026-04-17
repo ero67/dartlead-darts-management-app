@@ -1008,61 +1008,65 @@ export const tournamentService = {
     }
   },
 
-  // Helper function to generate groups (moved from TournamentCreation)
-  generateGroups(players, settings) {
+  generateGroups(players, settings, seededPlayerIds = new Set()) {
     const groups = [];
     let groupCount;
     let playersPerGroup;
 
     if (settings.type === 'groups') {
       groupCount = Math.max(1, Number(settings.value) || 1);
-      // Don't create more groups than players
       groupCount = Math.min(groupCount, players.length);
     } else {
       playersPerGroup = settings.value;
       groupCount = Math.ceil(players.length / playersPerGroup);
     }
 
-    // Shuffle players for random distribution
-    const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+    const seededSet = seededPlayerIds instanceof Set ? seededPlayerIds : new Set(seededPlayerIds);
+    const seeded = [...players].filter(p => seededSet.has(p.id)).sort(() => Math.random() - 0.5);
+    const nonSeeded = [...players].filter(p => !seededSet.has(p.id)).sort(() => Math.random() - 0.5);
 
+    const groupBuckets = Array.from({ length: groupCount }, () => []);
+
+    for (let i = 0; i < seeded.length; i++) {
+      groupBuckets[i % groupCount].push(seeded[i]);
+    }
+
+    const groupSizes = new Array(groupCount);
     if (settings.type === 'groups') {
-      // Distribute players as evenly as possible:
-      // e.g. 34 players, 4 groups => 9, 9, 8, 8 (difference between any two groups is at most 1)
-      const baseSize = Math.floor(shuffledPlayers.length / groupCount);
-      const extra = shuffledPlayers.length % groupCount; // first <extra> groups get +1
-      let cursor = 0;
-
+      const baseSize = Math.floor(players.length / groupCount);
+      const extra = players.length % groupCount;
       for (let i = 0; i < groupCount; i++) {
-        const size = baseSize + (i < extra ? 1 : 0);
-        const groupPlayers = shuffledPlayers.slice(cursor, cursor + size);
-        cursor += size;
-
-        if (groupPlayers.length === 0) continue;
-        groups.push({
-          id: generateId(),
-          name: `Group ${String.fromCharCode(65 + i)}`, // A, B, C, etc.
-          players: groupPlayers,
-          matches: this.generateGroupMatches(groupPlayers, i + 1),
-          standings: []
-        });
+        groupSizes[i] = baseSize + (i < extra ? 1 : 0);
       }
     } else {
-      // Legacy behavior: fixed players-per-group (last group may be smaller)
       playersPerGroup = Math.max(1, Number(playersPerGroup) || 1);
-    for (let i = 0; i < groupCount; i++) {
-      const groupPlayers = shuffledPlayers.slice(i * playersPerGroup, (i + 1) * playersPerGroup);
-      if (groupPlayers.length > 0) {
-        const group = {
-          id: generateId(),
-          name: `Group ${String.fromCharCode(65 + i)}`, // A, B, C, etc.
-          players: groupPlayers,
-          matches: this.generateGroupMatches(groupPlayers, i + 1),
-          standings: []
-        };
-        groups.push(group);
-        }
+      for (let i = 0; i < groupCount; i++) {
+        const remaining = players.length - i * playersPerGroup;
+        groupSizes[i] = Math.min(playersPerGroup, remaining);
       }
+    }
+
+    let nonSeededIdx = 0;
+    for (let i = 0; i < groupCount; i++) {
+      const slotsLeft = groupSizes[i] - groupBuckets[i].length;
+      for (let j = 0; j < slotsLeft && nonSeededIdx < nonSeeded.length; j++) {
+        groupBuckets[i].push(nonSeeded[nonSeededIdx++]);
+      }
+    }
+    while (nonSeededIdx < nonSeeded.length) {
+      const smallest = groupBuckets.reduce((min, b, idx) => b.length < groupBuckets[min].length ? idx : min, 0);
+      groupBuckets[smallest].push(nonSeeded[nonSeededIdx++]);
+    }
+
+    for (let i = 0; i < groupCount; i++) {
+      if (groupBuckets[i].length === 0) continue;
+      groups.push({
+        id: generateId(),
+        name: `Group ${String.fromCharCode(65 + i)}`,
+        players: groupBuckets[i],
+        matches: this.generateGroupMatches(groupBuckets[i], i + 1),
+        standings: []
+      });
     }
 
     return groups;
