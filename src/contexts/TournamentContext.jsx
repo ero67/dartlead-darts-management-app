@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { tournamentService, matchService } from '../services/tournamentService.js';
 import { leagueService } from '../services/leagueService.js';
+import { supabase } from '../lib/supabase.js';
 
 
 const TournamentContext = createContext();
@@ -137,15 +138,19 @@ function tournamentReducer(state, action) {
       
       // Check if this is a playoff match
       if (matchResult.isPlayoff && matchResult.playoffRound) {
-        
+
         // Find the playoff match in the rounds
         if (updatedTournament.playoffs && updatedTournament.playoffs.rounds) {
-          const rounds = updatedTournament.playoffs.rounds;
+          // Deep-copy rounds so React detects state changes
+          const rounds = updatedTournament.playoffs.rounds.map(r => ({
+            ...r,
+            matches: r.matches.map(m => ({ ...m }))
+          }));
+          updatedTournament.playoffs = { ...updatedTournament.playoffs, rounds };
+
           let foundMatch = null;
           let foundRoundIndex = -1;
-          let foundMatchIndex = -1;
-          
-          // Find the match in playoff rounds
+
           for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
             const round = rounds[roundIndex];
             if (round.matches) {
@@ -153,21 +158,15 @@ function tournamentReducer(state, action) {
               if (matchIndex !== -1) {
                 foundMatch = round.matches[matchIndex];
                 foundRoundIndex = roundIndex;
-                foundMatchIndex = matchIndex;
                 break;
               }
             }
           }
-          
+
           if (foundMatch) {
-            // Update the match status
             foundMatch.status = 'completed';
             foundMatch.result = matchResult;
-            
-            // Get the winner and loser player objects
-            // Prefer names from matchResult (comes from the actual match) over foundMatch
-            // (bracket JSON which may be stale after manual player edits)
-            const winnerId = matchResult.winner;
+
             const p1Name = matchResult.player1Name || foundMatch.player1?.name;
             const p2Name = matchResult.player2Name || foundMatch.player2?.name;
             const winnerPlayer = matchResult.winner === matchResult.player1Id
@@ -177,77 +176,71 @@ function tournamentReducer(state, action) {
             const loserPlayer = matchResult.winner === matchResult.player1Id
               ? { id: matchResult.player2Id, name: p2Name }
               : { id: matchResult.player1Id, name: p1Name };
-            
-            // Check if this is a semifinal match (round with 2 matches = 4 players)
+
             const currentRound = rounds[foundRoundIndex];
-            const isSemifinal = currentRound && currentRound.matches && currentRound.matches.length === 2 && foundRoundIndex < rounds.length - 1;
-            
-            // Automatically advance winner to next round if not the final
-            // This implements standard tournament bracket progression
-            if (foundRoundIndex < rounds.length - 1) {
+            const nonThirdPlaceMatches = currentRound?.matches?.filter(m => !m.isThirdPlaceMatch) || [];
+            const isSemifinal = nonThirdPlaceMatches.length === 2 && foundRoundIndex < rounds.length - 1;
+
+            // Track matches that need DB sync after JSONB save
+            const matchesNeedingDbSync = [];
+
+            // Use the match's index among non-3rd-place matches for bracket mapping
+            const bracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === foundMatch.id);
+
+            if (foundRoundIndex < rounds.length - 1 && bracketIndex !== -1) {
               const nextRound = rounds[foundRoundIndex + 1];
               if (nextRound && nextRound.matches) {
-                // Calculate which match in the next round this winner should go to
-                // Standard bracket: Match 0 and Match 1 winners -> Next Round Match 0
-                //                   Match 2 and Match 3 winners -> Next Round Match 1
-                //                   etc.
-                const nextMatchIndex = Math.floor(foundMatchIndex / 2);
-                const nextMatch = nextRound.matches[nextMatchIndex];
-                
-                if (nextMatch && !nextMatch.isThirdPlaceMatch) {
-                  // Determine position: even matchIndex -> player1, odd -> player2
-                  const isFirstMatchOfPair = (foundMatchIndex % 2 === 0);
-                  
-                  // Only auto-assign if not manually overridden
-                  // (We'll add manual override flag later, for now always assign)
+                const nextNonThird = nextRound.matches.filter(m => !m.isThirdPlaceMatch);
+                const nextMatchIndex = Math.floor(bracketIndex / 2);
+                const nextMatch = nextNonThird[nextMatchIndex];
+
+                if (nextMatch) {
+                  const isFirstMatchOfPair = (bracketIndex % 2 === 0);
+
                   if (isFirstMatchOfPair) {
                     nextMatch.player1 = winnerPlayer;
                   } else {
                     nextMatch.player2 = winnerPlayer;
                   }
-                  
-                  // Update match status if both players are set
-                  if (nextMatch.player1 && nextMatch.player2) {
-                    nextMatch.status = 'pending';
-                  } else {
-                    // If only one player is set, mark as waiting
-                    nextMatch.status = 'pending';
-                  }
+                  nextMatch.status = 'pending';
+                  matchesNeedingDbSync.push(nextMatch);
                 }
               }
             }
-            
-            // If this is a semifinal, assign loser to 3rd place match
+
             if (isSemifinal && rounds.length > 0) {
               const finalRound = rounds[rounds.length - 1];
               const thirdPlaceMatch = finalRound.matches.find(m => m.isThirdPlaceMatch);
-              
+
               if (thirdPlaceMatch) {
-                // Determine which position in 3rd place match (first semifinal loser -> player1, second semifinal loser -> player2)
-                if (foundMatchIndex === 0) {
+                const semiBracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === foundMatch.id);
+                if (semiBracketIndex === 0) {
                   thirdPlaceMatch.player1 = loserPlayer;
-                } else if (foundMatchIndex === 1) {
+                } else if (semiBracketIndex === 1) {
                   thirdPlaceMatch.player2 = loserPlayer;
                 }
-                
-                // Update match status if both players are set
+
                 if (thirdPlaceMatch.player1 && thirdPlaceMatch.player2) {
                   thirdPlaceMatch.status = 'pending';
                 }
+                matchesNeedingDbSync.push(thirdPlaceMatch);
               }
             }
+
+            // Attach sync list to playoffs so the async handler can update DB
+            updatedTournament.playoffs._matchesNeedingDbSync = matchesNeedingDbSync;
             
-            // Advance playoffs currentRound if all matches in the current round are completed
-            if (Array.isArray(rounds) && rounds.length > 0 && typeof currentRound === 'number') {
-              const currentRoundIndex = Math.max(0, Math.min(currentRound - 1, rounds.length - 1));
-              const currentRoundObj = rounds[currentRoundIndex];
+            // Advance playoffs currentRound if all matches in the found round are completed
+            const playoffCurrentRound = updatedTournament.playoffs.currentRound;
+            if (typeof playoffCurrentRound === 'number' && playoffCurrentRound > 0) {
+              const crIdx = Math.max(0, Math.min(playoffCurrentRound - 1, rounds.length - 1));
+              const currentRoundObj = rounds[crIdx];
               if (currentRoundObj && currentRoundObj.matches?.length) {
-                const allCurrentRoundCompleted = currentRoundObj.matches
-                  .filter(m => !m.isThirdPlaceMatch) // ignore 3rd place when advancing rounds
+                const allDone = currentRoundObj.matches
+                  .filter(m => !m.isThirdPlaceMatch)
                   .every(m => m.status === 'completed');
-                if (allCurrentRoundCompleted && currentRound < rounds.length) {
-                  // Move to next round
-                  updatedTournament.playoffs.currentRound = currentRound + 1;
+                if (allDone && playoffCurrentRound < rounds.length) {
+                  updatedTournament.playoffs.currentRound = playoffCurrentRound + 1;
                 }
               }
             }
@@ -599,9 +592,38 @@ export function TournamentProvider({ children }) {
         if (currentState.currentTournament) {
           // If this is a playoff match, save updated playoff rounds
           if (matchResult.isPlayoff && currentState.currentTournament.playoffs) {
+            const playoffs = currentState.currentTournament.playoffs;
+
+            // Sync advanced players to the matches table so DB matches
+            // stay consistent with the JSONB bracket after advancement
+            const toSync = playoffs._matchesNeedingDbSync || [];
+            for (const m of toSync) {
+              if (m.player1?.id || m.player2?.id) {
+                try {
+                  await supabase
+                    .from('matches')
+                    .upsert({
+                      id: m.id,
+                      tournament_id: currentState.currentTournament.id,
+                      player1_id: m.player1?.id || null,
+                      player2_id: m.player2?.id || null,
+                      status: m.status || 'pending',
+                      is_playoff: true,
+                      playoff_round: m.playoffRound,
+                      playoff_match_number: m.playoffMatchNumber,
+                      legs_to_win: currentState.currentTournament.legsToWin || 3,
+                      starting_score: currentState.currentTournament.startingScore || 501
+                    }, { onConflict: 'id' });
+                } catch (syncErr) {
+                  console.warn('Non-fatal: could not sync next-round match to DB:', syncErr);
+                }
+              }
+            }
+            delete playoffs._matchesNeedingDbSync;
+
             await tournamentService.updateTournamentPlayoffs(
               currentState.currentTournament.id,
-              currentState.currentTournament.playoffs
+              playoffs
             );
           }
           
