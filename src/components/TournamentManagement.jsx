@@ -45,7 +45,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const [editingMatch, setEditingMatch] = useState(null); // Match being edited
   const [liveMatches, setLiveMatches] = useState([]);
   const [matchStatistics, setMatchStatistics] = useState(null); // Match to show statistics for
-  const liveMatchesRef = useRef([]); // Keep a ref to prevent flickering
+  const liveMatchesRef = useRef([]);
+  const [favoriteMatchIds, setFavoriteMatchIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('darts-favorite-matches');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
   const modalOpenRef = useRef(false); // Track if any modal is open
   const activeTabRef = useRef(activeTab); // Track active tab for interval callback
   const [matchGroupFilter, setMatchGroupFilter] = useState('all'); // Filter by group
@@ -102,6 +108,21 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     activeTabRef.current = activeTab;
   }, [activeTab]);
   
+  useEffect(() => {
+    try {
+      localStorage.setItem('darts-favorite-matches', JSON.stringify([...favoriteMatchIds]));
+    } catch { /* quota exceeded */ }
+  }, [favoriteMatchIds]);
+
+  const toggleFavoriteMatch = useCallback((matchId) => {
+    setFavoriteMatchIds(prev => {
+      const next = new Set(prev);
+      if (next.has(matchId)) next.delete(matchId);
+      else next.add(matchId);
+      return next;
+    });
+  }, []);
+
   // Sync ref with state whenever state changes
   useEffect(() => {
     liveMatchesRef.current = liveMatches;
@@ -1658,7 +1679,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       <div className="player-result">
                         <div className="player-name-row">
                           <span className={`player-name ${isPlayer1Winner ? 'winner' : ''}`}>
-                            {match.player1?.name || 'Unknown Player'}
+                            {match.player1?.name || t('common.unknown')}
                           </span>
                           <span className="score">{match.result.player1Legs}</span>
                         </div>
@@ -1667,7 +1688,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       <div className="player-result">
                         <div className="player-name-row">
                           <span className={`player-name ${isPlayer2Winner ? 'winner' : ''}`}>
-                            {match.player2?.name || 'Unknown Player'}
+                            {match.player2?.name || t('common.unknown')}
                           </span>
                           <span className="score">{match.result.player2Legs}</span>
                         </div>
@@ -1675,9 +1696,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     </div>
                   ) : (
                     <div className="match-players-compact">
-                      <span className="player">{match.player1?.name || 'Unknown Player'}</span>
+                      <span className="player">{match.player1?.name || t('common.unknown')}</span>
                       <span className="vs">vs</span>
-                      <span className="player">{match.player2?.name || 'Unknown Player'}</span>
+                      <span className="player">{match.player2?.name || t('common.unknown')}</span>
                     </div>
                   )}
                   {match.status === 'pending' && !isMatchActuallyLive(match.id) && (
@@ -1891,7 +1912,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           leg: leg.leg,
           checkout: leg.checkout || null,
           matchId,
-          opponent: opponent?.name || 'Unknown'
+          opponent: opponent?.name || t('common.unknown')
         });
       });
       return true;
@@ -1933,7 +1954,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           player: match.player1,
           average: match.result.player1Stats.average,
           matchId: match.id,
-          opponent: match.player2?.name || 'Unknown'
+          opponent: match.player2?.name || t('common.unknown')
         });
       }
       if (match.result.player2Stats?.average) {
@@ -1941,7 +1962,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           player: match.player2,
           average: match.result.player2Stats.average,
           matchId: match.id,
-          opponent: match.player1?.name || 'Unknown'
+          opponent: match.player1?.name || t('common.unknown')
         });
       }
 
@@ -1979,7 +2000,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               leg: checkout.leg,
               darts: checkout.totalDarts || checkout.darts,
               matchId: match.id,
-              opponent: opponent?.name || 'Unknown'
+              opponent: opponent?.name || t('common.unknown')
             });
           }
         });
@@ -2012,7 +2033,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               leg: checkout.leg,
               checkout: checkout.checkout,
               matchId: match.id,
-              opponent: opponent?.name || 'Unknown'
+              opponent: opponent?.name || t('common.unknown')
             });
           });
         };
@@ -2125,7 +2146,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {bestAverages.map((entry, index) => (
                 <div key={`avg-${index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || 'Unknown'}</span>
+                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
                   <span className="value">{entry.average.toFixed(1)}</span>
                   <span className="opponent">{entry.opponent}</span>
                 </div>
@@ -2149,7 +2170,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {bestCheckouts.map((entry, index) => (
                 <div key={`checkout-${index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || 'Unknown'}</span>
+                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
                   <span className="value">{entry.checkouts.join(', ')}</span>
                 </div>
               ))}
@@ -2173,7 +2194,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {fewestDarts.map((entry, index) => (
                 <div key={`darts-${index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || 'Unknown'}</span>
+                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
                   <span className="value">{entry.darts}</span>
                   <span className="opponent">{entry.opponent}</span>
                 </div>
@@ -2197,7 +2218,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {most180s.map((entry, index) => (
                 <div key={`180-${entry.player?.id || index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || 'Unknown'}</span>
+                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
                   <span className="value">{entry.count}</span>
                 </div>
               ))}
@@ -2460,22 +2481,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       const matchGroupId = match.group_id || match.group?.id;
       return tournamentGroupIds.has(matchGroupId) || tournamentPlayoffIds.has(match.id);
     };
-    const filteredLiveMatches = liveMatches.filter(belongsToThisTournament);
-
-    const formatTimeAgo = (timestamp) => {
-      if (!timestamp) return 'Unknown';
-      const now = new Date();
-      const time = new Date(timestamp);
-      const diffMs = now - time;
-      const diffMins = Math.floor(diffMs / 60000);
-      
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      const diffHours = Math.floor(diffMins / 60);
-      if (diffHours < 24) return `${diffHours}h ago`;
-      const diffDays = Math.floor(diffHours / 24);
-      return `${diffDays}d ago`;
-    };
+    const filteredLiveMatches = liveMatches
+      .filter(belongsToThisTournament)
+      .sort((a, b) => {
+        const aFav = favoriteMatchIds.has(a.id) ? 1 : 0;
+        const bFav = favoriteMatchIds.has(b.id) ? 1 : 0;
+        if (aFav !== bFav) return bFav - aFav;
+        const timeA = new Date(a.last_activity_at || 0).getTime();
+        const timeB = new Date(b.last_activity_at || 0).getTime();
+        return timeB - timeA;
+      });
 
     return (
       <div className="live-matches-view">
@@ -2485,7 +2500,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             {t('management.liveMatches') || 'Live Matches'}
           </h3>
           <p className="live-matches-count">
-            {filteredLiveMatches.length} match{filteredLiveMatches.length !== 1 ? 'es' : ''} currently in progress
+            {filteredLiveMatches.length} {t('management.matchesInProgress') || 'matches currently in progress'}
           </p>
         </div>
 
@@ -2498,7 +2513,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         ) : (
           <div className="live-matches-grid">
             {filteredLiveMatches.map(match => (
-              <div key={match.id} className="live-match-card scoreboard-style">
+              <div key={match.id} className={`live-match-card scoreboard-style${favoriteMatchIds.has(match.id) ? ' is-favorite-match' : ''}`}>
                 <div className="scoreboard-header">
                   {match.live_board_number ? (
                     <div className="board-indicator">
@@ -2508,30 +2523,39 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   ) : (
                     <div className="match-format">{t('management.firstTo', 'First to')} {match.legs_to_win || 3}</div>
                   )}
-                  <div className="live-badge">
-                    <Activity size={12} />
-                    <span>{t('management.live', 'LIVE')}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      className={`live-match-favorite-btn${favoriteMatchIds.has(match.id) ? ' active' : ''}`}
+                      onClick={() => toggleFavoriteMatch(match.id)}
+                      title={t('management.toggleFavorite') || 'Toggle favorite'}
+                    >
+                      <Star size={14} fill={favoriteMatchIds.has(match.id) ? 'currentColor' : 'none'} />
+                    </button>
+                    <div className="live-badge">
+                      <Activity size={12} />
+                      <span>{t('management.live', 'LIVE')}</span>
+                    </div>
                   </div>
                 </div>
-                
+
                 <div className="scoreboard-content">
                   <div className="scoreboard-row">
-                    <div className="scoreboard-label">Legs</div>
+                    <div className="scoreboard-label">{t('management.legs') || 'Legs'}</div>
                   </div>
-                  
+
                   <div className="player-row player1-row">
                     <div className="player-info">
-                      <div className="player-name-large">{match.player1?.name || 'Player 1'}</div>
+                      <div className="player-name-large">{match.player1?.name || t('common.unknown')}</div>
                     </div>
                     <div className="scoreboard-scores">
                       <div className="legs-score">{match.player1_legs || 0}</div>
                       <div className="current-score-large">{match.player1_current_score || 501}</div>
                     </div>
                   </div>
-                  
+
                   <div className="player-row player2-row">
                     <div className="player-info">
-                      <div className="player-name-large">{match.player2?.name || 'Player 2'}</div>
+                      <div className="player-name-large">{match.player2?.name || t('common.unknown')}</div>
                     </div>
                     <div className="scoreboard-scores">
                       <div className="legs-score">{match.player2_legs || 0}</div>
@@ -2542,10 +2566,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 
                 <div className="scoreboard-footer">
                   {match.group && (
-                    <span className="group-name">{match.group.name || 'Group'}</span>
+                    <span className="group-name">{match.group.name}</span>
                   )}
                   {match.live_board_number && (
-                    <span className="match-format-footer">First to {match.legs_to_win || 3}</span>
+                    <span className="match-format-footer">{t('management.firstTo', 'First to')} {match.legs_to_win || 3}</span>
                   )}
                   {match.live_device_name && (
                     <span className="device-name-footer">{match.live_device_name}</span>

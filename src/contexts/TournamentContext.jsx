@@ -629,12 +629,23 @@ export function TournamentProvider({ children }) {
           
           // If tournament is completed, update status in database
           if (currentState.currentTournament.status === 'completed') {
-            await tournamentService.updateTournamentStatus(
-              currentState.currentTournament.id,
-              'completed'
-            );
-            
-            // If tournament is linked to a league, calculate points
+            try {
+              await tournamentService.updateTournamentStatus(
+                currentState.currentTournament.id,
+                'completed'
+              );
+            } catch (statusErr) {
+              console.error('Error saving completed status, retrying:', statusErr);
+              try {
+                await tournamentService.updateTournamentStatus(
+                  currentState.currentTournament.id,
+                  'completed'
+                );
+              } catch (retryErr) {
+                console.error('Retry also failed:', retryErr);
+              }
+            }
+
             if (currentState.currentTournament.leagueId) {
               try {
                 await leagueService.calculateTournamentPlacements(
@@ -644,7 +655,6 @@ export function TournamentProvider({ children }) {
                 );
               } catch (error) {
                 console.error('Error calculating league points:', error);
-                // Don't block tournament completion if points calculation fails
               }
             }
           }
