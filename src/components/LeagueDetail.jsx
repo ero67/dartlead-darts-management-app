@@ -934,56 +934,24 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               </p>
               
               {/* Scoring Rules List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              <div className="scoring-rules-list">
                 {scoringRules.map((rule, index) => (
-                  <div 
-                    key={rule.position} 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '1rem',
-                      padding: '0.75rem 1rem',
-                      background: 'var(--bg-secondary)',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border-color)'
-                    }}
-                  >
-                    <span style={{ 
-                      flex: 1, 
-                      color: 'var(--text-primary)',
-                      fontWeight: rule.position <= 3 ? '600' : '400'
-                    }}>
+                  <div key={rule.position} className="scoring-rule-row">
+                    <span className="scoring-rule-label" style={{ fontWeight: rule.position <= 3 ? '600' : '400' }}>
                       {getPlacementLabel(rule.position)}
                     </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="scoring-rule-controls">
                       <input
                         type="number"
                         min="0"
                         value={rule.points}
                         onChange={(e) => handleScoringRuleChange(index, 'points', e.target.value)}
-                        style={{
-                          width: '80px',
-                          padding: '0.5rem',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '6px',
-                          background: 'var(--input-bg)',
-                          color: 'var(--text-primary)',
-                          textAlign: 'center',
-                          fontSize: '1rem',
-                          fontWeight: '600'
-                        }}
+                        className="scoring-rule-input"
                       />
                       <span style={{ color: 'var(--text-secondary)' }}>{t('common.pts')}</span>
                       <button
                         onClick={() => handleRemovePlacement(index)}
-                        style={{
-                          padding: '0.5rem',
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--text-secondary)',
-                          cursor: 'pointer',
-                          borderRadius: '4px'
-                        }}
+                        className="scoring-rule-remove"
                         title={t('leagues.removePlacement')}
                       >
                         <X size={18} />
@@ -1015,13 +983,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                         ? (t('leagues.roundOf16') || 'Round of 16')
                         : (t('leagues.quarterfinals') || 'Quarterfinals');
                     return (
-                      <div key={rule.round} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        padding: '0.5rem 0.75rem',
+                      <div key={rule.round} className="round-points-row" style={{
                         background: rule.enabled ? 'var(--bg-secondary)' : 'transparent',
-                        borderRadius: '6px',
                         border: rule.enabled ? '1px solid var(--border-color)' : '1px solid transparent',
                         opacity: rule.enabled ? 1 : 0.6
                       }}>
@@ -1035,7 +998,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                               setRoundPointsRules(updated);
                             }}
                           />
-                          <span style={{ color: 'var(--text-primary)', fontWeight: rule.enabled ? '500' : '400', minWidth: '120px' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: rule.enabled ? '500' : '400' }}>
                             {roundLabel}
                           </span>
                         </label>
@@ -1049,18 +1012,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                             updated[index] = { ...updated[index], points: parseInt(e.target.value) || 0 };
                             setRoundPointsRules(updated);
                           }}
-                          style={{
-                            width: '70px',
-                            padding: '0.4rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            background: 'var(--input-bg)',
-                            color: 'var(--text-primary)',
-                            textAlign: 'center',
-                            fontSize: '1rem',
-                            fontWeight: '600',
-                            opacity: rule.enabled ? 1 : 0.4
-                          }}
+                          className="scoring-rule-input"
+                          style={{ opacity: rule.enabled ? 1 : 0.4 }}
                         />
                         <span style={{ color: 'var(--text-secondary)' }}>{t('common.pts')}</span>
                       </div>
@@ -1136,7 +1089,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
             <div className="group-card" style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <h3 style={{ color: 'var(--text-primary)', margin: 0 }}>{t('leagues.defaultTournamentSettings')}</h3>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     className="action-btn delete"
                     onClick={handleResetTournamentDefaults}
