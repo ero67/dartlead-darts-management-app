@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { matchService } from '../services/tournamentService';
+import checkoutData from '../data/checkouts.json';
 
 export function MatchInterface({ match, onMatchComplete, onBack }) {
   // Show loading state if match is not loaded yet
@@ -1684,6 +1685,11 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             <div className="legs-won">{legScores.player1.legs}</div>
           </div>
           <div className="current-score">{safeScore(legScores.player1.currentScore, matchSettings.startingScore)}</div>
+          {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))] && (
+            <div className="checkout-suggestion">
+              {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))].join(' → ')}
+            </div>
+          )}
           {player1LastThrows.length > 0 && (
             <div className="last-throws">
               {player1LastThrows.map((throwLabel, idx) => (
@@ -1708,6 +1714,11 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             <div className="legs-won">{legScores.player2.legs}</div>
           </div>
           <div className="current-score">{safeScore(legScores.player2.currentScore, matchSettings.startingScore)}</div>
+          {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))] && (
+            <div className="checkout-suggestion">
+              {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))].join(' → ')}
+            </div>
+          )}
           {player2LastThrows.length > 0 && (
             <div className="last-throws">
               {player2LastThrows.map((throwLabel, idx) => (
