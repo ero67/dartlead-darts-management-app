@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { Trophy, Target, Zap, Award, Hash } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { Trophy, Target, Zap, Award, Hash, Download, Loader } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import { useLanguage } from '../contexts/LanguageContext';
 import logo from '../assets/logo.png';
 
@@ -15,6 +16,28 @@ import logo from '../assets/logo.png';
  */
 export function TournamentSummary({ tournament }) {
   const { t } = useLanguage();
+  const summaryRef = useRef(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportImage = async () => {
+    if (!summaryRef.current) return;
+    setExporting(true);
+    try {
+      const dataUrl = await toPng(summaryRef.current, {
+        backgroundColor: '#1e293b',
+        pixelRatio: 2,
+        style: { padding: '1.5rem' }
+      });
+      const link = document.createElement('a');
+      link.download = `${tournament.name || 'tournament'}-summary.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ── helpers ──────────────────────────────────────────────────────────
   const getCheckoutValue = (checkout) => {
@@ -356,6 +379,13 @@ export function TournamentSummary({ tournament }) {
 
   return (
     <div className="tournament-summary">
+      <div className="summary-export-bar">
+        <button className="admin-button primary" onClick={handleExportImage} disabled={exporting}>
+          {exporting ? <Loader size={16} className="spinning" /> : <Download size={16} />}
+          {exporting ? (t('summary.exporting') || 'Exporting...') : (t('summary.exportImage') || 'Export as Image')}
+        </button>
+      </div>
+      <div className="summary-content" ref={summaryRef}>
       {/* Title + branding */}
       <div className="summary-header">
         <Trophy size={32} className="summary-trophy-icon" />
@@ -437,6 +467,7 @@ export function TournamentSummary({ tournament }) {
         <span className="summary-branding-text">
           {t('summary.poweredBy') || 'Powered by'} <strong>DartLead</strong>
         </span>
+      </div>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
+import { HeadToHead } from './HeadToHead';
 
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
@@ -641,6 +642,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                 <Trophy size={48} />
                 <p>{t('leagues.noResultsYet')}</p>
               </div>
+            )}
+
+            {currentLeague.leaderboard && currentLeague.leaderboard.length >= 2 && (
+              <HeadToHead
+                leagueId={currentLeague.id}
+                players={currentLeague.leaderboard.map(e => e.player).filter(Boolean)}
+              />
             )}
           </div>
         )}
