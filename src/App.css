@@ -9558,3 +9558,31 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* ===== Playoff Bye Match Styles ===== */
+
+.bye-result {
+  opacity: 0.7;
+}
+
+.bye-badge {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.bye-advance-btn {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.bye-advance-btn:hover {
+  background: var(--accent-primary) !important;
+  color: white !important;
+  border-color: var(--accent-primary) !important;
+}

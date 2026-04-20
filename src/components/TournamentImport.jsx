@@ -338,6 +338,8 @@ export function TournamentImport() {
         if (!playoffsEnabled) return true;
         return playoffRounds.every(round =>
           round.matches.every(match => {
+            const isBye = (match.player1 && !match.player2) || (!match.player1 && match.player2);
+            if (isBye) return true;
             if (!match.player1 || !match.player2) return false;
             const r = playoffResults[match.id];
             return r && r.winner && r.player1Legs >= 0 && r.player2Legs >= 0;
@@ -464,19 +466,29 @@ export function TournamentImport() {
 
           for (let mi = 0; mi < round.matches.length; mi++) {
             const match = round.matches[mi];
-            const p1Id = nameToId.get(match.player1);
-            const p2Id = nameToId.get(match.player2);
+            const p1Id = match.player1 ? nameToId.get(match.player1) : null;
+            const p2Id = match.player2 ? nameToId.get(match.player2) : null;
+            const isBye = (match.player1 && !match.player2) || (!match.player1 && match.player2);
+            const byePlayer = isBye ? (match.player1 || match.player2) : null;
+            const byePlayerId = byePlayer ? nameToId.get(byePlayer) : null;
             const result = playoffResults[match.id];
-            const winnerId = result ? nameToId.get(result.winner) : null;
+            const winnerId = isBye ? byePlayerId : (result ? nameToId.get(result.winner) : null);
 
             const dbMatchId = generateId();
 
-            // Insert playoff match into DB
+            const matchResult = isBye
+              ? { winner: byePlayerId, player1Legs: 0, player2Legs: 0, isBye: true }
+              : result ? {
+                  winner: winnerId,
+                  player1Legs: result.winner === match.player1 ? result.player1Legs : result.player2Legs,
+                  player2Legs: result.winner === match.player1 ? result.player2Legs : result.player1Legs
+                } : null;
+
             await supabase.from('matches').insert({
               id: dbMatchId,
               tournament_id: created.id,
-              player1_id: p1Id,
-              player2_id: p2Id,
+              player1_id: p1Id || null,
+              player2_id: p2Id || null,
               status: 'completed',
               legs_to_win: legsToWin,
               starting_score: startingScore,
@@ -484,8 +496,9 @@ export function TournamentImport() {
               playoff_round: ri + 1,
               playoff_match_number: mi + 1,
               winner_id: winnerId,
-              player1_legs: result ? (result.winner === match.player1 ? result.player1Legs : result.player2Legs) : 0,
-              player2_legs: result ? (result.winner === match.player1 ? result.player2Legs : result.player1Legs) : 0,
+              player1_legs: matchResult ? matchResult.player1Legs : 0,
+              player2_legs: matchResult ? matchResult.player2Legs : 0,
+              result: matchResult,
               updated_at: new Date().toISOString()
             });
 
@@ -497,11 +510,7 @@ export function TournamentImport() {
               isThirdPlaceMatch: match.isThirdPlaceMatch || false,
               playoffRound: ri + 1,
               playoffMatchNumber: mi + 1,
-              result: result ? {
-                winner: winnerId,
-                player1Legs: result.winner === match.player1 ? result.player1Legs : result.player2Legs,
-                player2Legs: result.winner === match.player1 ? result.player2Legs : result.player1Legs
-              } : null
+              result: matchResult
             });
           }
 
@@ -887,7 +896,7 @@ export function TournamentImport() {
                               </>
                             ) : (
                               <span className="import-match-row__players">
-                                {match.player1 || '?'} {t('manager.importVs')} {match.player2 || '?'}
+                                {match.player1 || (match.player2 ? 'BYE' : '?')} {t('manager.importVs')} {match.player2 || (match.player1 ? 'BYE' : '?')}
                               </span>
                             )}
                           </div>
@@ -919,6 +928,9 @@ export function TournamentImport() {
                                 placeholder={match.player2}
                               />
                             </div>
+                          )}
+                          {((match.player1 && !match.player2) || (!match.player1 && match.player2)) && (
+                            <span className="bye-badge">BYE</span>
                           )}
                           {ri === 0 && !match.isThirdPlaceMatch && mi < round.matches.length - 1 && (
                             <button

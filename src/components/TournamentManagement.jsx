@@ -451,13 +451,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   // Top 8 = Quarterfinals, Top 16 = Round of 16, etc.
   const generatePlayoffRounds = useCallback((totalQualifiers, includeThirdPlaceMatch = true) => {
     const rounds = [];
-    let currentRoundSize = totalQualifiers;
+    // Round up to next power of 2 for proper bracket with byes
+    let bracketSize = 1;
+    while (bracketSize < totalQualifiers) bracketSize *= 2;
+    let currentRoundSize = bracketSize;
     let roundNumber = 1;
     let hasSemifinals = false;
 
     // Generate rounds from first round to final
     while (currentRoundSize > 1) {
-      const numMatches = Math.ceil(currentRoundSize / 2);
+      const numMatches = currentRoundSize / 2;
       
       const round = {
         id: generateId(),
@@ -761,20 +764,35 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         return h(bSize);
       };
       
-      const bracketPos = genBracketPos(totalPlayers);
-      
+      const globalBracketSize = numMatches * 2;
+      const bracketPos = genBracketPos(globalBracketSize);
+
       // Create initial seeded bracket: pairs[i] = [seed1, seed2]
       // Standard bracket: position[0] vs position[N-1], position[1] vs position[N-2], etc.
-      const seededSlots = []; // Array of { matchIdx, seed1, seed2, player1Idx, player2Idx }
+      // Seeds beyond totalPlayers become byes (handled after conflict resolution)
+      const seededSlots = [];
+      const byeMatches = [];
       for (let i = 0; i < numMatches; i++) {
         const s1 = bracketPos[i];
-        const s2 = bracketPos[totalPlayers - 1 - i];
-        if (s1 >= 1 && s1 <= totalPlayers && s2 >= 1 && s2 <= totalPlayers && s1 !== s2) {
+        const s2 = bracketPos[globalBracketSize - 1 - i];
+        const p1Valid = s1 >= 1 && s1 <= totalPlayers;
+        const p2Valid = s2 >= 1 && s2 <= totalPlayers;
+
+        if (p1Valid && p2Valid && s1 !== s2) {
           seededSlots.push({
             matchIdx: i,
-            player1Idx: s1 - 1, // 0-based index into qualifyingPlayers
+            player1Idx: s1 - 1,
             player2Idx: s2 - 1
           });
+        } else {
+          // Bye match — one or no real player
+          const match = firstRound.matches[i];
+          match.player1 = p1Valid ? (qualifyingPlayers[s1 - 1] || null) : null;
+          match.player2 = p2Valid ? (qualifyingPlayers[s2 - 1] || null) : null;
+          match.seed1 = s1;
+          match.seed2 = s2;
+          match.status = 'pending';
+          byeMatches.push(i);
         }
       }
       
@@ -917,32 +935,28 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       return helper(bracketSize);
     };
     
-    // Generate bracket positions (these are the seed numbers in bracket order)
-    const bracketPositions = generateBracketPositions(totalPlayers);
-    
+    // Generate bracket positions using the bracket size (power of 2)
+    const bracketSize = numMatches * 2;
+    const bracketPositions = generateBracketPositions(bracketSize);
+
     // Create pairs: position 0 with position N-1, position 1 with position N-2, etc.
     const pairs = [];
     for (let i = 0; i < numMatches; i++) {
       const pos1 = bracketPositions[i];
-      const pos2 = bracketPositions[totalPlayers - 1 - i];
+      const pos2 = bracketPositions[bracketSize - 1 - i];
       pairs.push([pos1, pos2]);
     }
-    
-    // Assign players to matches
+
+    // Assign players to matches (seeds beyond totalPlayers become byes → null)
     for (let i = 0; i < numMatches && i < pairs.length; i++) {
       const match = firstRound.matches[i];
       const [seed1, seed2] = pairs[i];
-      
-      // Ensure seeds are valid
-      if (seed1 >= 1 && seed1 <= totalPlayers && 
-          seed2 >= 1 && seed2 <= totalPlayers && 
-          seed1 !== seed2) {
-        match.player1 = qualifyingPlayers[seed1 - 1] || null; // Seed 1 = index 0
-        match.player2 = qualifyingPlayers[seed2 - 1] || null;
-        match.seed1 = seed1;
-        match.seed2 = seed2;
-        match.status = 'pending';
-      }
+
+      match.player1 = (seed1 >= 1 && seed1 <= totalPlayers) ? (qualifyingPlayers[seed1 - 1] || null) : null;
+      match.player2 = (seed2 >= 1 && seed2 <= totalPlayers) ? (qualifyingPlayers[seed2 - 1] || null) : null;
+      match.seed1 = seed1;
+      match.seed2 = seed2;
+      match.status = 'pending';
     }
     
     return firstRound;
@@ -1322,6 +1336,67 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         console.error('Error resetting playoffs:', error);
         alert(t('management.failedToResetPlayoffs') || 'Failed to reset playoffs. Please try again.');
       }
+    }
+  };
+
+  const handleAdvanceBye = async (match, roundIndex) => {
+    if (!tournament?.playoffs?.rounds) return;
+
+    const player = match.player1 || match.player2;
+    if (!player) return;
+
+    const rounds = tournament.playoffs.rounds.map(r => ({
+      ...r,
+      matches: r.matches.map(m => ({ ...m }))
+    }));
+
+    const currentRound = rounds[roundIndex];
+    const matchIndex = currentRound.matches.findIndex(m => m.id === match.id);
+    if (matchIndex === -1) return;
+
+    currentRound.matches[matchIndex] = {
+      ...currentRound.matches[matchIndex],
+      status: 'completed',
+      result: {
+        winner: player.id,
+        player1Legs: 0,
+        player2Legs: 0,
+        isBye: true
+      }
+    };
+
+    // Advance winner to next round
+    const nonThirdPlaceMatches = currentRound.matches.filter(m => !m.isThirdPlaceMatch);
+    const bracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === match.id);
+
+    if (roundIndex < rounds.length - 1 && bracketIndex !== -1) {
+      const nextRound = rounds[roundIndex + 1];
+      const nextNonThird = nextRound.matches.filter(m => !m.isThirdPlaceMatch);
+      const nextMatchIndex = Math.floor(bracketIndex / 2);
+      const nextMatch = nextNonThird[nextMatchIndex];
+
+      if (nextMatch) {
+        const slot = bracketIndex % 2 === 0 ? 'player1' : 'player2';
+        nextMatch[slot] = player;
+        nextMatch.status = 'pending';
+      }
+    }
+
+    // Check if current round is complete to advance currentRound counter
+    const updatedPlayoffs = { ...tournament.playoffs, rounds };
+    const crIdx = Math.max(0, (updatedPlayoffs.currentRound || 1) - 1);
+    const crObj = rounds[crIdx];
+    if (crObj) {
+      const allDone = crObj.matches.filter(m => !m.isThirdPlaceMatch).every(m => m.status === 'completed');
+      if (allDone && updatedPlayoffs.currentRound < rounds.length) {
+        updatedPlayoffs.currentRound = (updatedPlayoffs.currentRound || 1) + 1;
+      }
+    }
+
+    try {
+      await contextStartPlayoffs(updatedPlayoffs);
+    } catch (error) {
+      console.error('Error advancing bye:', error);
     }
   };
 
@@ -2876,29 +2951,47 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       </div>
                     </div>
                     {match.status === 'completed' && match.result ? (
-                      <div className="playoff-match-result">
-                        <div className={`playoff-player-row ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
-                          <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
-                          <span className="playoff-player-score">{match.result.player1Legs}</span>
-                      </div>
-                        <div className={`playoff-player-row ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
-                          <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
-                          <span className="playoff-player-score">{match.result.player2Legs}</span>
+                      match.result.isBye ? (
+                        <div className="playoff-match-result bye-result">
+                          <div className="playoff-player-row winner">
+                            <span className="playoff-player-name">{(match.player1 || match.player2)?.name || 'TBD'}</span>
+                            <span className="playoff-player-score bye-badge">{t('management.bye')}</span>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="playoff-match-result">
+                          <div className={`playoff-player-row ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
+                            <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
+                            <span className="playoff-player-score">{match.result.player1Legs}</span>
+                          </div>
+                          <div className={`playoff-player-row ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
+                            <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
+                            <span className="playoff-player-score">{match.result.player2Legs}</span>
+                          </div>
+                        </div>
+                      )
                     ) : (
                       <div className="playoff-match-players">
                         <div className="playoff-player-row">
-                          <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
+                          <span className="playoff-player-name">{match.player1?.name || (!match.player2 ? 'TBD' : t('management.bye'))}</span>
                     </div>
                         <div className="playoff-vs">vs</div>
                         <div className="playoff-player-row">
-                          <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
+                          <span className="playoff-player-name">{match.player2?.name || (!match.player1 ? 'TBD' : t('management.bye'))}</span>
                       </div>
                       </div>
                     )}
                     
                     <div className="match-actions">
+                      {match.status === 'pending' && ((match.player1 && !match.player2) || (!match.player1 && match.player2)) && (
+                        <button
+                          className="start-match-btn bye-advance-btn"
+                          onClick={() => handleAdvanceBye(match, index)}
+                        >
+                          <CheckCircle size={16} />
+                          {t('management.advancePlayer')}
+                        </button>
+                      )}
                       {match.status === 'pending' && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
                         user ? (
                           <button 
