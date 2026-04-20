@@ -554,6 +554,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
           {t('leagues.statistics')}
         </button>
         <button
+          className={activeTab === 'h2h' ? 'active' : ''}
+          onClick={() => setActiveTab('h2h')}
+        >
+          <Users size={18} />
+          {t('leagues.headToHead')}
+        </button>
+        <button
           className={activeTab === 'players' ? 'active' : ''}
           onClick={() => setActiveTab('players')}
         >
@@ -644,12 +651,6 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               </div>
             )}
 
-            {currentLeague.leaderboard && currentLeague.leaderboard.length >= 2 && (
-              <HeadToHead
-                leagueId={currentLeague.id}
-                players={currentLeague.leaderboard.map(e => e.player).filter(Boolean)}
-              />
-            )}
           </div>
         )}
 
@@ -896,6 +897,23 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'h2h' && (
+          <div>
+            <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>{t('leagues.headToHead')}</h2>
+            {currentLeague.leaderboard && currentLeague.leaderboard.length >= 2 ? (
+              <HeadToHead
+                leagueId={currentLeague.id}
+                players={currentLeague.leaderboard.map(e => e.player).filter(Boolean)}
+              />
+            ) : (
+              <div className="empty-state">
+                <Users size={48} />
+                <p>{t('leagues.noResultsYet')}</p>
               </div>
             )}
           </div>
