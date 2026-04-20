@@ -8968,7 +8968,8 @@ body {
     padding: 0.2rem 0.45rem;
   }
 
-  .league-leaderboard-table .lb-col-tournaments {
+  .league-leaderboard-table .lb-col-tournaments,
+  .league-leaderboard-table .lb-col-legs {
     display: none;
   }
 }
@@ -9115,5 +9116,445 @@ body {
   .league-stat-table tbody td {
     padding: 0.45rem 0.4rem;
     font-size: 0.78rem;
+  }
+}
+
+/* ===== Import Tournament Wizard ===== */
+
+.import-wizard {
+  margin-top: 1.5rem;
+}
+
+.import-stepper {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.import-stepper__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 60px;
+  cursor: default;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.import-stepper__step--active,
+.import-stepper__step--completed {
+  opacity: 1;
+}
+
+.import-stepper__step--completed {
+  cursor: pointer;
+}
+
+.import-stepper__dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 2px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.import-stepper__step--active .import-stepper__dot {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.import-stepper__step--completed .import-stepper__dot {
+  background: var(--success-color, #22c55e);
+  color: white;
+  border-color: var(--success-color, #22c55e);
+}
+
+.import-stepper__label {
+  font-size: 0.7rem;
+  text-align: center;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.import-stepper__step--active .import-stepper__label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.import-wizard__content {
+  min-height: 200px;
+  margin-bottom: 1.5rem;
+}
+
+.import-wizard__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.import-wizard__actions-right {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.import-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.import-settings-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.import-settings-row .form-group {
+  flex: 1;
+}
+
+.import-add-player-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.import-add-player-row input {
+  flex: 1;
+}
+
+.import-player-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.import-player-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.65rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.import-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.import-remove-btn:hover {
+  color: var(--danger-color, #ef4444);
+  background: var(--bg-tertiary);
+}
+
+.import-error-text {
+  color: var(--danger-color, #ef4444);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.import-info-text {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.import-group-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.import-group-controls .form-group {
+  flex: 0 0 auto;
+  min-width: 120px;
+}
+
+.import-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.import-group-column {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.import-group-column--unassigned {
+  border-color: var(--danger-color, #ef4444);
+  border-style: dashed;
+}
+
+.import-group-column h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.import-group-player {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+  gap: 0.5rem;
+}
+
+.import-group-player select {
+  padding: 0.15rem 0.3rem;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  min-width: 40px;
+}
+
+.import-results-group {
+  margin-bottom: 1.25rem;
+}
+
+.import-results-group h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.import-match-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color-light, var(--border-color));
+  flex-wrap: wrap;
+}
+
+.import-match-row--third {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 2px dashed var(--border-color);
+}
+
+.import-match-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 100%;
+}
+
+.import-match-row__players {
+  font-size: 0.85rem;
+  min-width: 140px;
+  color: var(--text-primary);
+}
+
+.import-match-row__inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.import-match-row__inputs select {
+  flex: 1;
+  min-width: 90px;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.import-match-row__inputs input[type="number"] {
+  width: 45px;
+  padding: 0.3rem 0.35rem;
+  font-size: 0.85rem;
+  text-align: center;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.import-match-row__inputs span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.import-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.import-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.import-qualifiers-section {
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.import-qualifiers-section h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.import-qualifier-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.import-playoff-bracket {
+  margin-top: 1rem;
+}
+
+.import-playoff-round {
+  margin-bottom: 1.25rem;
+}
+
+.import-playoff-round h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--accent-primary);
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.import-playoff-matchup {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 140px;
+}
+
+.import-playoff-matchup select {
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  min-width: 80px;
+}
+
+.import-playoff-matchup span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.import-swap-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.import-swap-btn:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.import-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.import-summary__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.import-summary__stat span {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.import-summary__stat strong {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+@media (max-width: 600px) {
+  .import-stepper {
+    gap: 0.15rem;
+  }
+
+  .import-stepper__label {
+    display: none;
+  }
+
+  .import-settings-row {
+    flex-direction: column;
+  }
+
+  .import-group-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .import-match-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .import-match-row__inputs {
+    width: 100%;
+  }
+
+  .import-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .import-playoff-matchup {
+    flex-wrap: wrap;
   }
 }

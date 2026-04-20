@@ -386,7 +386,9 @@ export const leagueService = {
         bestPlacement: l.best_placement,
         worstPlacement: l.worst_placement,
         avgPlacement: l.avg_placement ? parseFloat(l.avg_placement) : null,
-        lastTournamentAt: l.last_tournament_at
+        lastTournamentAt: l.last_tournament_at,
+        legsWon: l.legs_won || 0,
+        legsLost: l.legs_lost || 0
       }));
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -896,7 +898,41 @@ export const leagueService = {
         });
       }
 
-      // ── 3. Aggregate by player ─────────────────────────────────────
+      // ── 3. Get leg stats from completed matches in league tournaments ──
+      const { data: leagueTournaments } = await supabase
+        .from('tournaments')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('status', 'completed')
+        .eq('deleted', false);
+
+      const leagueTournamentIds = (leagueTournaments || []).map(t => t.id);
+
+      const playerLegs = {};
+      if (leagueTournamentIds.length > 0) {
+        const { data: matches } = await supabase
+          .from('matches')
+          .select('player1_id, player2_id, player1_legs, player2_legs, winner_id')
+          .in('tournament_id', leagueTournamentIds)
+          .eq('status', 'completed');
+
+        (matches || []).forEach(match => {
+          const p1 = match.player1_id;
+          const p2 = match.player2_id;
+          const p1Legs = match.player1_legs || 0;
+          const p2Legs = match.player2_legs || 0;
+
+          if (!playerLegs[p1]) playerLegs[p1] = { won: 0, lost: 0 };
+          if (!playerLegs[p2]) playerLegs[p2] = { won: 0, lost: 0 };
+
+          playerLegs[p1].won += p1Legs;
+          playerLegs[p1].lost += p2Legs;
+          playerLegs[p2].won += p2Legs;
+          playerLegs[p2].lost += p1Legs;
+        });
+      }
+
+      // ── 4. Aggregate by player ─────────────────────────────────────
       const playerStats = {};
       results.forEach(result => {
         const playerId = result.player_id;
@@ -921,7 +957,7 @@ export const leagueService = {
         }
       });
 
-      // ── 4. Also include players who have manual_points but no tournament results
+      // ── 5. Also include players who have manual_points but no tournament results
       for (const [playerId, manual] of Object.entries(existingManual)) {
         if (manual > 0 && !playerStats[playerId]) {
           playerStats[playerId] = {
@@ -934,13 +970,14 @@ export const leagueService = {
         }
       }
 
-      // ── 5. Build leaderboard entries (tournament + manual) ─────────
+      // ── 6. Build leaderboard entries (tournament + manual) ─────────
       const leaderboardEntries = Object.values(playerStats).map(stats => {
         const placements = stats.placements.sort((a, b) => a - b);
         const avgPlacement = placements.length > 0
           ? placements.reduce((sum, p) => sum + p, 0) / placements.length
           : null;
         const manualPts = existingManual[stats.playerId] || 0;
+        const legs = playerLegs[stats.playerId] || { won: 0, lost: 0 };
 
         return {
           league_id: leagueId,
@@ -951,7 +988,9 @@ export const leagueService = {
           best_placement: placements.length > 0 ? placements[0] : null,
           worst_placement: placements.length > 0 ? placements[placements.length - 1] : null,
           avg_placement: avgPlacement,
-          last_tournament_at: stats.lastTournamentAt
+          last_tournament_at: stats.lastTournamentAt,
+          legs_won: legs.won,
+          legs_lost: legs.lost
         };
       });
 

@@ -542,6 +542,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       <th>#</th>
                       <th>{t('leagues.player')}</th>
                       <th>{t('leagues.points')}</th>
+                      <th className="lb-col-legs">{t('leagues.legs')}</th>
                       <th className="lb-col-tournaments">{t('tournaments.title')}</th>
                       <th className="lb-col-best">{t('leagues.best')}</th>
                       <th className="lb-col-avg">{t('leagues.avgPlacement')}</th>
@@ -557,6 +558,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                           </td>
                           <td><span className="lb-player-name">{entry.player?.name || t('common.unknown')}</span></td>
                           <td><span className="lb-points">{entry.totalPoints || 0}</span></td>
+                          <td className="lb-col-legs">{entry.legsWon}:{entry.legsLost}</td>
                           <td className="lb-col-tournaments">{entry.tournamentsPlayed || 0}</td>
                           <td className="lb-col-best">{entry.bestPlacement || '-'}</td>
                           <td className="lb-col-avg">{entry.avgPlacement ? entry.avgPlacement.toFixed(1) : '-'}</td>
