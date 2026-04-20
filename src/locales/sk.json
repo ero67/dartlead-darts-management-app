@@ -644,6 +644,7 @@
     "recalculate": "Prepočítať",
     "rank": "Poradie",
     "player": "Hráč",
+    "form": "Forma",
     "points": "Body",
     "legs": "Legy (V:P)",
     "best": "Najlepšie",
@@ -748,7 +749,10 @@
     "noLinkedProfile": "Žiadny profil hráča",
     "registerForTournamentToCreate": "Registrujte sa na turnaj a vytvorte si profil hráča.",
     "noTournaments": "Zatiaľ žiadna história turnajov.",
-    "playerNotFound": "Hráč nebol nájdený"
+    "playerNotFound": "Hráč nebol nájdený",
+    "total180s": "Celkovo 180",
+    "legsRecord": "Legy (V:P)",
+    "tournamentWins": "Výhry v turnajoch"
   },
   "userSearch": {
     "placeholder": "Hľadať podľa mena alebo emailu...",

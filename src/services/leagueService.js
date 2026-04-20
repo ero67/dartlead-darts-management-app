@@ -376,18 +376,47 @@ export const leagueService = {
 
       if (error) throw error;
 
-      const mapped = (data || []).map(l => ({
-        player: l.player,
-        totalPoints: l.total_points || 0,
-        manualPoints: l.manual_points || 0,
-        tournamentsPlayed: l.tournaments_played || 0,
-        bestPlacement: l.best_placement,
-        worstPlacement: l.worst_placement,
-        avgPlacement: l.avg_placement ? parseFloat(l.avg_placement) : null,
-        lastTournamentAt: l.last_tournament_at,
-        legsWon: l.legs_won || 0,
-        legsLost: l.legs_lost || 0
-      }));
+      // Get league tournament IDs for form indicator
+      const { data: leagueTournaments } = await supabase
+        .from('tournaments')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('deleted', false);
+      const ltIds = (leagueTournaments || []).map(t => t.id);
+
+      // Fetch last 5 matches per player for form indicator
+      let allRecentMatches = [];
+      if (ltIds.length > 0) {
+        const { data: recentData } = await supabase
+          .from('matches')
+          .select('player1_id, player2_id, winner_id, completed_at')
+          .in('tournament_id', ltIds)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false });
+        allRecentMatches = recentData || [];
+      }
+
+      const mapped = (data || []).map(l => {
+        const playerId = l.player_id;
+        const playerMatches = allRecentMatches
+          .filter(m => m.player1_id === playerId || m.player2_id === playerId)
+          .slice(0, 5);
+        const last5 = playerMatches.map(m => m.winner_id === playerId);
+
+        return {
+          player: l.player,
+          totalPoints: l.total_points || 0,
+          manualPoints: l.manual_points || 0,
+          tournamentsPlayed: l.tournaments_played || 0,
+          bestPlacement: l.best_placement,
+          worstPlacement: l.worst_placement,
+          avgPlacement: l.avg_placement ? parseFloat(l.avg_placement) : null,
+          lastTournamentAt: l.last_tournament_at,
+          legsWon: l.legs_won || 0,
+          legsLost: l.legs_lost || 0,
+          last5
+        };
+      });
 
       mapped.sort((a, b) => {
         if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;

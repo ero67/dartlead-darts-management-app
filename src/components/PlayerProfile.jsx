@@ -110,6 +110,24 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
               <p>{t('playerProfile.highestCheckout')}</p>
             </div>
           </div>
+          <div className="stat-card">
+            <div className="stat-content">
+              <h3>{careerStats.total180s || 0}</h3>
+              <p>{t('playerProfile.total180s')}</p>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-content">
+              <h3>{careerStats.totalLegsWon || 0}:{careerStats.totalLegsLost || 0}</h3>
+              <p>{t('playerProfile.legsRecord')}</p>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-content">
+              <h3>{careerStats.tournamentWins || 0}</h3>
+              <p>{t('playerProfile.tournamentWins')}</p>
+            </div>
+          </div>
         </div>
       </div>
 

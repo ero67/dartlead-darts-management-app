@@ -650,6 +650,7 @@
     "recalculate": "Recalculate",
     "rank": "Rank",
     "player": "Player",
+    "form": "Form",
     "points": "Points",
     "legs": "Legs (W:L)",
     "best": "Best",
@@ -754,7 +755,10 @@
     "noLinkedProfile": "No Player Profile",
     "registerForTournamentToCreate": "Register for a tournament to create your player profile.",
     "noTournaments": "No tournament history yet.",
-    "playerNotFound": "Player not found"
+    "playerNotFound": "Player not found",
+    "total180s": "Total 180s",
+    "legsRecord": "Legs (W:L)",
+    "tournamentWins": "Tournament Wins"
   },
   "userSearch": {
     "placeholder": "Search by name or email...",

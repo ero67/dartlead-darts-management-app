@@ -10027,3 +10027,42 @@ body {
   color: white !important;
   border-color: var(--accent-primary) !important;
 }
+
+/* ===== Color-coded Standings Rows ===== */
+
+.table-row.qualify-row {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.table-row.eliminate-row {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+/* ===== Form Indicator Dots ===== */
+
+.form-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.form-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.form-dot.win {
+  background: var(--accent-success, #22c55e);
+}
+
+.form-dot.loss {
+  background: var(--accent-danger, #ef4444);
+}
+
+@media (max-width: 500px) {
+  .league-leaderboard-table .lb-col-form {
+    display: none;
+  }
+}

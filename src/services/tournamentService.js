@@ -1531,14 +1531,41 @@ export const tournamentService = {
       let highestCheckout = 0;
       let totalDarts = 0;
       let totalScore = 0;
+      let totalLegsWon = 0;
+      let totalLegsLost = 0;
       (matchStats || []).forEach(s => {
         const avg = parseFloat(s.average) || 0;
         if (avg > bestAverage) bestAverage = avg;
         if ((s.highest_checkout || 0) > highestCheckout) highestCheckout = s.highest_checkout;
         totalDarts += s.total_darts || 0;
         totalScore += s.total_score || 0;
+        totalLegsWon += s.legs_won || 0;
+        totalLegsLost += s.legs_lost || 0;
       });
       const overallAverage = totalDarts > 0 ? (totalScore / totalDarts) * 3 : 0;
+
+      // Count 180s from match results
+      let total180s = 0;
+      const { data: matchesWithResults } = await supabase
+        .from('matches')
+        .select('player1_id, player2_id, result')
+        .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
+        .eq('status', 'completed')
+        .not('result', 'is', null);
+
+      (matchesWithResults || []).forEach(m => {
+        if (!m.result) return;
+        const stats = m.player1_id === playerId ? m.result.player1Stats : m.result.player2Stats;
+        if (stats?.oneEighties) total180s += stats.oneEighties;
+      });
+
+      // Tournament wins
+      const { data: placementResults } = await supabase
+        .from('league_tournament_results')
+        .select('placement')
+        .eq('player_id', playerId)
+        .eq('placement', 1);
+      const tournamentWins = (placementResults || []).length;
 
       // League memberships
       const { data: leagueMemberships } = await supabase
@@ -1556,7 +1583,11 @@ export const tournamentService = {
           bestAverage,
           overallAverage,
           highestCheckout,
-          totalDarts
+          totalDarts,
+          total180s,
+          totalLegsWon,
+          totalLegsLost,
+          tournamentWins
         },
         leagues: leagueMemberships || []
       };

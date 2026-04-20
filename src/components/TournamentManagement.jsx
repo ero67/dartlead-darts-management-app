@@ -1909,8 +1909,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 <span>{t('management.pts')}</span>
               </div>
               {(group.standings || []).length > 0 ? (
-                (group.standings || []).map((standing, index) => (
-                  <div key={standing.player.id} className="table-row">
+                (group.standings || []).map((standing, index) => {
+                  const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
+                  const qualifyCount = tournament?.playoffSettings?.playersPerGroup || 1;
+                  const rowClass = playoffsEnabled ? (index < qualifyCount ? 'qualify-row' : 'eliminate-row') : '';
+                  return (
+                  <div key={standing.player.id} className={`table-row ${rowClass}`}>
                     <span className="position">{index + 1}</span>
                     <span className="player-name">{standing.player.name}</span>
                     <span>{standing.matchesPlayed}</span>
@@ -1923,7 +1927,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <span>{standing.average.toFixed(1)}</span>
                     <span className="points">{standing.points}</span>
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="no-standings">
                   <p>{t('management.noMatchesPlayedYet')}</p>

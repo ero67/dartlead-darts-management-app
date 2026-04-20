@@ -601,6 +601,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                     <tr>
                       <th>#</th>
                       <th>{t('leagues.player')}</th>
+                      <th className="lb-col-form">{t('leagues.form')}</th>
                       <th>{t('leagues.points')}</th>
                       <th className="lb-col-legs">{t('leagues.legs')}</th>
                       <th className="lb-col-tournaments">{t('tournaments.title')}</th>
@@ -617,6 +618,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                             <span className={`lb-rank${rank <= 3 ? ` rank-${rank}` : ''}`}>{rank}</span>
                           </td>
                           <td><span className="lb-player-name">{entry.player?.name || t('common.unknown')}</span></td>
+                          <td className="lb-col-form">
+                            <div className="form-dots">
+                              {(entry.last5 || []).map((win, i) => (
+                                <span key={i} className={`form-dot ${win ? 'win' : 'loss'}`} />
+                              ))}
+                            </div>
+                          </td>
                           <td><span className="lb-points">{entry.totalPoints || 0}</span></td>
                           <td className="lb-col-legs">{entry.legsWon}:{entry.legsLost}</td>
                           <td className="lb-col-tournaments">{entry.tournamentsPlayed || 0}</td>
