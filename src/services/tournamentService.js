@@ -1264,6 +1264,308 @@ export const tournamentService = {
     }
   },
 
+  // === Tournament Self-Registration ===
+
+  async registerForTournament(tournamentId, playerName) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error('Must be logged in to register');
+
+      const { data: tournament, error: tError } = await supabase
+        .from('tournaments')
+        .select('status')
+        .eq('id', tournamentId)
+        .eq('deleted', false)
+        .single();
+      if (tError) throw tError;
+      if (tournament.status !== 'open_for_registration') {
+        throw new Error('Tournament is not accepting registrations');
+      }
+
+      const { data: registration, error } = await supabase
+        .from('tournament_registrations')
+        .insert({
+          tournament_id: tournamentId,
+          user_id: user.id,
+          player_name: playerName
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return registration;
+    } catch (error) {
+      console.error('Error registering for tournament:', error);
+      throw error;
+    }
+  },
+
+  async getTournamentRegistrations(tournamentId) {
+    try {
+      const { data, error } = await supabase
+        .from('tournament_registrations')
+        .select('*')
+        .eq('tournament_id', tournamentId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
+      throw error;
+    }
+  },
+
+  async approveRegistration(registrationId) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      const { data: reg, error: regError } = await supabase
+        .from('tournament_registrations')
+        .select('*')
+        .eq('id', registrationId)
+        .single();
+      if (regError) throw regError;
+      if (reg.status !== 'pending') throw new Error('Registration already processed');
+
+      // Find or create player (reuse pattern from addPlayerToTournament)
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('id, user_id')
+        .eq('name', reg.player_name)
+        .maybeSingle();
+
+      let playerId;
+      if (existingPlayer) {
+        playerId = existingPlayer.id;
+        if (!existingPlayer.user_id) {
+          await supabase
+            .from('players')
+            .update({ user_id: reg.user_id })
+            .eq('id', playerId);
+        }
+      } else {
+        const { data: newPlayer, error: createError } = await supabase
+          .from('players')
+          .insert({ name: reg.player_name, user_id: reg.user_id })
+          .select('id')
+          .single();
+        if (createError) throw createError;
+        playerId = newPlayer.id;
+      }
+
+      // Add to tournament_players
+      const { error: tpError } = await supabase
+        .from('tournament_players')
+        .insert({ tournament_id: reg.tournament_id, player_id: playerId });
+      if (tpError) throw tpError;
+
+      // Update registration status
+      const { data: updated, error: updateError } = await supabase
+        .from('tournament_registrations')
+        .update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id
+        })
+        .eq('id', registrationId)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      return updated;
+    } catch (error) {
+      console.error('Error approving registration:', error);
+      throw error;
+    }
+  },
+
+  async rejectRegistration(registrationId) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      const { data, error } = await supabase
+        .from('tournament_registrations')
+        .update({
+          status: 'rejected',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id
+        })
+        .eq('id', registrationId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error rejecting registration:', error);
+      throw error;
+    }
+  },
+
+  async getMyRegistrationForTournament(tournamentId) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('tournament_registrations')
+        .select('*')
+        .eq('tournament_id', tournamentId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching my registration:', error);
+      return null;
+    }
+  },
+
+  async searchUsers(searchTerm) {
+    try {
+      const { data, error } = await supabase.rpc('search_users', { search_term: searchTerm });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error searching users:', error);
+      return [];
+    }
+  },
+
+  async addUserToTournament(tournamentId, userId, playerName) {
+    try {
+      // Find player by user_id first
+      let { data: existingPlayer } = await supabase
+        .from('players')
+        .select('id, user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!existingPlayer) {
+        // Try by name
+        const { data: byName } = await supabase
+          .from('players')
+          .select('id, user_id')
+          .eq('name', playerName)
+          .maybeSingle();
+
+        if (byName) {
+          existingPlayer = byName;
+          if (!byName.user_id) {
+            await supabase.from('players').update({ user_id: userId }).eq('id', byName.id);
+          }
+        } else {
+          const { data: newPlayer, error } = await supabase
+            .from('players')
+            .insert({ name: playerName, user_id: userId })
+            .select('id')
+            .single();
+          if (error) throw error;
+          existingPlayer = newPlayer;
+        }
+      }
+
+      const { error: tpError } = await supabase
+        .from('tournament_players')
+        .insert({ tournament_id: tournamentId, player_id: existingPlayer.id });
+      if (tpError) throw tpError;
+
+      return existingPlayer;
+    } catch (error) {
+      console.error('Error adding user to tournament:', error);
+      throw error;
+    }
+  },
+
+  async getPlayerProfile(playerId) {
+    try {
+      const { data: player, error: playerError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', playerId)
+        .single();
+      if (playerError) throw playerError;
+
+      // Tournament history
+      const { data: tournamentLinks } = await supabase
+        .from('tournament_players')
+        .select('tournament_id')
+        .eq('player_id', playerId);
+
+      const tournamentIds = (tournamentLinks || []).map(tp => tp.tournament_id);
+      let tournaments = [];
+      if (tournamentIds.length > 0) {
+        const { data: tournamentsData } = await supabase
+          .from('tournaments')
+          .select('id, name, status, created_at')
+          .in('id', tournamentIds)
+          .eq('deleted', false)
+          .order('created_at', { ascending: false });
+        tournaments = tournamentsData || [];
+      }
+
+      // Match stats for career aggregation
+      const { data: matchStats } = await supabase
+        .from('match_player_stats')
+        .select('*')
+        .eq('player_id', playerId);
+
+      // Win/loss from matches
+      const { data: matchesAsP1 } = await supabase
+        .from('matches')
+        .select('id, winner_id')
+        .eq('player1_id', playerId)
+        .eq('status', 'completed');
+      const { data: matchesAsP2 } = await supabase
+        .from('matches')
+        .select('id, winner_id')
+        .eq('player2_id', playerId)
+        .eq('status', 'completed');
+
+      const allMatches = [...(matchesAsP1 || []), ...(matchesAsP2 || [])];
+      const wins = allMatches.filter(m => m.winner_id === playerId).length;
+      const losses = allMatches.length - wins;
+
+      // Career stats from match_player_stats
+      let bestAverage = 0;
+      let highestCheckout = 0;
+      let totalDarts = 0;
+      let totalScore = 0;
+      (matchStats || []).forEach(s => {
+        const avg = parseFloat(s.average) || 0;
+        if (avg > bestAverage) bestAverage = avg;
+        if ((s.highest_checkout || 0) > highestCheckout) highestCheckout = s.highest_checkout;
+        totalDarts += s.total_darts || 0;
+        totalScore += s.total_score || 0;
+      });
+      const overallAverage = totalDarts > 0 ? (totalScore / totalDarts) * 3 : 0;
+
+      // League memberships
+      const { data: leagueMemberships } = await supabase
+        .from('league_members')
+        .select('league_id, role, is_active, leagues(id, name, status)')
+        .eq('player_id', playerId);
+
+      return {
+        player,
+        tournaments,
+        careerStats: {
+          matchesPlayed: allMatches.length,
+          wins,
+          losses,
+          bestAverage,
+          overallAverage,
+          highestCheckout,
+          totalDarts
+        },
+        leagues: leagueMemberships || []
+      };
+    } catch (error) {
+      console.error('Error fetching player profile:', error);
+      throw error;
+    }
+  },
+
   // Update tournament
   async updateTournament(tournamentId, updates) {
     try {

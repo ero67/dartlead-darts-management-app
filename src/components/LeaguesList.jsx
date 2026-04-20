@@ -16,8 +16,13 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
     // Leagues are loaded in LeagueContext
   }, []);
 
+  const isMyLeague = (league) => user && (
+    league.createdBy === user.id || (league.managerIds && league.managerIds.includes(user.id))
+  );
+
   const filteredLeagues = leagues.filter(league => {
     if (filter === 'all') return true;
+    if (filter === 'mine') return isMyLeague(league);
     return league.status === filter;
   });
 
@@ -71,12 +76,20 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
           >
             Completed ({leagues.filter(l => l.status === 'completed').length})
           </button>
-          <button 
+          <button
             className={`filter-btn ${filter === 'archived' ? 'active' : ''}`}
             onClick={() => setFilter('archived')}
           >
             Archived ({leagues.filter(l => l.status === 'archived').length})
           </button>
+          {user && canCreateTournaments && (
+            <button
+              className={`filter-btn ${filter === 'mine' ? 'active' : ''}`}
+              onClick={() => setFilter('mine')}
+            >
+              {t('leagues.myLeagues')} ({leagues.filter(l => isMyLeague(l)).length})
+            </button>
+          )}
         </div>
       </div>
 

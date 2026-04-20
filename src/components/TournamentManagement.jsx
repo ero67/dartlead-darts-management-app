@@ -213,6 +213,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   });
   const { isMatchLive, isMatchLiveOnThisDevice, isMatchStartedByCurrentUser, getLiveMatchInfo, toggleFavoriteGroup, isGroupFavorite, hasFavoriteGroups, getFavoriteGroups } = useLiveMatch();
   const { isAdmin, isAdminMode } = useAdmin();
+  const isOwner = user && tournament?.userId && user.id === tournament.userId;
+  const canManage = isAdmin || isOwner;
   const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament } = useTournament();
 
   // Update tournamentSettings when tournament prop changes (e.g., after reload from DB)
@@ -1439,7 +1441,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const handleDeleteTournament = async () => {
     if (!tournament) return;
     
-    if (!isAdmin) {
+    if (!canManage) {
       alert(t('management.onlyAdminsCanDelete'));
       return;
     }
@@ -1485,7 +1487,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     if (isMatchActuallyLive(matchId)) {
       if (isMatchInLocalStorage(matchId)) {
         return t('management.liveThisDevice');
-      } else if (isAdmin) {
+      } else if (canManage) {
         return t('management.liveAdminAccess');
       } else {
         return t('management.liveOtherDevice');
@@ -1503,8 +1505,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     if (isMatchActuallyLive(matchId)) {
       if (isMatchInLocalStorage(matchId)) {
         return '#3b82f6'; // Blue for this device
-      } else if (isAdmin) {
-        return '#dc2626'; // Red for admin access
+      } else if (canManage) {
+        return '#dc2626'; // Red for admin/owner access
       } else {
         return '#f59e0b'; // Orange for other device
       }
@@ -1826,8 +1828,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     )
                   )}
 
-                  {/* Admin emergency: match is in progress but not detected as live on this device */}
-                  {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && isAdmin && user && (
+                  {/* Emergency: match is in progress but not detected as live on this device */}
+                  {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && canManage && user && (
                     <button
                       className="continue-match-btn admin-override-btn"
                       onClick={() => onMatchStart({
@@ -2874,7 +2876,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <Grid3x3 size={18} />
               {t('management.bracket')}
             </button>
-            {isAdmin && (
+            {canManage && (
               <button
                 className="view-toggle-btn reset-btn"
                 onClick={handleResetPlayoffs}
@@ -2932,8 +2934,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         )}
                       </div>
                       <div className="match-header-actions">
-                        {isAdmin && match.status === 'pending' && !isMatchActuallyLive(match.id) && (
-                          <button 
+                        {canManage && match.status === 'pending' && !isMatchActuallyLive(match.id) && (
+                          <button
                             className="edit-match-icon-btn"
                             onClick={() => setEditingMatch({ ...match, isThirdPlaceMatch: bracketMatch.isThirdPlaceMatch })}
                             title={t('management.editMatchPlayers') || 'Edit match players'}
@@ -3052,8 +3054,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         )
                       )}
 
-                      {/* Admin emergency: playoff match is in progress but not detected as live on this device */}
-                      {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && isAdmin && user && (
+                      {/* Emergency: playoff match is in progress but not detected as live on this device */}
+                      {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && canManage && user && (
                         <button
                           className="continue-match-btn admin-override-btn"
                           onClick={() => {
@@ -3133,6 +3135,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="tournament-title">
           <Trophy size={24} />
           <h2>{tournament.name}</h2>
+          {user && (
+            canManage ? (
+              <span className="management-indicator managing">{t('management.youAreManaging')}</span>
+            ) : (
+              <span className="management-indicator viewing">{t('management.youAreViewing')}</span>
+            )
+          )}
         </div>
         <div className="tournament-overview">
           <div className="overview-stat">
@@ -3144,8 +3153,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           </div>
         </div>
         <div className="header-actions">
-          {user && (
-            <button 
+          {canManage && user && (
+            <button
               className="edit-settings-btn"
               onClick={() => setShowEditSettings(true)}
               title={t('registration.editTournamentSettings')}
@@ -3154,11 +3163,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {t('registration.editSettings')}
             </button>
           )}
-          {isAdmin && user && (
-            <button 
+          {canManage && user && (
+            <button
               className="delete-tournament-btn"
               onClick={handleDeleteTournament}
-              title={t('management.deleteTournamentAdminOnly')}
+              title={t('management.deleteTournament')}
             >
               <Trash2 size={20} />
               {t('management.deleteTournament')}

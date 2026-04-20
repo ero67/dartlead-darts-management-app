@@ -1681,7 +1681,201 @@ export const leagueService = {
       createdAt: league.created_at,
       updatedAt: league.updated_at
     };
+  },
+
+  // === League Self-Registration ===
+
+  async registerForLeague(leagueId, playerName) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error('Must be logged in to register');
+
+      const { data: registration, error } = await supabase
+        .from('league_registrations')
+        .insert({
+          league_id: leagueId,
+          user_id: user.id,
+          player_name: playerName
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return registration;
+    } catch (error) {
+      console.error('Error registering for league:', error);
+      throw error;
+    }
+  },
+
+  async getLeagueRegistrations(leagueId) {
+    try {
+      const { data, error } = await supabase
+        .from('league_registrations')
+        .select('*')
+        .eq('league_id', leagueId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching league registrations:', error);
+      throw error;
+    }
+  },
+
+  async approveLeagueRegistration(registrationId) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      const { data: reg, error: regError } = await supabase
+        .from('league_registrations')
+        .select('*')
+        .eq('id', registrationId)
+        .single();
+      if (regError) throw regError;
+      if (reg.status !== 'pending') throw new Error('Registration already processed');
+
+      // Find or create player
+      const { data: existingPlayer } = await supabase
+        .from('players')
+        .select('id, user_id')
+        .eq('name', reg.player_name)
+        .maybeSingle();
+
+      let playerId;
+      if (existingPlayer) {
+        playerId = existingPlayer.id;
+        if (!existingPlayer.user_id) {
+          await supabase.from('players').update({ user_id: reg.user_id }).eq('id', playerId);
+        }
+      } else {
+        const { data: newPlayer, error: createError } = await supabase
+          .from('players')
+          .insert({ name: reg.player_name, user_id: reg.user_id })
+          .select('id')
+          .single();
+        if (createError) throw createError;
+        playerId = newPlayer.id;
+      }
+
+      // Add to league_members
+      await supabase.from('league_members').upsert({
+        id: generateId(),
+        league_id: reg.league_id,
+        player_id: playerId,
+        role: 'player',
+        is_active: true,
+        joined_at: new Date().toISOString()
+      }, { onConflict: 'league_id,player_id' });
+
+      // Update registration status
+      const { data: updated, error: updateError } = await supabase
+        .from('league_registrations')
+        .update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id
+        })
+        .eq('id', registrationId)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      return updated;
+    } catch (error) {
+      console.error('Error approving league registration:', error);
+      throw error;
+    }
+  },
+
+  async rejectLeagueRegistration(registrationId) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      const { data, error } = await supabase
+        .from('league_registrations')
+        .update({
+          status: 'rejected',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id
+        })
+        .eq('id', registrationId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error rejecting league registration:', error);
+      throw error;
+    }
+  },
+
+  async getMyLeagueRegistration(leagueId) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('league_registrations')
+        .select('*')
+        .eq('league_id', leagueId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching my league registration:', error);
+      return null;
+    }
+  },
+
+  async addUserToLeague(leagueId, userId, playerName) {
+    try {
+      // Find or create player linked to user
+      let { data: existingPlayer } = await supabase
+        .from('players')
+        .select('id, user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (!existingPlayer) {
+        // Try by name
+        const { data: byName } = await supabase
+          .from('players')
+          .select('id, user_id')
+          .eq('name', playerName)
+          .maybeSingle();
+
+        if (byName) {
+          existingPlayer = byName;
+          if (!byName.user_id) {
+            await supabase.from('players').update({ user_id: userId }).eq('id', byName.id);
+          }
+        } else {
+          const { data: newPlayer, error } = await supabase
+            .from('players')
+            .insert({ name: playerName, user_id: userId })
+            .select('id')
+            .single();
+          if (error) throw error;
+          existingPlayer = newPlayer;
+        }
+      }
+
+      await supabase.from('league_members').upsert({
+        id: generateId(),
+        league_id: leagueId,
+        player_id: existingPlayer.id,
+        role: 'player',
+        is_active: true,
+        joined_at: new Date().toISOString()
+      }, { onConflict: 'league_id,player_id' });
+
+      return existingPlayer;
+    } catch (error) {
+      console.error('Error adding user to league:', error);
+      throw error;
+    }
   }
 };
-
-

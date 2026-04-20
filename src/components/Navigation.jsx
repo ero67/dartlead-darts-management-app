@@ -32,12 +32,9 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
   
   const navItems = [
     { id: '/', label: t('navigation.home'), icon: Home },
-    { id: '/dashboard', label: t('navigation.dashboard'), icon: Trophy },
+    { id: '/dashboard', label: (isAdmin || isManager) ? t('dashboard.myDashboard') : t('navigation.dashboard'), icon: Trophy, primary: isAdmin || isManager },
     { id: '/tournaments', label: t('navigation.tournaments'), icon: Users },
     { id: '/leagues', label: t('navigation.leagues'), icon: Crown },
-    // { id: '/privacy', label: 'Privacy', icon: Shield },
-    // { id: '/players', label: t('navigation.players'), icon: Users },
-    // { id: '/settings', label: t('navigation.settings'), icon: Settings }
   ];
 
   const handleSignOut = async () => {
@@ -105,7 +102,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
           return (
             <button
               key={item.id}
-              className={`nav-item ${currentView === item.id ? 'active' : ''}`}
+              className={`nav-item ${currentView === item.id ? 'active' : ''} ${item.primary ? 'nav-item-primary' : ''}`}
               onClick={() => handleNavItemClick(item.id)}
               title={isCollapsed ? item.label : ''}
             >
@@ -152,20 +149,18 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
               {(!isCollapsed || isMobile) && (
                 <div className="user-details">
                   <div className="user-name-row">
-                  <span className="user-name">{user?.user_metadata?.full_name || user?.email || 'User'}</span>
+                    <span className="user-name">{user?.user_metadata?.full_name || user?.email || 'User'}</span>
                     {isAdmin && (
-                      <Crown 
-                        size={14} 
-                        className="admin-icon" 
-                        title="Administrator"
-                      />
+                      <>
+                        <Crown size={14} className="admin-icon" title="Administrator" />
+                        <span className="role-label">Admin</span>
+                      </>
                     )}
                     {!isAdmin && isManager && (
-                      <Badge 
-                        size={14} 
-                        className="manager-icon" 
-                        title="Manager"
-                      />
+                      <>
+                        <Badge size={14} className="manager-icon" title="Manager" />
+                        <span className="role-label">Manager</span>
+                      </>
                     )}
                   </div>
                 </div>
@@ -185,8 +180,16 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
                 />
               )}
             </div>
-            <button 
-              className="device-settings-btn" 
+            <button
+              className="nav-item"
+              onClick={() => handleNavItemClick('/my-profile')}
+              title={isCollapsed ? t('navigation.myProfile') : ''}
+            >
+              <User size={16} />
+              {(!isCollapsed || isMobile) && <span>{t('navigation.myProfile')}</span>}
+            </button>
+            <button
+              className="device-settings-btn"
               onClick={() => { setShowDeviceSettings(true); if (onMobileClose) onMobileClose(); }}
               title={isCollapsed ? t('deviceSettings.title', 'Nastavenia zariadenia') : ''}
             >
@@ -214,18 +217,18 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             <div className="language-section">
               <LanguageSwitcher />
             </div>
-            
-            <button 
-              className="theme-toggle-btn" 
+
+            <button
+              className="theme-toggle-btn"
               onClick={toggleTheme}
               title={isCollapsed ? (isDarkMode ? t('navigation.lightMode') : t('navigation.darkMode')) : ''}
             >
               {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
               {(!isCollapsed || isMobile) && <span>{isDarkMode ? t('navigation.lightMode') : t('navigation.darkMode')}</span>}
             </button>
-            
-            <button 
-              className="logout-btn" 
+
+            <button
+              className="logout-btn"
               onClick={handleSignOut}
               title={isCollapsed ? t('navigation.logout') : ''}
             >

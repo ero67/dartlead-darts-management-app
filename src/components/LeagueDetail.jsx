@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { leagueService } from '../services/leagueService';
+import { UserSearchPicker } from './UserSearchPicker';
 
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
@@ -27,12 +28,16 @@ const DEFAULT_TOURNAMENT_SETTINGS = {
 export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague } = useLeague();
+  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, getLeagueRegistrations, approveLeagueRegistration, rejectLeagueRegistration } = useLeague();
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '' });
   const [newPlayerName, setNewPlayerName] = useState('');
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
+  const [addMode, setAddMode] = useState('name'); // 'name' or 'users'
+  const [myLeagueRegistration, setMyLeagueRegistration] = useState(null);
+  const [leagueRegistrations, setLeagueRegistrations] = useState([]);
+  const [registerLoading, setRegisterLoading] = useState(false);
   const [scoringRules, setScoringRules] = useState([]);
   const [roundPointsRules, setRoundPointsRules] = useState([
     { round: 32, points: 0, enabled: false },
@@ -149,6 +154,18 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     setLeagueStats(null);
   }, [leagueId]);
 
+  // League registration effects
+  useEffect(() => {
+    if (!currentLeague?.id || !user) return;
+    const isMgr = currentLeague.createdBy === user.id ||
+      (currentLeague.managerIds && currentLeague.managerIds.includes(user.id));
+    if (!isMgr) {
+      leagueService.getMyLeagueRegistration(currentLeague.id).then(reg => setMyLeagueRegistration(reg));
+    } else {
+      getLeagueRegistrations(currentLeague.id).then(regs => setLeagueRegistrations(regs || []));
+    }
+  }, [currentLeague?.id, user]);
+
   if (!currentLeague) {
     return (
       <div className="loading-container">
@@ -185,6 +202,49 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         console.error('Error deleting league:', error);
         alert(t('leagues.failedToDeleteLeague'));
       }
+    }
+  };
+
+  const handleSelfRegisterLeague = async () => {
+    if (!user || !currentLeague) return;
+    setRegisterLoading(true);
+    try {
+      const playerName = user.user_metadata?.full_name || user.email;
+      const reg = await registerForLeague(currentLeague.id, playerName);
+      setMyLeagueRegistration(reg);
+    } catch (error) {
+      console.error('Error registering for league:', error);
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleApproveLeagueReg = async (regId) => {
+    try {
+      await approveLeagueRegistration(regId);
+      setLeagueRegistrations(prev => prev.filter(r => r.id !== regId));
+    } catch (error) {
+      console.error('Error approving:', error);
+    }
+  };
+
+  const handleRejectLeagueReg = async (regId) => {
+    try {
+      await rejectLeagueRegistration(regId);
+      setLeagueRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: 'rejected' } : r));
+    } catch (error) {
+      console.error('Error rejecting:', error);
+    }
+  };
+
+  const handleAddUserFromSearch = async (selectedUser) => {
+    try {
+      await leagueService.addUserToLeague(currentLeague.id, selectedUser.id, selectedUser.fullName);
+      // Refresh league to pick up new member
+      await selectLeague(currentLeague.id);
+    } catch (error) {
+      console.error('Error adding user to league:', error);
+      alert(t('leagues.failedToAddPlayer'));
     }
   };
 
@@ -827,6 +887,66 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
 
         {activeTab === 'players' && (
           <div>
+            {/* Player Self-Registration (non-managers) */}
+            {user && !isManager && (
+              <div className="self-register-section">
+                {!myLeagueRegistration && (
+                  <button
+                    className="create-tournament-btn"
+                    onClick={handleSelfRegisterLeague}
+                    disabled={registerLoading}
+                  >
+                    <Plus size={20} />
+                    {registerLoading ? t('common.loading') : t('leagues.joinLeague')}
+                  </button>
+                )}
+                {myLeagueRegistration?.status === 'pending' && (
+                  <div className="registration-status-badge pending">
+                    <Clock size={16} />
+                    {t('leagues.registrationPending')}
+                  </div>
+                )}
+                {myLeagueRegistration?.status === 'approved' && (
+                  <div className="registration-status-badge approved">
+                    <CheckCircle size={16} />
+                    {t('leagues.registrationApproved')}
+                  </div>
+                )}
+                {myLeagueRegistration?.status === 'rejected' && (
+                  <div className="registration-status-badge rejected">
+                    <XCircle size={16} />
+                    {t('leagues.registrationRejected')}
+                  </div>
+                )}
+                {myLeagueRegistration?.status === 'pending' && (
+                  <p>{t('leagues.registrationSubmitted')}</p>
+                )}
+              </div>
+            )}
+
+            {/* Pending Requests (managers) */}
+            {isManager && leagueRegistrations.filter(r => r.status === 'pending').length > 0 && (
+              <div className="pending-requests-section">
+                <h3>{t('leagues.pendingRequests')} ({leagueRegistrations.filter(r => r.status === 'pending').length})</h3>
+                {leagueRegistrations.filter(r => r.status === 'pending').map(reg => (
+                  <div key={reg.id} className="registration-request-card">
+                    <div className="request-info">
+                      <span className="request-name">{reg.player_name}</span>
+                      <span className="request-date">{new Date(reg.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div className="request-actions">
+                      <button className="approve-btn" onClick={() => handleApproveLeagueReg(reg.id)}>
+                        <CheckCircle size={14} /> {t('registration.approve')}
+                      </button>
+                      <button className="reject-btn" onClick={() => handleRejectLeagueReg(reg.id)}>
+                        <XCircle size={14} /> {t('registration.reject')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 style={{ color: 'var(--text-primary)' }}>{t('leagues.players')}</h2>
               {isManager && (
@@ -837,28 +957,44 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       {t('leagues.addPlayer')}
                     </button>
                   ) : (
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        value={newPlayerName}
-                        onChange={(e) => setNewPlayerName(e.target.value)}
-                        placeholder={t('leagues.playerName')}
-                        style={{
-                          padding: '0.5rem',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          background: 'var(--input-bg)',
-                          color: 'var(--text-primary)'
-                        }}
-                        onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
-                      />
-                      <button className="action-btn play" onClick={handleAddPlayer}>
-                        <Check size={16} />
-                      </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '280px' }}>
+                      <div className="add-mode-toggle">
+                        <button className={addMode === 'name' ? 'active' : ''} onClick={() => setAddMode('name')}>
+                          {t('userSearch.addByName')}
+                        </button>
+                        <button className={addMode === 'users' ? 'active' : ''} onClick={() => setAddMode('users')}>
+                          {t('userSearch.addFromUsers')}
+                        </button>
+                      </div>
+                      {addMode === 'name' ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={newPlayerName}
+                            onChange={(e) => setNewPlayerName(e.target.value)}
+                            placeholder={t('leagues.playerName')}
+                            style={{
+                              padding: '0.5rem',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              background: 'var(--input-bg)',
+                              color: 'var(--text-primary)',
+                              flex: 1
+                            }}
+                            onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
+                          />
+                          <button className="action-btn play" onClick={handleAddPlayer}>
+                            <Check size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <UserSearchPicker onSelect={handleAddUserFromSearch} />
+                      )}
                       <button className="action-btn delete" onClick={() => {
                         setIsAddingPlayer(false);
                         setNewPlayerName('');
-                      }}>
+                        setAddMode('name');
+                      }} style={{ alignSelf: 'flex-end' }}>
                         <X size={16} />
                       </button>
                     </div>

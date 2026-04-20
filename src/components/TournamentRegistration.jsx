@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star } from 'lucide-react';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../contexts/AdminContext';
 import { tournamentService } from '../services/tournamentService';
+import { UserSearchPicker } from './UserSearchPicker';
 
 export function TournamentRegistration({ tournament, onBack }) {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const { isAdmin } = useAdmin();
+  const isOwner = user && tournament?.userId && user.id === tournament.userId;
+  const canManage = isAdmin || isOwner;
   // Ensure players is always an array
   const players = tournament.players || [];
   const [newPlayerName, setNewPlayerName] = useState('');
   const [bulkPlayerNames, setBulkPlayerNames] = useState('');
+  const [addMode, setAddMode] = useState('name'); // 'name' or 'users'
   const [showEditSettings, setShowEditSettings] = useState(false);
   const [showGroupsPreview, setShowGroupsPreview] = useState(false);
   const [draftGroups, setDraftGroups] = useState([]);
@@ -61,7 +69,64 @@ export function TournamentRegistration({ tournament, onBack }) {
     })()
   });
   const [seededPlayerIds, setSeededPlayerIds] = useState(new Set());
-  const { addPlayerToTournament, removePlayerFromTournament, startTournament, updateTournamentSettings } = useTournament();
+  const { addPlayerToTournament, removePlayerFromTournament, startTournament, updateTournamentSettings, registerForTournament, getTournamentRegistrations, approveRegistration, rejectRegistration, getTournament } = useTournament();
+
+  // Self-registration state
+  const [myRegistration, setMyRegistration] = useState(null);
+  const [registrations, setRegistrations] = useState([]);
+  const [registerLoading, setRegisterLoading] = useState(false);
+
+  // Load registration data on mount
+  useEffect(() => {
+    if (!tournament?.id) return;
+    if (user && !canManage) {
+      tournamentService.getMyRegistrationForTournament(tournament.id).then(reg => setMyRegistration(reg));
+    }
+    if (canManage) {
+      getTournamentRegistrations(tournament.id).then(regs => setRegistrations(regs || []));
+    }
+  }, [tournament?.id, user, canManage]);
+
+  const handleAddUserFromSearch = async (selectedUser) => {
+    try {
+      await tournamentService.addUserToTournament(tournament.id, selectedUser.id, selectedUser.fullName);
+      await getTournament(tournament.id);
+    } catch (error) {
+      console.error('Error adding user to tournament:', error);
+    }
+  };
+
+  const handleSelfRegister = async () => {
+    if (!user) return;
+    setRegisterLoading(true);
+    try {
+      const playerName = user.user_metadata?.full_name || user.email;
+      const reg = await registerForTournament(tournament.id, playerName);
+      setMyRegistration(reg);
+    } catch (error) {
+      console.error('Error registering:', error);
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleApproveRegistration = async (regId) => {
+    try {
+      await approveRegistration(regId);
+      setRegistrations(prev => prev.filter(r => r.id !== regId));
+    } catch (error) {
+      console.error('Error approving:', error);
+    }
+  };
+
+  const handleRejectRegistration = async (regId) => {
+    try {
+      await rejectRegistration(regId);
+      setRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: 'rejected' } : r));
+    } catch (error) {
+      console.error('Error rejecting:', error);
+    }
+  };
 
   // Update tournamentSettings when tournament prop changes (e.g., after reload from DB)
   useEffect(() => {
@@ -293,14 +358,16 @@ export function TournamentRegistration({ tournament, onBack }) {
         </button>
         <h1>{tournament.name}</h1>
         <div className="header-actions">
-          <button 
-            className="edit-settings-btn"
-            onClick={() => setShowEditSettings(true)}
-            title={t('registration.editTournamentSettings')}
-          >
-            <Settings size={18} />
-            {t('registration.editSettings')}
-          </button>
+          {canManage && (
+            <button
+              className="edit-settings-btn"
+              onClick={() => setShowEditSettings(true)}
+              title={t('registration.editTournamentSettings')}
+            >
+              <Settings size={18} />
+              {t('registration.editSettings')}
+            </button>
+          )}
           <div className="tournament-status">
             <span className="status-badge open">{t('registration.openForRegistration')}</span>
           </div>
@@ -308,60 +375,140 @@ export function TournamentRegistration({ tournament, onBack }) {
       </div>
 
       <div className="registration-content">
+        {/* Player Self-Registration (for non-managers) */}
+        {user && !canManage && (
+          <div className="self-register-section">
+            {!myRegistration && (
+              <>
+                <button
+                  className="create-tournament-btn"
+                  onClick={handleSelfRegister}
+                  disabled={registerLoading}
+                >
+                  <Plus size={20} />
+                  {registerLoading ? t('common.loading') : t('registration.registerForTournament')}
+                </button>
+              </>
+            )}
+            {myRegistration?.status === 'pending' && (
+              <div className="registration-status-badge pending">
+                <Clock size={16} />
+                {t('registration.alreadyRegistered')}
+              </div>
+            )}
+            {myRegistration?.status === 'approved' && (
+              <div className="registration-status-badge approved">
+                <CheckCircle size={16} />
+                {t('registration.registrationApproved')}
+              </div>
+            )}
+            {myRegistration?.status === 'rejected' && (
+              <div className="registration-status-badge rejected">
+                <XCircle size={16} />
+                {t('registration.registrationRejected')}
+              </div>
+            )}
+            {myRegistration?.status === 'pending' && (
+              <p>{t('registration.registrationSubmitted')}</p>
+            )}
+          </div>
+        )}
+
+        {/* Pending Registration Requests (for managers) */}
+        {canManage && registrations.filter(r => r.status === 'pending').length > 0 && (
+          <div className="pending-requests-section">
+            <h3>{t('registration.pendingRequests')} ({registrations.filter(r => r.status === 'pending').length})</h3>
+            {registrations.filter(r => r.status === 'pending').map(reg => (
+              <div key={reg.id} className="registration-request-card">
+                <div className="request-info">
+                  <span className="request-name">{reg.player_name}</span>
+                  <span className="request-date">{new Date(reg.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="request-actions">
+                  <button className="approve-btn" onClick={() => handleApproveRegistration(reg.id)}>
+                    <CheckCircle size={14} /> {t('registration.approve')}
+                  </button>
+                  <button className="reject-btn" onClick={() => handleRejectRegistration(reg.id)}>
+                    <XCircle size={14} /> {t('registration.reject')}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="players-section">
           <div className="section-header">
             <h2>
               <Users size={20} />
               {t('registration.players')} ({players.length})
             </h2>
-            <div className="add-player-form">
-              <input
-                type="text"
-                placeholder={t('registration.enterPlayerName')}
-                value={newPlayerName}
-                onChange={(e) => setNewPlayerName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
-                maxLength={50}
-              />
-              <button 
-                className="add-player-btn"
-                onClick={addPlayer}
-                disabled={!newPlayerName.trim() || players.length >= 64}
-              >
-                <Plus size={16} />
-                {t('registration.addPlayer')}
-              </button>
-            </div>
-            <div className="add-player-form add-player-form--bulk">
-              <textarea
-                placeholder={t('registration.playersBulkPlaceholder') || 'Name Surname; Name Surname; Name Surname'}
-                value={bulkPlayerNames}
-                onChange={(e) => setBulkPlayerNames(e.target.value)}
-                rows={3}
-                maxLength={1000}
-              />
-              <button
-                className="add-player-btn"
-                onClick={addBulkPlayers}
-                disabled={!bulkPlayerNames.trim() || players.length >= 64}
-              >
-                <Plus size={16} />
-                {t('registration.addPlayers') || 'Add players'}
-              </button>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-              {t('registration.playersBulkHelp') || 'Separate players with semicolons or new lines.'}
-            </p>
-            {tournament.tournamentType !== 'playoff_only' && (
-              <p className="seeded-hint">
-                <Star size={14} />
-                {t('registration.seededHint') || 'Seeded players will be placed into different groups'}
-                {seededPlayerIds.size > 0 && (
-                  <span className="seeded-count">
-                    {' — '}{seededPlayerIds.size} {t('registration.seeded') || 'Seeded'}
-                  </span>
+            {canManage && (
+              <>
+                <div className="add-mode-toggle">
+                  <button className={addMode === 'name' ? 'active' : ''} onClick={() => setAddMode('name')}>
+                    {t('userSearch.addByName')}
+                  </button>
+                  <button className={addMode === 'users' ? 'active' : ''} onClick={() => setAddMode('users')}>
+                    {t('userSearch.addFromUsers')}
+                  </button>
+                </div>
+                {addMode === 'name' ? (
+                  <>
+                    <div className="add-player-form">
+                      <input
+                        type="text"
+                        placeholder={t('registration.enterPlayerName')}
+                        value={newPlayerName}
+                        onChange={(e) => setNewPlayerName(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
+                        maxLength={50}
+                      />
+                      <button
+                        className="add-player-btn"
+                        onClick={addPlayer}
+                        disabled={!newPlayerName.trim() || players.length >= 64}
+                      >
+                        <Plus size={16} />
+                        {t('registration.addPlayer')}
+                      </button>
+                    </div>
+                    <div className="add-player-form add-player-form--bulk">
+                      <textarea
+                        placeholder={t('registration.playersBulkPlaceholder') || 'Name Surname; Name Surname; Name Surname'}
+                        value={bulkPlayerNames}
+                        onChange={(e) => setBulkPlayerNames(e.target.value)}
+                        rows={3}
+                        maxLength={1000}
+                      />
+                      <button
+                        className="add-player-btn"
+                        onClick={addBulkPlayers}
+                        disabled={!bulkPlayerNames.trim() || players.length >= 64}
+                      >
+                        <Plus size={16} />
+                        {t('registration.addPlayers') || 'Add players'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                      {t('registration.playersBulkHelp') || 'Separate players with semicolons or new lines.'}
+                    </p>
+                  </>
+                ) : (
+                  <UserSearchPicker onSelect={handleAddUserFromSearch} />
                 )}
-              </p>
+                {tournament.tournamentType !== 'playoff_only' && (
+                  <p className="seeded-hint">
+                    <Star size={14} />
+                    {t('registration.seededHint') || 'Seeded players will be placed into different groups'}
+                    {seededPlayerIds.size > 0 && (
+                      <span className="seeded-count">
+                        {' — '}{seededPlayerIds.size} {t('registration.seeded') || 'Seeded'}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -376,7 +523,7 @@ export function TournamentRegistration({ tournament, onBack }) {
                   <div key={player.id} className={`player-card${seededPlayerIds.has(player.id) ? ' player-card--seeded' : ''}`}>
                     <span className="player-number">{index + 1}</span>
                     <span className="player-name">{player.name}</span>
-                    {tournament.status === 'open_for_registration' && tournament.tournamentType !== 'playoff_only' && (
+                    {tournament.status === 'open_for_registration' && canManage && tournament.tournamentType !== 'playoff_only' && (
                       <button
                         className={`seed-toggle-btn${seededPlayerIds.has(player.id) ? ' seed-toggle-btn--active' : ''}`}
                         onClick={() => toggleSeeded(player.id)}
@@ -385,7 +532,7 @@ export function TournamentRegistration({ tournament, onBack }) {
                         <Star size={16} fill={seededPlayerIds.has(player.id) ? 'currentColor' : 'none'} />
                       </button>
                     )}
-                    {tournament.status === 'open_for_registration' && (
+                    {tournament.status === 'open_for_registration' && canManage && (
                       <button
                         className="remove-player-btn"
                         onClick={() => removePlayer(player.id)}
@@ -401,9 +548,9 @@ export function TournamentRegistration({ tournament, onBack }) {
           </div>
         </div>
 
-        {players.length >= 2 && (
+        {players.length >= 2 && canManage && (
           <div className="start-tournament-section">
-            <button 
+            <button
               className="start-tournament-btn"
               onClick={handleStartTournament}
             >

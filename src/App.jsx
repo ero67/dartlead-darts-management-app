@@ -23,6 +23,8 @@ import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { AdminPanel } from './components/AdminPanel';
 import { ManagerPanel } from './components/ManagerPanel';
 import { LandingPage } from './components/LandingPage';
+import { PlayerProfile } from './components/PlayerProfile';
+import { supabase } from './lib/supabase';
 import './App.css';
 
 function AppContent() {
@@ -196,6 +198,59 @@ function AppContent() {
     );
   };
 
+  // Player profile route
+  const PlayerProfileRoute = () => {
+    const { id } = useParams();
+    return (
+      <PlayerProfile
+        playerId={id}
+        onBack={() => navigate(-1)}
+        onSelectTournament={(tourn) => navigate(`/tournament/${tourn.id}`)}
+        onSelectLeague={(league) => navigate(`/league/${league.id}`)}
+      />
+    );
+  };
+
+  // My profile redirect - looks up the player linked to current user
+  const MyProfileRedirect = () => {
+    const [profileLoading, setProfileLoading] = useState(true);
+
+    useEffect(() => {
+      const findMyPlayer = async () => {
+        try {
+          const { data } = await supabase
+            .from('players')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (data) {
+            navigate(`/player/${data.id}`, { replace: true });
+          } else {
+            setProfileLoading(false);
+          }
+        } catch {
+          setProfileLoading(false);
+        }
+      };
+      if (user) findMyPlayer();
+      else setProfileLoading(false);
+    }, []);
+
+    if (profileLoading) {
+      return (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+        </div>
+      );
+    }
+    return (
+      <div className="unauthorized-container">
+        <h2>No Player Profile</h2>
+        <p>Register for a tournament to create your player profile.</p>
+      </div>
+    );
+  };
+
   // Show loading spinner while checking authentication
   if (loading) {
     return (
@@ -326,10 +381,12 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={
-            <Dashboard 
-              tournaments={tournaments}
+            <Dashboard
               onCreateTournament={handleCreateTournament}
               onSelectTournament={handleSelectTournament}
+              onCreateLeague={handleCreateLeague}
+              onSelectLeague={handleSelectLeague}
+              onNavigate={(path) => navigate(path)}
             />
           } />
           <Route path="/tournaments" element={
@@ -380,6 +437,12 @@ function AppContent() {
           } />
           <Route path="/tournament/:id" element={<TournamentRoute />} />
           <Route path="/match/:id" element={<MatchRoute />} />
+          <Route path="/player/:id" element={
+            user ? <PlayerProfileRoute /> : <Auth />
+          } />
+          <Route path="/my-profile" element={
+            user ? <MyProfileRedirect /> : <Auth />
+          } />
           <Route path="/leagues" element={
             <LeaguesList 
               onCreateLeague={handleCreateLeague}

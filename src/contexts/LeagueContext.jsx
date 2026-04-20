@@ -307,6 +307,49 @@ export function LeagueProvider({ children }) {
     }
   };
 
+  // === League Self-Registration ===
+
+  const registerForLeague = async (leagueId, playerName) => {
+    try {
+      return await leagueService.registerForLeague(leagueId, playerName);
+    } catch (error) {
+      console.error('Error registering for league:', error);
+      throw error;
+    }
+  };
+
+  const getLeagueRegistrations = async (leagueId) => {
+    try {
+      return await leagueService.getLeagueRegistrations(leagueId);
+    } catch (error) {
+      console.error('Error fetching league registrations:', error);
+      throw error;
+    }
+  };
+
+  const approveLeagueRegistration = async (registrationId) => {
+    try {
+      const result = await leagueService.approveLeagueRegistration(registrationId);
+      if (state.currentLeague) {
+        const league = await leagueService.getLeague(state.currentLeague.id);
+        dispatch({ type: ACTIONS.SELECT_LEAGUE, payload: league });
+      }
+      return result;
+    } catch (error) {
+      console.error('Error approving league registration:', error);
+      throw error;
+    }
+  };
+
+  const rejectLeagueRegistration = async (registrationId) => {
+    try {
+      return await leagueService.rejectLeagueRegistration(registrationId);
+    } catch (error) {
+      console.error('Error rejecting league registration:', error);
+      throw error;
+    }
+  };
+
   const value = {
     ...state,
     createLeague,
@@ -320,7 +363,11 @@ export function LeagueProvider({ children }) {
     refreshLeaderboard,
     getUnlinkedTournaments,
     linkTournamentToLeague,
-    unlinkTournamentFromLeague
+    unlinkTournamentFromLeague,
+    registerForLeague,
+    getLeagueRegistrations,
+    approveLeagueRegistration,
+    rejectLeagueRegistration
   };
 
   return (
