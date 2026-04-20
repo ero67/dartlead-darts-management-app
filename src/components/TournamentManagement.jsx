@@ -1901,6 +1901,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 <span>{t('management.played')}</span>
                 <span>{t('management.won')}</span>
                 <span>{t('management.lost')}</span>
+                <span>{t('management.legsWL')}</span>
                 <span>{t('management.legsDiff')}</span>
                 <span>{t('management.avg')}</span>
                 <span>{t('management.pts')}</span>
@@ -1913,6 +1914,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <span>{standing.matchesPlayed}</span>
                     <span>{standing.matchesWon}</span>
                     <span>{standing.matchesLost}</span>
+                    <span>{standing.legsWon}:{standing.legsLost}</span>
                     <span className={standing.legsWon - standing.legsLost >= 0 ? 'positive' : 'negative'}>
                       {standing.legsWon - standing.legsLost > 0 ? '+' : ''}{standing.legsWon - standing.legsLost}
                     </span>

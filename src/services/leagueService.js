@@ -372,13 +372,11 @@ export const leagueService = {
           *,
           player:players(*)
         `)
-        .eq('league_id', leagueId)
-        .order('total_points', { ascending: false })
-        .order('avg_placement', { ascending: true });
+        .eq('league_id', leagueId);
 
       if (error) throw error;
 
-      return (data || []).map(l => ({
+      const mapped = (data || []).map(l => ({
         player: l.player,
         totalPoints: l.total_points || 0,
         manualPoints: l.manual_points || 0,
@@ -390,6 +388,16 @@ export const leagueService = {
         legsWon: l.legs_won || 0,
         legsLost: l.legs_lost || 0
       }));
+
+      mapped.sort((a, b) => {
+        if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+        const aDiff = a.legsWon - a.legsLost;
+        const bDiff = b.legsWon - b.legsLost;
+        if (bDiff !== aDiff) return bDiff - aDiff;
+        return b.legsWon - a.legsWon;
+      });
+
+      return mapped;
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       return [];

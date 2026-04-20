@@ -449,8 +449,8 @@ export function TournamentImport() {
 
             await matchService.updateMatchResult(matchId, {
               winner: winnerId,
-              player1Legs: result.winner === p1Name ? result.player1Legs : result.player2Legs,
-              player2Legs: result.winner === p1Name ? result.player2Legs : result.player1Legs
+              player1Legs: result.player1Legs,
+              player2Legs: result.player2Legs
             });
           }
         }
