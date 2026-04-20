@@ -7,7 +7,7 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { DeviceSettings } from './DeviceSettings';
-import logo from '../assets/logo.png';
+import logoIcon from '../assets/logo-icon.png';
 
 export function Navigation({ currentView, onViewChange, tournament, isMobileOpen, onMobileClose }) {
   const { user, signOut } = useAuth();
@@ -72,7 +72,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
       <div className="nav-header">
         <div className="nav-logo">
           <img
-            src={logo}
+            src={logoIcon}
             alt="DartLead"
             className="nav-logo-image"
           />
