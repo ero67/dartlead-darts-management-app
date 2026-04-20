@@ -388,7 +388,9 @@
     "highestCheckout": "Najvyšší Checkout",
     "most180s": "Najviac 180",
     "fewestDartsLeg": "Najmenej Šípok (Jeden Leg)",
-    "poweredBy": "Vytvorené pomocou"
+    "poweredBy": "Vytvorené pomocou",
+    "exportImage": "Exportovať ako obrázok",
+    "exporting": "Exportujem..."
   },
   "landing": {
     "heroBadge": "Pre šípkarské ligy a turnaje",

@@ -394,7 +394,9 @@
     "highestCheckout": "Highest Checkout",
     "most180s": "Most 180s",
     "fewestDartsLeg": "Fewest Darts (Single Leg)",
-    "poweredBy": "Powered by"
+    "poweredBy": "Powered by",
+    "exportImage": "Export as Image",
+    "exporting": "Exporting..."
   },
   "landing": {
     "heroBadge": "For darts leagues & tournaments",
