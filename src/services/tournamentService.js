@@ -385,10 +385,11 @@ export const tournamentService = {
 
       const tournamentIds = tournaments.map(t => t.id)
 
-      // Get all players
+      // Get all players (override default 1000-row limit)
       const { data: allPlayers, error: playersError } = await supabase
         .from('players')
         .select('*')
+        .limit(10000)
 
       if (playersError) throw playersError
 
@@ -705,8 +706,9 @@ export const tournamentService = {
           const { data: matchPlayerStats, error: statsError } = await supabase
             .from('match_player_stats')
             .select('*')
-            .in('match_id', allMatchIds);
-          
+            .in('match_id', allMatchIds)
+            .limit(5000);
+
           if (statsError) {
             console.error('Error fetching match player stats:', statsError);
           } else {

@@ -392,7 +392,8 @@ export const leagueService = {
           .select('player1_id, player2_id, winner_id, completed_at')
           .in('tournament_id', ltIds)
           .eq('status', 'completed')
-          .order('completed_at', { ascending: false });
+          .order('completed_at', { ascending: false })
+          .limit(10000);
         allRecentMatches = recentData || [];
       }
 
@@ -951,7 +952,8 @@ export const leagueService = {
           .from('matches')
           .select('player1_id, player2_id, player1_legs, player2_legs, winner_id')
           .in('tournament_id', leagueTournamentIds)
-          .eq('status', 'completed');
+          .eq('status', 'completed')
+          .limit(10000);
 
         (matches || []).forEach(match => {
           const p1 = match.player1_id;
@@ -1523,7 +1525,8 @@ export const leagueService = {
       const { data, error } = await supabase
         .from('players')
         .select('id, name')
-        .order('name');
+        .order('name')
+        .limit(10000);
 
       if (error) throw error;
       return data || [];
