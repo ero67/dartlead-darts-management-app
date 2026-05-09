@@ -586,27 +586,31 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       turnStartScore: null
     }));
 
-    setLegScores(prev => ({
-      ...prev,
-      [playerKey]: {
-        ...prev[playerKey],
-        // Restore remaining score to what it was at the start of that visit (more reliable than adding turnScore back)
-        currentScore: Math.min(
-          matchSettings.startingScore,
-          Math.max(
-            0,
-            restoredScoreRaw !== null ? restoredScoreRaw : (safeScore(prev[playerKey].currentScore, matchSettings.startingScore) + safeScore(turnScore))
-          )
-        ),
-        totalScore: Math.max(0, prev[playerKey].totalScore - turnScore),
-        totalDarts: Math.max(0, prev[playerKey].totalDarts - turnDarts),
-        legDarts: Math.max(0, prev[playerKey].legDarts - turnDarts),
-        oneEighties: Math.max(
-          0,
-          (prev[playerKey].oneEighties || 0) - (turnScore === 180 ? 1 : 0)
-        )
+    setLegScores(prev => {
+      let restoredCurrentScore;
+      if (restoredScoreRaw !== null) {
+        restoredCurrentScore = restoredScoreRaw;
+      } else if (last.legScores?.[playerKey]?.currentScore !== undefined) {
+        restoredCurrentScore = last.legScores[playerKey].currentScore;
+      } else {
+        restoredCurrentScore = prev[playerKey].currentScore + safeScore(turnScore);
       }
-    }));
+
+      return {
+        ...prev,
+        [playerKey]: {
+          ...prev[playerKey],
+          currentScore: restoredCurrentScore,
+          totalScore: Math.max(0, prev[playerKey].totalScore - turnScore),
+          totalDarts: Math.max(0, prev[playerKey].totalDarts - turnDarts),
+          legDarts: Math.max(0, prev[playerKey].legDarts - turnDarts),
+          oneEighties: Math.max(
+            0,
+            (prev[playerKey].oneEighties || 0) - (turnScore === 180 ? 1 : 0)
+          )
+        }
+      };
+    });
 
     setTurnHistory(prev => prev.slice(0, -1));
   };
@@ -1009,7 +1013,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         score: newScore,
         darts: newDarts,
         scores: newScores,
-        dartCount: prev.dartCount - 1
+        dartCount: prev.dartCount - 1,
+        turnStartScore: prev.turnStartScore
       }));
 
       // Restore the score by adding back the removed dart's value
@@ -1062,27 +1067,21 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       });
 
       // Restore the leg scores properly using turnStartScore
-      // This prevents incorrectly adding dart value to 501 when undoing after a new leg starts
       setLegScores(prev => {
         const playerKey = `player${lastTurn.player + 1}`;
         const turnStartScore = lastTurn.turn.turnStartScore;
-        
-        // Use turnStartScore if available (most reliable), otherwise calculate
+
+        // Use turnStartScore if available (most reliable)
+        // Fallback to the legScores snapshot stored in history (captures state before that turn)
         let restoredCurrentScore;
         if (turnStartScore !== null && turnStartScore !== undefined) {
-          // Score at start of that turn minus the darts we're keeping
           restoredCurrentScore = turnStartScore - restoredScore;
+        } else if (lastTurn.legScores?.[playerKey]?.currentScore !== undefined) {
+          restoredCurrentScore = lastTurn.legScores[playerKey].currentScore;
         } else {
-          // Fallback: add back the removed dart's value
-          restoredCurrentScore = safeScore(prev[playerKey].currentScore, matchSettings.startingScore) + safeScore(lastDart?.value);
+          restoredCurrentScore = prev[playerKey].currentScore + safeScore(lastDart?.value);
         }
-        
-        // Clamp to valid range
-        restoredCurrentScore = Math.min(
-          matchSettings.startingScore,
-          Math.max(0, restoredCurrentScore)
-        );
-        
+
         return {
           ...prev,
           [playerKey]: {
@@ -1090,7 +1089,6 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
             currentScore: restoredCurrentScore,
             totalDarts: Math.max(0, prev[playerKey].totalDarts - (wasBustTurn ? 1 : 0)),
             legDarts: Math.max(0, (lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts) - (wasBustTurn ? 1 : 0)),
-            // Restore legDarts if this was a checkout (new leg had started)
             ...(wasBustTurn ? {} : { legDarts: lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts })
           }
         };

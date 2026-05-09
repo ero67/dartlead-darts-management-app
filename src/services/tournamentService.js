@@ -1738,12 +1738,9 @@ export const tournamentService = {
   // Update tournament playoffs
   async updateTournamentPlayoffs(tournamentId, playoffsData) {
     try {
-      // Don't create playoff matches automatically - they will be created when matches are started
-
-      // Then update the tournament playoffs data
       const { data, error } = await supabase
         .from('tournaments')
-        .update({ 
+        .update({
           playoffs: playoffsData,
           updated_at: new Date().toISOString()
         })
