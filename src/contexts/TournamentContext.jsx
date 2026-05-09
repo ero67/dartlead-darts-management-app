@@ -547,16 +547,7 @@ export function TournamentProvider({ children }) {
       return tournament;
     } catch (error) {
       console.error('Error creating tournament:', error);
-      // Fallback to local creation
-      const tournament = {
-        ...tournamentData,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: 'active'
-      };
-      dispatch({ type: ACTIONS.CREATE_TOURNAMENT, payload: tournament });
-      return tournament;
+      throw error;
     }
   };
 

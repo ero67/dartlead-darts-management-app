@@ -227,79 +227,84 @@ export const tournamentService = {
 
       if (tpError) throw tpError
 
-      // Create groups
-      const groups = []
-      for (let i = 0; i < tournamentData.groups.length; i++) {
-        const group = tournamentData.groups[i]
-        const groupId = generateId()
-        
-        const { data: newGroup, error: groupError } = await supabase
-          .from('groups')
-          .insert({
-            id: groupId,
-            tournament_id: tournamentId,
-            name: group.name
-          })
-          .select()
-          .single()
+      // Prepare group data with generated IDs
+      const groupsWithIds = tournamentData.groups.map(group => ({
+        ...group,
+        generatedId: generateId()
+      }))
 
-        if (groupError) throw groupError
+      // Batch insert all groups
+      const groupInserts = groupsWithIds.map(g => ({
+        id: g.generatedId,
+        tournament_id: tournamentId,
+        name: g.name
+      }))
+      const { data: createdGroups, error: groupsError } = await supabase
+        .from('groups')
+        .insert(groupInserts)
+        .select()
+      if (groupsError) throw groupsError
 
-        // Create group_players relationships
-        const groupPlayers = group.players.map(player => ({
-          group_id: groupId,
+      // Batch insert all group_players
+      const allGroupPlayers = groupsWithIds.flatMap(g =>
+        g.players.map(player => ({
+          group_id: g.generatedId,
           player_id: playerIdMap.get(player.id)
         }))
+      )
+      const { error: gpError } = await supabase
+        .from('group_players')
+        .upsert(allGroupPlayers, {
+          onConflict: 'group_id,player_id',
+          ignoreDuplicates: true
+        })
+      if (gpError) throw gpError
 
-        const { error: gpError } = await supabase
-          .from('group_players')
-          .upsert(groupPlayers, { 
-            onConflict: 'group_id,player_id',
-            ignoreDuplicates: true 
-          })
+      // Batch insert all matches
+      const matchInserts = []
+      const matchesByGroup = new Map()
 
-        if (gpError) throw gpError
-
-        // Create matches
-        const matches = []
-        
+      for (const group of groupsWithIds) {
+        const groupMatches = []
         for (const match of group.matches) {
-          const matchId = generateId()
-          
-          // Get player IDs safely
           const player1Id = playerIdMap.get(match.player1?.id)
           const player2Id = playerIdMap.get(match.player2?.id)
-          
           if (!player1Id || !player2Id) {
             console.error('Missing player IDs for match:', match)
             continue
           }
-          
-          const { data: newMatch, error: matchError } = await supabase
-            .from('matches')
-            .insert({
-              id: matchId,
-              tournament_id: tournamentId,
-              group_id: groupId,
-              player1_id: player1Id,
-              player2_id: player2Id,
-              legs_to_win: tournamentData.legsToWin || 3,
-              starting_score: tournamentData.startingScore || 501,
-              status: 'pending'
-            })
-            .select()
-            .single()
-
-          if (matchError) throw matchError
-          matches.push(newMatch)
+          const matchId = generateId()
+          matchInserts.push({
+            id: matchId,
+            tournament_id: tournamentId,
+            group_id: group.generatedId,
+            player1_id: player1Id,
+            player2_id: player2Id,
+            legs_to_win: tournamentData.legsToWin || 3,
+            starting_score: tournamentData.startingScore || 501,
+            status: 'pending'
+          })
+          groupMatches.push(matchId)
         }
-
-        groups.push({
-          ...newGroup,
-          players: group.players,
-          matches: matches
-        })
+        matchesByGroup.set(group.generatedId, groupMatches)
       }
+
+      const { data: createdMatches, error: matchesError } = await supabase
+        .from('matches')
+        .insert(matchInserts)
+        .select()
+      if (matchesError) throw matchesError
+
+      // Build groups array with their matches for the return value
+      const matchesById = new Map(createdMatches.map(m => [m.id, m]))
+      const groups = groupsWithIds.map((g, i) => {
+        const groupMatchIds = matchesByGroup.get(g.generatedId) || []
+        return {
+          ...createdGroups[i],
+          players: g.players,
+          matches: groupMatchIds.map(id => matchesById.get(id)).filter(Boolean)
+        }
+      })
 
       // Parse group_settings if it's a string (JSONB from Supabase might be string)
       let groupSettings = tournament.group_settings;
@@ -341,7 +346,6 @@ export const tournamentService = {
             id: playerIdMap.get(player.id)
           })),
           matches: group.matches.map(match => {
-            console.log('Transforming match:', match, 'playerIdMap:', playerIdMap);
             return {
               ...match,
               legsToWin: match.legs_to_win,
@@ -361,19 +365,7 @@ export const tournamentService = {
 
     } catch (error) {
       console.error('Error creating tournament:', error)
-      
-      // If Supabase fails, return a local tournament structure for fallback
-      return {
-        id: generateId(),
-        name: tournamentData.name,
-        status: 'active',
-        legsToWin: tournamentData.legsToWin || 3,
-        startingScore: tournamentData.startingScore || 501,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        players: tournamentData.players,
-        groups: tournamentData.groups
-      }
+      throw error
     }
   },
 
@@ -937,52 +929,43 @@ export const tournamentService = {
         groups = this.generateGroups(players, groupSettings);
       }
       
-      // Create groups in database
-      const groupIds = [];
-      for (const group of groups) {
-        const { data: newGroup, error: groupError } = await supabase
-          .from('groups')
-          .insert({
-            id: group.id,
-            tournament_id: tournamentId,
-            name: group.name
-          })
-          .select()
-          .single();
+      // Batch insert all groups
+      const groupInserts = groups.map(g => ({
+        id: g.id,
+        tournament_id: tournamentId,
+        name: g.name
+      }));
+      const { error: groupsError } = await supabase
+        .from('groups')
+        .insert(groupInserts);
+      if (groupsError) throw groupsError;
 
-        if (groupError) throw groupError;
-        groupIds.push(newGroup.id);
+      // Batch insert all group_players
+      const allGroupPlayers = groups.flatMap(g =>
+        g.players.map(p => ({ group_id: g.id, player_id: p.id }))
+      );
+      const { error: gpError } = await supabase
+        .from('group_players')
+        .insert(allGroupPlayers);
+      if (gpError) throw gpError;
 
-        // Add players to group
-        const groupPlayerInserts = group.players.map(player => ({
-          group_id: group.id,
-          player_id: player.id
-        }));
-
-        const { error: gpError } = await supabase
-          .from('group_players')
-          .insert(groupPlayerInserts);
-
-        if (gpError) throw gpError;
-
-        // Create matches for this group
-        for (const match of group.matches) {
-          const { error: matchError } = await supabase
-            .from('matches')
-            .insert({
-              id: match.id,
-              tournament_id: tournamentId,
-              group_id: group.id,
-              player1_id: match.player1.id,
-              player2_id: match.player2.id,
-              legs_to_win: tournament.legs_to_win,
-              starting_score: tournament.starting_score,
-              status: 'pending'
-            });
-
-          if (matchError) throw matchError;
-        }
-      }
+      // Batch insert all matches
+      const allMatches = groups.flatMap(g =>
+        g.matches.map(m => ({
+          id: m.id,
+          tournament_id: tournamentId,
+          group_id: g.id,
+          player1_id: m.player1.id,
+          player2_id: m.player2.id,
+          legs_to_win: tournament.legs_to_win,
+          starting_score: tournament.starting_score,
+          status: 'pending'
+        }))
+      );
+      const { error: matchesError } = await supabase
+        .from('matches')
+        .insert(allMatches);
+      if (matchesError) throw matchesError;
 
       // Update tournament status to 'started'
       const { data: updatedTournament, error: updateError } = await supabase
