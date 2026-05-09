@@ -381,6 +381,10 @@ export const tournamentService = {
 
       if (tournamentsError) throw tournamentsError
 
+      if (tournaments.length === 0) return []
+
+      const tournamentIds = tournaments.map(t => t.id)
+
       // Get all players
       const { data: allPlayers, error: playersError } = await supabase
         .from('players')
@@ -391,40 +395,59 @@ export const tournamentService = {
       // Create a player lookup map
       const playerMap = new Map(allPlayers.map(player => [player.id, player]))
 
-      // Get all matches
+      // Get matches scoped to these tournaments (override default 1000-row limit)
       const { data: allMatches, error: matchesError } = await supabase
         .from('matches')
         .select('*')
+        .in('tournament_id', tournamentIds)
+        .limit(10000)
 
       if (matchesError) throw matchesError
 
-      // Get all groups
+      // Get groups scoped to these tournaments
       const { data: allGroups, error: groupsError } = await supabase
         .from('groups')
         .select('*')
+        .in('tournament_id', tournamentIds)
 
       if (groupsError) throw groupsError
 
-      // Get tournament players
+      // Get tournament players scoped to these tournaments
       const { data: tournamentPlayers, error: tpError } = await supabase
         .from('tournament_players')
         .select('*')
+        .in('tournament_id', tournamentIds)
 
       if (tpError) throw tpError
 
-      // Get group players
+      // Get group players scoped to the fetched groups
+      const groupIds = allGroups.map(g => g.id)
       const { data: groupPlayers, error: gpError } = await supabase
         .from('group_players')
         .select('*')
+        .in('group_id', groupIds)
+        .limit(10000)
 
       if (gpError) throw gpError
 
-      // Fetch match player stats
-      const { data: matchPlayerStats, error: statsError } = await supabase
-        .from('match_player_stats')
-        .select('*')
-
-      if (statsError) throw statsError
+      // Fetch match player stats for completed matches
+      const completedMatchIds = allMatches
+        .filter(m => m.status === 'completed')
+        .map(m => m.id)
+      let matchPlayerStats = []
+      if (completedMatchIds.length > 0) {
+        // Chunk into batches of 500 to avoid URL length limits
+        for (let i = 0; i < completedMatchIds.length; i += 500) {
+          const chunk = completedMatchIds.slice(i, i + 500)
+          const { data: statsChunk, error: statsError } = await supabase
+            .from('match_player_stats')
+            .select('*')
+            .in('match_id', chunk)
+            .limit(5000)
+          if (statsError) throw statsError
+          matchPlayerStats = matchPlayerStats.concat(statsChunk)
+        }
+      }
 
 
       // Transform data to match our app structure
