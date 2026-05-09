@@ -543,20 +543,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       if (!groupMatchups || groupMatchups.length === 0) {
         const groupNames = tournament.groups.map(g => g.name);
         groupMatchups = [];
-        
+
         if (isEvenGroups) {
-          // For 2 groups: A vs B
-          // For 4 groups: A vs D, B vs C (crossover)
-          // For 6+ groups: pair them up with crossover pattern
           if (groupNames.length === 2) {
             groupMatchups.push({ group1: groupNames[0], group2: groupNames[1] });
           } else {
             // Crossover: first half vs second half (reversed)
             const halfLength = Math.floor(groupNames.length / 2);
             for (let i = 0; i < halfLength; i++) {
-              groupMatchups.push({ 
-                group1: groupNames[i], 
-                group2: groupNames[groupNames.length - 1 - i] 
+              groupMatchups.push({
+                group1: groupNames[i],
+                group2: groupNames[groupNames.length - 1 - i]
               });
             }
           }
@@ -671,47 +668,87 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       };
       
       let matchIndex = 0;
-      groupMatchups.forEach(matchup => {
-        const group1Players = playersByGroup[matchup.group1] || [];
-        const group2Players = playersByGroup[matchup.group2] || [];
-        const maxPlayers = Math.min(group1Players.length, group2Players.length);
-        
-        if (maxPlayers <= 0) return;
-        
-        // Create all cross-pairings ordered by strength:
-        // Pairing 0 (strongest): A1 vs B_last
-        // Pairing 1: A2 vs B_(last-1)
-        // ...
-        // Pairing N-1 (weakest): A_last vs B1
-        const crossPairings = [];
-        for (let i = 0; i < maxPlayers; i++) {
-          crossPairings.push({ g1Idx: i, g2Idx: maxPlayers - 1 - i });
-        }
-        
-        // Get bracket order: which pairing goes into which match slot
-        const bracketOrder = generateCrossGroupBracketOrder(maxPlayers);
-        
-        console.log('Cross-group bracket order for', maxPlayers, 'pairings:', 
-          bracketOrder.map(idx => `A${idx+1}vB${maxPlayers-idx}`));
-        
-        // Assign players to matches in bracket order
-        bracketOrder.forEach(pairingIdx => {
+
+      // For 4 groups with 4 advancing each (16 players), use the fixed bracket template.
+      // This ensures group winners are in separate quarters and same-group players
+      // can't meet until the semi-finals.
+      //
+      // Bracket structure:
+      //   Match 0: A1-B4 \
+      //   Match 1: C3-D2 / → QF1 → \
+      //   Match 2: C2-A3 \           → SF1 → \
+      //   Match 3: D4-B1 / → QF2 → /         \
+      //                                        → Final
+      //   Match 4: C1-A4 \                    /
+      //   Match 5: D3-B2 / → QF3 → \        /
+      //   Match 6: A2-B3 \           → SF2 →/
+      //   Match 7: C4-D1 / → QF4 → /
+      const groupNames = tournament.groups.map(g => g.name);
+      const use4GroupTemplate = numGroups === 4 && playersPerGroup >= 4;
+
+      if (use4GroupTemplate) {
+        const A = playersByGroup[groupNames[0]] || [];
+        const B = playersByGroup[groupNames[1]] || [];
+        const C = playersByGroup[groupNames[2]] || [];
+        const D = playersByGroup[groupNames[3]] || [];
+
+        const bracketTemplate = [
+          [A, 0, B, 3], // A1 vs B4
+          [C, 2, D, 1], // C3 vs D2
+          [C, 1, A, 2], // C2 vs A3
+          [D, 3, B, 0], // D4 vs B1
+          [C, 0, A, 3], // C1 vs A4
+          [D, 2, B, 1], // D3 vs B2
+          [A, 1, B, 2], // A2 vs B3
+          [C, 3, D, 0], // C4 vs D1
+        ];
+
+        bracketTemplate.forEach(([g1, idx1, g2, idx2]) => {
           if (matchIndex >= numMatches) return;
-          const pairing = crossPairings[pairingIdx];
-          if (!pairing) return;
-          
-          const match = firstRound.matches[matchIndex];
-          const player1 = group1Players[pairing.g1Idx];
-          const player2 = group2Players[pairing.g2Idx];
-          
+          const player1 = g1[idx1];
+          const player2 = g2[idx2];
           if (player1 && player2) {
+            const match = firstRound.matches[matchIndex];
             match.player1 = player1;
             match.player2 = player2;
             match.status = 'pending';
             matchIndex++;
           }
         });
-      });
+      } else {
+        // For 2 groups or other configurations, use cross-group pairing algorithm
+        groupMatchups.forEach(matchup => {
+          const group1Players = playersByGroup[matchup.group1] || [];
+          const group2Players = playersByGroup[matchup.group2] || [];
+          const maxPlayers = Math.min(group1Players.length, group2Players.length);
+
+          if (maxPlayers <= 0) return;
+
+          const crossPairings = [];
+          for (let i = 0; i < maxPlayers; i++) {
+            crossPairings.push({ g1Idx: i, g2Idx: maxPlayers - 1 - i });
+          }
+
+          const bracketOrder = generateCrossGroupBracketOrder(maxPlayers);
+
+          bracketOrder.forEach(pairingIdx => {
+            if (matchIndex >= numMatches) return;
+            const pairing = crossPairings[pairingIdx];
+            if (!pairing) return;
+
+            const match = firstRound.matches[matchIndex];
+            const player1 = group1Players[pairing.g1Idx];
+            const player2 = group2Players[pairing.g2Idx];
+
+            if (player1 && player2) {
+              match.player1 = player1;
+              match.player2 = player2;
+              match.status = 'pending';
+              matchIndex++;
+            }
+          });
+        });
+      }
       
       // Check if we successfully assigned players to all matches via cross-group pairing
       const assignedMatches = firstRound.matches.filter(m => m.player1 && m.player2).length;
