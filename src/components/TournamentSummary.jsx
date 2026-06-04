@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Trophy, Target, Zap, Award, Hash, Download, Loader } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { useLanguage } from '../contexts/LanguageContext';
+import { isValidLegDartCount } from '../utils/dartStats';
 import logo from '../assets/logo.png';
 
 /**
@@ -207,6 +208,8 @@ export function TournamentSummary({ tournament }) {
         if (stats.legs?.length) {
           stats.legs.forEach(leg => {
             if (!leg?.isWin || !leg.darts) return;
+            // Skip impossible dart counts (e.g. corrupt "1-dart leg").
+            if (!isValidLegDartCount(leg.darts, match.startingScore)) return;
             const existing = playerBestLeg.get(pid);
             if (!existing || leg.darts < existing.darts) {
               playerBestLeg.set(pid, { player, darts: leg.darts, opponent: opponent?.name || '?' });
@@ -222,7 +225,8 @@ export function TournamentSummary({ tournament }) {
                 totalDarts = Math.round((startingScore / legAvg) * 3);
               }
             }
-            if (!totalDarts) return;
+            // Skip impossible dart counts (corrupt data or a bad estimate).
+            if (!isValidLegDartCount(totalDarts, match.startingScore)) return;
             const existing = playerBestLeg.get(pid);
             if (!existing || totalDarts < existing.darts) {
               playerBestLeg.set(pid, { player, darts: totalDarts, opponent: opponent?.name || '?' });

@@ -358,6 +358,8 @@
     "player1": "Hráč 1",
     "player2": "Hráč 2",
     "pleaseSelectBothPlayers": "Prosím vyberte oboch hráčov",
+    "pleaseSelectAtLeastOnePlayer": "Prosím vyberte aspoň jedného hráča",
+    "noOpponentBye": "— Bez súpera (Voľno) —",
     "playersMustBeDifferent": "Hráči musia byť rôzni",
     "completePreviousRoundFirst": "Prosím dokončite najprv zápasy {{roundName}}, aby ste videli dostupných hráčov",
     "onlySemifinalLosersAvailable": "Dostupní sú iba hráči, ktorí prehrali v semifinále",

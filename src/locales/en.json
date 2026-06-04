@@ -364,6 +364,8 @@
     "player1": "Player 1",
     "player2": "Player 2",
     "pleaseSelectBothPlayers": "Please select both players",
+    "pleaseSelectAtLeastOnePlayer": "Please select at least one player",
+    "noOpponentBye": "— No opponent (Bye) —",
     "playersMustBeDifferent": "Players must be different",
     "completePreviousRoundFirst": "Please complete {{roundName}} matches first to see available players",
     "onlySemifinalLosersAvailable": "Only players who lost in semifinals are available",

@@ -1,4 +1,5 @@
 import { supabase, generateId } from '../lib/supabase.js';
+import { isValidLegDartCount } from '../utils/dartStats.js';
 
 export const leagueService = {
   // Create a new league
@@ -1648,6 +1649,8 @@ export const leagueService = {
         if (stats.legs?.length) {
           stats.legs.forEach(leg => {
             if (!leg?.isWin || !leg.darts) return;
+            // Skip impossible dart counts (e.g. corrupt "1-dart leg").
+            if (!isValidLegDartCount(leg.darts, startingScore)) return;
             const existing = playerBestLeg.get(pid);
             if (!existing || leg.darts < existing.darts) {
               playerBestLeg.set(pid, { player, darts: leg.darts, opponent: opponent?.name || '?', tournamentName });
@@ -1663,7 +1666,8 @@ export const leagueService = {
                 totalDarts = Math.round((score / legAvg) * 3);
               }
             }
-            if (!totalDarts) return;
+            // Skip impossible dart counts (corrupt data or a bad estimate).
+            if (!isValidLegDartCount(totalDarts, startingScore)) return;
             const existing = playerBestLeg.get(pid);
             if (!existing || totalDarts < existing.darts) {
               playerBestLeg.set(pid, { player, darts: totalDarts, opponent: opponent?.name || '?', tournamentName });

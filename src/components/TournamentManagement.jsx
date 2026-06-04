@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { BracketVisualization } from './BracketVisualization';
 import { TournamentSummary } from './TournamentSummary';
+import { isValidLegDartCount } from '../utils/dartStats';
 
   // Generate unique ID for playoff matches (using crypto.randomUUID for proper UUIDs)
   const generateId = () => {
@@ -402,7 +403,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             ...match,
             player1: player1,
             player2: player2,
-            status: (player1 && player2) ? 'pending' : 'pending'
+            // Editing players always resets the match to pending. A match with
+            // only one player is a bye and is advanced via the "Advance Player" button.
+            status: 'pending'
           };
         }
         return match;
@@ -415,14 +418,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     };
 
     try {
-      // Also update the matches DB record so player IDs stay in sync
-      // This prevents bracket propagation from breaking after tournament refresh
-      if (player1?.id && player2?.id) {
+      // Also update the matches DB record so player IDs stay in sync.
+      // This prevents bracket propagation from breaking after tournament refresh,
+      // and keeps a previously-created DB row from overriding a bye edit (the
+      // bracket display prefers the DB row when one exists).
+      if (player1?.id || player2?.id) {
         const { error: matchUpdateError } = await supabase
           .from('matches')
           .update({
-            player1_id: player1.id,
-            player2_id: player2.id,
+            player1_id: player1?.id || null,
+            player2_id: player2?.id || null,
             status: 'pending',
             // Clear any stale result data from a previous play
             winner_id: null,
@@ -563,6 +568,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         }
       }
       
+      // Set of players who actually qualified for the playoffs. We organize the
+      // bracket from THESE players (in each group's seeded order) rather than from
+      // the raw playersPerGroup setting — this is what makes "top N" brackets seed
+      // correctly even when groups have fewer players than N (the missing top seeds
+      // simply become byes). qualifyingPlayers already respects the qualification
+      // mode (perGroup vs totalPlayers).
+      const qualifyingIds = new Set((qualifyingPlayers || []).map(p => p?.id).filter(Boolean));
+
       // Get players organized by group
       const playersByGroup = {};
       tournament.groups.forEach(group => {
@@ -595,8 +608,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             return 0;
           });
           
-          // Take top N players from this group
-          const topPlayers = sortedStandings.slice(0, playersPerGroup).map(s => s.player);
+          // Take this group's qualifying players, in seeded order. Falls back to the
+          // playersPerGroup slice if qualifying info isn't available (defensive).
+          const qualifiedFromGroup = sortedStandings
+            .map(s => s.player)
+            .filter(p => p?.id && qualifyingIds.has(p.id));
+          const topPlayers = qualifiedFromGroup.length > 0
+            ? qualifiedFromGroup
+            : sortedStandings.slice(0, playersPerGroup).map(s => s.player);
           playersByGroup[group.name] = topPlayers;
         }
       });
@@ -716,42 +735,58 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           }
         });
       } else {
-        // For 2 groups or other configurations, use cross-group pairing algorithm
-        groupMatchups.forEach(matchup => {
-          const group1Players = playersByGroup[matchup.group1] || [];
-          const group2Players = playersByGroup[matchup.group2] || [];
-          const maxPlayers = Math.min(group1Players.length, group2Players.length);
+        // For 2 groups (and other even, non-4 configurations), seed the bracket at
+        // its FULL size — not just the number of players that happened to qualify.
+        //
+        // Example: 2 groups, "top 16" playoffs (8 first-round matches) but only 6
+        // players qualified per group. We still seed it as an 8-per-group draw:
+        //   A1-B8, A2-B7, ... A8-B1
+        // Seeds 7 and 8 don't exist, so those slots become byes — the top seeds get
+        // a free pass to the next round, exactly like a standard seeded bracket.
+        //
+        // Each cross-group matchup fills an equal share of the first-round matches.
+        const numMatchups = groupMatchups.length || 1;
+        const seedsPerGroup = Math.floor(numMatches / numMatchups);
 
-          if (maxPlayers <= 0) return;
+        if (seedsPerGroup > 0) {
+          groupMatchups.forEach(matchup => {
+            const group1Players = playersByGroup[matchup.group1] || [];
+            const group2Players = playersByGroup[matchup.group2] || [];
 
-          const crossPairings = [];
-          for (let i = 0; i < maxPlayers; i++) {
-            crossPairings.push({ g1Idx: i, g2Idx: maxPlayers - 1 - i });
-          }
+            // Build pairings for the FULL bracket size (A_i vs B_(N-1-i)), regardless
+            // of how many players actually exist. A missing seed becomes null = bye.
+            const crossPairings = [];
+            for (let i = 0; i < seedsPerGroup; i++) {
+              crossPairings.push({ g1Idx: i, g2Idx: seedsPerGroup - 1 - i });
+            }
 
-          const bracketOrder = generateCrossGroupBracketOrder(maxPlayers);
+            const bracketOrder = generateCrossGroupBracketOrder(seedsPerGroup);
 
-          bracketOrder.forEach(pairingIdx => {
-            if (matchIndex >= numMatches) return;
-            const pairing = crossPairings[pairingIdx];
-            if (!pairing) return;
+            bracketOrder.forEach(pairingIdx => {
+              if (matchIndex >= numMatches) return;
+              const pairing = crossPairings[pairingIdx];
+              if (!pairing) return;
 
-            const match = firstRound.matches[matchIndex];
-            const player1 = group1Players[pairing.g1Idx];
-            const player2 = group2Players[pairing.g2Idx];
+              const player1 = group1Players[pairing.g1Idx] || null;
+              const player2 = group2Players[pairing.g2Idx] || null;
 
-            if (player1 && player2) {
+              // Only skip a slot if BOTH seeds are missing. A single player is kept
+              // as a bye and advanced via the "Advance Player" button.
+              if (!player1 && !player2) return;
+
+              const match = firstRound.matches[matchIndex];
               match.player1 = player1;
               match.player2 = player2;
               match.status = 'pending';
               matchIndex++;
-            }
+            });
           });
-        });
+        }
       }
-      
-      // Check if we successfully assigned players to all matches via cross-group pairing
-      const assignedMatches = firstRound.matches.filter(m => m.player1 && m.player2).length;
+
+      // Check if cross-group seeding filled every first-round match.
+      // A match counts as assigned even if it holds a bye (exactly one player).
+      const assignedMatches = firstRound.matches.filter(m => m.player1 || m.player2).length;
       if (assignedMatches >= numMatches) {
         console.log(`Cross-group bracket seeding assigned ${assignedMatches} matches`);
         return firstRound;
@@ -2019,12 +2054,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const allCheckouts = [];
     const allLegs = [];
     const player180s = new Map(); // playerId -> { player, count }
-    const collectLegs = (playerStats, player, opponent, matchId) => {
+    const collectLegs = (playerStats, player, opponent, matchId, startingScore) => {
       if (!playerStats?.legs?.length) {
         return false;
       }
       playerStats.legs.forEach(leg => {
         if (!leg || !leg.isWin || !leg.darts) {
+          return;
+        }
+        // Skip impossible dart counts (e.g. corrupt "1-dart leg") so they
+        // never pollute the fewest-darts records.
+        if (!isValidLegDartCount(leg.darts, startingScore)) {
           return;
         }
         allLegs.push({
@@ -2130,8 +2170,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       addCheckoutEntries(match.result.player1Stats, match.player1, match.player2);
       addCheckoutEntries(match.result.player2Stats, match.player2, match.player1);
 
-      const player1LegsAdded = collectLegs(match.result.player1Stats, match.player1, match.player2, match.id);
-      const player2LegsAdded = collectLegs(match.result.player2Stats, match.player2, match.player1, match.id);
+      const player1LegsAdded = collectLegs(match.result.player1Stats, match.player1, match.player2, match.id, match.startingScore);
+      const player2LegsAdded = collectLegs(match.result.player2Stats, match.player2, match.player1, match.id, match.startingScore);
 
       if (!player1LegsAdded && !player2LegsAdded) {
         // Fallback for legacy data without legs array
@@ -2147,7 +2187,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 totalDarts = Math.round((startingScore / legAverage) * 3);
               }
             }
-            if (!totalDarts) return;
+            // Skip impossible dart counts (corrupt data or a bad estimate).
+            if (!isValidLegDartCount(totalDarts, startingScore)) return;
             allLegs.push({
               player,
               darts: totalDarts,
@@ -4250,15 +4291,17 @@ function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onC
   };
 
   const handleSave = () => {
-    if (!selectedPlayer1 || !selectedPlayer2) {
-      alert(t('management.pleaseSelectBothPlayers'));
+    // A playoff match may legitimately have only one player: that player gets a
+    // bye (free pass) to the next round. So we require at least one player, not two.
+    if (!selectedPlayer1 && !selectedPlayer2) {
+      alert(t('management.pleaseSelectAtLeastOnePlayer'));
       return;
     }
-    if (selectedPlayer1.id === selectedPlayer2.id) {
+    if (selectedPlayer1 && selectedPlayer2 && selectedPlayer1.id === selectedPlayer2.id) {
       alert(t('management.playersMustBeDifferent'));
       return;
     }
-    onSave(selectedPlayer1, selectedPlayer2);
+    onSave(selectedPlayer1 || null, selectedPlayer2 || null);
   };
 
   const availablePlayers1 = getAvailablePlayers(selectedPlayer2?.id);
@@ -4286,7 +4329,7 @@ function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onC
             setSelectedPlayer1(player || null);
           }}
         >
-          <option value="">{t('management.selectPlayer1')}</option>
+          <option value="">{t('management.noOpponentBye')}</option>
           {availablePlayers1.map(player => (
             <option key={player.id} value={player.id}>
               {player.name}
@@ -4303,7 +4346,7 @@ function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onC
             setSelectedPlayer2(player || null);
           }}
         >
-          <option value="">{t('management.selectPlayer2')}</option>
+          <option value="">{t('management.noOpponentBye')}</option>
           {availablePlayers2.map(player => (
             <option key={player.id} value={player.id}>
               {player.name}
