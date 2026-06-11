@@ -1362,10 +1362,16 @@ export const tournamentService = {
         playerId = newPlayer.id;
       }
 
-      // Add to tournament_players
+      // Add to tournament_players. Idempotent: the player may already be in the
+      // tournament (e.g. a manager added them by name before approving the
+      // self-registration). tournament_players has a composite PK
+      // (tournament_id, player_id), so a plain insert would throw on a duplicate.
       const { error: tpError } = await supabase
         .from('tournament_players')
-        .insert({ tournament_id: reg.tournament_id, player_id: playerId });
+        .upsert(
+          { tournament_id: reg.tournament_id, player_id: playerId },
+          { onConflict: 'tournament_id,player_id', ignoreDuplicates: true }
+        );
       if (tpError) throw tpError;
 
       // Update registration status
@@ -1473,9 +1479,14 @@ export const tournamentService = {
         }
       }
 
+      // Idempotent insert: composite PK (tournament_id, player_id) means a plain
+      // insert throws if the player is already in the tournament.
       const { error: tpError } = await supabase
         .from('tournament_players')
-        .insert({ tournament_id: tournamentId, player_id: existingPlayer.id });
+        .upsert(
+          { tournament_id: tournamentId, player_id: existingPlayer.id },
+          { onConflict: 'tournament_id,player_id', ignoreDuplicates: true }
+        );
       if (tpError) throw tpError;
 
       return existingPlayer;

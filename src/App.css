@@ -44,24 +44,24 @@
   --text-secondary: #cbd5e1;
   --text-tertiary: #94a3b8;
   
-  --border-color: #334155;
-  --border-color-light: #475569;
+  --border-color: #475569;
+  --border-color-light: #64748b;
   --border-color-dark: #1e293b;
-  
+
   --shadow-sm: rgba(0, 0, 0, 0.3);
   --shadow-md: rgba(0, 0, 0, 0.4);
   --shadow-lg: rgba(0, 0, 0, 0.5);
-  
+
   --accent-primary: #60a5fa;
   --primary-color: #60a5fa;
   --accent-success: #34d399;
   --accent-warning: #fbbf24;
   --accent-danger: #f87171;
   --accent-info: #22d3ee;
-  
+
   --nav-bg: #1e293b;
   --card-bg: #1e293b;
-  --input-bg: #334155;
+  --input-bg: #0f172a;
   --modal-overlay: rgba(0, 0, 0, 0.7);
 }
 
@@ -8301,7 +8301,7 @@ body {
   margin-bottom: 0.5rem;
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  background-color: var(--bg-tertiary);
+  background-color: var(--card-bg);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
