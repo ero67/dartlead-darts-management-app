@@ -1,0 +1,124 @@
+.bracket-seeding-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.seeding-editor-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.seeding-editor-note {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 0.75rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.seeding-editor-stale {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+}
+
+.seeding-editor-rebuild {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  background: #fff;
+  color: #92400e;
+  cursor: pointer;
+}
+
+.seeding-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.seeding-editor-actions button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.seeding-editor-actions button:hover {
+  background: var(--bg-tertiary);
+}
+
+.seeding-editor-matches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+.seeding-editor-match {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+}
+
+.seeding-editor-match-num {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+}
+
+.seeding-editor-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.seeding-editor-select {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.dark-mode .seeding-editor-stale {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.dark-mode .seeding-editor-rebuild {
+  background: transparent;
+  color: #fcd34d;
+}

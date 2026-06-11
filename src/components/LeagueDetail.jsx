@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { HeadToHead } from './HeadToHead';
+import { SeedingPresetLibrary } from './SeedingPresetLibrary';
 
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
@@ -1600,6 +1601,21 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                           {t('registration.thirdPlaceMatchNo') || 'No - Both semifinal losers share 3rd place'}
                         </label>
                       </div>
+                    </div>
+
+                    {/* Prepared seeding configs (library) */}
+                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
+                      <label>{t('registration.presetLibraryLabel')}</label>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                        {t('registration.presetLibraryDescription')}
+                      </p>
+                      <SeedingPresetLibrary
+                        presets={tournamentDefaults.playoffSettings.seedingPresets || {}}
+                        onChange={(seedingPresets) => setTournamentDefaults({
+                          ...tournamentDefaults,
+                          playoffSettings: { ...tournamentDefaults.playoffSettings, seedingPresets }
+                        })}
+                      />
                     </div>
 
                     {/* Playoff Legs by Round */}

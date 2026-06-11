@@ -384,6 +384,32 @@ export function ManagerPanel() {
     setMessage({ type: '', text: '' });
   };
 
+  // Live inline validation for the manual-result form (mirrors saveManualResult's checks).
+  const getManualResultError = () => {
+    if (!matchInfo) return '';
+    if (!manualResult.winner) return t('manager.selectWinnerError');
+    if (manualResult.player1Legs < 0 || manualResult.player2Legs < 0) return t('manager.legsNegativeError');
+    const winnerLegs = manualResult.winner === matchInfo.player1_id ? manualResult.player1Legs : manualResult.player2Legs;
+    const loserLegs = manualResult.winner === matchInfo.player1_id ? manualResult.player2Legs : manualResult.player1Legs;
+    if (winnerLegs <= loserLegs) return t('manager.winnerMoreLegsError');
+    return '';
+  };
+
+  // Preset scorelines derived from the match's legs-to-win (e.g. first-to-3 -> 3-0, 3-1, 3-2).
+  const getScorePresets = () => {
+    const legsToWin = matchInfo?.legs_to_win || 3;
+    return Array.from({ length: legsToWin }, (_, loserLegs) => ({ winnerLegs: legsToWin, loserLegs }));
+  };
+
+  const applyPreset = (winnerId, winnerLegs, loserLegs) => {
+    const isPlayer1 = winnerId === matchInfo.player1_id;
+    setManualResult({
+      winner: winnerId,
+      player1Legs: isPlayer1 ? winnerLegs : loserLegs,
+      player2Legs: isPlayer1 ? loserLegs : winnerLegs
+    });
+  };
+
   useEffect(() => {
     loadTournamentsForMatch();
   }, []);
@@ -561,6 +587,30 @@ export function ManagerPanel() {
                               </select>
                             </div>
 
+                            {manualResult.winner && (
+                              <div className="form-group">
+                                <label>{t('manager.quickScore')}</label>
+                                <div className="manager-preset-row">
+                                  {getScorePresets().map(({ winnerLegs, loserLegs }) => {
+                                    const winnerIsP1 = manualResult.winner === matchInfo.player1_id;
+                                    const p1 = winnerIsP1 ? winnerLegs : loserLegs;
+                                    const p2 = winnerIsP1 ? loserLegs : winnerLegs;
+                                    const active = manualResult.player1Legs === p1 && manualResult.player2Legs === p2;
+                                    return (
+                                      <button
+                                        key={`${winnerLegs}-${loserLegs}`}
+                                        type="button"
+                                        className={`manager-preset-btn ${active ? 'active' : ''}`}
+                                        onClick={() => applyPreset(manualResult.winner, winnerLegs, loserLegs)}
+                                      >
+                                        {winnerLegs} - {loserLegs}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="manager-score-grid">
                               <div className="form-group">
                                 <label htmlFor="manualPlayer1Legs">{matchInfo.player1?.name || 'Player 1'} {t('manager.legs')}</label>
@@ -584,11 +634,23 @@ export function ManagerPanel() {
                               </div>
                             </div>
 
+                            {getManualResultError() ? (
+                              <div className="manager-inline-error">
+                                <AlertCircle size={14} />
+                                <span>{getManualResultError()}</span>
+                              </div>
+                            ) : (
+                              <div className="manager-inline-hint">
+                                <AlertCircle size={14} />
+                                <span>{t('manager.statsNotRecalculatedHint')}</span>
+                              </div>
+                            )}
+
                             <div className="manager-tool-card__actions">
                               <button
                                 className="admin-button primary"
                                 onClick={saveManualResult}
-                                disabled={savingResult}
+                                disabled={savingResult || !!getManualResultError()}
                               >
                                 {savingResult ? (
                                   <>

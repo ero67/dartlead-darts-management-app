@@ -8,8 +8,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { BracketVisualization } from './BracketVisualization';
+import { BracketSeedingEditor } from './BracketSeedingEditor';
 import { TournamentSummary } from './TournamentSummary';
 import { isValidLegDartCount } from '../utils/dartStats';
+import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 
   // Generate unique ID for playoff matches (using crypto.randomUUID for proper UUIDs)
   const generateId = () => {
@@ -520,12 +522,68 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     return rounds;
   }, []);
 
+  // Apply a prepared seed-slot template, overriding the hardcoded group/standard
+  // seeding below. resolveActiveTemplate picks, in order: a per-tournament custom
+  // template (if its signature still matches), then a matching league-prepared
+  // library preset keyed by (groups, bracket start). Returns the seeded firstRound,
+  // or null so the caller falls through to automatic seeding.
+  const applyCustomSeeding = useCallback((qualifyingPlayers, firstRound, tournament) => {
+    const active = resolveActiveTemplate(tournament?.playoffSettings, tournament?.groups);
+    if (!active) return null;
+
+    const qualifyingIds = new Set((qualifyingPlayers || []).map(p => p?.id).filter(Boolean));
+
+    // Build resolver maps.
+    let playerByGroupRank = {};
+    let playerBySeed = {};
+    if (active.mode === 'global' || !(tournament?.groups?.length)) {
+      // Global mode: qualifyingPlayers is already globally sorted (getQualifyingPlayers).
+      (qualifyingPlayers || []).forEach((p, i) => { playerBySeed[i + 1] = p; });
+    } else {
+      const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
+      tournament.groups.forEach(group => {
+        if (!group?.standings) return;
+        const sorted = sortStandingsByCriteria(group.standings, criteriaOrder);
+        const ranked = sorted
+          .map(s => s.player)
+          .filter(p => p?.id && qualifyingIds.has(p.id));
+        const byRank = {};
+        ranked.forEach((p, i) => { byRank[i + 1] = p; });
+        playerByGroupRank[group.name] = byRank;
+      });
+    }
+
+    const resolve = (slot) => {
+      if (!slot) return null;
+      if (slot.seed != null) return playerBySeed[slot.seed] || null;
+      if (slot.group != null && slot.rank != null) {
+        return playerByGroupRank[slot.group]?.[slot.rank] || null;
+      }
+      return null;
+    };
+
+    const numMatches = firstRound.matches.length;
+    for (let m = 0; m < numMatches; m++) {
+      const match = firstRound.matches[m];
+      match.player1 = resolve(active.slots[m * 2]);
+      match.player2 = resolve(active.slots[m * 2 + 1]);
+      match.status = 'pending';
+    }
+
+    console.log(`Applied seed template (${active.source}) to first round`);
+    return firstRound;
+  }, []);
+
   // Seed first round using standard tournament seeding or group-based seeding
   const seedFirstRound = useCallback((qualifyingPlayers, firstRound, tournament) => {
     if (!firstRound || !firstRound.matches || qualifyingPlayers.length === 0) {
       return firstRound;
     }
-    
+
+    // Custom seed-slot template takes precedence over all automatic seeding.
+    const customSeeded = applyCustomSeeding(qualifyingPlayers, firstRound, tournament);
+    if (customSeeded) return customSeeded;
+
     const numMatches = firstRound.matches.length;
     const totalPlayers = qualifyingPlayers.length;
     
@@ -1032,9 +1090,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       match.seed2 = seed2;
       match.status = 'pending';
     }
-    
+
     return firstRound;
-  }, []);
+  }, [applyCustomSeeding]);
 
   // Populate playoff bracket with qualifying players using proper seeding
   // Seeding: Best vs Worst, 2nd best vs 2nd worst, etc.
@@ -1043,9 +1101,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // Get the thirdPlaceMatch setting from tournament (default to true for backwards compatibility)
     const includeThirdPlaceMatch = tournament?.playoffSettings?.thirdPlaceMatch !== false;
     
-    // If no rounds exist, generate them first
+    // If no rounds exist, generate them first.
+    // When a valid (non-stale) custom seed template is present, honor its declared
+    // bracketSize so a "top 16" template still builds a 16-slot bracket even if
+    // fewer players qualified (the missing seeds become byes).
     if (!rounds || rounds.length === 0) {
-      rounds = generatePlayoffRounds(qualifyingPlayers.length, includeThirdPlaceMatch);
+      let generationSize = qualifyingPlayers.length;
+      const active = resolveActiveTemplate(tournament?.playoffSettings, tournament?.groups);
+      if (active && active.bracketSize) {
+        generationSize = Math.max(generationSize, active.bracketSize);
+      }
+      rounds = generatePlayoffRounds(nextPow2(generationSize), includeThirdPlaceMatch);
     }
     
     const updatedRounds = [...rounds];
@@ -3893,7 +3959,26 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           )}
                         </div>
                       )}
-                      
+
+                    <div className="input-group">
+                      <label>{t('registration.customSeedingLabel')}</label>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+                        {t('registration.customSeedingDescription')}
+                      </p>
+                      <BracketSeedingEditor
+                        playoffSettings={tournamentSettings.playoffSettings}
+                        groups={tournament?.groups || []}
+                        value={tournamentSettings.playoffSettings.customSeeding || null}
+                        onChange={(customSeeding) => setTournamentSettings({
+                          ...tournamentSettings,
+                          playoffSettings: {
+                            ...tournamentSettings.playoffSettings,
+                            customSeeding
+                          }
+                        })}
+                      />
+                    </div>
+
                     <div className="playoff-legs-settings">
                       <h5>{t('registration.playoffLegsToWin')}:</h5>
                       <div className="input-group">

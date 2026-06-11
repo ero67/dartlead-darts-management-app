@@ -1461,7 +1461,8 @@ body {
 }
 
 .scoring-rule-input {
-  width: 70px;
+  width: 90px;
+  min-width: 90px;
   padding: 0.5rem;
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -3643,6 +3644,43 @@ body {
   justify-content: center;
 }
 
+/* Bull-up offer banner (over-long leg) */
+.bullup-offer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent-primary);
+}
+
+.bullup-offer-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.bullup-offer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-primary);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s ease;
+}
+
+.bullup-offer-btn:hover {
+  filter: brightness(1.08);
+}
+
 /* Checkout modal (3-dart total finish) */
 .checkout-modal .checkout-btn-row {
   display: flex;
@@ -4316,8 +4354,8 @@ body {
 
 /* Playoff Settings */
 .playoff-settings {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 1.5rem;
   margin-top: 0.5rem;
@@ -6683,6 +6721,10 @@ body {
   border-top: 1px solid var(--border-color);
   justify-content: flex-end;
   transition: border-color 0.3s ease;
+  position: sticky;
+  bottom: 0;
+  background: var(--card-bg);
+  z-index: 2;
 }
 
 /* Confirmation Modal Styles */
@@ -8260,7 +8302,12 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background-color: var(--bg-tertiary);
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.criteria-order-item:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .criteria-number {
@@ -8283,7 +8330,12 @@ body {
 }
 
 .move-btn {
-  padding: 0.25rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background-color: var(--card-bg);
@@ -8300,8 +8352,9 @@ body {
 .move-btn.disabled {
   background-color: var(--bg-tertiary);
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.35;
   color: var(--text-secondary);
+  pointer-events: none;
 }
 
 /* Privacy Policy */
@@ -8839,6 +8892,60 @@ body {
   gap: 0.75rem;
 }
 
+.manager-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.manager-preset-btn {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.manager-preset-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+}
+
+.manager-preset-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.manager-inline-error,
+.manager-inline-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+}
+
+.manager-inline-error {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.manager-inline-hint {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+}
+
+.dark-mode .manager-inline-error {
+  color: #fca5a5;
+}
+
 .manager-tool-card__actions {
   display: flex;
   gap: 0.75rem;
@@ -9007,7 +9114,7 @@ body {
   border-radius: 4px;
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .device-settings-modal .form-group {

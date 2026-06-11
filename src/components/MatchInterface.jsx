@@ -7,6 +7,10 @@ import { supabase } from '../lib/supabase';
 import { matchService } from '../services/tournamentService';
 import checkoutData from '../data/checkouts.json';
 
+// When both players have thrown this many visits in a single leg, the leg has run
+// too long and the app offers to decide it by a bull-up. See awardLegByBullup.
+const BULLUP_VISIT_THRESHOLD = 15;
+
 export function MatchInterface({ match, onMatchComplete, onBack }) {
   // Show loading state if match is not loaded yet
   if (!match) {
@@ -149,6 +153,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
   const [bustingPlayer, setBustingPlayer] = useState(null); // Track which player is busting (0 or 1)
   const [turnTotalInput, setTurnTotalInput] = useState('');
   const [pendingCheckout, setPendingCheckout] = useState(null); // { total: number, dartsUsed: 1|2|3, finishedOnDouble: boolean } | null
+  const [showBullup, setShowBullup] = useState(false); // bull-up decision modal for over-long legs
   const [useOnScreenKeypad, setUseOnScreenKeypad] = useState(() => {
     if (typeof window === 'undefined') return true;
     const isCoarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
@@ -1453,6 +1458,99 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     onMatchComplete(matchResult);
   };
 
+  // Number of completed visits a player has thrown in the current leg.
+  const getLegVisits = (playerIndex) =>
+    turnHistory.filter(h => h.leg === currentLeg && h.player === playerIndex).length;
+
+  // Both players have thrown the threshold number of visits in this leg — the leg
+  // has gone too long, so offer to decide it by bull-up.
+  const bothReachedBullupThreshold =
+    getLegVisits(0) >= BULLUP_VISIT_THRESHOLD && getLegVisits(1) >= BULLUP_VISIT_THRESHOLD;
+
+  // Decide the current leg by a bull-up (closest to bull wins) instead of a checkout.
+  // IMPORTANT: this records NO checkout and NO leg average — the darts already thrown
+  // this leg were counted toward totalScore/totalDarts during play, so running averages
+  // stay accurate, but we never fabricate a checkout/finish that didn't happen.
+  const awardLegByBullup = (winnerIndex) => {
+    if (isViewOnly) return;
+    const winnerKey = `player${winnerIndex + 1}`;
+    const loserIndex = winnerIndex === 0 ? 1 : 0;
+    const loserKey = `player${loserIndex + 1}`;
+
+    // Fold any in-progress (partial) visit into cumulative totals so real darts count.
+    const pendingScore = currentTurn.score || 0;
+    const pendingDarts = currentTurn.darts || 0;
+
+    const newWinnerLegs = legScores[winnerKey].legs + 1;
+    const matchOver = newWinnerLegs >= matchSettings.legsToWin;
+
+    const finalLegScores = {
+      ...legScores,
+      [winnerKey]: {
+        ...legScores[winnerKey],
+        legs: newWinnerLegs,
+        currentScore: matchSettings.startingScore,
+        totalScore: legScores[winnerKey].totalScore + (currentPlayer === winnerIndex ? pendingScore : 0),
+        totalDarts: legScores[winnerKey].totalDarts + (currentPlayer === winnerIndex ? pendingDarts : 0),
+        legDarts: 0,
+        legDetails: [
+          ...(legScores[winnerKey].legDetails || []),
+          {
+            leg: currentLeg,
+            darts: legScores[winnerKey].legDarts + (currentPlayer === winnerIndex ? pendingDarts : 0),
+            checkout: null,
+            average: null,
+            isWin: true,
+            byBullup: true
+          }
+        ]
+      },
+      [loserKey]: {
+        ...legScores[loserKey],
+        currentScore: matchSettings.startingScore,
+        totalScore: legScores[loserKey].totalScore + (currentPlayer === loserIndex ? pendingScore : 0),
+        totalDarts: legScores[loserKey].totalDarts + (currentPlayer === loserIndex ? pendingDarts : 0),
+        legDarts: 0,
+        legDetails: [
+          ...(legScores[loserKey].legDetails || []),
+          {
+            leg: currentLeg,
+            darts: legScores[loserKey].legDarts + (currentPlayer === loserIndex ? pendingDarts : 0),
+            checkout: null,
+            average: null,
+            isWin: false,
+            byBullup: true,
+            remainingScore: legScores[loserKey].currentScore
+          }
+        ]
+      }
+    };
+
+    setShowBullup(false);
+    setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
+    setLegScores(finalLegScores);
+
+    if (matchOver) {
+      completeMatch(finalLegScores);
+      return;
+    }
+
+    // Start the next leg — alternate who starts, same rule as the checkout path.
+    const newLegNumber = currentLeg + 1;
+    const newLegStarter = (newLegNumber % 2 === 1) ? matchStarter : (1 - matchStarter);
+    setCurrentLeg(newLegNumber);
+    setCurrentPlayer(newLegStarter);
+    setTurnHistory([]);
+
+    setTimeout(() => {
+      updateMatchToDatabase(match.id, {
+        currentLeg: newLegNumber,
+        legScores: finalLegScores,
+        currentPlayer: newLegStarter
+      });
+    }, 100);
+  };
+
 
   const selectMatchStarter = (playerIndex) => {
     if (isViewOnly) return; // Non-logged-in users cannot start matches
@@ -1730,6 +1828,54 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
           </div>
         </div>
       </div>
+
+      {!isViewOnly && bothReachedBullupThreshold && !matchComplete && (
+        <div className="bullup-offer">
+          <span className="bullup-offer-text">{t('match.bullup.offer')}</span>
+          <button
+            type="button"
+            className="bullup-offer-btn"
+            onClick={() => setShowBullup(true)}
+          >
+            <Target size={18} />
+            {t('match.bullup.decideButton')}
+          </button>
+        </div>
+      )}
+
+      {showBullup && (
+        <div className="leg-starter-dialog checkout-modal">
+          <div className="dialog-content checkout-modal-content">
+            <h2>{t('match.bullup.title')}</h2>
+            <p style={{ marginTop: '0.5rem' }}>{t('match.bullup.prompt')}</p>
+            <div className="checkout-btn-row">
+              <button
+                type="button"
+                className="create-tournament-btn"
+                onClick={() => awardLegByBullup(0)}
+              >
+                {match.player1?.name || 'Player 1'}
+              </button>
+              <button
+                type="button"
+                className="create-tournament-btn"
+                onClick={() => awardLegByBullup(1)}
+              >
+                {match.player2?.name || 'Player 2'}
+              </button>
+            </div>
+            <div className="checkout-btn-row" style={{ marginTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="mode-btn checkout-cancel-btn"
+                onClick={() => setShowBullup(false)}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Section - Individual darts */}
       <div className="match-stats-section">
