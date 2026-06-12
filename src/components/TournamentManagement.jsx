@@ -18,6 +18,17 @@ import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
     return crypto.randomUUID();
   };
 
+// Stable ordering for live match cards. We deliberately do NOT sort by
+// last_activity_at (which changes constantly as matches are scored, causing
+// cards to jump around). Order by board number, then match id — both stable
+// for the lifetime of a match.
+const compareLiveMatchesStable = (a, b) => {
+  const boardA = a.live_board_number ?? Number.MAX_SAFE_INTEGER;
+  const boardB = b.live_board_number ?? Number.MAX_SAFE_INTEGER;
+  if (boardA !== boardB) return boardA - boardB;
+  return String(a.id).localeCompare(String(b.id));
+};
+
 export function TournamentManagement({ tournament, onMatchStart, onBack, onDeleteTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -2502,12 +2513,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           }
         }
 
-        // Sort by last activity
-        allLiveMatches.sort((a, b) => {
-          const timeA = new Date(a.last_activity_at || 0).getTime();
-          const timeB = new Date(b.last_activity_at || 0).getTime();
-          return timeB - timeA;
-        });
+        // Stable order (board number, then id) so cards don't jump around
+        allLiveMatches.sort(compareLiveMatchesStable);
 
         // Smart merge: preserve existing matches and only update changed ones
         // This prevents cards from disappearing during refresh
@@ -2540,13 +2547,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             }
           });
           
-          // Sort the merged result
-          mergedMatches.sort((a, b) => {
-            const timeA = new Date(a.last_activity_at || 0).getTime();
-            const timeB = new Date(b.last_activity_at || 0).getTime();
-            return timeB - timeA;
-          });
-          
+          // Sort the merged result in the same stable order
+          mergedMatches.sort(compareLiveMatchesStable);
+
           // Update ref with merged matches BEFORE returning
           // This ensures next update has the latest data
           liveMatchesRef.current = mergedMatches;
@@ -2741,12 +2744,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const filteredLiveMatches = liveMatches
       .filter(belongsToThisTournament)
       .sort((a, b) => {
+        // Favorites pinned first (deliberate user action), then a stable order
+        // (board, then id) so cards don't reshuffle as scores update.
         const aFav = favoriteMatchIds.has(a.id) ? 1 : 0;
         const bFav = favoriteMatchIds.has(b.id) ? 1 : 0;
         if (aFav !== bFav) return bFav - aFav;
-        const timeA = new Date(a.last_activity_at || 0).getTime();
-        const timeB = new Date(b.last_activity_at || 0).getTime();
-        return timeB - timeA;
+        return compareLiveMatchesStable(a, b);
       });
 
     return (
