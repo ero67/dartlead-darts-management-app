@@ -379,6 +379,7 @@
     "noLiveMatches": "No Live Matches",
     "noLiveMatchesDescription": "There are no matches currently in progress for this tournament.",
     "live": "LIVE",
+    "playerTurn": "Player to throw",
     "viewMatch": "View Match",
     "firstTo": "First to",
     "viewStatistics": "View Statistics",

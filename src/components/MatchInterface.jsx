@@ -475,9 +475,12 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }
   }, [currentPlayer, match?.id, matchComplete]);
 
-  // Prompt database sync on every scoring change (debounced) so other devices
-  // see live scores within ~1s via the realtime subscription. Debounced to
-  // coalesce rapid dart-by-dart changes into a single write.
+  // Sync to the DB at TURN boundaries (not per dart) so the live board on other
+  // devices shows a player's score only after their full visit, not mid-turn.
+  // `currentPlayer` flips and/or the leg counts change only when a turn ends
+  // (see finishTurn / bust handling), so depending on those — and NOT on the
+  // per-dart `legScores...currentScore` — fires exactly once per completed turn.
+  // A small debounce coalesces the simultaneous state updates of a turn end.
   useEffect(() => {
     if (!match?.id || matchComplete) return;
     if (!user) return; // view-only users don't write
@@ -488,18 +491,25 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         legScores,
         currentPlayer
       });
-    }, 1200);
+    }, 400);
 
     return () => clearTimeout(timeout);
-  }, [match?.id, currentLeg, legScores, currentPlayer, matchComplete, user]);
+    // legScores is intentionally omitted from deps: we only want to sync when a
+    // turn ends (currentPlayer / leg counts / leg number change), reading the
+    // latest legScores from the closure at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.id, currentPlayer, currentLeg, legScores.player1.legs, legScores.player2.legs, matchComplete, user]);
 
   // Periodic database sync - safety-net fallback every 30 seconds during active
-  // play (covers a missed debounced write, e.g. the tab was backgrounded).
+  // play (covers a missed write, e.g. the tab was backgrounded). Skips writing
+  // mid-turn so the live board never shows a partial visit.
   useEffect(() => {
     if (!match?.id || matchComplete) return;
     if (!user) return;
 
     const interval = setInterval(() => {
+      // Don't leak a mid-turn score to watchers — only sync between turns.
+      if (currentTurn.darts > 0) return;
       updateMatchToDatabase(match.id, {
         currentLeg,
         legScores,
@@ -508,7 +518,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }, 30000); // Update every 30 seconds
 
     return () => clearInterval(interval);
-  }, [match?.id, currentLeg, legScores, currentPlayer, matchComplete, user]);
+  }, [match?.id, currentLeg, legScores, currentPlayer, currentTurn.darts, matchComplete, user]);
 
   // Save match state to localStorage whenever it changes
   useEffect(() => {

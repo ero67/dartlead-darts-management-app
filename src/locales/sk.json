@@ -372,6 +372,7 @@
     "noLiveMatches": "Žiadne Live Zápasy",
     "noLiveMatchesDescription": "Pre tento turnaj momentálne neprebiehajú žiadne zápasy.",
     "live": "LIVE",
+    "playerTurn": "Na rade",
     "viewMatch": "Zobraziť Zápas",
     "firstTo": "Prvý na",
     "loginToStartMatch": "Na spustenie zápasu je potrebné sa prihlásiť",

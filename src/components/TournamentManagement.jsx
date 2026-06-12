@@ -2800,8 +2800,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <div className="scoreboard-label">{t('management.legs') || 'Legs'}</div>
                   </div>
 
-                  <div className="player-row player1-row">
+                  <div className={`player-row player1-row${match.current_player === 0 ? ' is-active-turn' : ''}`}>
                     <div className="player-info">
+                      {match.current_player === 0 && (
+                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn', 'Player to throw')} />
+                      )}
                       <div className="player-name-large">{match.player1?.name || t('common.unknown')}</div>
                     </div>
                     <div className="scoreboard-scores">
@@ -2810,8 +2813,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     </div>
                   </div>
 
-                  <div className="player-row player2-row">
+                  <div className={`player-row player2-row${match.current_player === 1 ? ' is-active-turn' : ''}`}>
                     <div className="player-info">
+                      {match.current_player === 1 && (
+                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn', 'Player to throw')} />
+                      )}
                       <div className="player-name-large">{match.player2?.name || t('common.unknown')}</div>
                     </div>
                     <div className="scoreboard-scores">
