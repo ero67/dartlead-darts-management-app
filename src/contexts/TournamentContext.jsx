@@ -14,7 +14,6 @@ const ACTIONS = {
   UPDATE_MATCH_RESULT: 'UPDATE_MATCH_RESULT',
   START_MATCH: 'START_MATCH',
   COMPLETE_MATCH: 'COMPLETE_MATCH',
-  APPLY_REMOTE_MATCH_RESULT: 'APPLY_REMOTE_MATCH_RESULT',
   DELETE_TOURNAMENT: 'DELETE_TOURNAMENT',
   UPDATE_TOURNAMENT_STATUS: 'UPDATE_TOURNAMENT_STATUS',
   START_PLAYOFFS: 'START_PLAYOFFS'
@@ -128,66 +127,197 @@ function tournamentReducer(state, action) {
         currentMatch: action.payload
       };
 
-    case ACTIONS.COMPLETE_MATCH: {
+    case ACTIONS.COMPLETE_MATCH:
       if (!state.currentTournament) {
         console.error('No current tournament to update');
         return state;
       }
+      
+      const updatedTournament = { ...state.currentTournament };
+      const matchResult = action.payload;
+      
+      // Check if this is a playoff match
+      if (matchResult.isPlayoff && matchResult.playoffRound) {
 
-      const updatedTournament = applyMatchCompletion(state.currentTournament, action.payload);
-      if (!updatedTournament) {
-        // Helper could not apply (group/match not found) – leave state untouched
-        return state;
+        // Find the playoff match in the rounds
+        if (updatedTournament.playoffs && updatedTournament.playoffs.rounds) {
+          // Deep-copy rounds so React detects state changes
+          const rounds = updatedTournament.playoffs.rounds.map(r => ({
+            ...r,
+            matches: r.matches.map(m => ({ ...m }))
+          }));
+          updatedTournament.playoffs = { ...updatedTournament.playoffs, rounds };
+
+          let foundMatch = null;
+          let foundRoundIndex = -1;
+
+          for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
+            const round = rounds[roundIndex];
+            if (round.matches) {
+              const matchIndex = round.matches.findIndex(m => m.id === matchResult.matchId);
+              if (matchIndex !== -1) {
+                foundMatch = round.matches[matchIndex];
+                foundRoundIndex = roundIndex;
+                break;
+              }
+            }
+          }
+
+          if (foundMatch) {
+            foundMatch.status = 'completed';
+            foundMatch.result = matchResult;
+
+            const p1Name = matchResult.player1Name || foundMatch.player1?.name;
+            const p2Name = matchResult.player2Name || foundMatch.player2?.name;
+            const winnerPlayer = matchResult.winner === matchResult.player1Id
+              ? { id: matchResult.player1Id, name: p1Name }
+              : { id: matchResult.player2Id, name: p2Name };
+
+            const loserPlayer = matchResult.winner === matchResult.player1Id
+              ? { id: matchResult.player2Id, name: p2Name }
+              : { id: matchResult.player1Id, name: p1Name };
+
+            const currentRound = rounds[foundRoundIndex];
+            const nonThirdPlaceMatches = currentRound?.matches?.filter(m => !m.isThirdPlaceMatch) || [];
+            const isSemifinal = nonThirdPlaceMatches.length === 2 && foundRoundIndex < rounds.length - 1;
+
+            // Track matches that need DB sync after JSONB save
+            const matchesNeedingDbSync = [];
+
+            // Use the match's index among non-3rd-place matches for bracket mapping
+            const bracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === foundMatch.id);
+
+            if (foundRoundIndex < rounds.length - 1 && bracketIndex !== -1) {
+              const nextRound = rounds[foundRoundIndex + 1];
+              if (nextRound && nextRound.matches) {
+                const nextNonThird = nextRound.matches.filter(m => !m.isThirdPlaceMatch);
+                const nextMatchIndex = Math.floor(bracketIndex / 2);
+                const nextMatch = nextNonThird[nextMatchIndex];
+
+                if (nextMatch) {
+                  const isFirstMatchOfPair = (bracketIndex % 2 === 0);
+
+                  if (isFirstMatchOfPair) {
+                    nextMatch.player1 = winnerPlayer;
+                  } else {
+                    nextMatch.player2 = winnerPlayer;
+                  }
+                  nextMatch.status = 'pending';
+                  matchesNeedingDbSync.push(nextMatch);
+                }
+              }
+            }
+
+            if (isSemifinal && rounds.length > 0) {
+              const finalRound = rounds[rounds.length - 1];
+              const thirdPlaceMatch = finalRound.matches.find(m => m.isThirdPlaceMatch);
+
+              if (thirdPlaceMatch) {
+                const semiBracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === foundMatch.id);
+                if (semiBracketIndex === 0) {
+                  thirdPlaceMatch.player1 = loserPlayer;
+                } else if (semiBracketIndex === 1) {
+                  thirdPlaceMatch.player2 = loserPlayer;
+                }
+
+                if (thirdPlaceMatch.player1 && thirdPlaceMatch.player2) {
+                  thirdPlaceMatch.status = 'pending';
+                }
+                matchesNeedingDbSync.push(thirdPlaceMatch);
+              }
+            }
+
+            // Attach sync list to playoffs so the async handler can update DB
+            updatedTournament.playoffs._matchesNeedingDbSync = matchesNeedingDbSync;
+            
+            // Advance playoffs currentRound if all matches in the found round are completed
+            const playoffCurrentRound = updatedTournament.playoffs.currentRound;
+            if (typeof playoffCurrentRound === 'number' && playoffCurrentRound > 0) {
+              const crIdx = Math.max(0, Math.min(playoffCurrentRound - 1, rounds.length - 1));
+              const currentRoundObj = rounds[crIdx];
+              if (currentRoundObj && currentRoundObj.matches?.length) {
+                const allDone = currentRoundObj.matches
+                  .filter(m => !m.isThirdPlaceMatch)
+                  .every(m => m.status === 'completed');
+                if (allDone && playoffCurrentRound < rounds.length) {
+                  updatedTournament.playoffs.currentRound = playoffCurrentRound + 1;
+                }
+              }
+            }
+            
+            // Check if tournament is complete (final and 3rd place match are both finished)
+            if (rounds.length > 0) {
+              const finalRound = rounds[rounds.length - 1];
+              const finalMatch = finalRound.matches.find(m => !m.isThirdPlaceMatch);
+              const thirdPlaceMatch = finalRound.matches.find(m => m.isThirdPlaceMatch);
+              
+              // Tournament is complete if:
+              // 1. Final match is completed
+              // 2. If 3rd place match exists, it must also be completed
+              const finalComplete = finalMatch && finalMatch.status === 'completed';
+              const thirdPlaceComplete = !thirdPlaceMatch || thirdPlaceMatch.status === 'completed';
+              
+              if (finalComplete && thirdPlaceComplete) {
+                updatedTournament.status = 'completed';
+              }
+            }
+          } else {
+            console.error('Playoff match not found in rounds:', matchResult.matchId);
+          }
+        }
+      } else {
+        // Regular group match
+        const group = updatedTournament.groups?.find(g => g.id === matchResult.groupId);
+        
+        if (!group) {
+          console.error('Group not found for match completion:', matchResult.groupId);
+          return state;
+        }
+        
+        const match = group.matches?.find(m => m.id === matchResult.matchId);
+        
+        if (!match) {
+          console.error('Match not found for completion:', matchResult.matchId);
+          return state;
+        }
+        
+        match.result = matchResult;
+        match.status = 'completed';
+        
+        // Update group standings with tournament settings
+        updateGroupStandings(group, updatedTournament);
+        
+        // Check if all group matches are completed (for tournaments without playoffs)
+        const allGroupMatchesComplete = updatedTournament.groups?.every(g => 
+          g.matches?.every(m => m.status === 'completed')
+        );
+        
+        // If all group matches are complete and playoffs are not enabled or not started, mark tournament as completed
+        if (allGroupMatchesComplete) {
+          const playoffsEnabled = updatedTournament.playoffSettings?.enabled;
+          const hasPlayoffs = updatedTournament.playoffs && updatedTournament.playoffs.rounds && updatedTournament.playoffs.rounds.length > 0;
+          
+          // Tournament is complete if:
+          // 1. Playoffs are not enabled, OR
+          // 2. Playoffs are enabled but not started (no rounds), OR
+          // 3. Playoffs are enabled and all playoff matches are complete (handled in playoff section above)
+          if (!playoffsEnabled || !hasPlayoffs) {
+            updatedTournament.status = 'completed';
+          }
+        }
       }
-
+      
       // Update tournament in tournaments array
-      const updatedTournaments = state.tournaments.map(t =>
+      const updatedTournaments = state.tournaments.map(t => 
         t.id === updatedTournament.id ? updatedTournament : t
       );
-
+      
       return {
         ...state,
         currentTournament: updatedTournament,
         tournaments: updatedTournaments,
         currentMatch: null
       };
-    }
-
-    case ACTIONS.APPLY_REMOTE_MATCH_RESULT: {
-      // A match was completed on another device. Apply the SAME granular
-      // transform the scoring device runs, but without any DB side-effects and
-      // without touching currentMatch. Only mutates the affected bracket/group
-      // subtrees, so React re-renders just the changed cards (no flicker).
-      if (!state.currentTournament) return state;
-
-      const matchResult = action.payload;
-
-      // Idempotency guard – ignore our own realtime echo (or duplicate events)
-      if (isMatchAlreadyCompleted(state.currentTournament, matchResult)) {
-        return state;
-      }
-
-      const updatedTournament = applyMatchCompletion(state.currentTournament, matchResult);
-      if (!updatedTournament) {
-        return state;
-      }
-
-      // Watchers must never write to the DB – the scoring device owns bracket sync
-      if (updatedTournament.playoffs) {
-        delete updatedTournament.playoffs._matchesNeedingDbSync;
-      }
-
-      const updatedTournaments = state.tournaments.map(t =>
-        t.id === updatedTournament.id ? updatedTournament : t
-      );
-
-      return {
-        ...state,
-        currentTournament: updatedTournament,
-        tournaments: updatedTournaments
-        // NOTE: currentMatch intentionally left untouched
-      };
-    }
 
     case ACTIONS.DELETE_TOURNAMENT:
       return {
@@ -229,237 +359,6 @@ function tournamentReducer(state, action) {
     default:
       return state;
   }
-}
-
-// Returns true if the given match is already recorded as completed for the
-// same winner – used to ignore a device's own realtime echo / duplicate events.
-function isMatchAlreadyCompleted(tournament, matchResult) {
-  if (!tournament || !matchResult) return false;
-
-  if (matchResult.isPlayoff && tournament.playoffs?.rounds) {
-    for (const round of tournament.playoffs.rounds) {
-      const m = (round.matches || []).find(mm => mm.id === matchResult.matchId);
-      if (m) {
-        return m.status === 'completed' && m.result?.winner === matchResult.winner;
-      }
-    }
-    return false;
-  }
-
-  const group = tournament.groups?.find(g =>
-    (g.matches || []).some(m => m.id === matchResult.matchId)
-  );
-  if (!group) return false;
-  const m = group.matches.find(mm => mm.id === matchResult.matchId);
-  return !!m && m.status === 'completed' && m.result?.winner === matchResult.winner;
-}
-
-// Pure transform: apply a completed match result to a tournament and return a
-// NEW tournament object (deep-copying only the affected playoff rounds / group
-// so unchanged subtrees keep their identity). Returns null if the match's
-// group/match cannot be found. Shared by COMPLETE_MATCH (scoring device) and
-// APPLY_REMOTE_MATCH_RESULT (watcher devices) so the bracket-advancement and
-// standings logic stays identical everywhere.
-function applyMatchCompletion(currentTournament, matchResult) {
-  const updatedTournament = { ...currentTournament };
-
-  // If a remote payload arrived without the full result JSONB (e.g. a playoff
-  // slot completed via the lighter updateMatchResult path), synthesize the
-  // minimal shape the standings/bracket logic depends on.
-  if (!matchResult.result && matchResult.winner) {
-    matchResult = {
-      ...matchResult,
-      result: {
-        winner: matchResult.winner,
-        player1Legs: matchResult.player1Legs,
-        player2Legs: matchResult.player2Legs
-      }
-    };
-  }
-
-  // Check if this is a playoff match
-  if (matchResult.isPlayoff && matchResult.playoffRound) {
-
-    // Find the playoff match in the rounds
-    if (updatedTournament.playoffs && updatedTournament.playoffs.rounds) {
-      // Deep-copy rounds so React detects state changes
-      const rounds = updatedTournament.playoffs.rounds.map(r => ({
-        ...r,
-        matches: r.matches.map(m => ({ ...m }))
-      }));
-      updatedTournament.playoffs = { ...updatedTournament.playoffs, rounds };
-
-      let foundMatch = null;
-      let foundRoundIndex = -1;
-
-      for (let roundIndex = 0; roundIndex < rounds.length; roundIndex++) {
-        const round = rounds[roundIndex];
-        if (round.matches) {
-          const matchIndex = round.matches.findIndex(m => m.id === matchResult.matchId);
-          if (matchIndex !== -1) {
-            foundMatch = round.matches[matchIndex];
-            foundRoundIndex = roundIndex;
-            break;
-          }
-        }
-      }
-
-      if (foundMatch) {
-        foundMatch.status = 'completed';
-        foundMatch.result = matchResult;
-
-        const p1Name = matchResult.player1Name || foundMatch.player1?.name;
-        const p2Name = matchResult.player2Name || foundMatch.player2?.name;
-        const winnerPlayer = matchResult.winner === matchResult.player1Id
-          ? { id: matchResult.player1Id, name: p1Name }
-          : { id: matchResult.player2Id, name: p2Name };
-
-        const loserPlayer = matchResult.winner === matchResult.player1Id
-          ? { id: matchResult.player2Id, name: p2Name }
-          : { id: matchResult.player1Id, name: p1Name };
-
-        const currentRound = rounds[foundRoundIndex];
-        const nonThirdPlaceMatches = currentRound?.matches?.filter(m => !m.isThirdPlaceMatch) || [];
-        const isSemifinal = nonThirdPlaceMatches.length === 2 && foundRoundIndex < rounds.length - 1;
-
-        // Track matches that need DB sync after JSONB save
-        const matchesNeedingDbSync = [];
-
-        // Use the match's index among non-3rd-place matches for bracket mapping
-        const bracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === foundMatch.id);
-
-        if (foundRoundIndex < rounds.length - 1 && bracketIndex !== -1) {
-          const nextRound = rounds[foundRoundIndex + 1];
-          if (nextRound && nextRound.matches) {
-            const nextNonThird = nextRound.matches.filter(m => !m.isThirdPlaceMatch);
-            const nextMatchIndex = Math.floor(bracketIndex / 2);
-            const nextMatch = nextNonThird[nextMatchIndex];
-
-            if (nextMatch) {
-              const isFirstMatchOfPair = (bracketIndex % 2 === 0);
-
-              if (isFirstMatchOfPair) {
-                nextMatch.player1 = winnerPlayer;
-              } else {
-                nextMatch.player2 = winnerPlayer;
-              }
-              nextMatch.status = 'pending';
-              matchesNeedingDbSync.push(nextMatch);
-            }
-          }
-        }
-
-        if (isSemifinal && rounds.length > 0) {
-          const finalRound = rounds[rounds.length - 1];
-          const thirdPlaceMatch = finalRound.matches.find(m => m.isThirdPlaceMatch);
-
-          if (thirdPlaceMatch) {
-            const semiBracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === foundMatch.id);
-            if (semiBracketIndex === 0) {
-              thirdPlaceMatch.player1 = loserPlayer;
-            } else if (semiBracketIndex === 1) {
-              thirdPlaceMatch.player2 = loserPlayer;
-            }
-
-            if (thirdPlaceMatch.player1 && thirdPlaceMatch.player2) {
-              thirdPlaceMatch.status = 'pending';
-            }
-            matchesNeedingDbSync.push(thirdPlaceMatch);
-          }
-        }
-
-        // Attach sync list to playoffs so the async handler can update DB
-        updatedTournament.playoffs._matchesNeedingDbSync = matchesNeedingDbSync;
-
-        // Advance playoffs currentRound if all matches in the found round are completed
-        const playoffCurrentRound = updatedTournament.playoffs.currentRound;
-        if (typeof playoffCurrentRound === 'number' && playoffCurrentRound > 0) {
-          const crIdx = Math.max(0, Math.min(playoffCurrentRound - 1, rounds.length - 1));
-          const currentRoundObj = rounds[crIdx];
-          if (currentRoundObj && currentRoundObj.matches?.length) {
-            const allDone = currentRoundObj.matches
-              .filter(m => !m.isThirdPlaceMatch)
-              .every(m => m.status === 'completed');
-            if (allDone && playoffCurrentRound < rounds.length) {
-              updatedTournament.playoffs.currentRound = playoffCurrentRound + 1;
-            }
-          }
-        }
-
-        // Check if tournament is complete (final and 3rd place match are both finished)
-        if (rounds.length > 0) {
-          const finalRound = rounds[rounds.length - 1];
-          const finalMatch = finalRound.matches.find(m => !m.isThirdPlaceMatch);
-          const thirdPlaceMatch = finalRound.matches.find(m => m.isThirdPlaceMatch);
-
-          // Tournament is complete if:
-          // 1. Final match is completed
-          // 2. If 3rd place match exists, it must also be completed
-          const finalComplete = finalMatch && finalMatch.status === 'completed';
-          const thirdPlaceComplete = !thirdPlaceMatch || thirdPlaceMatch.status === 'completed';
-
-          if (finalComplete && thirdPlaceComplete) {
-            updatedTournament.status = 'completed';
-          }
-        }
-      } else {
-        console.error('Playoff match not found in rounds:', matchResult.matchId);
-      }
-    }
-  } else {
-    // Regular group match
-    const group = updatedTournament.groups?.find(g => g.id === matchResult.groupId);
-
-    if (!group) {
-      console.error('Group not found for match completion:', matchResult.groupId);
-      return null;
-    }
-
-    const match = group.matches?.find(m => m.id === matchResult.matchId);
-
-    if (!match) {
-      console.error('Match not found for completion:', matchResult.matchId);
-      return null;
-    }
-
-    // Deep-copy this group (and its match list) so unchanged groups keep their
-    // identity – only the affected group's subtree re-renders.
-    const newGroup = {
-      ...group,
-      matches: group.matches.map(m =>
-        m.id === matchResult.matchId
-          ? { ...m, result: matchResult, status: 'completed' }
-          : m
-      )
-    };
-    updatedTournament.groups = updatedTournament.groups.map(g =>
-      g.id === group.id ? newGroup : g
-    );
-
-    // Update group standings with tournament settings
-    updateGroupStandings(newGroup, updatedTournament);
-
-    // Check if all group matches are completed (for tournaments without playoffs)
-    const allGroupMatchesComplete = updatedTournament.groups?.every(g =>
-      g.matches?.every(m => m.status === 'completed')
-    );
-
-    // If all group matches are complete and playoffs are not enabled or not started, mark tournament as completed
-    if (allGroupMatchesComplete) {
-      const playoffsEnabled = updatedTournament.playoffSettings?.enabled;
-      const hasPlayoffs = updatedTournament.playoffs && updatedTournament.playoffs.rounds && updatedTournament.playoffs.rounds.length > 0;
-
-      // Tournament is complete if:
-      // 1. Playoffs are not enabled, OR
-      // 2. Playoffs are enabled but not started (no rounds), OR
-      // 3. Playoffs are enabled and all playoff matches are complete (handled in playoff section above)
-      if (!playoffsEnabled || !hasPlayoffs) {
-        updatedTournament.status = 'completed';
-      }
-    }
-  }
-
-  return updatedTournament;
 }
 
 // Helper function to update group standings
@@ -660,12 +559,6 @@ export function TournamentProvider({ children }) {
     dispatch({ type: ACTIONS.START_MATCH, payload: match });
   };
 
-  // Apply a match result completed on another device (from a realtime event),
-  // updating the local bracket/standings granularly without any DB writes.
-  const applyRemoteMatchResult = (matchResult) => {
-    dispatch({ type: ACTIONS.APPLY_REMOTE_MATCH_RESULT, payload: matchResult });
-  };
-
   const completeMatch = async (matchResult) => {
     // Clear match from session – the match is done, no need to restore it
     saveSessionIds(state.currentTournament?.id || null, null);
@@ -756,19 +649,16 @@ export function TournamentProvider({ children }) {
               }
             }
           }
-
-          // NOTE: A full getTournament() refetch + SELECT_TOURNAMENT dispatch used
-          // to run here "to get full statistics". It was removed because it
-          // replaced the entire currentTournament object reference and caused a
-          // ~500ms flash on return to the management view. COMPLETE_MATCH already
-          // stored the full matchResult (incl. all stats) into match.result, and
-          // saveMatchResult persisted the same result JSONB to the DB, so the
-          // local state is already complete and correct.
+          
+          // Refresh tournament from database to get latest match results with full statistics
+          // This ensures statistics view shows the complete match data
+          const refreshedTournament = await tournamentService.getTournament(currentState.currentTournament.id);
+          dispatch({ type: ACTIONS.SELECT_TOURNAMENT, payload: refreshedTournament });
         }
       } catch (error) {
         console.error('Error updating tournament in database:', error);
       }
-    }, 500); // Allow the COMPLETE_MATCH dispatch to settle before DB side-effects
+    }, 500); // Increased timeout to ensure database write completes
   };
 
   const deleteTournament = async (tournamentId) => {
@@ -929,7 +819,6 @@ export function TournamentProvider({ children }) {
     getTournament,
     startMatch,
     completeMatch,
-    applyRemoteMatchResult,
     deleteTournament,
     updateTournamentStatus,
     startPlayoffs,

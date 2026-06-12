@@ -57,11 +57,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   });
   const modalOpenRef = useRef(false); // Track if any modal is open
   const activeTabRef = useRef(activeTab); // Track active tab for interval callback
-  // Refs mirroring tournament scope so the realtime channel handlers (which only
-  // re-subscribe on tournament id) never read stale group/playoff id sets.
-  const tournamentGroupIdsRef = useRef(new Set());
-  const tournamentPlayoffIdsRef = useRef(new Set());
-  const applyRemoteMatchResultRef = useRef(null);
   const [matchGroupFilter, setMatchGroupFilter] = useState('all'); // Filter by group
   const [matchPlayerFilter, setMatchPlayerFilter] = useState(''); // Filter by player name
   const [bracketViewMode, setBracketViewMode] = useState('detailed'); // 'detailed' or 'compact'
@@ -135,18 +130,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   useEffect(() => {
     liveMatchesRef.current = liveMatches;
   }, [liveMatches]);
-
-  // Keep tournament-scope refs current for the realtime channel handlers
-  useEffect(() => {
-    tournamentGroupIdsRef.current = tournamentGroupIds;
-  }, [tournamentGroupIds]);
-  useEffect(() => {
-    tournamentPlayoffIdsRef.current = tournamentPlayoffIds;
-  }, [tournamentPlayoffIds]);
-  useEffect(() => {
-    applyRemoteMatchResultRef.current = applyRemoteMatchResult;
-  }, [applyRemoteMatchResult]);
-
+  
   // Track modal state in ref so interval callback can check it
   useEffect(() => {
     modalOpenRef.current = showEditSettings || !!editingMatch || !!matchStatistics || !!matchToConfirm;
@@ -234,7 +218,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const { isAdmin, isAdminMode } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   const canManage = isAdmin || isOwner;
-  const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament, applyRemoteMatchResult } = useTournament();
+  const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament } = useTournament();
 
   // Update tournamentSettings when tournament prop changes (e.g., after reload from DB)
   useEffect(() => {
@@ -283,15 +267,69 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   }, [tournament?.id, tournament?.standingsCriteriaOrder, tournament?.playoffSettings]);
 
-  // NOTE: The previous 8-second full-tournament refetch poll was removed here.
-  // It called getTournament() which replaced the entire currentTournament object
-  // reference, re-rendering this whole component and causing visible flicker.
-  // Cross-device updates are now handled granularly:
-  //   - Live Matches tab: the realtime channel below updates the separate
-  //     `liveMatches` array (never the tournament object).
-  //   - Playoffs / Standings tabs: the realtime channel detects matches that
-  //     transition to 'completed' and applies them via applyRemoteMatchResult,
-  //     which mutates only the affected bracket/standings subtrees.
+  // Auto-refresh tournament data
+  // - Live Matches tab: only poll when there are live matches
+  // - Playoffs tab: poll so results from other devices advance the bracket and populate next rounds
+  useEffect(() => {
+    // Only run auto-refresh when a tab that needs it is active
+    if (activeTab !== 'liveMatches' && activeTab !== 'playoffs') {
+      return;
+    }
+
+    if (!tournament?.id || !getTournament) {
+      return;
+    }
+
+    // Check if there are any live matches (status === 'in_progress')
+    const checkHasLiveMatches = (currentTournament) => {
+      if (!currentTournament) return false;
+      
+      // Check group matches
+      const groupMatches = currentTournament?.groups?.flatMap(g => g.matches || []) || [];
+      const hasLiveGroupMatch = groupMatches.some(m => m.status === 'in_progress');
+      
+      // Check playoff matches
+      const playoffMatches = currentTournament?.playoffMatches || [];
+      const hasLivePlayoffMatch = playoffMatches.some(m => m.status === 'in_progress');
+      
+      return hasLiveGroupMatch || hasLivePlayoffMatch;
+    };
+
+    if (activeTab === 'liveMatches' && !checkHasLiveMatches(tournament)) {
+      return; // No live matches, don't set up polling
+    }
+
+    if (activeTab === 'playoffs' && (!tournament?.playoffs?.rounds || tournament.playoffs.rounds.length === 0)) {
+      return; // No playoff bracket, nothing to keep in sync
+    }
+
+    // Set up interval to refresh tournament every 8 seconds
+    const refreshInterval = setInterval(async () => {
+      try {
+        // Skip refresh if any modals are open to prevent them from closing
+        if (modalOpenRef.current) {
+          return;
+        }
+        
+        // Double-check we're still on the same tab before refreshing (prevents refresh after tab switch)
+        const expectedTab = activeTabRef.current;
+        if (expectedTab !== 'liveMatches' && expectedTab !== 'playoffs') {
+          return;
+        }
+        
+        const refreshedTournament = await getTournament(tournament.id);
+        // Check if there are still live matches after refresh
+        // If not, the interval will be cleaned up on next render
+      } catch (error) {
+        console.error('Error refreshing tournament for live matches:', error);
+      }
+    }, 8000); // 8 seconds
+
+    // Cleanup interval on unmount or when tournament changes
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [activeTab, tournament?.id, tournament?.groups, tournament?.playoffMatches, getTournament]);
 
   // Simple function to check if match exists in localStorage (started on this device)
   const isMatchInLocalStorage = (matchId) => {
@@ -2655,54 +2693,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               liveMatchesRef.current = updated;
               return updated;
             });
-          }
-        }
-      )
-      // Detect matches that transition to 'completed' on another device and
-      // apply them granularly to the local bracket/standings. NOTE: no status
-      // filter here — the in_progress-filtered listeners above can never match
-      // a row whose new status is 'completed'. We filter in JS instead.
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'matches'
-        },
-        (payload) => {
-          const match = payload.new;
-          if (!match || match.status !== 'completed') {
-            return; // Only care about completions here
-          }
-
-          const belongsToTournament =
-            tournamentGroupIdsRef.current.has(match.group_id) ||
-            tournamentPlayoffIdsRef.current.has(match.id);
-
-          if (!belongsToTournament) {
-            return;
-          }
-
-          // Build a matchResult from the payload row. saveMatchResult writes the
-          // full result JSONB + winner + leg counts, so the payload carries
-          // everything the standings/bracket transform needs. applyMatchCompletion
-          // synthesizes a minimal result if `result` is somehow absent.
-          const matchResult = {
-            matchId: match.id,
-            winner: match.winner_id,
-            player1Id: match.player1_id,
-            player2Id: match.player2_id,
-            player1Legs: match.player1_legs,
-            player2Legs: match.player2_legs,
-            isPlayoff: !!match.is_playoff,
-            playoffRound: match.playoff_round,
-            groupId: match.group_id,
-            result: match.result || null,
-            ...(match.result || {})
-          };
-
-          const apply = applyRemoteMatchResultRef.current;
-          if (apply) {
-            apply(matchResult);
           }
         }
       )
