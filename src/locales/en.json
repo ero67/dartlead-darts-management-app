@@ -1,4 +1,13 @@
 {
+  "offline": {
+    "youAreOffline": "You're offline",
+    "scoresQueued": "scores will sync when you're back online",
+    "pendingCount": "{{count}} change(s) waiting to sync",
+    "backOnline": "Back online — syncing",
+    "updateAvailable": "A new version is available",
+    "refresh": "Refresh",
+    "waitingForConnection": "Waiting for connection"
+  },
   "navigation": {
     "home": "Home",
     "dashboard": "Dashboard",

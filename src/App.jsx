@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdminProvider, useAdmin } from './contexts/AdminContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { OfflineProvider } from './contexts/OfflineContext';
 import { Navigation } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { TournamentsList } from './components/TournamentsList';
@@ -24,6 +25,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { ManagerPanel } from './components/ManagerPanel';
 import { LandingPage } from './components/LandingPage';
 import { PlayerProfile } from './components/PlayerProfile';
+import { OfflineBanner } from './components/OfflineBanner';
 import { supabase } from './lib/supabase';
 import './App.css';
 
@@ -347,6 +349,8 @@ function AppContent() {
 
   return (
     <div className="app">
+      <OfflineBanner />
+
       {/* Mobile Header - only show on mobile */}
       {isMobile && (
         <div className="mobile-header">
@@ -482,6 +486,7 @@ function App() {
     <Router>
       <ThemeProvider>
         <LanguageProvider>
+          <OfflineProvider>
           <AuthProvider>
             <AdminProvider>
               <LeagueProvider>
@@ -493,6 +498,7 @@ function App() {
               </LeagueProvider>
             </AdminProvider>
           </AuthProvider>
+          </OfflineProvider>
         </LanguageProvider>
       </ThemeProvider>
     </Router>
