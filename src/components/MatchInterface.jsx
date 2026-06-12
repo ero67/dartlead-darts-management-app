@@ -475,9 +475,29 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }
   }, [currentPlayer, match?.id, matchComplete]);
 
-  // Periodic database sync - update every 30 seconds during active play
+  // Prompt database sync on every scoring change (debounced) so other devices
+  // see live scores within ~1s via the realtime subscription. Debounced to
+  // coalesce rapid dart-by-dart changes into a single write.
   useEffect(() => {
     if (!match?.id || matchComplete) return;
+    if (!user) return; // view-only users don't write
+
+    const timeout = setTimeout(() => {
+      updateMatchToDatabase(match.id, {
+        currentLeg,
+        legScores,
+        currentPlayer
+      });
+    }, 1200);
+
+    return () => clearTimeout(timeout);
+  }, [match?.id, currentLeg, legScores, currentPlayer, matchComplete, user]);
+
+  // Periodic database sync - safety-net fallback every 30 seconds during active
+  // play (covers a missed debounced write, e.g. the tab was backgrounded).
+  useEffect(() => {
+    if (!match?.id || matchComplete) return;
+    if (!user) return;
 
     const interval = setInterval(() => {
       updateMatchToDatabase(match.id, {
@@ -488,7 +508,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }, 30000); // Update every 30 seconds
 
     return () => clearInterval(interval);
-  }, [match?.id, currentLeg, legScores, currentPlayer, matchComplete]);
+  }, [match?.id, currentLeg, legScores, currentPlayer, matchComplete, user]);
 
   // Save match state to localStorage whenever it changes
   useEffect(() => {

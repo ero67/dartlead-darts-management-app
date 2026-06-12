@@ -2560,6 +2560,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // Load initial matches
     loadLiveMatches();
 
+    // Lightweight polling fallback for live scores. The realtime subscription
+    // below only delivers if Postgres realtime is enabled on the `matches`
+    // table; this poll guarantees live scores still refresh otherwise. It
+    // re-runs loadLiveMatches (which smart-merges into the `liveMatches` array
+    // only — never the whole tournament), so it does NOT cause page flicker.
+    // Runs only while the Live Matches tab is active to avoid needless queries.
+    const livePollInterval = setInterval(() => {
+      if (activeTabRef.current === 'liveMatches') {
+        loadLiveMatches();
+      }
+    }, 5000);
+
     // Set up real-time subscription
     const channel = supabase
       .channel(`live-matches-tournament-${tournament.id}`)
@@ -2716,6 +2728,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
     return () => {
       isMounted = false;
+      clearInterval(livePollInterval);
       supabase.removeChannel(channel);
     };
   }, [tournament?.id]); // Only depend on tournament ID to avoid unnecessary reloads

@@ -1,10 +1,13 @@
 import React from 'react';
-import { WifiOff, RefreshCw, CloudUpload } from 'lucide-react';
+import { WifiOff, RefreshCw } from 'lucide-react';
 import { useOffline } from '../contexts/OfflineContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
-// Minimal fixed banner that surfaces offline status, queued-write count, and a
-// soft "update available" prompt. Rendered once near the app root.
+// Minimal fixed banner. Only surfaces things the user needs to act on or know:
+//   - that they're currently OFFLINE (scores are being queued), and
+//   - that a new app version is ready to load.
+// When online we do NOT show a "syncing" bar — the queue flushes on its own,
+// so a persistent banner there would just be noise.
 export function OfflineBanner() {
   const { isOnline, hasPendingWrites, pendingWrites, needRefresh, applyUpdate } = useOffline();
   const { t } = useLanguage();
@@ -13,8 +16,8 @@ export function OfflineBanner() {
     applyUpdate();
   };
 
-  // Nothing to show when fully online, synced, and up to date.
-  if (isOnline && !hasPendingWrites && !needRefresh) {
+  // Nothing to show when online and there's no pending update.
+  if (isOnline && !needRefresh) {
     return null;
   }
 
@@ -29,13 +32,6 @@ export function OfflineBanner() {
               ? ` — ${t('offline.pendingCount', { count: pendingWrites })}`
               : ` — ${t('offline.scoresQueued')}`}
           </span>
-        </div>
-      )}
-
-      {isOnline && hasPendingWrites && (
-        <div className="offline-banner offline-banner--syncing">
-          <CloudUpload size={16} />
-          <span>{t('offline.pendingCount', { count: pendingWrites })}</span>
         </div>
       )}
 
