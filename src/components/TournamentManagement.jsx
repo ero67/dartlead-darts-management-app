@@ -143,9 +143,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   useEffect(() => {
     tournamentPlayoffIdsRef.current = tournamentPlayoffIds;
   }, [tournamentPlayoffIds]);
-  useEffect(() => {
-    applyRemoteMatchResultRef.current = applyRemoteMatchResult;
-  }, [applyRemoteMatchResult]);
+  // NOTE: the applyRemoteMatchResult ref-sync effect lives AFTER the
+  // useTournament() destructuring below — referencing it here would hit the
+  // temporal dead zone (the const isn't initialized until later in render).
 
   // Track modal state in ref so interval callback can check it
   useEffect(() => {
@@ -235,6 +235,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   const canManage = isAdmin || isOwner;
   const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament, applyRemoteMatchResult } = useTournament();
+
+  // Keep the apply-remote fn in a ref for the realtime channel handlers.
+  // Placed here (after useTournament) to avoid a temporal-dead-zone error.
+  useEffect(() => {
+    applyRemoteMatchResultRef.current = applyRemoteMatchResult;
+  }, [applyRemoteMatchResult]);
 
   // Update tournamentSettings when tournament prop changes (e.g., after reload from DB)
   useEffect(() => {
