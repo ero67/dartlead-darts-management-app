@@ -1,13 +1,4 @@
 {
-  "offline": {
-    "youAreOffline": "Ste offline",
-    "scoresQueued": "skóre sa zosynchronizuje po obnovení pripojenia",
-    "pendingCount": "{{count}} zmena(y) čaká na synchronizáciu",
-    "backOnline": "Späť online — synchronizujem",
-    "updateAvailable": "K dispozícii je nová verzia",
-    "refresh": "Obnoviť",
-    "waitingForConnection": "Čaká sa na pripojenie"
-  },
   "navigation": {
     "home": "Domov",
     "dashboard": "Prehľad",

@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import { tournamentService, matchService } from '../services/tournamentService.js';
 import { leagueService } from '../services/leagueService.js';
 import { supabase } from '../lib/supabase.js';
-import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue.js';
 
 
 const TournamentContext = createContext();
@@ -671,20 +670,14 @@ export function TournamentProvider({ children }) {
     // Clear match from session – the match is done, no need to restore it
     saveSessionIds(state.currentTournament?.id || null, null);
 
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      // Known offline – don't even attempt; queue the result so it syncs later.
-      enqueueWrite(QUEUE_TYPES.saveMatchResult, matchResult, `result:${matchResult.matchId}`);
-    } else {
-      try {
-        // Save to Supabase first
-        await matchService.saveMatchResult(matchResult);
-      } catch (error) {
-        console.error('Error saving match result to Supabase, queueing for retry:', error);
-        // Don't lose the result – queue it for retry when connectivity returns.
-        enqueueWrite(QUEUE_TYPES.saveMatchResult, matchResult, `result:${matchResult.matchId}`);
-      }
+    try {
+      // Save to Supabase first
+      await matchService.saveMatchResult(matchResult);
+    } catch (error) {
+      console.error('Error saving match result to Supabase:', error);
+      // Continue with local update even if Supabase fails
     }
-
+    
     // Update local state first
     dispatch({ type: ACTIONS.COMPLETE_MATCH, payload: matchResult });
     
@@ -704,27 +697,23 @@ export function TournamentProvider({ children }) {
             const toSync = playoffs._matchesNeedingDbSync || [];
             for (const m of toSync) {
               if (m.player1?.id || m.player2?.id) {
-                const upsertRow = {
-                  id: m.id,
-                  tournament_id: currentState.currentTournament.id,
-                  player1_id: m.player1?.id || null,
-                  player2_id: m.player2?.id || null,
-                  status: m.status || 'pending',
-                  is_playoff: true,
-                  playoff_round: m.playoffRound,
-                  playoff_match_number: m.playoffMatchNumber,
-                  legs_to_win: currentState.currentTournament.legsToWin || 3,
-                  starting_score: currentState.currentTournament.startingScore || 501
-                };
                 try {
-                  const { error: upsertErr } = await supabase
+                  await supabase
                     .from('matches')
-                    .upsert(upsertRow, { onConflict: 'id' });
-                  if (upsertErr) throw upsertErr;
+                    .upsert({
+                      id: m.id,
+                      tournament_id: currentState.currentTournament.id,
+                      player1_id: m.player1?.id || null,
+                      player2_id: m.player2?.id || null,
+                      status: m.status || 'pending',
+                      is_playoff: true,
+                      playoff_round: m.playoffRound,
+                      playoff_match_number: m.playoffMatchNumber,
+                      legs_to_win: currentState.currentTournament.legsToWin || 3,
+                      starting_score: currentState.currentTournament.startingScore || 501
+                    }, { onConflict: 'id' });
                 } catch (syncErr) {
-                  console.warn('Could not sync next-round match to DB, queueing for retry:', syncErr);
-                  // Queue so the bracket advancement is not lost offline.
-                  enqueueWrite(QUEUE_TYPES.playoffSync, upsertRow, `playoff:${m.id}`);
+                  console.warn('Non-fatal: could not sync next-round match to DB:', syncErr);
                 }
               }
             }
