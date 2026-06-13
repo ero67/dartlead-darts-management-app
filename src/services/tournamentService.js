@@ -2171,23 +2171,17 @@ export const matchService = {
     try {
       console.log('💾 Saving match result:', matchResult.matchId, 'Winner:', matchResult.winner)
       
-      // Check authentication status
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) {
-        console.error('Auth error:', authError);
-        // If auth session is missing, try to get the session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) {
-          console.error('No auth session available:', sessionError);
-          throw new Error('Authentication required to complete match. Please log in again.');
-        }
-      }
-      
-      if (!user) {
-        console.error('No authenticated user found');
+      // Verify we have an auth session. Prefer getSession() (reads the locally
+      // stored token, no network round-trip) so this works immediately after a
+      // reconnect / queue flush. getUser() makes a network call that can fail or
+      // be served stale right after coming back online, which previously caused
+      // queued match-result writes to abort before the match was ever updated.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('No auth session available');
         throw new Error('Authentication required to complete match. Please log in again.');
       }
-      
+
       // Update the match with results
       
       const updateData = {
@@ -2309,9 +2303,25 @@ export const matchService = {
         }
       }
       
+      // ── Secondary writes (per-player stats + leg records) ──────────────────
+      // The match status UPDATE above is the authoritative completion. Everything
+      // below is supplementary statistics. It is wrapped so that:
+      //   (a) a failure here NEVER throws away the committed match completion
+      //       (which would re-queue the whole write and leave the match showing
+      //       "in progress" forever), and
+      //   (b) it is idempotent — we delete any existing stats/legs for this match
+      //       first, so a queued retry doesn't create duplicate rows.
+      try {
+        await supabase.from('match_player_stats').delete().eq('match_id', matchResult.matchId);
+        await supabase.from('legs').delete().eq('match_id', matchResult.matchId);
+      } catch (cleanupErr) {
+        console.warn('Non-fatal: could not clear prior stats/legs before re-insert:', cleanupErr);
+      }
+
+      try {
       // Save player statistics to match_player_stats table
       const statsPromises = [];
-      
+
       // Player 1 stats
       if (matchResult.player1Id && matchResult.player1Stats) {
         const highestCheckout = matchResult.player1Stats.checkouts?.length > 0 
@@ -2430,38 +2440,22 @@ export const matchService = {
       }
 
       await Promise.all(legPromises)
+      // NOTE: a second, duplicate match_player_stats insert used to live here and
+      // threw on error. It was removed — the per-player stats are already inserted
+      // above, and a duplicate insert both created double rows and (via its throw)
+      // could re-queue an already-completed match. Stats are non-authoritative.
 
-      // Update player statistics
-      const { error: statsError } = await supabase
-        .from('match_player_stats')
-        .insert([
-          {
-            match_id: matchResult.matchId,
-            player_id: matchResult.player1Id,
-            legs_won: matchResult.player1Legs,
-            legs_lost: matchResult.player2Legs,
-            total_score: matchResult.player1Stats?.totalScore || 0,
-            total_darts: matchResult.player1Stats?.totalDarts || 0,
-            average: matchResult.player1Stats?.average || 0,
-            highest_checkout: Math.max(...(matchResult.player1Stats?.checkouts || [0]))
-          },
-          {
-            match_id: matchResult.matchId,
-            player_id: matchResult.player2Id,
-            legs_won: matchResult.player2Legs,
-            legs_lost: matchResult.player1Legs,
-            total_score: matchResult.player2Stats?.totalScore || 0,
-            total_darts: matchResult.player2Stats?.totalDarts || 0,
-            average: matchResult.player2Stats?.average || 0,
-            highest_checkout: Math.max(...(matchResult.player2Stats?.checkouts || [0]))
-          }
-        ])
-
-      if (statsError) throw statsError
+        console.log('✅ Player stats & legs saved')
+      } catch (secondaryErr) {
+        // Secondary stats/legs failed, but the match completion already committed
+        // above. Do NOT rethrow — rethrowing would re-queue the whole write and
+        // leave the match stuck showing "in progress".
+        console.warn('Non-fatal: match completed, but saving stats/legs failed:', secondaryErr);
+      }
 
       console.log('✅ Match result saved to database')
       console.log('✅ Final match status:', updatedMatch?.status)
-      
+
       // Return the updated match with verified status
       return updatedMatch
 

@@ -46,13 +46,18 @@ export default defineConfig({
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
-            // Cache Supabase GET reads so views render offline from last data.
-            // Writes never hit this — they go through the app's offline queue.
+            // Cache ONLY Supabase REST data reads (/rest/v1) so views can render
+            // offline from the last data. We deliberately exclude /auth/v1 and
+            // /realtime — caching auth responses can serve a stale/empty session
+            // right after reconnect, which made authenticated writes (e.g. saving
+            // a match result) fail. Auth and realtime must always hit the network.
             urlPattern: ({ url, request }) =>
-              url.hostname.endsWith('.supabase.co') && request.method === 'GET',
+              url.hostname.endsWith('.supabase.co') &&
+              url.pathname.startsWith('/rest/v1') &&
+              request.method === 'GET',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'supabase-api',
+              cacheName: 'supabase-rest',
               networkTimeoutSeconds: 5,
               expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
               cacheableResponse: { statuses: [0, 200] }
