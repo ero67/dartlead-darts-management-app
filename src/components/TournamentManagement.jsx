@@ -1618,21 +1618,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
 
-  const getMatchStatusColor = (status, matchId) => {
+  // Returns a semantic status class so the badge inherits design-system
+  // colors (token-driven) instead of hardcoded inline hex values.
+  const getMatchStatusClass = (status, matchId) => {
     if (isMatchActuallyLive(matchId)) {
-      if (isMatchInLocalStorage(matchId)) {
-        return '#3b82f6'; // Blue for this device
-      } else if (canManage) {
-        return '#dc2626'; // Red for admin/owner access
-      } else {
-        return '#f59e0b'; // Orange for other device
-      }
+      return 'status-live';
     }
-    
+
     switch (status) {
-      case 'completed': return '#10b981';
-      case 'in_progress': return '#f59e0b';
-      default: return '#6b7280';
+      case 'completed': return 'status-completed';
+      case 'in_progress': return 'status-live';
+      default: return 'status-pending';
     }
   };
 
@@ -1839,13 +1835,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 const isPlayer2Winner = match.status === 'completed' && match.result && match.result.winner === match.player2?.id;
                 
                 return (
-                <div key={match.id} className="match-card">
+                <div key={match.id} className={`match-card ${getMatchStatusClass(match.status, match.id)}`}>
                   <div className="match-header">
                     <div className="match-status">
-                      <span 
-                        className="status-badge"
-                        style={{ backgroundColor: getMatchStatusColor(match.status, match.id) }}
-                      >
+                      <span className={`match-badge ${getMatchStatusClass(match.status, match.id)}`}>
                         {getMatchStatusText(match.status, match.id)}
                       </span>
                       {isMatchActuallyLive(match.id) && (
@@ -2005,44 +1998,78 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     );
   };
 
-  const renderStandings = () => (
+  const renderStandings = () => {
+    const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
+    const qualifyCount = tournament?.playoffSettings?.playersPerGroup || 1;
+    return (
     <div className="standings-view">
-      <h3>{t('management.groupStandings')}</h3>
+      <div className="standings-view-header">
+        <h3>{t('management.groupStandings')}</h3>
+        {playoffsEnabled && (
+          <div className="standings-legend">
+            <span className="standings-legend-item">
+              <span className="standings-legend-dot qualify" />
+              {t('management.qualifies') || 'Qualifies'}
+            </span>
+            <span className="standings-legend-item">
+              <span className="standings-legend-dot eliminate" />
+              {t('management.eliminated') || 'Eliminated'}
+            </span>
+          </div>
+        )}
+      </div>
       <div className="standings-list">
         {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map(group => {
+          const standings = group.standings || [];
+          const hasData = standings.length > 0;
           return (
           <div key={group.id} className="group-standings">
-            <h4>{group.name}</h4>
+            <div className="group-standings-title">
+              <Trophy size={15} />
+              <h4>{group.name}</h4>
+              {hasData && (
+                <span className="group-standings-count">
+                  {standings.length} {t('common.players') || 'players'}
+                </span>
+              )}
+            </div>
             <div className="standings-table">
               <div className="table-header">
-                <span>{t('management.pos')}</span>
-                <span>{t('management.player')}</span>
-                <span>{t('management.played')}</span>
-                <span>{t('management.won')}</span>
-                <span>{t('management.lost')}</span>
-                <span>{t('management.legsWL')}</span>
-                <span>{t('management.legsDiff')}</span>
-                <span>{t('management.avg')}</span>
-                <span>{t('management.pts')}</span>
+                <span className="col-pos">{t('management.pos')}</span>
+                <span className="col-player">{t('management.player')}</span>
+                <span className="col-num" title={t('management.played')}>{t('management.played')}</span>
+                <span className="col-num" title={t('management.won')}>{t('management.won')}</span>
+                <span className="col-num" title={t('management.lost')}>{t('management.lost')}</span>
+                <span className="col-legs">{t('management.legsWL')}</span>
+                <span className="col-num">{t('management.legsDiff')}</span>
+                <span className="col-num">{t('management.avg')}</span>
+                <span className="col-pts">{t('management.pts')}</span>
               </div>
-              {(group.standings || []).length > 0 ? (
-                (group.standings || []).map((standing, index) => {
-                  const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
-                  const qualifyCount = tournament?.playoffSettings?.playersPerGroup || 1;
-                  const rowClass = playoffsEnabled ? (index < qualifyCount ? 'qualify-row' : 'eliminate-row') : '';
+              {hasData ? (
+                standings.map((standing, index) => {
+                  const rank = index + 1;
+                  const isQualify = playoffsEnabled && index < qualifyCount;
+                  const rowClass = playoffsEnabled ? (isQualify ? 'qualify-row' : 'eliminate-row') : '';
+                  const isCutLine = playoffsEnabled && rank === qualifyCount && standings.length > qualifyCount;
+                  const legDiff = standing.legsWon - standing.legsLost;
                   return (
-                  <div key={standing.player.id} className={`table-row ${rowClass}`}>
-                    <span className="position">{index + 1}</span>
-                    <span className="player-name">{standing.player.name}</span>
-                    <span>{standing.matchesPlayed}</span>
-                    <span>{standing.matchesWon}</span>
-                    <span>{standing.matchesLost}</span>
-                    <span>{standing.legsWon}:{standing.legsLost}</span>
-                    <span className={standing.legsWon - standing.legsLost >= 0 ? 'positive' : 'negative'}>
-                      {standing.legsWon - standing.legsLost > 0 ? '+' : ''}{standing.legsWon - standing.legsLost}
+                  <div
+                    key={standing.player.id}
+                    className={`table-row ${rowClass} ${isCutLine ? 'cut-line' : ''}`}
+                  >
+                    <span className="col-pos">
+                      <span className={`standings-rank rank-${rank}`}>{rank}</span>
                     </span>
-                    <span>{standing.average.toFixed(1)}</span>
-                    <span className="points">{standing.points}</span>
+                    <span className="col-player player-name">{standing.player.name}</span>
+                    <span className="col-num">{standing.matchesPlayed}</span>
+                    <span className="col-num col-won">{standing.matchesWon}</span>
+                    <span className="col-num">{standing.matchesLost}</span>
+                    <span className="col-legs">{standing.legsWon}:{standing.legsLost}</span>
+                    <span className={`col-num ${legDiff >= 0 ? 'positive' : 'negative'}`}>
+                      {legDiff > 0 ? '+' : ''}{legDiff}
+                    </span>
+                    <span className="col-num">{standing.average.toFixed(1)}</span>
+                    <span className="col-pts points">{standing.points}</span>
                   </div>
                   );
                 })
@@ -2061,7 +2088,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   const renderStatistics = () => {
     // Helper function to get checkout value (handles both numeric and legacy string format)
@@ -3104,10 +3132,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     )}
                     <div className="match-header">
                       <div className="match-status">
-                        <span 
-                          className="status-badge"
-                          style={{ backgroundColor: getMatchStatusColor(match.status, match.id) }}
-                        >
+                        <span className={`match-badge ${getMatchStatusClass(match.status, match.id)}`}>
                           {getMatchStatusText(match.status, match.id)}
                         </span>
                         {isMatchActuallyLive(match.id) && (
