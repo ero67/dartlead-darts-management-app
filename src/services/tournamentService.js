@@ -405,19 +405,21 @@ export const tournamentService = {
 
       if (matchesError) throw matchesError
 
-      // Get groups scoped to these tournaments
+      // Get groups scoped to these tournaments (override default 1000-row limit)
       const { data: allGroups, error: groupsError } = await supabase
         .from('groups')
         .select('*')
         .in('tournament_id', tournamentIds)
+        .limit(10000)
 
       if (groupsError) throw groupsError
 
-      // Get tournament players scoped to these tournaments
+      // Get tournament players scoped to these tournaments (override default 1000-row limit)
       const { data: tournamentPlayers, error: tpError } = await supabase
         .from('tournament_players')
         .select('*')
         .in('tournament_id', tournamentIds)
+        .limit(10000)
 
       if (tpError) throw tpError
 
