@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { supabase } from '../lib/supabase';
 import { matchService } from '../services/tournamentService';
+import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import checkoutData from '../data/checkouts.json';
 
 // When both players have thrown this many visits in a single leg, the leg has run
@@ -298,21 +299,30 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         console.warn('⚠️ Skipping DB sync: invalid scores detected', { p1Score, p2Score });
         return;
       }
+      const update = {
+        current_leg: matchState.currentLeg,
+        player1_current_score: p1Score,
+        player2_current_score: p2Score,
+        player1_legs: matchState.legScores.player1.legs,
+        player2_legs: matchState.legScores.player2.legs,
+        current_player: matchState.currentPlayer,
+        last_activity_at: new Date().toISOString()
+      };
+
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        // Offline – queue the live sync (dedup keeps only the latest per match)
+        enqueueWrite(QUEUE_TYPES.liveSync, { matchId, update }, `live:${matchId}`);
+        return;
+      }
+
       const { error } = await supabase
         .from('matches')
-        .update({
-          current_leg: matchState.currentLeg,
-          player1_current_score: p1Score,
-          player2_current_score: p2Score,
-          player1_legs: matchState.legScores.player1.legs,
-          player2_legs: matchState.legScores.player2.legs,
-          current_player: matchState.currentPlayer,
-          last_activity_at: new Date().toISOString()
-        })
+        .update(update)
         .eq('id', matchId);
 
       if (error) {
-        console.error('Error updating match to database:', error);
+        console.error('Error updating match to database, queueing live sync:', error);
+        enqueueWrite(QUEUE_TYPES.liveSync, { matchId, update }, `live:${matchId}`);
       } else {
         console.log('✅ Database sync:', matchId);
       }
@@ -465,11 +475,41 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }
   }, [currentPlayer, match?.id, matchComplete]);
 
-  // Periodic database sync - update every 30 seconds during active play
+  // Sync to the DB at TURN boundaries (not per dart) so the live board on other
+  // devices shows a player's score only after their full visit, not mid-turn.
+  // `currentPlayer` flips and/or the leg counts change only when a turn ends
+  // (see finishTurn / bust handling), so depending on those — and NOT on the
+  // per-dart `legScores...currentScore` — fires exactly once per completed turn.
+  // A small debounce coalesces the simultaneous state updates of a turn end.
   useEffect(() => {
     if (!match?.id || matchComplete) return;
+    if (!user) return; // view-only users don't write
+
+    const timeout = setTimeout(() => {
+      updateMatchToDatabase(match.id, {
+        currentLeg,
+        legScores,
+        currentPlayer
+      });
+    }, 400);
+
+    return () => clearTimeout(timeout);
+    // legScores is intentionally omitted from deps: we only want to sync when a
+    // turn ends (currentPlayer / leg counts / leg number change), reading the
+    // latest legScores from the closure at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.id, currentPlayer, currentLeg, legScores.player1.legs, legScores.player2.legs, matchComplete, user]);
+
+  // Periodic database sync - safety-net fallback every 30 seconds during active
+  // play (covers a missed write, e.g. the tab was backgrounded). Skips writing
+  // mid-turn so the live board never shows a partial visit.
+  useEffect(() => {
+    if (!match?.id || matchComplete) return;
+    if (!user) return;
 
     const interval = setInterval(() => {
+      // Don't leak a mid-turn score to watchers — only sync between turns.
+      if (currentTurn.darts > 0) return;
       updateMatchToDatabase(match.id, {
         currentLeg,
         legScores,
@@ -478,7 +518,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     }, 30000); // Update every 30 seconds
 
     return () => clearInterval(interval);
-  }, [match?.id, currentLeg, legScores, currentPlayer, matchComplete]);
+  }, [match?.id, currentLeg, legScores, currentPlayer, currentTurn.darts, matchComplete, user]);
 
   // Save match state to localStorage whenever it changes
   useEffect(() => {
@@ -724,7 +764,12 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
       // Mark match as live on THIS device in DB (enables cross-device visibility + admin takeover)
       if (deviceId) {
         matchService.startLiveMatch(match.id, deviceId, deviceName, boardNumber).catch(error => {
-          console.error('Error starting live match in database:', error);
+          console.error('Error starting live match in database, queueing for retry:', error);
+          enqueueWrite(
+            QUEUE_TYPES.startLiveMatch,
+            { matchId: match.id, deviceId, deviceName, boardNumber },
+            `start:${match.id}`
+          );
         });
       }
       matchService.startMatch(match.id, user.id, match).catch(error => {

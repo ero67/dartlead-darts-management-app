@@ -18,6 +18,17 @@ import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
     return crypto.randomUUID();
   };
 
+// Stable ordering for live match cards. We deliberately do NOT sort by
+// last_activity_at (which changes constantly as matches are scored, causing
+// cards to jump around). Order by board number, then match id — both stable
+// for the lifetime of a match.
+const compareLiveMatchesStable = (a, b) => {
+  const boardA = a.live_board_number ?? Number.MAX_SAFE_INTEGER;
+  const boardB = b.live_board_number ?? Number.MAX_SAFE_INTEGER;
+  if (boardA !== boardB) return boardA - boardB;
+  return String(a.id).localeCompare(String(b.id));
+};
+
 export function TournamentManagement({ tournament, onMatchStart, onBack, onDeleteTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -57,6 +68,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   });
   const modalOpenRef = useRef(false); // Track if any modal is open
   const activeTabRef = useRef(activeTab); // Track active tab for interval callback
+  // Refs mirroring tournament scope so the realtime channel handlers (which only
+  // re-subscribe on tournament id) never read stale group/playoff id sets.
+  const tournamentGroupIdsRef = useRef(new Set());
+  const tournamentPlayoffIdsRef = useRef(new Set());
+  const applyRemoteMatchResultRef = useRef(null);
   const [matchGroupFilter, setMatchGroupFilter] = useState('all'); // Filter by group
   const [matchPlayerFilter, setMatchPlayerFilter] = useState(''); // Filter by player name
   const [bracketViewMode, setBracketViewMode] = useState('detailed'); // 'detailed' or 'compact'
@@ -130,7 +146,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   useEffect(() => {
     liveMatchesRef.current = liveMatches;
   }, [liveMatches]);
-  
+
+  // Keep tournament-scope refs current for the realtime channel handlers
+  useEffect(() => {
+    tournamentGroupIdsRef.current = tournamentGroupIds;
+  }, [tournamentGroupIds]);
+  useEffect(() => {
+    tournamentPlayoffIdsRef.current = tournamentPlayoffIds;
+  }, [tournamentPlayoffIds]);
+  // NOTE: the applyRemoteMatchResult ref-sync effect lives AFTER the
+  // useTournament() destructuring below — referencing it here would hit the
+  // temporal dead zone (the const isn't initialized until later in render).
+
   // Track modal state in ref so interval callback can check it
   useEffect(() => {
     modalOpenRef.current = showEditSettings || !!editingMatch || !!matchStatistics || !!matchToConfirm;
@@ -218,7 +245,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const { isAdmin, isAdminMode } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   const canManage = isAdmin || isOwner;
-  const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament } = useTournament();
+  const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament, applyRemoteMatchResult } = useTournament();
+
+  // Keep the apply-remote fn in a ref for the realtime channel handlers.
+  // Placed here (after useTournament) to avoid a temporal-dead-zone error.
+  useEffect(() => {
+    applyRemoteMatchResultRef.current = applyRemoteMatchResult;
+  }, [applyRemoteMatchResult]);
 
   // Update tournamentSettings when tournament prop changes (e.g., after reload from DB)
   useEffect(() => {
@@ -267,69 +300,15 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   }, [tournament?.id, tournament?.standingsCriteriaOrder, tournament?.playoffSettings]);
 
-  // Auto-refresh tournament data
-  // - Live Matches tab: only poll when there are live matches
-  // - Playoffs tab: poll so results from other devices advance the bracket and populate next rounds
-  useEffect(() => {
-    // Only run auto-refresh when a tab that needs it is active
-    if (activeTab !== 'liveMatches' && activeTab !== 'playoffs') {
-      return;
-    }
-
-    if (!tournament?.id || !getTournament) {
-      return;
-    }
-
-    // Check if there are any live matches (status === 'in_progress')
-    const checkHasLiveMatches = (currentTournament) => {
-      if (!currentTournament) return false;
-      
-      // Check group matches
-      const groupMatches = currentTournament?.groups?.flatMap(g => g.matches || []) || [];
-      const hasLiveGroupMatch = groupMatches.some(m => m.status === 'in_progress');
-      
-      // Check playoff matches
-      const playoffMatches = currentTournament?.playoffMatches || [];
-      const hasLivePlayoffMatch = playoffMatches.some(m => m.status === 'in_progress');
-      
-      return hasLiveGroupMatch || hasLivePlayoffMatch;
-    };
-
-    if (activeTab === 'liveMatches' && !checkHasLiveMatches(tournament)) {
-      return; // No live matches, don't set up polling
-    }
-
-    if (activeTab === 'playoffs' && (!tournament?.playoffs?.rounds || tournament.playoffs.rounds.length === 0)) {
-      return; // No playoff bracket, nothing to keep in sync
-    }
-
-    // Set up interval to refresh tournament every 8 seconds
-    const refreshInterval = setInterval(async () => {
-      try {
-        // Skip refresh if any modals are open to prevent them from closing
-        if (modalOpenRef.current) {
-          return;
-        }
-        
-        // Double-check we're still on the same tab before refreshing (prevents refresh after tab switch)
-        const expectedTab = activeTabRef.current;
-        if (expectedTab !== 'liveMatches' && expectedTab !== 'playoffs') {
-          return;
-        }
-        
-        const refreshedTournament = await getTournament(tournament.id);
-        // Check if there are still live matches after refresh
-        // If not, the interval will be cleaned up on next render
-      } catch (error) {
-        console.error('Error refreshing tournament for live matches:', error);
-      }
-    }, 8000); // 8 seconds
-
-    // Cleanup interval on unmount or when tournament changes
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [activeTab, tournament?.id, tournament?.groups, tournament?.playoffMatches, getTournament]);
+  // NOTE: The previous 8-second full-tournament refetch poll was removed here.
+  // It called getTournament() which replaced the entire currentTournament object
+  // reference, re-rendering this whole component and causing visible flicker.
+  // Cross-device updates are now handled granularly:
+  //   - Live Matches tab: the realtime channel below updates the separate
+  //     `liveMatches` array (never the tournament object).
+  //   - Playoffs / Standings tabs: the realtime channel detects matches that
+  //     transition to 'completed' and applies them via applyRemoteMatchResult,
+  //     which mutates only the affected bracket/standings subtrees.
 
   // Simple function to check if match exists in localStorage (started on this device)
   const isMatchInLocalStorage = (matchId) => {
@@ -2534,12 +2513,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           }
         }
 
-        // Sort by last activity
-        allLiveMatches.sort((a, b) => {
-          const timeA = new Date(a.last_activity_at || 0).getTime();
-          const timeB = new Date(b.last_activity_at || 0).getTime();
-          return timeB - timeA;
-        });
+        // Stable order (board number, then id) so cards don't jump around
+        allLiveMatches.sort(compareLiveMatchesStable);
 
         // Smart merge: preserve existing matches and only update changed ones
         // This prevents cards from disappearing during refresh
@@ -2572,13 +2547,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             }
           });
           
-          // Sort the merged result
-          mergedMatches.sort((a, b) => {
-            const timeA = new Date(a.last_activity_at || 0).getTime();
-            const timeB = new Date(b.last_activity_at || 0).getTime();
-            return timeB - timeA;
-          });
-          
+          // Sort the merged result in the same stable order
+          mergedMatches.sort(compareLiveMatchesStable);
+
           // Update ref with merged matches BEFORE returning
           // This ensures next update has the latest data
           liveMatchesRef.current = mergedMatches;
@@ -2591,6 +2562,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
     // Load initial matches
     loadLiveMatches();
+
+    // Lightweight polling fallback for live scores. The realtime subscription
+    // below only delivers if Postgres realtime is enabled on the `matches`
+    // table; this poll guarantees live scores still refresh otherwise. It
+    // re-runs loadLiveMatches (which smart-merges into the `liveMatches` array
+    // only — never the whole tournament), so it does NOT cause page flicker.
+    // Runs only while the Live Matches tab is active to avoid needless queries.
+    const livePollInterval = setInterval(() => {
+      if (activeTabRef.current === 'liveMatches') {
+        loadLiveMatches();
+      }
+    }, 5000);
 
     // Set up real-time subscription
     const channel = supabase
@@ -2696,10 +2679,59 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           }
         }
       )
+      // Detect matches that transition to 'completed' on another device and
+      // apply them granularly to the local bracket/standings. NOTE: no status
+      // filter here — the in_progress-filtered listeners above can never match
+      // a row whose new status is 'completed'. We filter in JS instead.
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'matches'
+        },
+        (payload) => {
+          const match = payload.new;
+          if (!match || match.status !== 'completed') {
+            return; // Only care about completions here
+          }
+
+          const belongsToTournament =
+            tournamentGroupIdsRef.current.has(match.group_id) ||
+            tournamentPlayoffIdsRef.current.has(match.id);
+
+          if (!belongsToTournament) {
+            return;
+          }
+
+          // Build a matchResult from the payload row. saveMatchResult writes the
+          // full result JSONB + winner + leg counts, so the payload carries
+          // everything the standings/bracket transform needs. applyMatchCompletion
+          // synthesizes a minimal result if `result` is somehow absent.
+          const matchResult = {
+            matchId: match.id,
+            winner: match.winner_id,
+            player1Id: match.player1_id,
+            player2Id: match.player2_id,
+            player1Legs: match.player1_legs,
+            player2Legs: match.player2_legs,
+            isPlayoff: !!match.is_playoff,
+            playoffRound: match.playoff_round,
+            groupId: match.group_id,
+            result: match.result || null,
+            ...(match.result || {})
+          };
+
+          const apply = applyRemoteMatchResultRef.current;
+          if (apply) {
+            apply(matchResult);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
       isMounted = false;
+      clearInterval(livePollInterval);
       supabase.removeChannel(channel);
     };
   }, [tournament?.id]); // Only depend on tournament ID to avoid unnecessary reloads
@@ -2712,12 +2744,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const filteredLiveMatches = liveMatches
       .filter(belongsToThisTournament)
       .sort((a, b) => {
+        // Favorites pinned first (deliberate user action), then a stable order
+        // (board, then id) so cards don't reshuffle as scores update.
         const aFav = favoriteMatchIds.has(a.id) ? 1 : 0;
         const bFav = favoriteMatchIds.has(b.id) ? 1 : 0;
         if (aFav !== bFav) return bFav - aFav;
-        const timeA = new Date(a.last_activity_at || 0).getTime();
-        const timeB = new Date(b.last_activity_at || 0).getTime();
-        return timeB - timeA;
+        return compareLiveMatchesStable(a, b);
       });
 
     return (
@@ -2771,8 +2803,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <div className="scoreboard-label">{t('management.legs') || 'Legs'}</div>
                   </div>
 
-                  <div className="player-row player1-row">
+                  <div className={`player-row player1-row${match.current_player === 0 ? ' is-active-turn' : ''}`}>
                     <div className="player-info">
+                      {match.current_player === 0 && (
+                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn', 'Player to throw')} />
+                      )}
                       <div className="player-name-large">{match.player1?.name || t('common.unknown')}</div>
                     </div>
                     <div className="scoreboard-scores">
@@ -2781,8 +2816,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     </div>
                   </div>
 
-                  <div className="player-row player2-row">
+                  <div className={`player-row player2-row${match.current_player === 1 ? ' is-active-turn' : ''}`}>
                     <div className="player-info">
+                      {match.current_player === 1 && (
+                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn', 'Player to throw')} />
+                      )}
                       <div className="player-name-large">{match.player2?.name || t('common.unknown')}</div>
                     </div>
                     <div className="scoreboard-scores">

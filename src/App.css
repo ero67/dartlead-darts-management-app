@@ -7748,6 +7748,29 @@ body {
   transition: color 0.3s ease;
 }
 
+/* Active-turn indicator on live match cards */
+.turn-indicator-arrow {
+  color: #22c55e;
+  margin-right: 0.4rem;
+  flex-shrink: 0;
+  animation: turn-arrow-pulse 1.4s ease-in-out infinite;
+}
+
+.player-row.is-active-turn .player-name-large {
+  color: #22c55e;
+}
+
+.player-row.is-active-turn {
+  border-left: 3px solid #22c55e;
+  padding-left: 0.35rem;
+  margin-left: -0.6rem;
+}
+
+@keyframes turn-arrow-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
 .scoreboard-scores {
   display: flex;
   align-items: center;
@@ -10332,4 +10355,58 @@ body {
 .h2h-stat strong {
   font-size: 0.9rem;
   color: var(--text-primary);
+}
+
+/* ===== Offline / sync banner ===== */
+.offline-banner-stack {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  pointer-events: auto;
+}
+
+.offline-banner--offline {
+  background-color: #b45309; /* amber-700 */
+}
+
+.offline-banner--syncing {
+  background-color: #1d4ed8; /* blue-700 */
+}
+
+.offline-banner--update {
+  background-color: #047857; /* emerald-700 */
+}
+
+.offline-banner__btn {
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #047857;
+  background-color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.offline-banner__btn:hover {
+  background-color: #ecfdf5;
+  border-color: transparent;
 }

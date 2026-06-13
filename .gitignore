@@ -34,3 +34,6 @@ cypress.env.json
 .env
 .env.local
 .env.*.local
+
+# Playwright MCP artifacts
+.playwright-mcp
