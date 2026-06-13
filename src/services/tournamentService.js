@@ -2008,14 +2008,17 @@ export const matchService = {
   // Start a live match
   async startLiveMatch(matchId, deviceId, deviceName = null, boardNumber = null) {
     try {
-      // Try with all columns first (including live_board_number)
+      // Try with all columns first (including live_board_number).
+      // NOTE: do NOT write `started_at` — that column does not exist on the
+      // matches table (only live_started_at / created_at / updated_at do), and
+      // writing it made startLiveMatch fail with "could not find started_at
+      // column" on databases that never had it.
       const updateData = {
         status: 'in_progress',
         live_device_id: deviceId,
         live_device_name: deviceName,
         live_board_number: boardNumber,
-        live_started_at: new Date().toISOString(),
-        started_at: new Date().toISOString()
+        live_started_at: new Date().toISOString()
       };
 
       const { data, error } = await supabase
