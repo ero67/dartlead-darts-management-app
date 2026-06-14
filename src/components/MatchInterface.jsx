@@ -603,6 +603,28 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (turnHistory.length === 0) return;
 
     const last = turnHistory[turnHistory.length - 1];
+
+    // If the last turn won a leg, undo must cross the leg boundary: restore the
+    // full pre-leg-win snapshot (both players' scores, leg count, current leg
+    // and player) so the referee can fix an accidental checkout.
+    if (last.legCompleted && last.undoState) {
+      setPendingCheckout(null);
+      clearTurnTotal();
+      setCurrentLeg(last.undoState.currentLeg);
+      setCurrentPlayer(last.undoState.currentPlayer);
+      setLegScores(last.undoState.legScores);
+      setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
+      setTurnHistory(prev => prev.slice(0, -1));
+      setTimeout(() => {
+        updateMatchToDatabase(match.id, {
+          currentLeg: last.undoState.currentLeg,
+          legScores: last.undoState.legScores,
+          currentPlayer: last.undoState.currentPlayer
+        });
+      }, 100);
+      return;
+    }
+
     // Only allow undo if the last turn is from the current leg
     if (last.leg !== currentLeg) return;
     const playerIndex = last.player;
@@ -1089,13 +1111,32 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     // If current turn is empty, restore from history
     if (turnHistory.length > 0) {
       const lastTurn = turnHistory[turnHistory.length - 1];
-      
+
+      // If the last turn won a leg, restore the full pre-leg-win snapshot so
+      // undo can cross the leg boundary (fixes an accidental checkout).
+      if (lastTurn.legCompleted && lastTurn.undoState) {
+        setCurrentLeg(lastTurn.undoState.currentLeg);
+        setCurrentPlayer(lastTurn.undoState.currentPlayer);
+        setLegScores(lastTurn.undoState.legScores);
+        setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
+        setTurnHistory(prev => prev.slice(0, -1));
+        setTimeout(() => {
+          updateMatchToDatabase(match.id, {
+            currentLeg: lastTurn.undoState.currentLeg,
+            legScores: lastTurn.undoState.legScores,
+            currentPlayer: lastTurn.undoState.currentPlayer
+          });
+        }, 100);
+        setTimeout(() => setIsRemovingDart(false), 100);
+        return;
+      }
+
       // Only allow undo if the last turn is from the current leg
       if (lastTurn.leg !== currentLeg) {
         setIsRemovingDart(false);
         return;
       }
-      
+
       const lastDart = lastTurn.turn.scores[lastTurn.turn.scores.length - 1];
       const wasBustTurn = Boolean(lastTurn.turn?.isBust);
       
@@ -1159,6 +1200,11 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
     if (turnData.darts === 0) {
       return;
     }
+
+    // When this turn wins a leg (mid-match), we capture a full snapshot so the
+    // referee can undo an accidental checkout and resume the leg. Populated in
+    // the leg-win branch below and attached to the turn-history entry.
+    let legCompletedUndo = null;
 
     // Get the current score (use passed score or fall back to state)
     const currentScore = turnData.currentScore !== undefined
@@ -1345,6 +1391,23 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         return;
       }
 
+      // Capture a full pre-leg-win snapshot so this leg win can be undone.
+      // Uses the render-closure legScores (state BEFORE this turn's mutations:
+      // legs not yet incremented, scores/legDarts not yet reset) and overrides
+      // the winner's currentScore back to the score they had at the start of
+      // the winning turn. structuredClone keeps it immune to later updates.
+      legCompletedUndo = {
+        legScores: structuredClone({
+          ...legScores,
+          [`player${currentPlayer + 1}`]: {
+            ...legScores[`player${currentPlayer + 1}`],
+            currentScore: turnStartScore
+          }
+        }),
+        currentLeg,
+        currentPlayer
+      };
+
       // Start new leg - alternate who starts
       // Leg 1: matchStarter, Leg 2: other player, Leg 3: matchStarter, etc.
       const newLegNumber = currentLeg + 1;
@@ -1408,7 +1471,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
         player: currentPlayer,
         turn: { ...turnData },
         legScores: { ...legScores },
-        leg: currentLeg
+        leg: currentLeg,
+        // If this turn won a leg, carry the snapshot so undo can revert it.
+        ...(legCompletedUndo ? { legCompleted: true, undoState: legCompletedUndo } : {})
       }]);
     }
 
