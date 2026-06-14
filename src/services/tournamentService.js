@@ -369,6 +369,76 @@ export const tournamentService = {
     }
   },
 
+  // Get a lightweight summary of all tournaments for the list/dashboard views.
+  //
+  // The list only needs per-tournament aggregates (progress %, group count,
+  // active-match badge) -- never the nested match rows. This calls the
+  // get_tournaments_summary() Postgres RPC, which computes the counts in the
+  // DB and returns one row per tournament. Full groups/matches are loaded
+  // lazily via getTournament(id) when a single tournament is opened.
+  //
+  // The returned objects intentionally carry empty `groups`/`players` arrays
+  // so any legacy `.length`/`.some()` access degrades gracefully instead of
+  // throwing during the transition.
+  async getTournamentsSummary() {
+    try {
+      const { data, error } = await supabase.rpc('get_tournaments_summary')
+      if (error) throw error
+
+      return (data || []).map(row => {
+        // group_settings comes back as JSONB (object) but parse defensively
+        // in case an older row stored it as a JSON string.
+        let groupSettings = row.group_settings
+        if (typeof groupSettings === 'string') {
+          try {
+            groupSettings = JSON.parse(groupSettings)
+          } catch (e) {
+            console.error('Error parsing group_settings:', e)
+            groupSettings = null
+          }
+        }
+
+        const standingsCriteriaOrder =
+          groupSettings?.standingsCriteriaOrder ||
+          ['matchesWon', 'legDifference', 'average', 'headToHead']
+
+        return {
+          id: row.id,
+          name: row.name,
+          status: row.status,
+          legsToWin: row.legs_to_win,
+          startingScore: row.starting_score,
+          groupSettings: groupSettings || null,
+          playoffSettings: row.playoff_settings,
+          tournamentType: row.tournament_type || 'groups_with_playoffs',
+          standingsCriteriaOrder,
+          leagueId: row.league_id || null,
+          userId: row.user_id,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          // Aggregate counts from the RPC (numbers, not bigint strings)
+          groupCount: Number(row.group_count) || 0,
+          playerCount: Number(row.player_count) || 0,
+          totalMatches: Number(row.total_matches) || 0,
+          completedMatches: Number(row.completed_matches) || 0,
+          pendingMatches: Number(row.pending_matches) || 0,
+          inProgressMatches: Number(row.in_progress_matches) || 0,
+          // Empty placeholders -- full data is hydrated lazily on open
+          groups: [],
+          players: [],
+          playoffMatches: [],
+          // Marks this as a list stub (not yet hydrated). getTournament()
+          // returns objects WITHOUT this flag, so consumers can detect when
+          // full groups/matches still need to be loaded.
+          _summary: true
+        }
+      })
+    } catch (error) {
+      console.error('Error fetching tournaments summary:', error)
+      throw error
+    }
+  },
+
   // Get all tournaments
   async getTournaments() {
     try {

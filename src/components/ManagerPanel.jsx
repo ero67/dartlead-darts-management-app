@@ -44,7 +44,8 @@ export function ManagerPanel() {
   const loadTournamentsForMatch = async () => {
     setLoadingTournaments(true);
     try {
-      const allTournaments = await tournamentService.getTournaments();
+      // Dropdown only needs id/name/status/userId -- use the lightweight summary.
+      const allTournaments = await tournamentService.getTournamentsSummary();
       const tournaments = isAdmin
         ? allTournaments
         : (allTournaments || []).filter(t => user && t.userId === user.id);

@@ -81,13 +81,20 @@ function AppContent() {
     const { id } = useParams();
     
     useEffect(() => {
-      if (id && (!currentTournament || currentTournament.id !== id)) {
-        // First try to find tournament in the list
-        const tournament = tournaments.find(t => t.id === id);
-        if (tournament) {
-          selectTournament(tournament);
-        } else if (tournaments.length > 0) {
-          // Tournament not found in the list, try to load it directly from database
+      // Hydrate the full tournament (groups + matches) when:
+      //  - it isn't the current tournament yet, OR
+      //  - the current object is only a lightweight list stub (_summary).
+      const needsHydrate =
+        !currentTournament ||
+        currentTournament.id !== id ||
+        currentTournament._summary === true;
+
+      if (id && needsHydrate) {
+        // The list now holds lightweight summaries with empty groups/matches,
+        // so we must always fetch the full tournament from the DB on open
+        // (getTournament dispatches SELECT_TOURNAMENT with the complete data).
+        const existsInList = tournaments.find(t => t.id === id);
+        if (existsInList || tournaments.length > 0) {
           getTournament(id).catch(error => {
             console.error('Error loading tournament:', error);
             // If loading fails (tournament not found), redirect to tournaments list
@@ -96,7 +103,7 @@ function AppContent() {
         }
         // If tournaments.length === 0, we're still loading, so wait
       }
-    }, [id, tournaments, currentTournament, selectTournament, getTournament, navigate]);
+    }, [id, tournaments, currentTournament, getTournament, navigate]);
 
     // If currentTournament is null and we have tournaments loaded, 
     // it means the tournament was deleted, so redirect
@@ -109,8 +116,9 @@ function AppContent() {
       }
     }, [id, tournaments, currentTournament, navigate]);
 
-    // Show loading state if tournament is not loaded yet
-    if (!currentTournament || currentTournament.id !== id) {
+    // Show loading state if tournament is not loaded yet, or if we only have
+    // the lightweight list stub (full groups/matches still being hydrated).
+    if (!currentTournament || currentTournament.id !== id || currentTournament._summary === true) {
       return (
         <div className="loading-container">
           <div className="loading-spinner"></div>
@@ -159,6 +167,12 @@ function AppContent() {
     
     useEffect(() => {
       if (id && (!currentMatch || currentMatch.id !== id)) {
+        // Wait for the full tournament to hydrate -- a lightweight list stub
+        // has empty groups, so searching it would falsely "not find" the match
+        // and redirect away. The loader / TournamentRoute will replace the stub.
+        if (currentTournament && currentTournament._summary === true) {
+          return;
+        }
         // Find match in current tournament
         if (currentTournament) {
           // Search in group matches
@@ -283,7 +297,9 @@ function AppContent() {
   };
 
   const handleSelectTournament = (tournament) => {
-    selectTournament(tournament);
+    // Don't push the lightweight list stub into currentTournament -- it has
+    // empty groups/matches. Just navigate; TournamentRoute hydrates the full
+    // tournament via getTournament(id).
     navigate(`/tournament/${tournament.id}`);
   };
 
