@@ -614,8 +614,22 @@ export function TournamentProvider({ children }) {
   useEffect(() => {
     const loadTournaments = async () => {
       try {
-        const tournaments = await tournamentService.getTournaments();
+        // Lightweight summary for the list/dashboard -- no nested match rows.
+        const tournaments = await tournamentService.getTournamentsSummary();
         dispatch({ type: ACTIONS.LOAD_TOURNAMENTS, payload: tournaments });
+
+        // The summary objects carry empty groups/players. If a tournament was
+        // active before a refresh (session restore), re-hydrate its full data
+        // so the management/match views render correctly.
+        const saved = getSavedSessionIds();
+        if (saved.tournamentId) {
+          try {
+            const full = await tournamentService.getTournament(saved.tournamentId);
+            dispatch({ type: ACTIONS.SELECT_TOURNAMENT, payload: full });
+          } catch (hydrateError) {
+            console.error('Error hydrating active tournament:', hydrateError);
+          }
+        }
       } catch (error) {
         console.error('Error loading tournaments:', error);
         // Fallback to localStorage if Supabase fails

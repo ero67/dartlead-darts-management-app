@@ -32,10 +32,9 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
   });
 
   const getTournamentProgress = (tournament) => {
-    const totalMatches = tournament.groups.reduce((sum, g) => sum + g.matches.length, 0);
-    const completedMatches = tournament.groups.reduce((sum, g) => 
-      sum + g.matches.filter(m => m.status === 'completed').length, 0
-    );
+    // Counts come from the lightweight summary (getTournamentsSummary).
+    const totalMatches = tournament.totalMatches ?? 0;
+    const completedMatches = tournament.completedMatches ?? 0;
     return totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0;
   };
 
@@ -94,9 +93,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
       <div className="tournaments-grid">
         {sortedTournaments.map(tournament => {
           const progress = getTournamentProgress(tournament);
-          const hasActiveMatches = tournament.groups.some(g => 
-            g.matches.some(m => m.status === 'pending')
-          );
+          const hasActiveMatches = (tournament.pendingMatches ?? 0) > 0;
           
           // Check if current user owns this tournament
           const isOwner = user && tournament.userId && user.id === tournament.userId;
@@ -148,11 +145,11 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
               <div className="tournament-stats">
                 <div className="stat">
                   <Users size={16} />
-                  <span>{tournament.players.length} {t('common.players')}</span>
+                  <span>{tournament.playerCount ?? tournament.players?.length ?? 0} {t('common.players')}</span>
                 </div>
                 <div className="stat">
                   <Trophy size={16} />
-                  <span>{tournament.groups.length} {t('common.groups')}</span>
+                  <span>{tournament.groupCount ?? tournament.groups?.length ?? 0} {t('common.groups')}</span>
                 </div>
                 <div className="stat">
                   <Calendar size={16} />

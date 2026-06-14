@@ -24,17 +24,15 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
     : [];
 
   const myActiveTournaments = myTournaments.filter(tr => tr.status === 'active');
-  const myActiveMatches = myTournaments.reduce((sum, tr) =>
-    sum + tr.groups.reduce((gs, g) =>
-      gs + g.matches.filter(m => m.status === 'in_progress').length, 0
-    ), 0
+  // Counts come from the lightweight summary (getTournamentsSummary).
+  const myActiveMatches = myTournaments.reduce(
+    (sum, tr) => sum + (tr.inProgressMatches ?? 0),
+    0
   );
 
   const getTournamentProgress = (tournament) => {
-    const totalMatches = tournament.groups.reduce((sum, g) => sum + g.matches.length, 0);
-    const completedMatches = tournament.groups.reduce((sum, g) =>
-      sum + g.matches.filter(m => m.status === 'completed').length, 0
-    );
+    const totalMatches = tournament.totalMatches ?? 0;
+    const completedMatches = tournament.completedMatches ?? 0;
     return totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0;
   };
 
@@ -237,7 +235,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
                       <div className="tournament-stats">
                         <div className="stat">
                           <Users size={16} />
-                          <span>{tournament.players.length} {t('common.players')}</span>
+                          <span>{tournament.playerCount ?? tournament.players?.length ?? 0} {t('common.players')}</span>
                         </div>
                         <div className="stat">
                           <Calendar size={16} />

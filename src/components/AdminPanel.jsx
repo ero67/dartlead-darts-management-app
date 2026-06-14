@@ -175,7 +175,8 @@ export function AdminPanel() {
   const loadTournamentsForStatus = async () => {
     setLoadingTournaments(true);
     try {
-      const tournaments = await tournamentService.getTournaments();
+      // Dropdown only needs id/name/status -- use the lightweight summary.
+      const tournaments = await tournamentService.getTournamentsSummary();
       setTournamentsForStatus(tournaments || []);
     } catch (err) {
       console.error('Error loading tournaments:', err);
