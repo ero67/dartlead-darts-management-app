@@ -177,11 +177,13 @@ export const leagueService = {
         } else if (player.id) {
           playerId = player.id;
         } else if (player.name) {
-          // Create new player
+          // Find or create the player. Trim first: players.name is UNIQUE and
+          // matched exactly, so " Erik" would otherwise become a second profile.
+          const name = player.name.trim();
           const { data: existingPlayer } = await supabase
             .from('players')
             .select('id')
-            .eq('name', player.name)
+            .eq('name', name)
             .maybeSingle();
 
           if (existingPlayer) {
@@ -192,7 +194,7 @@ export const leagueService = {
               .from('players')
               .insert({
                 id: playerId,
-                name: player.name
+                name
               });
 
             if (playerError) throw playerError;
@@ -1725,14 +1727,22 @@ export const leagueService = {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-      if (!user) throw new Error('Must be logged in to register');
+      if (!user) throw new Error('NOT_LOGGED_IN');
+
+      const trimmedName = (playerName || '').trim();
+      if (!trimmedName) throw new Error('MISSING_PLAYER_NAME');
+
+      // Idempotent: league_registrations has UNIQUE(league_id, user_id), so a
+      // second insert would fail with an opaque constraint error.
+      const existing = await this.getMyLeagueRegistration(leagueId);
+      if (existing) return existing;
 
       const { data: registration, error } = await supabase
         .from('league_registrations')
         .insert({
           league_id: leagueId,
           user_id: user.id,
-          player_name: playerName
+          player_name: trimmedName
         })
         .select()
         .single();
@@ -1740,6 +1750,23 @@ export const leagueService = {
       return registration;
     } catch (error) {
       console.error('Error registering for league:', error);
+      throw error;
+    }
+  },
+
+  async withdrawLeagueRegistration(registrationId) {
+    try {
+      const { data, error } = await supabase
+        .from('league_registrations')
+        .delete()
+        .eq('id', registrationId)
+        .eq('status', 'pending')
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('WITHDRAW_NOT_ALLOWED');
+      return true;
+    } catch (error) {
+      console.error('Error withdrawing league registration:', error);
       throw error;
     }
   },
@@ -1772,27 +1799,52 @@ export const leagueService = {
       if (regError) throw regError;
       if (reg.status !== 'pending') throw new Error('Registration already processed');
 
-      // Find or create player
-      const { data: existingPlayer } = await supabase
+      // Resolve the player row for this registration — same rules as
+      // tournamentService.approveRegistration.
+      //
+      // Look up by account link FIRST: players.user_id is uniquely indexed, so a
+      // user who already has a player row (from a tournament or another league)
+      // cannot get a second one. Reusing it also keeps their career stats on a
+      // single profile as they move between leagues and tournaments.
+      let playerId;
+      const { data: linkedPlayer } = await supabase
         .from('players')
-        .select('id, user_id')
-        .eq('name', reg.player_name)
+        .select('id')
+        .eq('user_id', reg.user_id)
         .maybeSingle();
 
-      let playerId;
-      if (existingPlayer) {
-        playerId = existingPlayer.id;
-        if (!existingPlayer.user_id) {
-          await supabase.from('players').update({ user_id: reg.user_id }).eq('id', playerId);
-        }
+      if (linkedPlayer) {
+        playerId = linkedPlayer.id;
       } else {
-        const { data: newPlayer, error: createError } = await supabase
+        // players.name is UNIQUE: an existing row is either an unlinked manual
+        // player (claim it) or somebody else's account (reject).
+        const { data: playerByName } = await supabase
           .from('players')
-          .insert({ name: reg.player_name, user_id: reg.user_id })
-          .select('id')
-          .single();
-        if (createError) throw createError;
-        playerId = newPlayer.id;
+          .select('id, user_id')
+          .eq('name', reg.player_name)
+          .maybeSingle();
+
+        if (playerByName) {
+          if (playerByName.user_id && playerByName.user_id !== reg.user_id) {
+            throw new Error('PLAYER_NAME_TAKEN');
+          }
+          playerId = playerByName.id;
+          if (!playerByName.user_id) {
+            const { error: linkError } = await supabase
+              .from('players')
+              .update({ user_id: reg.user_id })
+              .eq('id', playerId);
+            if (linkError) throw linkError;
+          }
+        } else {
+          const { data: newPlayer, error: createError } = await supabase
+            .from('players')
+            .insert({ name: reg.player_name, user_id: reg.user_id })
+            .select('id')
+            .single();
+          if (createError) throw createError;
+          playerId = newPlayer.id;
+        }
       }
 
       // Add to league_members

@@ -90,7 +90,10 @@
     "addPlayers": "Add players to the tournament",
     "configureGroupSettings": "Configure group settings",
     "setupPlayoffSettings": "Set up playoff settings",
-    "startWhenReady": "Start the tournament when ready"
+    "startWhenReady": "Start the tournament when ready",
+    "statusOpenForRegistration": "Registration",
+    "statusStarted": "In progress",
+    "statusCompleted": "Completed"
   },
   "liveMatches": {
     "title": "Live Matches",
@@ -280,7 +283,23 @@
     "reject": "Reject",
     "noRequestsPending": "No pending registration requests",
     "registrationSubmitted": "Your registration has been submitted. Waiting for manager approval.",
-    "withdrawRegistration": "Withdraw"
+    "withdrawRegistration": "Withdraw",
+    "registrationRequests": "Registration Requests",
+    "statusPending": "pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "youAreRegistered": "You are registered in this tournament",
+    "selfRegisterHint": "Sign up and a tournament manager will confirm your spot.",
+    "confirmWithdraw": "Withdraw your registration from this tournament?",
+    "registrationRejectedHint": "Your registration was not accepted. Contact the tournament manager for details.",
+    "loginToRegister": "Log in",
+    "loginToRegisterHint": "Log in to register for this tournament.",
+    "errorNameTaken": "Another account already uses this player name. Ask a manager to add you manually.",
+    "errorRegistrationClosed": "This tournament is no longer accepting registrations.",
+    "errorWithdrawNotAllowed": "This registration can no longer be withdrawn.",
+    "errorNotLoggedIn": "You must be logged in to register.",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "all": "All"
   },
   "management": {
     "youAreManaging": "You are managing this tournament",
@@ -409,7 +428,6 @@
     "onlyAdvancedPlayersAvailable": "Only players who advanced from {{roundName}} are available",
     "previousRound": "previous round",
     "playoffBracket": "Playoff Bracket",
-    "playersQualified": "players qualified",
     "currentRound": "Current Round",
     "detailed": "Detailed",
     "bracket": "Bracket",
@@ -542,7 +560,8 @@
     "reset": "Reset",
     "pts": "pts",
     "saving": "Saving...",
-    "resetting": "Resetting..."
+    "resetting": "Resetting...",
+    "back": "Back"
   },
   "deviceSettings": {
     "title": "Device Settings",
@@ -602,7 +621,7 @@
     "resultUpdated": "Match result updated: {{player1}} {{score1}} - {{score2}} {{player2}}",
     "selectWinnerError": "Please select a winner",
     "legsNegativeError": "Legs cannot be negative",
-    "winnerMoreLegsError": "Winner must have more legs than loser",
+    "winnerMoreLegsError": "The winner must have more legs than the loser.",
     "quickScore": "Quick score (select winner first)",
     "statsNotRecalculatedHint": "Saves the score only — player averages and per-dart stats are not recalculated.",
     "searchFirstError": "Please search for a match first",
@@ -669,7 +688,9 @@
     "importStep": "Step {{current}} of {{total}}",
     "importSwapPlayers": "Swap",
     "importVs": "vs",
-    "importNoLeagues": "No leagues available"
+    "importNoLeagues": "No leagues available",
+    "correctResult": "Correct Result",
+    "enterNewScoreFor": "Enter the number of legs won by {{player}}:"
   },
   "leagues": {
     "title": "Leagues",
@@ -785,7 +806,8 @@
     "statDetails": "Details",
     "statVs": "vs",
     "statIn": "in",
-    "statDarts": "darts"
+    "statDarts": "darts",
+    "youAreMember": "You are a member of this league"
   },
   "playerProfile": {
     "title": "Player Profile",
@@ -806,7 +828,38 @@
     "playerNotFound": "Player not found",
     "total180s": "Total 180s",
     "legsRecord": "Legs (W:L)",
-    "tournamentWins": "Tournament Wins"
+    "tournamentWins": "Tournament Wins",
+    "viewProfile": "View player profile",
+    "yourProfile": "Your profile",
+    "dartsThrown": "Darts Thrown",
+    "recentMatches": "Recent Matches",
+    "noMatches": "No matches played yet.",
+    "formWin": "W",
+    "formLoss": "L",
+    "versus": "vs",
+    "avgShort": "avg",
+    "playoffTag": "Playoff",
+    "placementWinner": "Winner",
+    "placementRunnerUp": "Runner-up",
+    "placementThird": "3rd place",
+    "tournamentsCountOne": "{{count}} tournament",
+    "tournamentsCountFew": "{{count}} tournaments",
+    "tournamentsCountMany": "{{count}} tournaments",
+    "titlesCountOne": "{{count}} title",
+    "titlesCountFew": "{{count}} titles",
+    "titlesCountMany": "{{count}} titles",
+    "winStreakCountOne": "{{count}} win in a row",
+    "winStreakCountFew": "{{count}} wins in a row",
+    "winStreakCountMany": "{{count}} wins in a row",
+    "lossStreakCountOne": "{{count}} loss in a row",
+    "lossStreakCountFew": "{{count}} losses in a row",
+    "lossStreakCountMany": "{{count}} losses in a row",
+    "winsCountOne": "{{count}} win",
+    "winsCountFew": "{{count}} wins",
+    "winsCountMany": "{{count}} wins",
+    "lossesCountOne": "{{count}} loss",
+    "lossesCountFew": "{{count}} losses",
+    "lossesCountMany": "{{count}} losses"
   },
   "userSearch": {
     "placeholder": "Search by name or email...",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
@@ -32,7 +32,23 @@ const compareLiveMatchesStable = (a, b) => {
 export function TournamentManagement({ tournament, onMatchStart, onBack, onDeleteTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Player names open the player's profile (career stats, history, form)
+  const renderPlayerLink = (player, className = '') => {
+    if (!player?.id) return <span className={className}>{player?.name || t('common.unknown')}</span>;
+    return (
+      <button
+        type="button"
+        className={`player-profile-link ${className}`}
+        onClick={(e) => { e.stopPropagation(); navigate(`/player/${player.id}`); }}
+        title={t('playerProfile.viewProfile')}
+      >
+        {player.name}
+      </button>
+    );
+  };
   
   // Valid tabs (will be filtered for playoff-only tournaments)
   const validTabs = ['groups', 'matches', 'standings', 'playoffs', 'statistics', 'liveMatches', 'summary'];
@@ -274,6 +290,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             return {
               ...existing,
               legsToWinByRound: {
+                32: existing.playoffLegsToWin,
                 16: existing.playoffLegsToWin,
                 8: existing.playoffLegsToWin,
                 4: existing.playoffLegsToWin,
@@ -351,6 +368,15 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
     
     return false;
+  };
+
+  // Number of players in a bracket round, used to look up that round's leg count.
+  // The 3rd-place match is stored inside the FINAL round's match list, so counting
+  // raw matches reports the final as a 4-player round and applies the semi-final
+  // leg count to both the final and the 3rd-place match.
+  const getRoundSize = (round) => {
+    const bracketMatches = (round?.matches || []).filter(m => !m.isThirdPlaceMatch).length;
+    return Math.max(2, bracketMatches * 2);
   };
 
   // Get legs to win for a specific playoff round based on number of players in that round
@@ -1677,7 +1703,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 <div className="group-players">
                   {group.players.map(player => (
                     <div key={player.id} className="player-name">
-                      {player.name}
+                      {renderPlayerLink(player)}
                     </div>
                   ))}
                 </div>
@@ -1996,7 +2022,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                   refetchTournament();
                                 });
                               } else {
-                                alert(t('manager.winnerMoreLegsError') || 'Winner must have more legs than loser');
+                                alert(t('manager.winnerMoreLegsError'));
                               }
                             }
                           }
@@ -2087,7 +2113,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <span className="col-pos">
                       <span className={`standings-rank rank-${rank}`}>{rank}</span>
                     </span>
-                    <span className="col-player player-name">{standing.player.name}</span>
+                    <span className="col-player player-name">{renderPlayerLink(standing.player)}</span>
                     <span className="col-num">{standing.matchesPlayed}</span>
                     <span className="col-num col-won">{standing.matchesWon}</span>
                     <span className="col-num">{standing.matchesLost}</span>
@@ -2408,7 +2434,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {bestAverages.map((entry, index) => (
                 <div key={`avg-${index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
+                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
                   <span className="value">{entry.average.toFixed(1)}</span>
                   <span className="opponent">{entry.opponent}</span>
                 </div>
@@ -2432,7 +2458,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {bestCheckouts.map((entry, index) => (
                 <div key={`checkout-${index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
+                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
                   <span className="value">{entry.checkouts.join(', ')}</span>
                 </div>
               ))}
@@ -2456,7 +2482,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {fewestDarts.map((entry, index) => (
                 <div key={`darts-${index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
+                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
                   <span className="value">{entry.darts}</span>
                   <span className="opponent">{entry.opponent}</span>
                 </div>
@@ -2480,7 +2506,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {most180s.map((entry, index) => (
                 <div key={`180-${entry.player?.id || index}`} className="leaderboard-row">
                   <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{entry.player?.name || t('common.unknown')}</span>
+                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
                   <span className="value">{entry.count}</span>
                 </div>
               ))}
@@ -3241,7 +3267,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             className="start-match-btn"
                             onClick={() => {
                               // Calculate round size from number of matches (each match has 2 players)
-                              const roundSize = round.matches.length * 2;
+                              const roundSize = getRoundSize(round);
                               const legsToWin = getPlayoffLegsToWin(roundSize);
                               handleStartMatchRequest({ 
                                 ...match,
@@ -3271,7 +3297,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                 (t('management.adminTakeOverConfirm') || 'Admin takeover: this will let you continue scoring this match on this device. Continue?')
                               );
                               if (!ok) return;
-                              const roundSize = round.matches.length * 2;
+                              const roundSize = getRoundSize(round);
                               const legsToWin = getPlayoffLegsToWin(roundSize);
                               onMatchStart({
                                 ...match,
@@ -3298,7 +3324,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <button
                           className="continue-match-btn admin-override-btn"
                           onClick={() => {
-                            const roundSize = round.matches.length * 2;
+                            const roundSize = getRoundSize(round);
                             const legsToWin = getPlayoffLegsToWin(roundSize);
                             onMatchStart({
                               ...match,
@@ -3356,7 +3382,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                       refetchTournament();
                                     });
                                   } else {
-                                    alert(t('winnerMoreLegsError') || 'Winner must have more legs than loser');
+                                    alert(t('manager.winnerMoreLegsError'));
                                   }
                                 }
                               }

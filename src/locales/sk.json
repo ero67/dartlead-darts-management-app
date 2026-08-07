@@ -90,7 +90,10 @@
     "addPlayers": "Pridať hráčov do turnaja",
     "configureGroupSettings": "Nastaviť nastavenia skupín",
     "setupPlayoffSettings": "Nastaviť nastavenia play-off",
-    "startWhenReady": "Spustiť turnaj keď ste pripravení"
+    "startWhenReady": "Spustiť turnaj keď ste pripravení",
+    "statusOpenForRegistration": "Registrácia",
+    "statusStarted": "Prebieha",
+    "statusCompleted": "Ukončený"
   },
   "liveMatches": {
     "title": "Live Zápasy",
@@ -274,7 +277,22 @@
     "reject": "Zamietnuť",
     "noRequestsPending": "Žiadne čakajúce žiadosti o registráciu",
     "registrationSubmitted": "Vaša registrácia bola odoslaná. Čaká na schválenie manažérom.",
-    "withdrawRegistration": "Zrušiť"
+    "withdrawRegistration": "Zrušiť",
+    "registrationRequests": "Žiadosti o registráciu",
+    "statusPending": "čakajúcich",
+    "statusApproved": "Schválená",
+    "statusRejected": "Zamietnutá",
+    "youAreRegistered": "Ste zaregistrovaný na tomto turnaji",
+    "selfRegisterHint": "Prihláste sa a manažér turnaja potvrdí vaše miesto.",
+    "confirmWithdraw": "Zrušiť vašu registráciu na tomto turnaji?",
+    "registrationRejectedHint": "Vaša registrácia nebola prijatá. Pre detaily kontaktujte manažéra turnaja.",
+    "loginToRegister": "Prihlásiť sa",
+    "loginToRegisterHint": "Prihláste sa, aby ste sa mohli registrovať na tento turnaj.",
+    "errorNameTaken": "Toto meno hráča už používa iný účet. Požiadajte manažéra, aby vás pridal manuálne.",
+    "errorRegistrationClosed": "Tento turnaj už neprijíma registrácie.",
+    "errorWithdrawNotAllowed": "Túto registráciu už nie je možné zrušiť.",
+    "errorNotLoggedIn": "Na registráciu musíte byť prihlásený.",
+    "errorGeneric": "Niečo sa pokazilo. Skúste to znova."
   },
   "management": {
     "youAreManaging": "Spravujete tento turnaj",
@@ -337,7 +355,7 @@
     "tournamentWithoutPlayoffs": "Tento turnaj bol vytvorený bez povoleného play-off.",
     "readyToStartPlayoffs": "Pripravené na Spustenie Play-off!",
     "groupStageCompleted": "Skupinová fáza dokončená",
-    "playersQualified": "hráčov sa kvalifikovalo",
+    "playersQualified": "hráčov postúpilo",
     "qualifyingPlayers": "Kvalifikovaní Hráči",
     "selectedPlayers": "Vybrané: {{count}}",
     "autoQualified": "Automaticky: {{count}}",
@@ -403,7 +421,6 @@
     "onlyAdvancedPlayersAvailable": "Dostupní sú iba hráči, ktorí postúpili z {{roundName}}",
     "previousRound": "predchádzajúceho kola",
     "playoffBracket": "Playoff Pavúk",
-    "playersQualified": "hráčov postúpilo",
     "currentRound": "Aktuálne Kolo",
     "detailed": "Detailne",
     "bracket": "Pavúk",
@@ -536,7 +553,8 @@
     "reset": "Resetovať",
     "pts": "b.",
     "saving": "Ukladá sa...",
-    "resetting": "Resetuje sa..."
+    "resetting": "Resetuje sa...",
+    "back": "Späť"
   },
   "deviceSettings": {
     "title": "Nastavenia zariadenia",
@@ -596,7 +614,7 @@
     "resultUpdated": "Výsledok zápasu aktualizovaný: {{player1}} {{score1}} - {{score2}} {{player2}}",
     "selectWinnerError": "Prosím vyberte víťaza",
     "legsNegativeError": "Legy nemôžu byť záporné",
-    "winnerMoreLegsError": "Víťaz musí mať viac legov ako porazený",
+    "winnerMoreLegsError": "Víťaz musí mať viac legov ako porazený.",
     "quickScore": "Rýchle skóre (najprv vyberte víťaza)",
     "statsNotRecalculatedHint": "Uloží iba skóre — priemery hráčov a štatistiky šípok sa neprepočítajú.",
     "searchFirstError": "Prosím najprv vyhľadajte zápas",
@@ -663,7 +681,9 @@
     "importStep": "Krok {{current}} z {{total}}",
     "importSwapPlayers": "Vymeniť",
     "importVs": "vs",
-    "importNoLeagues": "Žiadne ligy k dispozícii"
+    "importNoLeagues": "Žiadne ligy k dispozícii",
+    "correctResult": "Opraviť Výsledok",
+    "enterNewScoreFor": "Zadajte počet legov, ktoré vyhral {{player}}:"
   },
   "leagues": {
     "title": "Ligy",
@@ -779,7 +799,8 @@
     "statDetails": "Detaily",
     "statVs": "vs",
     "statIn": "v",
-    "statDarts": "šípok"
+    "statDarts": "šípok",
+    "youAreMember": "Ste členom tejto ligy"
   },
   "playerProfile": {
     "title": "Profil hráča",
@@ -800,7 +821,38 @@
     "playerNotFound": "Hráč nebol nájdený",
     "total180s": "Celkovo 180",
     "legsRecord": "Legy (V:P)",
-    "tournamentWins": "Výhry v turnajoch"
+    "tournamentWins": "Výhry v turnajoch",
+    "viewProfile": "Zobraziť profil hráča",
+    "yourProfile": "Váš profil",
+    "dartsThrown": "Hodené šípky",
+    "recentMatches": "Posledné zápasy",
+    "noMatches": "Zatiaľ žiadne odohraté zápasy.",
+    "formWin": "V",
+    "formLoss": "P",
+    "versus": "vs",
+    "avgShort": "priemer",
+    "playoffTag": "Playoff",
+    "placementWinner": "Víťaz",
+    "placementRunnerUp": "Finalista",
+    "placementThird": "3. miesto",
+    "tournamentsCountOne": "{{count}} turnaj",
+    "tournamentsCountFew": "{{count}} turnaje",
+    "tournamentsCountMany": "{{count}} turnajov",
+    "titlesCountOne": "{{count}} titul",
+    "titlesCountFew": "{{count}} tituly",
+    "titlesCountMany": "{{count}} titulov",
+    "winStreakCountOne": "{{count}} výhra v rade",
+    "winStreakCountFew": "{{count}} výhry v rade",
+    "winStreakCountMany": "{{count}} výhier v rade",
+    "lossStreakCountOne": "{{count}} prehra v rade",
+    "lossStreakCountFew": "{{count}} prehry v rade",
+    "lossStreakCountMany": "{{count}} prehier v rade",
+    "winsCountOne": "{{count}} výhra",
+    "winsCountFew": "{{count}} výhry",
+    "winsCountMany": "{{count}} výhier",
+    "lossesCountOne": "{{count}} prehra",
+    "lossesCountFew": "{{count}} prehry",
+    "lossesCountMany": "{{count}} prehier"
   },
   "userSearch": {
     "placeholder": "Hľadať podľa mena alebo emailu...",

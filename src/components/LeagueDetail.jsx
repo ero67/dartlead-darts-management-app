@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,7 +30,7 @@ const DEFAULT_TOURNAMENT_SETTINGS = {
 export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, getLeagueRegistrations, approveLeagueRegistration, rejectLeagueRegistration } = useLeague();
+  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, getLeagueRegistrations, approveLeagueRegistration, rejectLeagueRegistration, withdrawLeagueRegistration } = useLeague();
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '' });
@@ -40,6 +40,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [myLeagueRegistration, setMyLeagueRegistration] = useState(null);
   const [leagueRegistrations, setLeagueRegistrations] = useState([]);
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [registrationError, setRegistrationError] = useState('');
+  const [processingRegId, setProcessingRegId] = useState(null);
   const [scoringRules, setScoringRules] = useState([]);
   const [roundPointsRules, setRoundPointsRules] = useState([
     { round: 32, points: 0, enabled: false },
@@ -182,6 +184,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     (currentLeague.managerIds && currentLeague.managerIds.includes(user.id))
   );
 
+  // The league member linked to my account — the real "I'm in this league",
+  // as opposed to a registration that is still waiting for approval.
+  const myMembership = user
+    ? (currentLeague.members || []).find(m => m.player?.user_id === user.id)
+    : null;
+
   const handleUpdateLeague = async () => {
     try {
       await updateLeague(currentLeague.id, {
@@ -207,35 +215,72 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     }
   };
 
+  // Map service error codes to localized messages (shared keys with tournaments)
+  const describeRegistrationError = (error) => {
+    const code = error?.message || '';
+    if (code.includes('PLAYER_NAME_TAKEN')) return t('registration.errorNameTaken');
+    if (code.includes('WITHDRAW_NOT_ALLOWED')) return t('registration.errorWithdrawNotAllowed');
+    if (code.includes('NOT_LOGGED_IN')) return t('registration.errorNotLoggedIn');
+    return t('registration.errorGeneric');
+  };
+
   const handleSelfRegisterLeague = async () => {
     if (!user || !currentLeague) return;
     setRegisterLoading(true);
+    setRegistrationError('');
     try {
       const playerName = user.user_metadata?.full_name || user.email;
       const reg = await registerForLeague(currentLeague.id, playerName);
       setMyLeagueRegistration(reg);
     } catch (error) {
       console.error('Error registering for league:', error);
+      setRegistrationError(describeRegistrationError(error));
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleWithdrawLeagueReg = async () => {
+    if (!myLeagueRegistration) return;
+    if (!confirm(t('registration.confirmWithdraw'))) return;
+    setRegisterLoading(true);
+    setRegistrationError('');
+    try {
+      await withdrawLeagueRegistration(myLeagueRegistration.id);
+      setMyLeagueRegistration(null);
+    } catch (error) {
+      console.error('Error withdrawing league registration:', error);
+      setRegistrationError(describeRegistrationError(error));
     } finally {
       setRegisterLoading(false);
     }
   };
 
   const handleApproveLeagueReg = async (regId) => {
+    setProcessingRegId(regId);
+    setRegistrationError('');
     try {
-      await approveLeagueRegistration(regId);
-      setLeagueRegistrations(prev => prev.filter(r => r.id !== regId));
+      const updated = await approveLeagueRegistration(regId);
+      setLeagueRegistrations(prev => prev.map(r => (r.id === regId ? { ...r, ...updated } : r)));
     } catch (error) {
       console.error('Error approving:', error);
+      setRegistrationError(describeRegistrationError(error));
+    } finally {
+      setProcessingRegId(null);
     }
   };
 
   const handleRejectLeagueReg = async (regId) => {
+    setProcessingRegId(regId);
+    setRegistrationError('');
     try {
-      await rejectLeagueRegistration(regId);
-      setLeagueRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: 'rejected' } : r));
+      const updated = await rejectLeagueRegistration(regId);
+      setLeagueRegistrations(prev => prev.map(r => (r.id === regId ? { ...r, ...(updated || { status: 'rejected' }) } : r)));
     } catch (error) {
       console.error('Error rejecting:', error);
+      setRegistrationError(describeRegistrationError(error));
+    } finally {
+      setProcessingRegId(null);
     }
   };
 
@@ -925,60 +970,118 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
             {/* Player Self-Registration (non-managers) */}
             {user && !isManager && (
               <div className="self-register-section">
-                {!myLeagueRegistration && (
-                  <button
-                    className="create-tournament-btn"
-                    onClick={handleSelfRegisterLeague}
-                    disabled={registerLoading}
-                  >
-                    <Plus size={20} />
-                    {registerLoading ? t('common.loading') : t('leagues.joinLeague')}
-                  </button>
-                )}
-                {myLeagueRegistration?.status === 'pending' && (
-                  <div className="registration-status-badge pending">
-                    <Clock size={16} />
-                    {t('leagues.registrationPending')}
-                  </div>
-                )}
-                {myLeagueRegistration?.status === 'approved' && (
+                {myMembership ? (
                   <div className="registration-status-badge approved">
                     <CheckCircle size={16} />
-                    {t('leagues.registrationApproved')}
+                    {t('leagues.youAreMember')}
                   </div>
+                ) : (
+                  <>
+                    {!myLeagueRegistration && (
+                      <button
+                        className="self-register-btn"
+                        onClick={handleSelfRegisterLeague}
+                        disabled={registerLoading}
+                      >
+                        <Plus size={20} />
+                        {registerLoading ? t('common.loading') : t('leagues.joinLeague')}
+                      </button>
+                    )}
+                    {myLeagueRegistration?.status === 'pending' && (
+                      <>
+                        <div className="registration-status-badge pending">
+                          <Clock size={16} />
+                          {t('leagues.registrationPending')}
+                        </div>
+                        <p>{t('leagues.registrationSubmitted')}</p>
+                        <button
+                          className="withdraw-registration-btn"
+                          onClick={handleWithdrawLeagueReg}
+                          disabled={registerLoading}
+                        >
+                          <X size={16} />
+                          {t('registration.withdrawRegistration')}
+                        </button>
+                      </>
+                    )}
+                    {myLeagueRegistration?.status === 'approved' && (
+                      <div className="registration-status-badge approved">
+                        <CheckCircle size={16} />
+                        {t('leagues.registrationApproved')}
+                      </div>
+                    )}
+                    {myLeagueRegistration?.status === 'rejected' && (
+                      <>
+                        <div className="registration-status-badge rejected">
+                          <XCircle size={16} />
+                          {t('leagues.registrationRejected')}
+                        </div>
+                        <p>{t('registration.registrationRejectedHint')}</p>
+                      </>
+                    )}
+                  </>
                 )}
-                {myLeagueRegistration?.status === 'rejected' && (
-                  <div className="registration-status-badge rejected">
-                    <XCircle size={16} />
-                    {t('leagues.registrationRejected')}
+                {registrationError && (
+                  <div className="registration-error">
+                    <AlertCircle size={16} />
+                    {registrationError}
                   </div>
-                )}
-                {myLeagueRegistration?.status === 'pending' && (
-                  <p>{t('leagues.registrationSubmitted')}</p>
                 )}
               </div>
             )}
 
-            {/* Pending Requests (managers) */}
-            {isManager && leagueRegistrations.filter(r => r.status === 'pending').length > 0 && (
+            {/* Registration requests (managers) */}
+            {isManager && (
               <div className="pending-requests-section">
-                <h3>{t('leagues.pendingRequests')} ({leagueRegistrations.filter(r => r.status === 'pending').length})</h3>
-                {leagueRegistrations.filter(r => r.status === 'pending').map(reg => (
-                  <div key={reg.id} className="registration-request-card">
-                    <div className="request-info">
-                      <span className="request-name">{reg.player_name}</span>
-                      <span className="request-date">{new Date(reg.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <div className="request-actions">
-                      <button className="approve-btn" onClick={() => handleApproveLeagueReg(reg.id)}>
-                        <CheckCircle size={14} /> {t('registration.approve')}
-                      </button>
-                      <button className="reject-btn" onClick={() => handleRejectLeagueReg(reg.id)}>
-                        <XCircle size={14} /> {t('registration.reject')}
-                      </button>
-                    </div>
+                <div className="requests-header">
+                  <h3>{t('leagues.pendingRequests')}</h3>
+                  {leagueRegistrations.filter(r => r.status === 'pending').length > 0 && (
+                    <span className="requests-count">
+                      {leagueRegistrations.filter(r => r.status === 'pending').length} {t('registration.statusPending')}
+                    </span>
+                  )}
+                </div>
+                {registrationError && (
+                  <div className="registration-error">
+                    <AlertCircle size={16} />
+                    {registrationError}
                   </div>
-                ))}
+                )}
+                {leagueRegistrations.length === 0 ? (
+                  <p className="no-requests">{t('registration.noRequestsPending')}</p>
+                ) : (
+                  leagueRegistrations.map(reg => (
+                    <div key={reg.id} className={`registration-request-card status-${reg.status}`}>
+                      <div className="request-info">
+                        <span className="request-name">{reg.player_name}</span>
+                        <span className="request-date">{new Date(reg.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {reg.status === 'pending' ? (
+                        <div className="request-actions">
+                          <button
+                            className="approve-btn"
+                            onClick={() => handleApproveLeagueReg(reg.id)}
+                            disabled={processingRegId === reg.id}
+                          >
+                            <CheckCircle size={14} /> {t('registration.approve')}
+                          </button>
+                          <button
+                            className="reject-btn"
+                            onClick={() => handleRejectLeagueReg(reg.id)}
+                            disabled={processingRegId === reg.id}
+                          >
+                            <XCircle size={14} /> {t('registration.reject')}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={`registration-status-badge ${reg.status}`}>
+                          {reg.status === 'approved' ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                          {reg.status === 'approved' ? t('registration.statusApproved') : t('registration.statusRejected')}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             )}
 

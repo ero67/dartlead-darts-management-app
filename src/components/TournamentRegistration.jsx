@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock, AlertCircle, UserCheck } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +10,7 @@ import { UserSearchPicker } from './UserSearchPicker';
 
 export function TournamentRegistration({ tournament, onBack }) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
@@ -69,23 +71,61 @@ export function TournamentRegistration({ tournament, onBack }) {
     })()
   });
   const [seededPlayerIds, setSeededPlayerIds] = useState(new Set());
-  const { addPlayerToTournament, removePlayerFromTournament, startTournament, updateTournamentSettings, registerForTournament, getTournamentRegistrations, approveRegistration, rejectRegistration, getTournament } = useTournament();
+  const { addPlayerToTournament, removePlayerFromTournament, startTournament, updateTournamentSettings, registerForTournament, getTournamentRegistrations, approveRegistration, rejectRegistration, withdrawRegistration, getTournament } = useTournament();
 
   // Self-registration state
   const [myRegistration, setMyRegistration] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [registrationError, setRegistrationError] = useState('');
+  const [processingRegId, setProcessingRegId] = useState(null);
 
-  // Load registration data on mount
+  // The player row linked to my account — set once a manager approves me (or
+  // adds me from the user list), which is the real "I am in this tournament".
+  const myPlayerEntry = user ? players.find(p => p.user_id === user.id) : null;
+
+  // Map service error codes to localized messages
+  const describeRegistrationError = (error) => {
+    const code = error?.message || '';
+    if (code.includes('PLAYER_NAME_TAKEN')) return t('registration.errorNameTaken');
+    if (code.includes('REGISTRATION_CLOSED')) return t('registration.errorRegistrationClosed');
+    if (code.includes('WITHDRAW_NOT_ALLOWED')) return t('registration.errorWithdrawNotAllowed');
+    if (code.includes('NOT_LOGGED_IN')) return t('registration.errorNotLoggedIn');
+    if (code.includes('MISSING_PLAYER_NAME')) return t('registration.pleaseEnterPlayerName');
+    return t('registration.errorGeneric');
+  };
+
+  const refreshRegistrations = useCallback(async () => {
+    if (!tournament?.id) return;
+    try {
+      const regs = await getTournamentRegistrations(tournament.id);
+      setRegistrations(regs || []);
+    } catch (error) {
+      console.error('Error loading registrations:', error);
+    }
+    // getTournamentRegistrations is recreated on every context render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournament?.id]);
+
+  const refreshMyRegistration = useCallback(async () => {
+    if (!tournament?.id || !user) return;
+    const reg = await tournamentService.getMyRegistrationForTournament(tournament.id);
+    setMyRegistration(reg);
+  }, [tournament?.id, user]);
+
+  // Load registration data on mount / when the viewer's role changes
   useEffect(() => {
     if (!tournament?.id) return;
-    if (user && !canManage) {
-      tournamentService.getMyRegistrationForTournament(tournament.id).then(reg => setMyRegistration(reg));
-    }
-    if (canManage) {
-      getTournamentRegistrations(tournament.id).then(regs => setRegistrations(regs || []));
-    }
-  }, [tournament?.id, user, canManage]);
+    if (user) refreshMyRegistration();
+    if (canManage) refreshRegistrations();
+  }, [tournament?.id, user, canManage, refreshMyRegistration, refreshRegistrations]);
+
+  // A manager may approve while the player has the page open: re-check my own
+  // registration whenever the tournament's player list changes.
+  const playerCount = players.length;
+  useEffect(() => {
+    if (user && !canManage) refreshMyRegistration();
+  }, [playerCount, user, canManage, refreshMyRegistration]);
 
   const handleAddUserFromSearch = async (selectedUser) => {
     try {
@@ -93,38 +133,67 @@ export function TournamentRegistration({ tournament, onBack }) {
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error adding user to tournament:', error);
+      setRegistrationError(describeRegistrationError(error));
     }
   };
 
   const handleSelfRegister = async () => {
     if (!user) return;
     setRegisterLoading(true);
+    setRegistrationError('');
     try {
       const playerName = user.user_metadata?.full_name || user.email;
       const reg = await registerForTournament(tournament.id, playerName);
       setMyRegistration(reg);
     } catch (error) {
       console.error('Error registering:', error);
+      setRegistrationError(describeRegistrationError(error));
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleWithdrawRegistration = async () => {
+    if (!myRegistration) return;
+    if (!confirm(t('registration.confirmWithdraw'))) return;
+    setRegisterLoading(true);
+    setRegistrationError('');
+    try {
+      await withdrawRegistration(myRegistration.id);
+      setMyRegistration(null);
+    } catch (error) {
+      console.error('Error withdrawing registration:', error);
+      setRegistrationError(describeRegistrationError(error));
     } finally {
       setRegisterLoading(false);
     }
   };
 
   const handleApproveRegistration = async (regId) => {
+    setProcessingRegId(regId);
+    setRegistrationError('');
     try {
-      await approveRegistration(regId);
-      setRegistrations(prev => prev.filter(r => r.id !== regId));
+      const updated = await approveRegistration(regId);
+      setRegistrations(prev => prev.map(r => (r.id === regId ? { ...r, ...updated } : r)));
     } catch (error) {
       console.error('Error approving:', error);
+      setRegistrationError(describeRegistrationError(error));
+    } finally {
+      setProcessingRegId(null);
     }
   };
 
   const handleRejectRegistration = async (regId) => {
+    setProcessingRegId(regId);
+    setRegistrationError('');
     try {
-      await rejectRegistration(regId);
-      setRegistrations(prev => prev.map(r => r.id === regId ? { ...r, status: 'rejected' } : r));
+      const updated = await rejectRegistration(regId);
+      setRegistrations(prev => prev.map(r => (r.id === regId ? { ...r, ...(updated || { status: 'rejected' }) } : r)));
     } catch (error) {
       console.error('Error rejecting:', error);
+      setRegistrationError(describeRegistrationError(error));
+    } finally {
+      setProcessingRegId(null);
     }
   };
 
@@ -151,6 +220,7 @@ export function TournamentRegistration({ tournament, onBack }) {
             return {
               ...existing,
               legsToWinByRound: {
+                32: existing.playoffLegsToWin,
                 16: existing.playoffLegsToWin,
                 8: existing.playoffLegsToWin,
                 4: existing.playoffLegsToWin,
@@ -375,65 +445,138 @@ export function TournamentRegistration({ tournament, onBack }) {
       </div>
 
       <div className="registration-content">
+        {/* Anonymous visitors: point them at login so they can register */}
+        {!user && (
+          <div className="self-register-section">
+            <p>{t('registration.loginToRegisterHint')}</p>
+            <button className="self-register-btn" onClick={() => navigate('/login')}>
+              <UserCheck size={18} />
+              {t('registration.loginToRegister')}
+            </button>
+          </div>
+        )}
+
         {/* Player Self-Registration (for non-managers) */}
         {user && !canManage && (
           <div className="self-register-section">
-            {!myRegistration && (
+            {myPlayerEntry ? (
+              <div className="registration-status-badge approved">
+                <UserCheck size={16} />
+                {t('registration.youAreRegistered')}
+              </div>
+            ) : (
               <>
-                <button
-                  className="create-tournament-btn"
-                  onClick={handleSelfRegister}
-                  disabled={registerLoading}
-                >
-                  <Plus size={20} />
-                  {registerLoading ? t('common.loading') : t('registration.registerForTournament')}
-                </button>
+                {!myRegistration && (
+                  <>
+                    <button
+                      className="self-register-btn"
+                      onClick={handleSelfRegister}
+                      disabled={registerLoading}
+                    >
+                      <Plus size={20} />
+                      {registerLoading ? t('common.loading') : t('registration.registerForTournament')}
+                    </button>
+                    <p>{t('registration.selfRegisterHint')}</p>
+                  </>
+                )}
+                {myRegistration?.status === 'pending' && (
+                  <>
+                    <div className="registration-status-badge pending">
+                      <Clock size={16} />
+                      {t('registration.alreadyRegistered')}
+                    </div>
+                    <p>{t('registration.registrationSubmitted')}</p>
+                    <button
+                      className="withdraw-registration-btn"
+                      onClick={handleWithdrawRegistration}
+                      disabled={registerLoading}
+                    >
+                      <X size={16} />
+                      {t('registration.withdrawRegistration')}
+                    </button>
+                  </>
+                )}
+                {myRegistration?.status === 'approved' && (
+                  <div className="registration-status-badge approved">
+                    <CheckCircle size={16} />
+                    {t('registration.registrationApproved')}
+                  </div>
+                )}
+                {myRegistration?.status === 'rejected' && (
+                  <>
+                    <div className="registration-status-badge rejected">
+                      <XCircle size={16} />
+                      {t('registration.registrationRejected')}
+                    </div>
+                    <p>{t('registration.registrationRejectedHint')}</p>
+                  </>
+                )}
               </>
             )}
-            {myRegistration?.status === 'pending' && (
-              <div className="registration-status-badge pending">
-                <Clock size={16} />
-                {t('registration.alreadyRegistered')}
+            {registrationError && (
+              <div className="registration-error">
+                <AlertCircle size={16} />
+                {registrationError}
               </div>
-            )}
-            {myRegistration?.status === 'approved' && (
-              <div className="registration-status-badge approved">
-                <CheckCircle size={16} />
-                {t('registration.registrationApproved')}
-              </div>
-            )}
-            {myRegistration?.status === 'rejected' && (
-              <div className="registration-status-badge rejected">
-                <XCircle size={16} />
-                {t('registration.registrationRejected')}
-              </div>
-            )}
-            {myRegistration?.status === 'pending' && (
-              <p>{t('registration.registrationSubmitted')}</p>
             )}
           </div>
         )}
 
-        {/* Pending Registration Requests (for managers) */}
-        {canManage && registrations.filter(r => r.status === 'pending').length > 0 && (
+        {/* Registration Requests (for managers) */}
+        {canManage && (
           <div className="pending-requests-section">
-            <h3>{t('registration.pendingRequests')} ({registrations.filter(r => r.status === 'pending').length})</h3>
-            {registrations.filter(r => r.status === 'pending').map(reg => (
-              <div key={reg.id} className="registration-request-card">
-                <div className="request-info">
-                  <span className="request-name">{reg.player_name}</span>
-                  <span className="request-date">{new Date(reg.created_at).toLocaleDateString()}</span>
-                </div>
-                <div className="request-actions">
-                  <button className="approve-btn" onClick={() => handleApproveRegistration(reg.id)}>
-                    <CheckCircle size={14} /> {t('registration.approve')}
-                  </button>
-                  <button className="reject-btn" onClick={() => handleRejectRegistration(reg.id)}>
-                    <XCircle size={14} /> {t('registration.reject')}
-                  </button>
-                </div>
+            <div className="requests-header">
+              <h3>
+                <UserCheck size={18} />
+                {t('registration.registrationRequests')}
+              </h3>
+              {registrations.filter(r => r.status === 'pending').length > 0 && (
+                <span className="requests-count">
+                  {registrations.filter(r => r.status === 'pending').length} {t('registration.statusPending')}
+                </span>
+              )}
+            </div>
+            {registrationError && (
+              <div className="registration-error">
+                <AlertCircle size={16} />
+                {registrationError}
               </div>
-            ))}
+            )}
+            {registrations.length === 0 ? (
+              <p className="no-requests">{t('registration.noRequestsPending')}</p>
+            ) : (
+              registrations.map(reg => (
+                <div key={reg.id} className={`registration-request-card status-${reg.status}`}>
+                  <div className="request-info">
+                    <span className="request-name">{reg.player_name}</span>
+                    <span className="request-date">{new Date(reg.created_at).toLocaleDateString()}</span>
+                  </div>
+                  {reg.status === 'pending' ? (
+                    <div className="request-actions">
+                      <button
+                        className="approve-btn"
+                        onClick={() => handleApproveRegistration(reg.id)}
+                        disabled={processingRegId === reg.id}
+                      >
+                        <CheckCircle size={14} /> {t('registration.approve')}
+                      </button>
+                      <button
+                        className="reject-btn"
+                        onClick={() => handleRejectRegistration(reg.id)}
+                        disabled={processingRegId === reg.id}
+                      >
+                        <XCircle size={14} /> {t('registration.reject')}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className={`registration-status-badge ${reg.status}`}>
+                      {reg.status === 'approved' ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                      {reg.status === 'approved' ? t('registration.statusApproved') : t('registration.statusRejected')}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         )}
 
@@ -522,7 +665,16 @@ export function TournamentRegistration({ tournament, onBack }) {
                 {players.map((player, index) => (
                   <div key={player.id} className={`player-card${seededPlayerIds.has(player.id) ? ' player-card--seeded' : ''}`}>
                     <span className="player-number">{index + 1}</span>
-                    <span className="player-name">{player.name}</span>
+                    <span className="player-name">
+                      <button
+                        type="button"
+                        className="player-profile-link"
+                        onClick={() => navigate(`/player/${player.id}`)}
+                        title={t('playerProfile.viewProfile')}
+                      >
+                        {player.name}
+                      </button>
+                    </span>
                     {tournament.status === 'open_for_registration' && canManage && tournament.tournamentType !== 'playoff_only' && (
                       <button
                         className={`seed-toggle-btn${seededPlayerIds.has(player.id) ? ' seed-toggle-btn--active' : ''}`}

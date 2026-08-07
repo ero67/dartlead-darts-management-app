@@ -350,6 +350,15 @@ export function LeagueProvider({ children }) {
     }
   };
 
+  const withdrawLeagueRegistration = async (registrationId) => {
+    try {
+      return await leagueService.withdrawLeagueRegistration(registrationId);
+    } catch (error) {
+      console.error('Error withdrawing league registration:', error);
+      throw error;
+    }
+  };
+
   const value = {
     ...state,
     createLeague,
@@ -367,7 +376,8 @@ export function LeagueProvider({ children }) {
     registerForLeague,
     getLeagueRegistrations,
     approveLeagueRegistration,
-    rejectLeagueRegistration
+    rejectLeagueRegistration,
+    withdrawLeagueRegistration
   };
 
   return (

@@ -26,8 +26,24 @@ import { ManagerPanel } from './components/ManagerPanel';
 import { LandingPage } from './components/LandingPage';
 import { PlayerProfile } from './components/PlayerProfile';
 import { OfflineBanner } from './components/OfflineBanner';
-import { supabase } from './lib/supabase';
+import { useLanguage } from './contexts/LanguageContext';
+import { tournamentService } from './services/tournamentService';
 import './App.css';
+
+// Shown when a signed-in user has no player record yet (they have never been
+// approved into a tournament, so there are no stats to display).
+function NoPlayerProfile({ onBrowseTournaments }) {
+  const { t } = useLanguage();
+  return (
+    <div className="unauthorized-container">
+      <h2>{t('playerProfile.noLinkedProfile')}</h2>
+      <p>{t('playerProfile.registerForTournamentToCreate')}</p>
+      <button className="primary-btn" onClick={onBrowseTournaments}>
+        {t('navigation.tournaments')}
+      </button>
+    </div>
+  );
+}
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -223,6 +239,7 @@ function AppContent() {
         onBack={() => navigate(-1)}
         onSelectTournament={(tourn) => navigate(`/tournament/${tourn.id}`)}
         onSelectLeague={(league) => navigate(`/league/${league.id}`)}
+        onSelectPlayer={(player) => navigate(`/player/${player.id}`)}
       />
     );
   };
@@ -232,24 +249,19 @@ function AppContent() {
     const [profileLoading, setProfileLoading] = useState(true);
 
     useEffect(() => {
+      let cancelled = false;
       const findMyPlayer = async () => {
-        try {
-          const { data } = await supabase
-            .from('players')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          if (data) {
-            navigate(`/player/${data.id}`, { replace: true });
-          } else {
-            setProfileLoading(false);
-          }
-        } catch {
+        const player = await tournamentService.getPlayerByUserId(user.id);
+        if (cancelled) return;
+        if (player) {
+          navigate(`/player/${player.id}`, { replace: true });
+        } else {
           setProfileLoading(false);
         }
       };
       if (user) findMyPlayer();
       else setProfileLoading(false);
+      return () => { cancelled = true; };
     }, []);
 
     if (profileLoading) {
@@ -259,12 +271,7 @@ function AppContent() {
         </div>
       );
     }
-    return (
-      <div className="unauthorized-container">
-        <h2>No Player Profile</h2>
-        <p>Register for a tournament to create your player profile.</p>
-      </div>
-    );
+    return <NoPlayerProfile onBrowseTournaments={() => navigate('/tournaments')} />;
   };
 
   // Show loading spinner while checking authentication
@@ -457,9 +464,8 @@ function AppContent() {
           } />
           <Route path="/tournament/:id" element={<TournamentRoute />} />
           <Route path="/match/:id" element={<MatchRoute />} />
-          <Route path="/player/:id" element={
-            user ? <PlayerProfileRoute /> : <Auth />
-          } />
+          {/* Profiles are public, like tournaments and leagues */}
+          <Route path="/player/:id" element={<PlayerProfileRoute />} />
           <Route path="/my-profile" element={
             user ? <MyProfileRedirect /> : <Auth />
           } />

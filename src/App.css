@@ -6171,25 +6171,533 @@ body {
 /* === Player Profile === */
 .player-profile {
   padding: 2rem;
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
-.profile-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
+.profile-topbar {
+  margin-bottom: 1.25rem;
 }
 
-.profile-header h1 {
+/* --- Hero --- */
+.profile-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 1.75rem;
+  margin-bottom: 1.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  background:
+    radial-gradient(900px 220px at 0% 0%, rgba(var(--accent-primary-rgb), 0.14), transparent 65%),
+    var(--card-bg);
+  box-shadow: 0 10px 30px var(--shadow-sm);
+}
+
+.profile-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.profile-avatar {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(var(--accent-primary-rgb), 1), rgba(var(--accent-primary-rgb), 0.6));
+  box-shadow: 0 8px 20px rgba(var(--accent-primary-rgb), 0.35);
+}
+
+.profile-identity {
+  min-width: 0;
+}
+
+.profile-identity h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+}
+
+.profile-chip--you,
+.profile-chip--linked {
+  background: rgba(var(--accent-success-rgb), 0.14);
+  border-color: rgba(var(--accent-success-rgb), 0.3);
+  color: var(--accent-success);
+}
+
+.profile-chip--title,
+.profile-chip--win {
+  background: rgba(var(--accent-warning-rgb), 0.15);
+  border-color: rgba(var(--accent-warning-rgb), 0.3);
+  color: var(--accent-warning);
+}
+
+.profile-chip--loss {
+  background: rgba(var(--accent-danger-rgb), 0.12);
+  border-color: rgba(var(--accent-danger-rgb), 0.28);
+  color: var(--accent-danger);
+}
+
+.profile-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.profile-hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+}
+
+.profile-hero-stat svg {
+  color: var(--accent-primary);
+  margin-bottom: 0.2rem;
+}
+
+.profile-hero-stat strong {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.profile-hero-stat span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.profile-winrate {
+  margin-top: 1.25rem;
+}
+
+.profile-winrate-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.profile-winrate-labels .win {
+  color: var(--accent-success);
+}
+
+.profile-winrate-labels .loss {
+  color: var(--accent-danger);
+}
+
+.profile-winrate-bar {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(var(--accent-danger-rgb), 0.22);
+}
+
+.profile-winrate-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(var(--accent-success-rgb), 0.75), rgba(var(--accent-success-rgb), 1));
+  transition: width 0.4s ease;
+}
+
+/* --- Sections --- */
+.profile-section {
+  margin-bottom: 2rem;
+}
+
+.profile-section h2 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--text-primary);
-  font-size: 1.75rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.profile-section h2 svg {
+  color: var(--accent-primary);
+}
+
+.profile-empty-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.profile-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--text-tertiary);
+}
+
+.profile-empty-state h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+}
+
+/* --- Career stat tiles --- */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.profile-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.profile-stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--shadow-sm);
+}
+
+.profile-stat-icon {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 0.35rem;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.profile-stat-tile.accent-primary .profile-stat-icon {
+  background: rgba(var(--accent-primary-rgb), 0.15);
+  color: var(--accent-primary);
+}
+
+.profile-stat-tile.accent-success .profile-stat-icon {
+  background: rgba(var(--accent-success-rgb), 0.15);
+  color: var(--accent-success);
+}
+
+.profile-stat-tile.accent-danger .profile-stat-icon {
+  background: rgba(var(--accent-danger-rgb), 0.13);
+  color: var(--accent-danger);
+}
+
+.profile-stat-tile.accent-warning .profile-stat-icon {
+  background: rgba(var(--accent-warning-rgb), 0.15);
+  color: var(--accent-warning);
+}
+
+.profile-stat-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
+.profile-stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+/* --- Recent form --- */
+.profile-form-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.9rem;
+}
+
+.profile-form-pill,
+.profile-match-result {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.profile-form-pill.win,
+.profile-match-result.win {
+  background: rgba(var(--accent-success-rgb), 0.18);
+  color: var(--accent-success);
+}
+
+.profile-form-pill.loss,
+.profile-match-result.loss {
+  background: rgba(var(--accent-danger-rgb), 0.14);
+  color: var(--accent-danger);
+}
+
+.profile-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-match-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid transparent;
+}
+
+.profile-match-row.win {
+  border-left-color: var(--accent-success);
+}
+
+.profile-match-row.loss {
+  border-left-color: var(--accent-danger);
+}
+
+.profile-match-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.profile-match-opponent {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.profile-match-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.profile-match-tag {
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-weight: 700;
+  background: rgba(var(--accent-warning-rgb), 0.15);
+  color: var(--accent-warning);
+}
+
+.profile-match-score {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.profile-match-avg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 54px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.profile-match-avg small {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* --- Inline profile links (used across tournament views too) --- */
+.player-profile-link,
+.profile-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.player-profile-link:hover,
+.profile-link-btn:hover {
+  color: var(--accent-primary);
+  border-bottom-color: rgba(var(--accent-primary-rgb), 0.5);
+}
+
+/* --- History + leagues --- */
+.profile-tournament-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tournament-history-item,
+.league-membership-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.tournament-history-item:hover,
+.league-membership-item:hover {
+  background: var(--bg-tertiary);
+  border-color: rgba(var(--accent-primary-rgb), 0.35);
+}
+
+.tournament-history-item .tournament-name,
+.league-membership-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.tournament-history-item .tournament-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.profile-placement {
+  flex: 0 0 auto;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 0.35rem;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+.profile-placement.place-1 {
+  background: rgba(234, 179, 8, 0.18);
+  color: #b7791f;
+}
+
+.profile-placement.place-2 {
+  background: rgba(148, 163, 184, 0.22);
+  color: #64748b;
+}
+
+.profile-placement.place-3 {
+  background: rgba(180, 83, 9, 0.18);
+  color: #b45309;
+}
+
+.profile-placement-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.profile-placement-label.place-1 {
+  background: rgba(234, 179, 8, 0.18);
+  color: #b7791f;
+}
+
+.profile-row-chevron {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+}
+
+.dark-mode .profile-placement.place-1,
+.dark-mode .profile-placement-label.place-1 {
+  color: #facc15;
+}
+
+.dark-mode .profile-placement.place-2 {
+  color: #cbd5e1;
+}
+
+.dark-mode .profile-placement.place-3 {
+  color: #fdba74;
+}
+
+.active-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(var(--accent-success-rgb), 0.15);
+  color: var(--accent-success);
 }
 
 .linked-badge {
@@ -6197,73 +6705,65 @@ body {
   font-weight: 600;
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  background: rgba(34, 197, 94, 0.15);
-  color: #16a34a;
+  background: rgba(var(--accent-success-rgb), 0.15);
+  color: var(--accent-success);
 }
 
-.profile-section {
-  margin-bottom: 2rem;
-}
+@media (max-width: 768px) {
+  .player-profile {
+    padding: 1rem;
+  }
 
-.profile-section h2 {
-  color: var(--text-primary);
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-}
+  .profile-hero {
+    padding: 1.25rem;
+  }
 
-.tournament-history-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
+  .profile-hero-main {
+    gap: 1rem;
+  }
 
-.tournament-history-item:hover {
-  background: var(--bg-tertiary);
-}
+  .profile-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 1.2rem;
+  }
 
-.tournament-history-item .tournament-name {
-  flex: 1;
-  font-weight: 500;
-  color: var(--text-primary);
-}
+  .profile-identity h1 {
+    font-size: 1.4rem;
+  }
 
-.tournament-history-item .tournament-date {
-  color: var(--text-tertiary);
-  font-size: 0.85rem;
-}
+  .profile-hero-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
 
-.league-membership-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
+  .profile-hero-stat {
+    padding: 0.6rem 0.5rem;
+  }
 
-.league-membership-item:hover {
-  background: var(--bg-tertiary);
-}
+  .profile-hero-stat strong {
+    font-size: 1.15rem;
+  }
 
-.active-badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  background: rgba(34, 197, 94, 0.15);
-  color: #16a34a;
+  .profile-hero-stat span {
+    font-size: 0.62rem;
+  }
+
+  .profile-match-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .profile-match-avg {
+    display: none;
+  }
+
+  .tournament-history-item .tournament-date,
+  .profile-placement-label {
+    display: none;
+  }
 }
 
 /* === Registration Requests === */
@@ -6392,6 +6892,127 @@ body {
   border-radius: 4px;
   background: rgba(var(--accent-primary-rgb), 0.1);
   color: var(--accent-primary);
+}
+
+.self-register-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(var(--accent-primary-rgb), 1), rgba(var(--accent-primary-rgb), 0.75));
+  box-shadow: 0 6px 16px rgba(var(--accent-primary-rgb), 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.self-register-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(var(--accent-primary-rgb), 0.4);
+}
+
+.self-register-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.withdraw-registration-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--accent-danger);
+  background: transparent;
+  border: 1px solid rgba(var(--accent-danger-rgb), 0.35);
+  transition: background-color 0.15s ease;
+}
+
+.withdraw-registration-btn:hover:not(:disabled) {
+  background: rgba(var(--accent-danger-rgb), 0.1);
+}
+
+.withdraw-registration-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.registration-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  color: var(--accent-danger);
+  background: rgba(var(--accent-danger-rgb), 0.1);
+  border: 1px solid rgba(var(--accent-danger-rgb), 0.25);
+}
+
+.registration-error svg {
+  flex: 0 0 auto;
+}
+
+.requests-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.requests-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.requests-header h3 svg {
+  color: var(--accent-primary);
+}
+
+.requests-count {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  background: rgba(var(--accent-warning-rgb), 0.15);
+  color: var(--accent-warning);
+}
+
+.no-requests {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.registration-request-card.status-approved {
+  border-left: 3px solid var(--accent-success);
+}
+
+.registration-request-card.status-rejected {
+  border-left: 3px solid var(--accent-danger);
+  opacity: 0.75;
+}
+
+.request-actions .approve-btn:disabled,
+.request-actions .reject-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* === User Search Picker === */

@@ -947,6 +947,15 @@ export function TournamentProvider({ children }) {
     }
   };
 
+  const withdrawRegistration = async (registrationId) => {
+    try {
+      return await tournamentService.withdrawRegistration(registrationId);
+    } catch (error) {
+      console.error('Error withdrawing registration:', error);
+      throw error;
+    }
+  };
+
   const value = {
     ...state,
     createTournament,
@@ -966,7 +975,8 @@ export function TournamentProvider({ children }) {
     registerForTournament,
     getTournamentRegistrations,
     approveRegistration,
-    rejectRegistration
+    rejectRegistration,
+    withdrawRegistration
   };
 
 

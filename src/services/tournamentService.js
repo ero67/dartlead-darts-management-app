@@ -178,36 +178,67 @@ export const tournamentService = {
       }
 
 
-      // Create/update players and map old IDs to new IDs
-      const playerIdMap = new Map() // oldId -> newId
+      // Resolve every incoming player to a row in `players`, mapping the id the
+      // caller used onto the real one.
+      //
+      // Match on id FIRST. Players preselected from a league arrive with their
+      // actual players.id, so this keeps them on their existing profile — and
+      // therefore their career stats — regardless of how the display name is
+      // spelled. Players coming from the creation/import forms carry a
+      // client-generated id that isn't in the table yet, so those fall back to a
+      // name lookup and finally to an insert.
+      const playerIdMap = new Map() // incoming id -> players.id
       const playerIds = []
-      
-      for (const player of tournamentData.players) {
-        // Check if player already exists
-        const { data: existingPlayer, error: checkError } = await supabase
+      const incomingPlayers = tournamentData.players || []
+
+      // Only real UUIDs can be looked up by id — anything else would make
+      // Postgres reject the whole query
+      const isUuid = (value) =>
+        typeof value === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+      const candidateIds = incomingPlayers.map(p => p.id).filter(isUuid)
+      const candidateNames = [...new Set(
+        incomingPlayers.map(p => (p.name || '').trim()).filter(Boolean)
+      )]
+
+      const knownIds = new Set()
+      if (candidateIds.length > 0) {
+        const { data: rowsById, error: byIdError } = await supabase
           .from('players')
           .select('id')
-          .eq('name', player.name)
-          .maybeSingle()
+          .in('id', candidateIds)
+        if (byIdError) throw byIdError
+        ;(rowsById || []).forEach(row => knownIds.add(row.id))
+      }
 
-        let playerId
-        if (existingPlayer && !checkError) {
-          playerId = existingPlayer.id
-        } else {
-          // Create new player
+      const idByName = new Map()
+      if (candidateNames.length > 0) {
+        const { data: rowsByName, error: byNameError } = await supabase
+          .from('players')
+          .select('id, name')
+          .in('name', candidateNames)
+        if (byNameError) throw byNameError
+        ;(rowsByName || []).forEach(row => idByName.set(row.name, row.id))
+      }
+
+      for (const player of incomingPlayers) {
+        const name = (player.name || '').trim()
+        let playerId = knownIds.has(player.id) ? player.id : idByName.get(name)
+
+        if (!playerId) {
           playerId = generateId()
-          const { data: newPlayer, error: playerError } = await supabase
+          const { error: playerError } = await supabase
             .from('players')
             .insert({
               id: playerId,
-              name: player.name
+              name
             })
-            .select()
-            .single()
 
           if (playerError) throw playerError
+          // Guard against the same name appearing twice in the input
+          idByName.set(name, playerId)
         }
-        
+
         playerIdMap.set(player.id, playerId)
         playerIds.push(playerId)
       }
@@ -1350,7 +1381,10 @@ export const tournamentService = {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-      if (!user) throw new Error('Must be logged in to register');
+      if (!user) throw new Error('NOT_LOGGED_IN');
+
+      const trimmedName = (playerName || '').trim();
+      if (!trimmedName) throw new Error('MISSING_PLAYER_NAME');
 
       const { data: tournament, error: tError } = await supabase
         .from('tournaments')
@@ -1360,15 +1394,21 @@ export const tournamentService = {
         .single();
       if (tError) throw tError;
       if (tournament.status !== 'open_for_registration') {
-        throw new Error('Tournament is not accepting registrations');
+        throw new Error('REGISTRATION_CLOSED');
       }
+
+      // Idempotent: tournament_registrations has UNIQUE(tournament_id, user_id),
+      // so a second insert would fail with an opaque constraint error. Return the
+      // existing row instead (covers double clicks and stale UI state).
+      const existing = await this.getMyRegistrationForTournament(tournamentId);
+      if (existing) return existing;
 
       const { data: registration, error } = await supabase
         .from('tournament_registrations')
         .insert({
           tournament_id: tournamentId,
           user_id: user.id,
-          player_name: playerName
+          player_name: trimmedName
         })
         .select()
         .single();
@@ -1376,6 +1416,25 @@ export const tournamentService = {
       return registration;
     } catch (error) {
       console.error('Error registering for tournament:', error);
+      throw error;
+    }
+  },
+
+  async withdrawRegistration(registrationId) {
+    try {
+      // RLS only allows deleting your own still-pending registration; the extra
+      // status filter makes that explicit and keeps the result verifiable.
+      const { data, error } = await supabase
+        .from('tournament_registrations')
+        .delete()
+        .eq('id', registrationId)
+        .eq('status', 'pending')
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('WITHDRAW_NOT_ALLOWED');
+      return true;
+    } catch (error) {
+      console.error('Error withdrawing registration:', error);
       throw error;
     }
   },
@@ -1408,30 +1467,52 @@ export const tournamentService = {
       if (regError) throw regError;
       if (reg.status !== 'pending') throw new Error('Registration already processed');
 
-      // Find or create player (reuse pattern from addPlayerToTournament)
-      const { data: existingPlayer } = await supabase
+      // Resolve the player row for this registration.
+      //
+      // Look up by account link FIRST, by name second. players.user_id has a
+      // partial UNIQUE index, so a user can own exactly one player row: if they
+      // already have one (registered before, or added via user search), inserting
+      // a second one under a different display name fails. Reusing the linked
+      // player also keeps their whole career on a single profile.
+      let playerId;
+      const { data: linkedPlayer } = await supabase
         .from('players')
-        .select('id, user_id')
-        .eq('name', reg.player_name)
+        .select('id')
+        .eq('user_id', reg.user_id)
         .maybeSingle();
 
-      let playerId;
-      if (existingPlayer) {
-        playerId = existingPlayer.id;
-        if (!existingPlayer.user_id) {
-          await supabase
-            .from('players')
-            .update({ user_id: reg.user_id })
-            .eq('id', playerId);
-        }
+      if (linkedPlayer) {
+        playerId = linkedPlayer.id;
       } else {
-        const { data: newPlayer, error: createError } = await supabase
+        // players.name is UNIQUE, so an existing row with this name is either
+        // an unlinked manual player (claim it) or somebody else's (reject).
+        const { data: playerByName } = await supabase
           .from('players')
-          .insert({ name: reg.player_name, user_id: reg.user_id })
-          .select('id')
-          .single();
-        if (createError) throw createError;
-        playerId = newPlayer.id;
+          .select('id, user_id')
+          .eq('name', reg.player_name)
+          .maybeSingle();
+
+        if (playerByName) {
+          if (playerByName.user_id && playerByName.user_id !== reg.user_id) {
+            throw new Error('PLAYER_NAME_TAKEN');
+          }
+          playerId = playerByName.id;
+          if (!playerByName.user_id) {
+            const { error: linkError } = await supabase
+              .from('players')
+              .update({ user_id: reg.user_id })
+              .eq('id', playerId);
+            if (linkError) throw linkError;
+          }
+        } else {
+          const { data: newPlayer, error: createError } = await supabase
+            .from('players')
+            .insert({ name: reg.player_name, user_id: reg.user_id })
+            .select('id')
+            .single();
+          if (createError) throw createError;
+          playerId = newPlayer.id;
+        }
       }
 
       // Add to tournament_players. Idempotent: the player may already be in the
@@ -1568,6 +1649,25 @@ export const tournamentService = {
     }
   },
 
+  // Resolve the player row linked to an auth account. players.user_id is
+  // uniquely indexed, but limit(1) keeps this safe on databases seeded before
+  // that index existed (maybeSingle() would throw there).
+  async getPlayerByUserId(userId) {
+    try {
+      if (!userId) return null;
+      const { data, error } = await supabase
+        .from('players')
+        .select('id, name, user_id')
+        .eq('user_id', userId)
+        .limit(1);
+      if (error) throw error;
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error fetching player by user id:', error);
+      return null;
+    }
+  },
+
   async getPlayerProfile(playerId) {
     try {
       const { data: player, error: playerError } = await supabase
@@ -1650,13 +1750,90 @@ export const tournamentService = {
         if (stats?.oneEighties) total180s += stats.oneEighties;
       });
 
-      // Tournament wins
+      // Placements, derived from the knockout bracket of every tournament the
+      // player took part in. The final is the highest playoff_round with
+      // playoff_match_number 1; the 3rd-place match shares that round number
+      // but sits at match number 2 (see generatePlayoffRounds).
+      const placementByTournament = {};
+      if (tournamentIds.length > 0) {
+        const { data: playoffMatches } = await supabase
+          .from('matches')
+          .select('tournament_id, playoff_round, playoff_match_number, winner_id, player1_id, player2_id')
+          .in('tournament_id', tournamentIds)
+          .eq('is_playoff', true)
+          .eq('status', 'completed')
+          .limit(5000);
+
+        const matchesByTournament = new Map();
+        (playoffMatches || []).forEach(m => {
+          if (!matchesByTournament.has(m.tournament_id)) matchesByTournament.set(m.tournament_id, []);
+          matchesByTournament.get(m.tournament_id).push(m);
+        });
+
+        matchesByTournament.forEach((list, tournamentId) => {
+          const finalRound = Math.max(...list.map(m => m.playoff_round || 0));
+          const finalMatch = list.find(m => m.playoff_round === finalRound && (m.playoff_match_number || 1) === 1);
+          const thirdPlaceMatch = list.find(m => m.playoff_round === finalRound && m.playoff_match_number === 2);
+
+          if (finalMatch && (finalMatch.player1_id === playerId || finalMatch.player2_id === playerId)) {
+            placementByTournament[tournamentId] = finalMatch.winner_id === playerId ? 1 : 2;
+          } else if (thirdPlaceMatch && thirdPlaceMatch.winner_id === playerId) {
+            placementByTournament[tournamentId] = 3;
+          }
+        });
+      }
+
+      // League-recorded placements fill in tournaments without a bracket result
       const { data: placementResults } = await supabase
         .from('league_tournament_results')
-        .select('placement')
-        .eq('player_id', playerId)
-        .eq('placement', 1);
-      const tournamentWins = (placementResults || []).length;
+        .select('tournament_id, placement')
+        .eq('player_id', playerId);
+      (placementResults || []).forEach(r => {
+        if (!placementByTournament[r.tournament_id] && r.placement) {
+          placementByTournament[r.tournament_id] = r.placement;
+        }
+      });
+
+      const tournamentWins = Object.values(placementByTournament).filter(p => p === 1).length;
+      const tournamentsWithPlacement = tournaments.map(tourn => ({
+        ...tourn,
+        placement: placementByTournament[tourn.id] || null
+      }));
+
+      // Recent form — newest completed matches with opponent and score
+      const statsByMatch = new Map((matchStats || []).map(s => [s.match_id, s]));
+      const tournamentNameById = new Map(tournaments.map(tourn => [tourn.id, tourn.name]));
+      const { data: recentRaw } = await supabase
+        .from('matches')
+        .select(`
+          id, tournament_id, winner_id, player1_id, player2_id,
+          player1_legs, player2_legs, is_playoff, created_at, updated_at,
+          player1:players!matches_player1_id_fkey(id, name),
+          player2:players!matches_player2_id_fkey(id, name)
+        `)
+        .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
+        .eq('status', 'completed')
+        .order('updated_at', { ascending: false })
+        .limit(10);
+
+      const recentMatches = (recentRaw || []).map(m => {
+        const isPlayer1 = m.player1_id === playerId;
+        const opponent = isPlayer1 ? m.player2 : m.player1;
+        const matchAverage = parseFloat(statsByMatch.get(m.id)?.average);
+        return {
+          id: m.id,
+          tournamentId: m.tournament_id,
+          tournamentName: tournamentNameById.get(m.tournament_id) || null,
+          opponentId: opponent?.id || null,
+          opponentName: opponent?.name || null,
+          legsFor: (isPlayer1 ? m.player1_legs : m.player2_legs) || 0,
+          legsAgainst: (isPlayer1 ? m.player2_legs : m.player1_legs) || 0,
+          won: m.winner_id === playerId,
+          isPlayoff: !!m.is_playoff,
+          average: Number.isFinite(matchAverage) ? matchAverage : null,
+          playedAt: m.updated_at || m.created_at
+        };
+      });
 
       // League memberships
       const { data: leagueMemberships } = await supabase
@@ -1666,7 +1843,8 @@ export const tournamentService = {
 
       return {
         player,
-        tournaments,
+        tournaments: tournamentsWithPlacement,
+        recentMatches,
         careerStats: {
           matchesPlayed: allMatches.length,
           wins,
@@ -1678,7 +1856,8 @@ export const tournamentService = {
           total180s,
           totalLegsWon,
           totalLegsLost,
-          tournamentWins
+          tournamentWins,
+          tournamentsPlayed: tournaments.length
         },
         leagues: leagueMemberships || []
       };
@@ -1964,6 +2143,38 @@ export const tournamentService = {
         throw error;
       }
 
+      // Push the new match format onto matches that haven't been played yet.
+      //
+      // Group matches copy legs_to_win / starting_score from the tournament when
+      // the group stage is created, and the match row wins over the tournament
+      // setting when a match is started. Without this, changing "legs to win"
+      // after the tournament has started silently does nothing to the fixtures
+      // that already exist.
+      //
+      // Playoff matches are deliberately excluded: their leg counts come from
+      // playoff_settings.legsToWinByRound per round, not from the tournament row,
+      // so overwriting a (possibly reset) playoff row here would break the
+      // per-round format. matchService.startMatch re-applies the round's value
+      // when a playoff match is started.
+      const matchFormatUpdate = {};
+      if (settings.legsToWin) matchFormatUpdate.legs_to_win = settings.legsToWin;
+      if (settings.startingScore) matchFormatUpdate.starting_score = settings.startingScore;
+
+      if (Object.keys(matchFormatUpdate).length > 0) {
+        matchFormatUpdate.updated_at = new Date().toISOString();
+        const { error: pendingMatchesError } = await supabase
+          .from('matches')
+          .update(matchFormatUpdate)
+          .eq('tournament_id', tournamentId)
+          .eq('status', 'pending')
+          .eq('is_playoff', false);
+
+        if (pendingMatchesError) {
+          console.error('Error applying settings to pending matches:', pendingMatchesError);
+          throw pendingMatchesError;
+        }
+      }
+
       return data;
 
     } catch (error) {
@@ -1979,14 +2190,23 @@ export const matchService = {
   async startMatch(matchId, userId, matchData = null) {
     try {
       
+      // Re-apply the format the caller resolved from current settings. The row
+      // may predate a settings change, or be a playoff match that was played and
+      // reset — and scoring auto-completion reads legs_to_win off the row
+      // (getLegsToWinForMatch), so the row has to agree with what the scoring UI
+      // was handed or the match ends on the wrong leg.
+      const startUpdate = {
+        started_by_user_id: userId,
+        status: 'in_progress',
+        updated_at: new Date().toISOString()
+      };
+      if (matchData?.legsToWin) startUpdate.legs_to_win = matchData.legsToWin;
+      if (matchData?.startingScore) startUpdate.starting_score = matchData.startingScore;
+
       // First, try to update the existing match
       const { data: existingMatch, error: updateError } = await supabase
         .from('matches')
-        .update({ 
-          started_by_user_id: userId,
-          status: 'in_progress',
-          updated_at: new Date().toISOString()
-        })
+        .update(startUpdate)
         .eq('id', matchId)
         .select()
         .maybeSingle()
