@@ -1668,6 +1668,63 @@ export const tournamentService = {
     }
   },
 
+  // Claim an existing player record — and therefore its whole match history —
+  // for an auth account. Used by the admin tool that attaches historical
+  // results (played under a plain name, before the player had a login) to the
+  // right profile.
+  async linkPlayerToUser(playerId, userId) {
+    try {
+      if (!playerId || !userId) throw new Error('MISSING_ARGUMENTS');
+
+      const { data: player, error: playerError } = await supabase
+        .from('players')
+        .select('id, name, user_id')
+        .eq('id', playerId)
+        .single();
+      if (playerError) throw playerError;
+
+      if (player.user_id === userId) return player; // already linked, nothing to do
+      if (player.user_id) throw new Error('PLAYER_ALREADY_LINKED');
+
+      // players.user_id is uniquely indexed: one account owns at most one player
+      // row, so an account that already has one has to be merged, not re-linked.
+      const alreadyLinked = await this.getPlayerByUserId(userId);
+      if (alreadyLinked && alreadyLinked.id !== playerId) {
+        const error = new Error('USER_ALREADY_LINKED');
+        error.linkedPlayer = alreadyLinked;
+        throw error;
+      }
+
+      const { data, error } = await supabase
+        .from('players')
+        .update({ user_id: userId })
+        .eq('id', playerId)
+        .select('id, name, user_id')
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error linking player to user:', error);
+      throw error;
+    }
+  },
+
+  async unlinkPlayerFromUser(playerId) {
+    try {
+      const { data, error } = await supabase
+        .from('players')
+        .update({ user_id: null })
+        .eq('id', playerId)
+        .select('id, name, user_id')
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error unlinking player from user:', error);
+      throw error;
+    }
+  },
+
   async getPlayerProfile(playerId) {
     try {
       const { data: player, error: playerError } = await supabase

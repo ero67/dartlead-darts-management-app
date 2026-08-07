@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, Settings, Search, Trophy, Save, GitMerge, ArrowRight } from 'lucide-react';
+import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, Settings, Search, Trophy, Save, GitMerge, ArrowRight, Link as LinkIcon, Unlink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
+import { UserSearchPicker } from './UserSearchPicker';
 
 export function AdminPanel() {
   const [email, setEmail] = useState('');
@@ -40,6 +41,17 @@ export function AdminPanel() {
   const [targetPlayerId, setTargetPlayerId] = useState('');
   const [merging, setMerging] = useState(false);
   const [mergeLog, setMergeLog] = useState([]);
+
+  // Link Account → Player Stats
+  const [linkUser, setLinkUser] = useState(null);
+  const [linkUserPlayer, setLinkUserPlayer] = useState(null);
+  const [linkPlayerId, setLinkPlayerId] = useState('');
+  const [linkExtraPlayerIds, setLinkExtraPlayerIds] = useState([]);
+  const [linkPlayerSearch, setLinkPlayerSearch] = useState('');
+  const [linkPreview, setLinkPreview] = useState(null);
+  const [loadingLinkPreview, setLoadingLinkPreview] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [linkLog, setLinkLog] = useState([]);
 
   const setManagerRole = async () => {
     if (!email.trim()) {
@@ -410,6 +422,147 @@ export function AdminPanel() {
       setMessage({ type: 'error', text: `Merge failed: ${err.message}` });
     } finally {
       setMerging(false);
+    }
+  };
+
+  // ── Link Account → Player Stats ──────────────────────────────────
+  const handleSelectLinkUser = async (selectedUser) => {
+    setLinkUser(selectedUser);
+    setLinkExtraPlayerIds([]);
+    setLinkLog([]);
+    setLinkPreview(null);
+    setMessage({ type: '', text: '' });
+
+    const existing = await tournamentService.getPlayerByUserId(selectedUser.id);
+    setLinkUserPlayer(existing);
+
+    if (existing) {
+      setLinkPlayerId(existing.id);
+      return;
+    }
+    // The usual case is "same name in every tournament", so pre-select the
+    // unclaimed player record whose name matches the account name.
+    const accountName = (selectedUser.fullName || '').trim().toLowerCase();
+    const nameMatch = allPlayers.find(
+      p => !p.user_id && p.name.trim().toLowerCase() === accountName
+    );
+    setLinkPlayerId(nameMatch?.id || '');
+  };
+
+  const addLinkExtraPlayer = (playerId) => {
+    if (!playerId || playerId === linkPlayerId || linkExtraPlayerIds.includes(playerId)) return;
+    setLinkExtraPlayerIds(prev => [...prev, playerId]);
+  };
+
+  const removeLinkExtraPlayer = (playerId) => {
+    setLinkExtraPlayerIds(prev => prev.filter(id => id !== playerId));
+  };
+
+  // Preview the stats the account is about to inherit
+  React.useEffect(() => {
+    if (!linkPlayerId) {
+      setLinkPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingLinkPreview(true);
+    tournamentService.getPlayerProfile(linkPlayerId)
+      .then(data => { if (!cancelled) setLinkPreview(data); })
+      .catch(() => { if (!cancelled) setLinkPreview(null); })
+      .finally(() => { if (!cancelled) setLoadingLinkPreview(false); });
+    return () => { cancelled = true; };
+  }, [linkPlayerId]);
+
+  const handleLinkStatsToUser = async () => {
+    if (!linkUser || !linkPlayerId) {
+      setMessage({ type: 'error', text: 'Select an account and a player record.' });
+      return;
+    }
+
+    // Pre-flight: an account owns at most one player row, so if it is already
+    // linked elsewhere the merge has to go INTO that row. Check before moving
+    // any data so a rejected link can't leave a half-finished merge behind.
+    if (linkUserPlayer && linkUserPlayer.id !== linkPlayerId) {
+      setMessage({
+        type: 'error',
+        text: `${linkUser.fullName} is already linked to "${linkUserPlayer.name}". Select that record as the profile and merge the others into it, or unlink first.`
+      });
+      return;
+    }
+
+    const targetName = allPlayers.find(p => p.id === linkPlayerId)?.name || linkPlayerId;
+    const extras = linkExtraPlayerIds.filter(id => id !== linkPlayerId);
+    const extraNames = extras.map(id => allPlayers.find(p => p.id === id)?.name || id);
+
+    const lines = [
+      `Attach player statistics to ${linkUser.fullName} (${linkUser.email})`,
+      '',
+      `Profile: "${targetName}"`
+    ];
+    if (extras.length > 0) {
+      lines.push('', 'These records will be MERGED into it and then deleted:');
+      extraNames.forEach(n => lines.push(`  • "${n}"`));
+    }
+    lines.push('', 'Continue?');
+    if (!confirm(lines.join('\n'))) return;
+
+    setLinking(true);
+    setLinkLog([]);
+    setMessage({ type: '', text: '' });
+    try {
+      const logs = [];
+      for (const sourceId of extras) {
+        const sourceName = allPlayers.find(p => p.id === sourceId)?.name || sourceId;
+        logs.push(`── Merging "${sourceName}" → "${targetName}" ──`);
+        const result = await leagueService.mergePlayers(sourceId, linkPlayerId);
+        logs.push(...(result.log || []));
+        logs.push('');
+      }
+
+      const linked = await tournamentService.linkPlayerToUser(linkPlayerId, linkUser.id);
+      logs.push(`Linked "${linked.name}" to ${linkUser.email}`);
+
+      setLinkLog(logs);
+      setLinkUserPlayer(linked);
+      setLinkExtraPlayerIds([]);
+      setMessage({
+        type: 'success',
+        text: `"${linked.name}" now belongs to ${linkUser.fullName}. Their tournament history and career statistics show up on that account's profile.`
+      });
+      await loadAllPlayers();
+    } catch (err) {
+      console.error('Error linking player to user:', err);
+      let text = `Failed to link: ${err.message}`;
+      if (err.message === 'PLAYER_ALREADY_LINKED') {
+        text = 'That player record already belongs to a different account. Unlink it first, or merge instead.';
+      } else if (err.message === 'USER_ALREADY_LINKED') {
+        text = `This account is already linked to "${err.linkedPlayer?.name}". Merge the other records into that one instead.`;
+      }
+      setMessage({ type: 'error', text });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const handleUnlinkPlayer = async () => {
+    if (!linkUserPlayer) return;
+    if (!confirm(
+      `Unlink "${linkUserPlayer.name}" from ${linkUser?.email}?\n\n` +
+      'The player record and all its match data stay intact — it just stops showing on that account\'s profile.'
+    )) return;
+
+    setLinking(true);
+    try {
+      await tournamentService.unlinkPlayerFromUser(linkUserPlayer.id);
+      setMessage({ type: 'success', text: `"${linkUserPlayer.name}" is no longer linked to that account.` });
+      setLinkUserPlayer(null);
+      setLinkPlayerId('');
+      await loadAllPlayers();
+    } catch (err) {
+      console.error('Error unlinking player:', err);
+      setMessage({ type: 'error', text: `Failed to unlink: ${err.message}` });
+    } finally {
+      setLinking(false);
     }
   };
 
@@ -1043,6 +1196,235 @@ export function AdminPanel() {
                   }}>
                     <strong style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Merge Log:</strong>
                     {mergeLog.map((line, i) => (
+                      <div key={i} style={{ color: 'var(--text-secondary)', padding: '0.15rem 0' }}>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Link Account to Player Stats ─────────────────────────── */}
+        <div className="admin-section">
+          <div className="admin-section-header">
+            <LinkIcon size={20} />
+            <h2>Link Account to Player Stats</h2>
+          </div>
+          <p className="admin-section-description">
+            Attach the results a player already has — from tournaments they played under their name, before they had a login — to their account.
+            Everything recorded against that player record (matches, averages, 180s, checkouts, tournament history, league memberships) then shows on their profile.
+            If they used more than one spelling of their name, merge those records in at the same time.
+          </p>
+
+          <div className="admin-form">
+            <div className="form-group">
+              <label>
+                <UserPlus size={16} />
+                Account
+              </label>
+              <UserSearchPicker onSelect={handleSelectLinkUser} />
+              {linkUser && (
+                <div style={{
+                  marginTop: '0.6rem',
+                  padding: '0.6rem 0.8rem',
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: '8px',
+                  fontSize: '0.88rem',
+                  color: 'var(--text-primary)'
+                }}>
+                  <strong>{linkUser.fullName}</strong>
+                  <span style={{ color: 'var(--text-secondary)' }}> — {linkUser.email}</span>
+                  <div style={{ marginTop: '0.35rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                    {linkUserPlayer
+                      ? <>Currently linked to player <strong>&quot;{linkUserPlayer.name}&quot;</strong></>
+                      : 'No player record linked yet'}
+                  </div>
+                  {linkUserPlayer && (
+                    <button
+                      className="admin-button"
+                      onClick={handleUnlinkPlayer}
+                      disabled={linking}
+                      style={{ marginTop: '0.6rem' }}
+                    >
+                      <Unlink size={14} />
+                      Unlink
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {linkUser && (
+              <>
+                <div className="form-group">
+                  <label>
+                    <Search size={16} />
+                    Filter Player Records
+                  </label>
+                  <input
+                    type="text"
+                    value={linkPlayerSearch}
+                    onChange={(e) => setLinkPlayerSearch(e.target.value)}
+                    placeholder="Type to filter player names..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>
+                    <Users size={16} />
+                    Player record to attach
+                  </label>
+                  <select
+                    value={linkPlayerId}
+                    onChange={(e) => setLinkPlayerId(e.target.value)}
+                    disabled={!!linkUserPlayer}
+                  >
+                    <option value="">-- Select a player --</option>
+                    {allPlayers
+                      .filter(p => !p.user_id || p.id === linkUserPlayer?.id)
+                      .filter(p => !linkPlayerSearch || p.name.toLowerCase().includes(linkPlayerSearch.toLowerCase()))
+                      .map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                  </select>
+                  <p style={{ marginTop: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                    Only records that no account has claimed are listed.
+                    {linkUserPlayer && ' This account is already linked, so the profile is fixed — use the merge list below to fold other spellings into it.'}
+                  </p>
+                </div>
+
+                {/* Stats preview so the admin can confirm it's the right person */}
+                {loadingLinkPreview && (
+                  <div className="admin-loading">
+                    <Loader size={16} className="spinning" />
+                    <span>Loading statistics...</span>
+                  </div>
+                )}
+                {!loadingLinkPreview && linkPreview && (
+                  <div style={{
+                    padding: '0.9rem 1rem',
+                    background: 'var(--bg-tertiary)',
+                    borderRadius: '8px',
+                    fontSize: '0.88rem'
+                  }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{linkPreview.player.name}</strong>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
+                      <span>{linkPreview.tournaments.length} tournaments</span>
+                      <span>{linkPreview.careerStats.matchesPlayed} matches</span>
+                      <span>{linkPreview.careerStats.wins}W / {linkPreview.careerStats.losses}L</span>
+                      <span>avg {linkPreview.careerStats.overallAverage.toFixed(2)}</span>
+                      <span>{linkPreview.careerStats.total180s} × 180</span>
+                      <span>{linkPreview.careerStats.tournamentWins} titles</span>
+                    </div>
+                    {linkPreview.tournaments.length > 0 && (
+                      <div style={{ marginTop: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>
+                        {linkPreview.tournaments.slice(0, 5).map(t => t.name).join(', ')}
+                        {linkPreview.tournaments.length > 5 && ` +${linkPreview.tournaments.length - 5} more`}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Optional: other spellings to fold in */}
+                <div className="form-group" style={{ marginTop: '1rem' }}>
+                  <label>
+                    <GitMerge size={16} />
+                    Also merge these records (optional)
+                  </label>
+                  <select
+                    value=""
+                    onChange={(e) => { addLinkExtraPlayer(e.target.value); e.target.value = ''; }}
+                  >
+                    <option value="">-- Add another spelling of the name --</option>
+                    {allPlayers
+                      .filter(p => !p.user_id && p.id !== linkPlayerId && !linkExtraPlayerIds.includes(p.id))
+                      .filter(p => !linkPlayerSearch || p.name.toLowerCase().includes(linkPlayerSearch.toLowerCase()))
+                      .map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                  </select>
+                  {linkExtraPlayerIds.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+                      {linkExtraPlayerIds.map(id => (
+                        <span
+                          key={id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            padding: '0.25rem 0.6rem',
+                            background: 'rgba(239, 68, 68, 0.12)',
+                            color: 'var(--accent-danger, #ef4444)',
+                            borderRadius: '20px',
+                            fontSize: '0.85rem',
+                            fontWeight: 500,
+                            textDecoration: 'line-through'
+                          }}
+                        >
+                          {allPlayers.find(p => p.id === id)?.name || id}
+                          <button
+                            onClick={() => removeLinkExtraPlayer(id)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--accent-danger, #ef4444)',
+                              cursor: 'pointer',
+                              padding: 0,
+                              marginLeft: '2px',
+                              lineHeight: 1
+                            }}
+                            title="Remove"
+                          >
+                            <X size={14} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {linkExtraPlayerIds.length > 0 && (
+                    <p style={{ marginTop: '0.5rem', color: 'var(--accent-danger, #ef4444)', fontSize: '0.82rem' }}>
+                      These {linkExtraPlayerIds.length} record(s) will be merged into the profile above and permanently deleted. This cannot be undone.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  className="admin-button primary"
+                  onClick={handleLinkStatsToUser}
+                  disabled={!linkPlayerId || linking || (!!linkUserPlayer && linkExtraPlayerIds.length === 0)}
+                  style={{ marginTop: '0.5rem', width: '100%' }}
+                >
+                  {linking ? (
+                    <>
+                      <Loader size={16} className="spinning" />
+                      Linking...
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon size={16} />
+                      {linkExtraPlayerIds.length > 0
+                        ? `Merge ${linkExtraPlayerIds.length} record(s) and link to account`
+                        : 'Link stats to account'}
+                    </>
+                  )}
+                </button>
+
+                {linkLog.length > 0 && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    background: 'var(--bg-tertiary)',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontFamily: 'monospace'
+                  }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Log:</strong>
+                    {linkLog.map((line, i) => (
                       <div key={i} style={{ color: 'var(--text-secondary)', padding: '0.15rem 0' }}>
                         {line}
                       </div>

@@ -1527,7 +1527,7 @@ export const leagueService = {
     try {
       const { data, error } = await supabase
         .from('players')
-        .select('id, name')
+        .select('id, name, user_id')
         .order('name')
         .limit(10000);
 
