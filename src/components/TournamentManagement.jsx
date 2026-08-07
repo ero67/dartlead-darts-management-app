@@ -1938,7 +1938,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     )
                   )}
 
-                  {/* Emergency: match is in progress but not detected as live on this device */}
+{/* Emergency: match is in progress but not detected as live on this device */}
                   {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && canManage && user && (
                     <button
                       className="continue-match-btn admin-override-btn"
@@ -1954,32 +1954,59 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       {t('management.adminScore') || 'Admin score'}
                     </button>
                   )}
-                  {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && (
-                    user ? (
-                      <button 
-                        className="continue-match-btn"
-                        onClick={() => onMatchStart({ 
-                          ...match,
-                          legsToWin: match.legsToWin || tournament.legsToWin,
-                          startingScore: match.startingScore || tournament.startingScore
-                        })}
+                  
+                  {/* Admin correction controls - only visible to admins/managers */}
+                  {canManage && user && (
+                    <div className="admin-controls">
+                      <button
+                        className="admin-btn admin-reset-btn"
+                        onClick={() => {
+                          if (window.confirm(t('manager.confirmReset', { matchId: match.id }))) {
+                            matchService.resetMatchToPending(match.id).then(() => {
+                              // Refetch tournament to update state
+                              refetchTournament();
+                            });
+                          }
+                        }}
+                        title={t('manager.resetMatchToPending') || 'Reset match to pending'}
                       >
-                        <Play size={16} />
-                        {t('management.continueMatch')}
+                        <RotateCcw size={16} />
+                        {t('manager.resetToPending') || 'Reset'}
                       </button>
-                    ) : (
-                      <button 
-                        className="view-match-btn"
-                        onClick={() => onMatchStart({ 
-                          ...match,
-                          legsToWin: match.legsToWin || tournament.legsToWin,
-                          startingScore: match.startingScore || tournament.startingScore
-                        })}
+                      <button
+                        className="admin-btn admin-correct-btn"
+                        onClick={() => {
+                          // Open a simple correction dialog - for now, we'll use a prompt
+                          // In a full implementation, this would open a modal
+                          const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.player1_legs || 0);
+                          if (newScore1 !== null) {
+                            const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.player2_legs || 0);
+                            if (newScore2 !== null) {
+                              const score1 = parseInt(newScore1, 10) || 0;
+                              const score2 = parseInt(newScore2, 10) || 0;
+                              
+                              // Validate that winner has more legs
+                              const winnerId = score1 > score2 ? match.player1_id : (score2 > score1 ? match.player2_id : null);
+                              if (winnerId) {
+                                matchService.updateMatchResult(match.id, {
+                                  winner: winnerId,
+                                  player1Legs: score1,
+                                  player2Legs: score2
+                                }).then(() => {
+                                  refetchTournament();
+                                });
+                              } else {
+                                alert(t('manager.winnerMoreLegsError') || 'Winner must have more legs than loser');
+                              }
+                            }
+                          }
+                        }}
+                        title={t('manager.manualMatchResult') || 'Correct match result'}
                       >
-                        <Eye size={16} />
-                        {t('management.viewLiveMatch')}
+                        <Edit2 size={16} />
+                        {t('manager.correctResult') || 'Correct'}
                       </button>
-                    )
+                    </div>
                   )}
                 </div>
               )})}
@@ -3266,7 +3293,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         )
                       )}
 
-                      {/* Emergency: playoff match is in progress but not detected as live on this device */}
+{/* Emergency: playoff match is in progress but not detected as live on this device */}
                       {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && canManage && user && (
                         <button
                           className="continue-match-btn admin-override-btn"
@@ -3287,42 +3314,59 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           {t('management.adminScore') || 'Admin score'}
                         </button>
                       )}
-                      {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && (
-                        user ? (
-                          <button 
-                            className="continue-match-btn"
+                      
+                      {/* Admin correction controls - only visible to admins/managers */}
+                      {canManage && user && (
+                        <div className="admin-controls">
+                          <button
+                            className="admin-btn admin-reset-btn"
                             onClick={() => {
-                              const roundSize = round.matches.length * 2;
-                              const legsToWin = getPlayoffLegsToWin(roundSize);
-                              onMatchStart({ 
-                                ...match,
-                                legsToWin: legsToWin,
-                                startingScore: tournament.startingScore,
-                                isPlayoff: true
-                              });
+                              if (window.confirm(t('manager.confirmReset', { matchId: match.id }))) {
+                                matchService.resetMatchToPending(match.id).then(() => {
+                                  // Refetch tournament to update state
+                                  refetchTournament();
+                                });
+                              }
                             }}
+                            title={t('manager.resetMatchToPending') || 'Reset match to pending'}
                           >
-                            <Play size={16} />
-                            {t('management.continueMatch')}
+                            <RotateCcw size={16} />
+                            {t('manager.resetToPending') || 'Reset'}
                           </button>
-                        ) : (
-                          <button 
-                            className="view-match-btn"
+                          <button
+                            className="admin-btn admin-correct-btn"
                             onClick={() => {
-                              const roundSize = round.matches.length * 2;
-                              const legsToWin = getPlayoffLegsToWin(roundSize);
-                              onMatchStart({ 
-                                ...match,
-                                legsToWin: legsToWin,
-                                startingScore: tournament.startingScore,
-                                isPlayoff: true
-                              });
+                              // Open a simple correction dialog - for now, we'll use a prompt
+                              // In a full implementation, this would open a modal
+                              const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.player1_legs || 0);
+                              if (newScore1 !== null) {
+                                const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.player2_legs || 0);
+                                if (newScore2 !== null) {
+                                  const score1 = parseInt(newScore1, 10) || 0;
+                                  const score2 = parseInt(newScore2, 10) || 0;
+                                  
+                                  // Validate that winner has more legs
+                                  const winnerId = score1 > score2 ? match.player1_id : (score2 > score1 ? match.player2_id : null);
+                                  if (winnerId) {
+                                    matchService.updateMatchResult(match.id, {
+                                      winner: winnerId,
+                                      player1Legs: score1,
+                                      player2Legs: score2
+                                    }).then(() => {
+                                      refetchTournament();
+                                    });
+                                  } else {
+                                    alert(t('winnerMoreLegsError') || 'Winner must have more legs than loser');
+                                  }
+                                }
+                              }
                             }}
+                            title={t('manager.manualMatchResult') || 'Correct match result'}
                           >
-                            <Eye size={16} />
-                            {t('management.viewLiveMatch')}
+                            <Edit2 size={16} />
+                            {t('manager.correctResult') || 'Correct'}
                           </button>
-                        )
+                        </div>
                       )}
                     </div>
                   </div>

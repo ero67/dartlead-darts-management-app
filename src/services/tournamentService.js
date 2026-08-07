@@ -2194,7 +2194,7 @@ export const matchService = {
     }
   },
 
-  // Manually update match result (for manager override)
+// Manually update match result (for manager override)
   async updateMatchResult(matchId, matchResult) {
     try {
       const updateData = {
@@ -2210,13 +2210,142 @@ export const matchService = {
         .update(updateData)
         .eq('id', matchId)
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return data
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error('Error updating match result:', error)
       throw error
+    }
+  },
+
+  // Reset match to pending state (for manager correction)
+  async resetMatchToPending(matchId) {
+    try {
+      const updateData = {
+        status: 'pending',
+        started_by_user_id: null,
+        player1_legs: 0,
+        player2_legs: 0,
+        current_leg: 1,
+        player1_current_score: null,
+        player2_current_score: null,
+        current_player: 0,
+        live_device_id: null,
+        live_started_at: null,
+        last_activity_at: null,
+        winner_id: null,
+        result: null,
+        updated_at: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase
+        .from('matches')
+        .update(updateData)
+        .eq('id', matchId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // Also clear related data like legs and match_player_stats
+      // Clear legs
+      await supabase
+        .from('legs')
+        .delete()
+        .eq('match_id', matchId);
+        
+      // Clear match player stats
+      await supabase
+        .from('match_player_stats')
+        .delete()
+        .eq('match_id', matchId);
+
+      return data;
+    } catch (error) {
+      console.error('Error resetting match to pending:', error)
+      throw error
+    }
+  },
+
+  // Adjust leg count for a player (add or remove legs)
+  async adjustLegs(matchId, playerId, legChange) {
+    try {
+      // First get current match state
+      const { data: match, error: matchError } = await supabase
+        .from('matches')
+        .select('player1_id, player2_id, player1_legs, player2_legs')
+        .eq('id', matchId)
+        .single();
+
+      if (matchError) throw matchError;
+      if (!match) throw new Error('Match not found');
+
+      // Determine which player's legs to update
+      let updateData = {};
+      if (playerId === match.player1_id) {
+        const newLegs = Math.max(0, (match.player1_legs || 0) + legChange);
+        updateData = { player1_legs: newLegs };
+      } else if (playerId === match.player2_id) {
+        const newLegs = Math.max(0, (match.player2_legs || 0) + legChange);
+        updateData = { player2_legs: newLegs };
+      } else {
+        throw new Error('Player ID does not match either player in match');
+      }
+
+      // If this adjustment completes the match, update winner and status
+      const legsToWin = await this.getLegsToWinForMatch(matchId);
+      if (legsToWin) {
+        const player1Legs = updateData.player1_legs !== undefined ? updateData.player1_legs : (match.player1_legs || 0);
+        const player2Legs = updateData.player2_legs !== undefined ? updateData.player2_legs : (match.player2_legs || 0);
+        
+        if (player1Legs >= legsToWin) {
+          updateData.status = 'completed';
+          updateData.winner_id = match.player1_id;
+        } else if (player2Legs >= legsToWin) {
+          updateData.status = 'completed';
+          updateData.winner_id = match.player2_id;
+        }
+      }
+
+      updateData.updated_at = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('matches')
+        .update(updateData)
+        .eq('id', matchId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adjusting legs:', error)
+      throw error
+    }
+  },
+
+  // Helper to get legs to win for a match (from match or tournament settings)
+  async getLegsToWinForMatch(matchId) {
+    try {
+      const { data, error } = await supabase
+        .from('matches')
+        .select(`
+          legs_to_win,
+          tournaments!inner(legs_to_win)
+        `)
+        .eq('id', matchId)
+        .single();
+
+      if (error) throw error;
+      
+      // Use match-specific legs_to_win if set, otherwise fall back to tournament setting
+      return data.legs_to_win || data.tournaments.legs_to_win || 3;
+    } catch (error) {
+      console.error('Error getting legs to win for match:', error)
+      // Fallback to default
+      return 3;
     }
   },
 
