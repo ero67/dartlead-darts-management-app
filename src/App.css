@@ -2021,10 +2021,10 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 1rem 1.1rem;
+  padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
   position: relative;
   overflow: hidden;
@@ -2181,8 +2181,8 @@ body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.7rem 0.85rem;
+  gap: 0.4rem;
+  padding: 0.55rem 0.7rem;
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
@@ -2201,7 +2201,7 @@ body {
 .player-name-row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.45rem;
   width: 100%;
 }
 
@@ -2237,7 +2237,7 @@ body {
 }
 
 .match-result-compact .score {
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -2247,8 +2247,8 @@ body {
   justify-content: center;
   line-height: 1;
   margin: 0;
-  padding: 0.25rem 0.55rem;
-  min-width: 2rem;
+  padding: 0.2rem 0.45rem;
+  min-width: 1.7rem;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -3141,9 +3141,12 @@ body {
   background: #b91c1c;
 }
 
+/* Admin correction controls: compact icon buttons that sit alongside the
+   card's other header actions (same family as .view-statistics-btn). */
 .admin-controls {
-  border-top: 1px solid #f59e0b;
-  padding-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
 }
 
 .admin-section h4 {
@@ -3153,66 +3156,42 @@ body {
   font-weight: 600;
 }
 
-.admin-buttons {
+.match-header-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
 }
 
 .admin-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #f59e0b;
-  border-radius: 6px;
-  background: white;
-  color: #92400e;
-  font-size: 0.8rem;
-  font-weight: 500;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px var(--shadow-sm);
+  flex-shrink: 0;
 }
 
 .admin-btn:hover {
-  background: #fef3c7;
-  border-color: #d97706;
+  background: var(--bg-tertiary);
 }
 
-.admin-btn.reset {
-  border-color: #dc2626;
-  color: #dc2626;
+.admin-reset-btn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
 }
 
-.admin-btn.reset:hover {
-  background: #fef2f2;
-}
-
-.admin-btn.edit {
-  border-color: var(--accent-primary);
+.admin-correct-btn:hover {
   color: var(--accent-primary);
-}
-
-.admin-btn.edit:hover {
-  background: #eff6ff;
-}
-
-.admin-btn.adjust {
-  border-color: #10b981;
-  color: #10b981;
-}
-
-.admin-btn.adjust:hover {
-  background: #ecfdf5;
-}
-
-.admin-btn.force-complete {
-  border-color: #f59e0b;
-  color: #f59e0b;
-}
-
-.admin-btn.force-complete:hover {
-  background: #fef3c7;
+  border-color: var(--accent-primary);
 }
 
 .admin-confirm-dialog {

@@ -2055,15 +2055,39 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         </div>
                       )}
                     </div>
-                    {match.status === 'completed' && match.result && (
-                      <button
-                        className="view-statistics-btn"
-                        onClick={() => setMatchStatistics(match)}
-                        title={t('management.viewStatistics') || 'View Statistics'}
-                      >
-                        <BarChart3 size={16} />
-                      </button>
-                    )}
+                    <div className="match-header-actions">
+                      {match.status === 'completed' && match.result && (
+                        <button
+                          className="view-statistics-btn"
+                          onClick={() => setMatchStatistics(match)}
+                          title={t('management.viewStatistics') || 'View Statistics'}
+                        >
+                          <BarChart3 size={16} />
+                        </button>
+                      )}
+                      {canManage && user && (
+                        <div className="admin-controls">
+                          {match.status !== 'pending' && (
+                            <button
+                              className="admin-btn admin-reset-btn"
+                              onClick={() => handleAdminResetMatch(match)}
+                              title={t('manager.resetMatchToPending') || 'Reset match to pending'}
+                              aria-label={t('manager.resetMatchToPending') || 'Reset match to pending'}
+                            >
+                              <RotateCcw size={15} />
+                            </button>
+                          )}
+                          <button
+                            className="admin-btn admin-correct-btn"
+                            onClick={() => handleAdminCorrectMatch(match)}
+                            title={t('manager.manualMatchResult') || 'Correct match result'}
+                            aria-label={t('manager.manualMatchResult') || 'Correct match result'}
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {match.status === 'completed' && match.result ? (
                     <div className="match-result-compact">
@@ -2159,27 +2183,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     </button>
                   )}
                   
-                  {/* Admin correction controls - only visible to admins/managers */}
-                  {canManage && user && (
-                    <div className="admin-controls">
-                      <button
-                        className="admin-btn admin-reset-btn"
-                        onClick={() => handleAdminResetMatch(match)}
-                        title={t('manager.resetMatchToPending') || 'Reset match to pending'}
-                      >
-                        <RotateCcw size={16} />
-                        {t('manager.resetToPending') || 'Reset'}
-                      </button>
-                      <button
-                        className="admin-btn admin-correct-btn"
-                        onClick={() => handleAdminCorrectMatch(match)}
-                        title={t('manager.manualMatchResult') || 'Correct match result'}
-                      >
-                        <Edit2 size={16} />
-                        {t('manager.correctResult') || 'Correct'}
-                      </button>
-                    </div>
-                  )}
                 </div>
               )})}
             </div>
@@ -3377,6 +3380,26 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             <BarChart3 size={16} />
                           </button>
                         )}
+                        {canManage && user && match.status !== 'pending' && (
+                          <div className="admin-controls">
+                            <button
+                              className="admin-btn admin-reset-btn"
+                              onClick={() => handleAdminResetMatch(match)}
+                              title={t('manager.resetMatchToPending') || 'Reset match to pending'}
+                              aria-label={t('manager.resetMatchToPending') || 'Reset match to pending'}
+                            >
+                              <RotateCcw size={15} />
+                            </button>
+                            <button
+                              className="admin-btn admin-correct-btn"
+                              onClick={() => handleAdminCorrectMatch(match)}
+                              title={t('manager.manualMatchResult') || 'Correct match result'}
+                              aria-label={t('manager.manualMatchResult') || 'Correct match result'}
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {match.status === 'completed' && match.result ? (
@@ -3501,27 +3524,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         </button>
                       )}
                       
-                      {/* Admin correction controls - only visible to admins/managers */}
-                      {canManage && user && (
-                        <div className="admin-controls">
-                          <button
-                            className="admin-btn admin-reset-btn"
-                            onClick={() => handleAdminResetMatch(match)}
-                            title={t('manager.resetMatchToPending') || 'Reset match to pending'}
-                          >
-                            <RotateCcw size={16} />
-                            {t('manager.resetToPending') || 'Reset'}
-                          </button>
-                          <button
-                            className="admin-btn admin-correct-btn"
-                            onClick={() => handleAdminCorrectMatch(match)}
-                            title={t('manager.manualMatchResult') || 'Correct match result'}
-                          >
-                            <Edit2 size={16} />
-                            {t('manager.correctResult') || 'Correct'}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                   );
