@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
+import { ManagerBilling } from './ManagerBilling';
 
 export function AdminPanel() {
   const [email, setEmail] = useState('');
@@ -683,6 +684,9 @@ export function AdminPanel() {
             </div>
           )}
         </div>
+
+        {/* Managers & Billing Section */}
+        <ManagerBilling />
 
         {/* View All Users Section */}
         <div className="admin-section">
