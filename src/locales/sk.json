@@ -860,5 +860,19 @@
     "typeToSearch": "Zadajte aspoň 2 znaky na vyhľadávanie",
     "addFromUsers": "Pridať z používateľov",
     "addByName": "Pridať podľa mena"
+  },
+  "scorers": {
+    "title": "Zapisovatelia",
+    "descriptionTournament": "Zapisovatelia môžu na svojom zariadení otvoriť zápasy tohto turnaja, počítať skóre a uložiť výsledky. Pridajte ich podľa e-mailu, s ktorým sa zaregistrovali.",
+    "descriptionLeague": "Ligoví zapisovatelia môžu počítať zápasy vo všetkých turnajoch tejto ligy. Pridajte ich podľa e-mailu, s ktorým sa zaregistrovali.",
+    "emailPlaceholder": "E-mail používateľa",
+    "add": "Pridať zapisovateľa",
+    "remove": "Odstrániť",
+    "empty": "Zatiaľ žiadni zapisovatelia",
+    "userNotFound": "Používateľ s týmto e-mailom neexistuje",
+    "notAuthorized": "Nemáte oprávnenie spravovať zapisovateľov",
+    "loadError": "Nepodarilo sa načítať zapisovateľov",
+    "addError": "Nepodarilo sa pridať zapisovateľa",
+    "removeError": "Nepodarilo sa odstrániť zapisovateľa"
   }
 }

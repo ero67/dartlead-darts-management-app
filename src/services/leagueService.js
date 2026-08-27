@@ -168,6 +168,11 @@ export const leagueService = {
       // players can be array of player IDs or array of player objects with id
       const playerIds = players.map(p => typeof p === 'string' ? p : p.id);
 
+      // Players are scoped per manager (owner_id); lookups and inserts must
+      // stay inside the caller's roster.
+      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
+      if (currentUserError) throw currentUserError;
+
       // Check if players exist, create if needed
       const membersToAdd = [];
       for (const player of players) {
@@ -177,13 +182,15 @@ export const leagueService = {
         } else if (player.id) {
           playerId = player.id;
         } else if (player.name) {
-          // Find or create the player. Trim first: players.name is UNIQUE and
-          // matched exactly, so " Erik" would otherwise become a second profile.
+          // Find or create the player. Trim first: players.name is unique per
+          // owner and matched exactly, so " Erik" would otherwise become a
+          // second profile.
           const name = player.name.trim();
           const { data: existingPlayer } = await supabase
             .from('players')
             .select('id')
             .eq('name', name)
+            .eq('owner_id', currentUser.id)
             .maybeSingle();
 
           if (existingPlayer) {
@@ -194,7 +201,8 @@ export const leagueService = {
               .from('players')
               .insert({
                 id: playerId,
-                name
+                name,
+                owner_id: currentUser.id
               });
 
             if (playerError) throw playerError;
@@ -1816,12 +1824,14 @@ export const leagueService = {
       if (linkedPlayer) {
         playerId = linkedPlayer.id;
       } else {
-        // players.name is UNIQUE: an existing row is either an unlinked manual
-        // player (claim it) or somebody else's account (reject).
+        // players.name is unique per owner: an existing row in the approving
+        // manager's roster is either an unlinked manual player (claim it) or
+        // somebody else's account (reject).
         const { data: playerByName } = await supabase
           .from('players')
           .select('id, user_id')
           .eq('name', reg.player_name)
+          .eq('owner_id', user.id)
           .maybeSingle();
 
         if (playerByName) {
@@ -1839,7 +1849,7 @@ export const leagueService = {
         } else {
           const { data: newPlayer, error: createError } = await supabase
             .from('players')
-            .insert({ name: reg.player_name, user_id: reg.user_id })
+            .insert({ name: reg.player_name, user_id: reg.user_id, owner_id: user.id })
             .select('id')
             .single();
           if (createError) throw createError;
@@ -1920,6 +1930,9 @@ export const leagueService = {
 
   async addUserToLeague(leagueId, userId, playerName) {
     try {
+      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
+      if (currentUserError) throw currentUserError;
+
       // Find or create player linked to user
       let { data: existingPlayer } = await supabase
         .from('players')
@@ -1928,11 +1941,12 @@ export const leagueService = {
         .maybeSingle();
 
       if (!existingPlayer) {
-        // Try by name
+        // Try by name within the caller's roster (players are owner-scoped)
         const { data: byName } = await supabase
           .from('players')
           .select('id, user_id')
           .eq('name', playerName)
+          .eq('owner_id', currentUser.id)
           .maybeSingle();
 
         if (byName) {
@@ -1943,7 +1957,7 @@ export const leagueService = {
         } else {
           const { data: newPlayer, error } = await supabase
             .from('players')
-            .insert({ name: playerName, user_id: userId })
+            .insert({ name: playerName, user_id: userId, owner_id: currentUser.id })
             .select('id')
             .single();
           if (error) throw error;
@@ -1963,6 +1977,50 @@ export const leagueService = {
       return existingPlayer;
     } catch (error) {
       console.error('Error adding user to league:', error);
+      throw error;
+    }
+  },
+
+  // Scorers: users authorized to count matches in any tournament of this league
+  async listScorers(leagueId) {
+    try {
+      const { data, error } = await supabase.rpc('list_league_scorers', { l_id: leagueId });
+      if (error) throw error;
+      return (data || []).map(row => ({
+        userId: row.user_id,
+        email: row.email,
+        fullName: row.full_name
+      }));
+    } catch (error) {
+      console.error('Error listing league scorers:', error);
+      throw error;
+    }
+  },
+
+  async addScorer(leagueId, email) {
+    try {
+      const { data, error } = await supabase.rpc('add_league_scorer', {
+        l_id: leagueId,
+        user_email: email
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adding league scorer:', error);
+      throw error;
+    }
+  },
+
+  async removeScorer(leagueId, userId) {
+    try {
+      const { error } = await supabase
+        .from('league_scorers')
+        .delete()
+        .eq('league_id', leagueId)
+        .eq('user_id', userId);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error removing league scorer:', error);
       throw error;
     }
   }

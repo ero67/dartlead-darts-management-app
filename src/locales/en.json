@@ -867,5 +867,19 @@
     "typeToSearch": "Type at least 2 characters to search",
     "addFromUsers": "Add from users",
     "addByName": "Add by name"
+  },
+  "scorers": {
+    "title": "Scorers",
+    "descriptionTournament": "Scorers can open this tournament's matches on their own device, count the score and save results. Add them by the email they signed up with.",
+    "descriptionLeague": "League scorers can count matches in every tournament of this league. Add them by the email they signed up with.",
+    "emailPlaceholder": "User email",
+    "add": "Add scorer",
+    "remove": "Remove",
+    "empty": "No scorers yet",
+    "userNotFound": "No user found with that email",
+    "notAuthorized": "You are not allowed to manage scorers",
+    "loadError": "Failed to load scorers",
+    "addError": "Failed to add scorer",
+    "removeError": "Failed to remove scorer"
   }
 }

@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { BracketVisualization } from './BracketVisualization';
 import { BracketSeedingEditor } from './BracketSeedingEditor';
 import { TournamentSummary } from './TournamentSummary';
+import { ScorersPanel } from './ScorersPanel';
 import { isValidLegDartCount } from '../utils/dartStats';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 
@@ -3520,7 +3521,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         {activeTab === 'playoffs' && renderPlayoffs()}
         {activeTab === 'statistics' && renderStatistics()}
         {activeTab === 'liveMatches' && renderLiveMatches()}
-        {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}
+        {activeTab === 'summary' && (
+          <>
+            {(isOwner || isAdmin) && <ScorersPanel type="tournament" entityId={tournament.id} />}
+            <TournamentSummary tournament={tournament} />
+          </>
+        )}
       </div>
 
       {/* Match Start Confirmation Modal */}

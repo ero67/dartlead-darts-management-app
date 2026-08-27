@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
+import { ScorersPanel } from './ScorersPanel';
 import { HeadToHead } from './HeadToHead';
 import { SeedingPresetLibrary } from './SeedingPresetLibrary';
 
@@ -1189,7 +1190,9 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         {activeTab === 'settings' && isManager && (
           <div>
             <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>{t('leagues.leagueSettings')}</h2>
-            
+
+            <ScorersPanel type="league" entityId={currentLeague.id} />
+
             {/* Scoring Rules Editor */}
             <div className="group-card" style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>

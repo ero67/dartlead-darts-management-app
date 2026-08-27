@@ -201,6 +201,11 @@ export const tournamentService = {
         incomingPlayers.map(p => (p.name || '').trim()).filter(Boolean)
       )]
 
+      // Players are scoped per manager (owner_id); name matching and creation
+      // must stay inside the caller's roster.
+      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser()
+      if (currentUserError) throw currentUserError
+
       const knownIds = new Set()
       if (candidateIds.length > 0) {
         const { data: rowsById, error: byIdError } = await supabase
@@ -217,6 +222,7 @@ export const tournamentService = {
           .from('players')
           .select('id, name')
           .in('name', candidateNames)
+          .eq('owner_id', currentUser.id)
         if (byNameError) throw byNameError
         ;(rowsByName || []).forEach(row => idByName.set(row.name, row.id))
       }
@@ -231,7 +237,8 @@ export const tournamentService = {
             .from('players')
             .insert({
               id: playerId,
-              name
+              name,
+              owner_id: currentUser.id
             })
 
           if (playerError) throw playerError
@@ -1295,11 +1302,16 @@ export const tournamentService = {
         throw new Error('Tournament is no longer accepting new players');
       }
 
-      // Create or find player
+      // Players are scoped per manager (owner_id)
+      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
+      if (currentUserError) throw currentUserError;
+
+      // Create or find player within the caller's roster
       const { data: existingPlayer, error: playerError } = await supabase
         .from('players')
         .select('id')
         .eq('name', playerName)
+        .eq('owner_id', currentUser.id)
         .maybeSingle();
 
       if (playerError) throw playerError;
@@ -1310,7 +1322,7 @@ export const tournamentService = {
       } else {
         const { data: newPlayer, error: createPlayerError } = await supabase
           .from('players')
-          .insert({ name: playerName })
+          .insert({ name: playerName, owner_id: currentUser.id })
           .select('id')
           .single();
 
@@ -1484,12 +1496,14 @@ export const tournamentService = {
       if (linkedPlayer) {
         playerId = linkedPlayer.id;
       } else {
-        // players.name is UNIQUE, so an existing row with this name is either
-        // an unlinked manual player (claim it) or somebody else's (reject).
+        // players.name is unique per owner, so an existing row with this name
+        // in the approving manager's roster is either an unlinked manual
+        // player (claim it) or somebody else's (reject).
         const { data: playerByName } = await supabase
           .from('players')
           .select('id, user_id')
           .eq('name', reg.player_name)
+          .eq('owner_id', user.id)
           .maybeSingle();
 
         if (playerByName) {
@@ -1507,7 +1521,7 @@ export const tournamentService = {
         } else {
           const { data: newPlayer, error: createError } = await supabase
             .from('players')
-            .insert({ name: reg.player_name, user_id: reg.user_id })
+            .insert({ name: reg.player_name, user_id: reg.user_id, owner_id: user.id })
             .select('id')
             .single();
           if (createError) throw createError;
@@ -1599,8 +1613,55 @@ export const tournamentService = {
     }
   },
 
+  // Scorers: users the manager authorizes to count matches of this tournament
+  async listScorers(tournamentId) {
+    try {
+      const { data, error } = await supabase.rpc('list_tournament_scorers', { t_id: tournamentId });
+      if (error) throw error;
+      return (data || []).map(row => ({
+        userId: row.user_id,
+        email: row.email,
+        fullName: row.full_name
+      }));
+    } catch (error) {
+      console.error('Error listing tournament scorers:', error);
+      throw error;
+    }
+  },
+
+  async addScorer(tournamentId, email) {
+    try {
+      const { data, error } = await supabase.rpc('add_tournament_scorer', {
+        t_id: tournamentId,
+        user_email: email
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adding tournament scorer:', error);
+      throw error;
+    }
+  },
+
+  async removeScorer(tournamentId, userId) {
+    try {
+      const { error } = await supabase
+        .from('tournament_scorers')
+        .delete()
+        .eq('tournament_id', tournamentId)
+        .eq('user_id', userId);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error removing tournament scorer:', error);
+      throw error;
+    }
+  },
+
   async addUserToTournament(tournamentId, userId, playerName) {
     try {
+      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
+      if (currentUserError) throw currentUserError;
+
       // Find player by user_id first
       let { data: existingPlayer } = await supabase
         .from('players')
@@ -1609,22 +1670,24 @@ export const tournamentService = {
         .maybeSingle();
 
       if (!existingPlayer) {
-        // Try by name
+        // Try by name within the caller's roster (players are owner-scoped)
         const { data: byName } = await supabase
           .from('players')
           .select('id, user_id')
           .eq('name', playerName)
+          .eq('owner_id', currentUser.id)
           .maybeSingle();
 
         if (byName) {
           existingPlayer = byName;
           if (!byName.user_id) {
-            await supabase.from('players').update({ user_id: userId }).eq('id', byName.id);
+            const { error: linkError } = await supabase.from('players').update({ user_id: userId }).eq('id', byName.id);
+            if (linkError) throw linkError;
           }
         } else {
           const { data: newPlayer, error } = await supabase
             .from('players')
-            .insert({ name: playerName, user_id: userId })
+            .insert({ name: playerName, user_id: userId, owner_id: currentUser.id })
             .select('id')
             .single();
           if (error) throw error;
@@ -1978,13 +2041,8 @@ export const tournamentService = {
       console.log('Current user ID:', user?.id);
       console.log('Tournament user_id:', existingTournament.user_id);
       
-      // Check if user is admin
-      const isAdmin = !!(
-        user?.user_metadata?.role === 'admin' ||
-        user?.app_metadata?.role === 'admin' ||
-        user?.raw_user_meta_data?.role === 'admin' ||
-        user?.raw_app_meta_data?.role === 'admin'
-      );
+      // Roles live in app_metadata only (user_metadata is user-editable)
+      const isAdmin = user?.app_metadata?.role === 'admin';
       
       // Allow deletion if user is admin OR if user owns the tournament
       if (user && existingTournament.user_id && user.id !== existingTournament.user_id && !isAdmin) {
