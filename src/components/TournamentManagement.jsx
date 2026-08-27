@@ -1461,11 +1461,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       rounds: populatePlayoffBracket(qualifyingPlayers, tournament.playoffs?.rounds || [])
     };
 
-    // Update tournament through context (now async and saves to database)
-    await contextStartPlayoffs(updatedPlayoffs);
-    
-    // Show success message
-    alert(t('management.playoffsStartedSuccess', { count: qualifyingPlayers.length }));
+    // Update tournament through context (now async and saves to database).
+    // startPlayoffs throws if the DB write fails — never show success (or play
+    // matches) against a bracket that only exists locally.
+    try {
+      await contextStartPlayoffs(updatedPlayoffs);
+      alert(t('management.playoffsStartedSuccess', { count: qualifyingPlayers.length }));
+    } catch (error) {
+      console.error('Error starting playoffs:', error);
+      alert(error.message);
+    }
   };
 
   // Reset playoffs to allow restarting

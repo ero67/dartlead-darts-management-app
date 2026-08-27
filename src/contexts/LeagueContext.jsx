@@ -52,11 +52,14 @@ function leagueReducer(state, action) {
     case ACTIONS.UPDATE_LEAGUE:
       return {
         ...state,
-        leagues: state.leagues.map(l => 
-          l.id === action.payload.id ? action.payload : l
+        leagues: state.leagues.map(l =>
+          l.id === action.payload.id ? { ...l, ...action.payload } : l
         ),
-        currentLeague: state.currentLeague?.id === action.payload.id 
-          ? action.payload 
+        // Merge instead of replace: the service payload carries only base
+        // columns, and replacing dropped members/leaderboard/tournaments from
+        // currentLeague (lists went empty after saving league settings).
+        currentLeague: state.currentLeague?.id === action.payload.id
+          ? { ...state.currentLeague, ...action.payload }
           : state.currentLeague
       };
 
@@ -67,15 +70,23 @@ function leagueReducer(state, action) {
         currentLeague: state.currentLeague?.id === action.payload ? null : state.currentLeague
       };
 
-    case ACTIONS.ADD_MEMBERS:
+    case ACTIONS.ADD_MEMBERS: {
       if (!state.currentLeague) return state;
+      // Upserted members come back for existing rows too — replace matching
+      // entries instead of blindly appending duplicates.
+      const existingMembers = state.currentLeague.members || [];
+      const incomingIds = new Set(action.payload.map(m => m.player?.id || m.playerId));
       return {
         ...state,
         currentLeague: {
           ...state.currentLeague,
-          members: [...(state.currentLeague.members || []), ...action.payload]
+          members: [
+            ...existingMembers.filter(m => !incomingIds.has(m.player?.id || m.playerId)),
+            ...action.payload
+          ]
         }
       };
+    }
 
     case ACTIONS.UPDATE_MEMBER:
       if (!state.currentLeague) return state;

@@ -648,10 +648,26 @@ export function TournamentProvider({ children }) {
     loadTournaments();
   }, []);
 
-  // Save tournaments to localStorage as backup whenever tournaments change
+  // Save tournaments to localStorage as backup whenever tournaments change.
+  // Strip the heavy subtrees (groups with per-match result JSONB, playoff
+  // matches) — after a match completes, the full tournament sits in this list
+  // and serializing multi-MB trees on every completion eventually throws
+  // QuotaExceededError inside the effect, taking down the React tree mid-match.
+  // The backup only feeds the list-view fallback, which needs summaries.
   useEffect(() => {
     if (state.tournaments.length > 0) {
-      localStorage.setItem('darts-tournaments', JSON.stringify(state.tournaments));
+      try {
+        const slim = state.tournaments.map(t => {
+          const copy = { ...t };
+          delete copy.groups;
+          delete copy.playoffMatches;
+          delete copy.playoffs;
+          return copy;
+        });
+        localStorage.setItem('darts-tournaments', JSON.stringify(slim));
+      } catch (storageError) {
+        console.warn('Could not persist tournaments backup to localStorage:', storageError);
+      }
     }
   }, [state.tournaments]);
 
@@ -812,14 +828,12 @@ export function TournamentProvider({ children }) {
   };
 
   const startPlayoffs = async (playoffsData) => {
-    try {
-      // Save playoff data to Supabase
-      await tournamentService.updateTournamentPlayoffs(state.currentTournament.id, playoffsData);
-    } catch (error) {
-      console.error('Error saving playoff data to Supabase:', error);
-    }
-    
-    // Update local state
+    // Save playoff data to Supabase FIRST — dispatching a bracket that never
+    // persisted means matches get played against a bracket that vanishes on
+    // refresh (and other devices never see the playoffs at all).
+    await tournamentService.updateTournamentPlayoffs(state.currentTournament.id, playoffsData);
+
+    // Update local state only after the DB write succeeded
     dispatch({ type: ACTIONS.START_PLAYOFFS, payload: { playoffs: playoffsData } });
   };
 

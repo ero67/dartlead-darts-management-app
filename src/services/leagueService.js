@@ -215,7 +215,11 @@ export const leagueService = {
           league_id: leagueId,
           player_id: playerId,
           role: player.role || 'player',
-          is_active: player.isActive !== undefined ? player.isActive : true
+          is_active: player.isActive !== undefined ? player.isActive : true,
+          // Must be cleared explicitly: re-adding a removed member hits the
+          // (league_id, player_id) conflict and without this the row keeps its
+          // old left_at, so getMembers (left_at IS NULL) never shows them again.
+          left_at: null
         });
       }
 
@@ -566,35 +570,39 @@ export const leagueService = {
         .eq('deleted', false);
 
       if (tournamentsError) throw tournamentsError;
-      
+
       console.log(`Found ${tournaments?.length || 0} completed tournaments for league ${leagueId}`);
+
+      // Fetch scoring rules ONCE — they are league-level, and a failed read
+      // must abort rather than silently rescore the league with defaults.
+      const { data: league, error: leagueError } = await supabase
+        .from('leagues')
+        .select('scoring_rules')
+        .eq('id', leagueId)
+        .single();
+
+      if (leagueError) throw leagueError;
+
+      const scoringRules = league?.scoring_rules || {
+        placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
+        allowManualOverride: true
+      };
+
+      const placementPoints = scoringRules.placementPoints || { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 };
 
       // Process each tournament
       for (const tournament of tournaments || []) {
         try {
           // Get full tournament data
           const fullTournament = await tournamentService.getTournament(tournament.id);
-          
+
           if (fullTournament) {
             console.log(`Calculating placements for tournament: ${fullTournament.name || tournament.name}`);
-            
+
             // Calculate placements from tournament data
             const placements = this.extractPlacements(fullTournament);
-            
+
             if (placements.length > 0) {
-              // Get league scoring rules
-              const { data: league } = await supabase
-                .from('leagues')
-                .select('scoring_rules')
-                .eq('id', leagueId)
-                .single();
-
-              const scoringRules = league?.scoring_rules || {
-                placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
-                allowManualOverride: true
-              };
-
-              const placementPoints = scoringRules.placementPoints || { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 };
 
               // Award points and create results records
               const resultsToInsert = placements.map(p => {
@@ -688,14 +696,22 @@ export const leagueService = {
         liveMatchMap.set(pm.id, pm);
       });
 
-      // Helper: overlay live data onto a bracket match from the JSONB snapshot
+      // Helper: overlay live data onto a bracket match from the JSONB snapshot.
+      // Status may only be UPGRADED to completed, never downgraded: in the
+      // live completion path the bracket JSONB is updated in memory before the
+      // playoffMatches array (fetched at hydration) knows the final finished —
+      // taking the stale live status there dropped the winner's placement at
+      // the exact moment the tournament completed.
       const freshen = (bracketMatch) => {
         if (!bracketMatch) return bracketMatch;
         const live = liveMatchMap.get(bracketMatch.id);
         if (live) {
+          const status = (bracketMatch.status === 'completed' || live.status === 'completed')
+            ? 'completed'
+            : live.status;
           return {
             ...bracketMatch,
-            status: live.status,
+            status,
             result: live.result || bracketMatch.result,
             player1: live.player1 || bracketMatch.player1,
             player2: live.player2 || bracketMatch.player2,
@@ -917,10 +933,15 @@ export const leagueService = {
   async updateLeaderboardCache(leagueId) {
     try {
       // ── 1. Read existing manual_points so we can preserve them ──────
-      const { data: existingRows } = await supabase
+      // Every read below feeds the rebuild write: a silently failed read here
+      // would rewrite the whole leaderboard with zeros (wiping admin-entered
+      // bonus points), so any read error must abort the rebuild.
+      const { data: existingRows, error: existingError } = await supabase
         .from('league_leaderboard')
         .select('player_id, manual_points')
         .eq('league_id', leagueId);
+
+      if (existingError) throw existingError;
 
       const existingManual = {};
       (existingRows || []).forEach(row => {
@@ -928,43 +949,50 @@ export const leagueService = {
       });
 
       // ── 2. Get all tournament results for this league ──────────────
-      const { data: results, error: resultsError } = await supabase
+      const { data: allResults, error: resultsError } = await supabase
         .from('league_tournament_results')
         .select(`
           *,
-          tournament:tournaments(created_at)
+          tournament:tournaments(created_at, deleted)
         `)
         .eq('league_id', leagueId);
 
       if (resultsError) throw resultsError;
-      
+
+      // Soft-deleted tournaments keep their result rows, but they must not
+      // count toward the leaderboard (the leg stats below already exclude
+      // them — counting one side and not the other made totals inconsistent).
+      const results = (allResults || []).filter(r => !r.tournament?.deleted);
+
       // Sort by tournament date in memory (Supabase doesn't support ordering by related fields)
-      if (results) {
-        results.sort((a, b) => {
-          const dateA = a.tournament?.created_at ? new Date(a.tournament.created_at) : new Date(0);
-          const dateB = b.tournament?.created_at ? new Date(b.tournament.created_at) : new Date(0);
-          return dateB - dateA; // descending order
-        });
-      }
+      results.sort((a, b) => {
+        const dateA = a.tournament?.created_at ? new Date(a.tournament.created_at) : new Date(0);
+        const dateB = b.tournament?.created_at ? new Date(b.tournament.created_at) : new Date(0);
+        return dateB - dateA; // descending order
+      });
 
       // ── 3. Get leg stats from completed matches in league tournaments ──
-      const { data: leagueTournaments } = await supabase
+      const { data: leagueTournaments, error: leagueTournamentsError } = await supabase
         .from('tournaments')
         .select('id')
         .eq('league_id', leagueId)
         .eq('status', 'completed')
         .eq('deleted', false);
 
+      if (leagueTournamentsError) throw leagueTournamentsError;
+
       const leagueTournamentIds = (leagueTournaments || []).map(t => t.id);
 
       const playerLegs = {};
       if (leagueTournamentIds.length > 0) {
-        const { data: matches } = await supabase
+        const { data: matches, error: matchesError } = await supabase
           .from('matches')
           .select('player1_id, player2_id, player1_legs, player2_legs, winner_id')
           .in('tournament_id', leagueTournamentIds)
           .eq('status', 'completed')
           .limit(10000);
+
+        if (matchesError) throw matchesError;
 
         (matches || []).forEach(match => {
           const p1 = match.player1_id;
@@ -1055,6 +1083,24 @@ export const leagueService = {
         if (upsertError) throw upsertError;
       }
 
+      // ── 7. Prune ghost rows ─────────────────────────────────────────
+      // Upsert alone can't remove players whose results disappeared (tournament
+      // unlinked or soft-deleted) — their old row would keep showing old totals.
+      const currentIds = new Set(leaderboardEntries.map(e => e.player_id));
+      const staleIds = (existingRows || [])
+        .map(r => r.player_id)
+        .filter(id => !currentIds.has(id));
+
+      if (staleIds.length > 0) {
+        const { error: pruneError } = await supabase
+          .from('league_leaderboard')
+          .delete()
+          .eq('league_id', leagueId)
+          .in('player_id', staleIds);
+
+        if (pruneError) throw pruneError;
+      }
+
       return leaderboardEntries;
     } catch (error) {
       console.error('Error updating leaderboard cache:', error);
@@ -1103,13 +1149,20 @@ export const leagueService = {
   async linkTournamentToLeague(leagueId, tournamentId) {
     try {
       // Set the league_id on the tournament
-      const { error: updateError } = await supabase
+      const { data: linkedRows, error: updateError } = await supabase
         .from('tournaments')
         .update({ league_id: leagueId, league_points_calculated: false })
         .eq('id', tournamentId)
-        .is('league_id', null); // safety: only link if not already linked
+        .is('league_id', null) // safety: only link if not already linked
+        .select('id');
 
       if (updateError) throw updateError;
+
+      // 0 rows means the tournament is already linked to another league —
+      // awarding points here would credit this league for a foreign tournament.
+      if (!linkedRows || linkedRows.length === 0) {
+        throw new Error('TOURNAMENT_ALREADY_LINKED');
+      }
 
       // If the tournament is completed, calculate points right away
       const { data: tournament } = await supabase
@@ -1552,8 +1605,6 @@ export const leagueService = {
   // the league.  Returns { most180s, bestCheckouts, bestMatchAverages, fewestDartsLegs }.
   async getLeagueStatistics(leagueId) {
     try {
-      const { tournamentService } = await import('./tournamentService.js');
-
       // 1. Get all completed tournaments in the league
       const { data: tournaments, error } = await supabase
         .from('tournaments')
@@ -1565,34 +1616,45 @@ export const leagueService = {
       if (error) throw error;
       if (!tournaments?.length) return { most180s: [], bestCheckouts: [], bestMatchAverages: [], fewestDartsLegs: [] };
 
-      // 2. Fetch full tournament data for each (contains match results)
-      const fullTournaments = [];
-      for (const t of tournaments) {
-        try {
-          const full = await tournamentService.getTournament(t.id);
-          if (full) fullTournaments.push(full);
-        } catch (e) {
-          console.error(`Error fetching tournament ${t.id}:`, e);
-        }
-      }
+      // 2+3. All completed matches with results, in ONE query. This previously
+      // fetched the full nested tournament tree per tournament (a season league
+      // meant 40-50 heavy sequential queries and megabytes of transfer every
+      // time the Statistics tab opened) — the aggregation below only needs the
+      // result JSONB, player names, and the starting score.
+      const nameById = new Map(tournaments.map(t => [t.id, t.name]));
 
-      // 3. Collect ALL completed matches across all tournaments
-      const allMatches = [];
-      for (const tourney of fullTournaments) {
-        const uniqueGroups = (() => {
-          if (!tourney.groups) return [];
-          const seen = new Set();
-          return tourney.groups.filter(g => { if (seen.has(g.id)) return false; seen.add(g.id); return true; });
-        })();
-        uniqueGroups.forEach(group => {
-          (group.matches || []).forEach(m => {
-            if (m.status === 'completed' && m.result) allMatches.push({ ...m, tournamentName: tourney.name });
-          });
-        });
-        (tourney.playoffMatches || []).forEach(m => {
-          if (m.status === 'completed' && m.result) allMatches.push({ ...m, tournamentName: tourney.name });
-        });
-      }
+      const { data: matchRows, error: matchesError } = await supabase
+        .from('matches')
+        .select(`
+          id,
+          status,
+          result,
+          starting_score,
+          tournament_id,
+          player1:players!matches_player1_id_fkey(id, name),
+          player2:players!matches_player2_id_fkey(id, name)
+        `)
+        .in('tournament_id', tournaments.map(t => t.id))
+        .eq('status', 'completed')
+        .not('result', 'is', null)
+        .limit(10000);
+
+      if (matchesError) throw matchesError;
+
+      const allMatches = (matchRows || [])
+        .map(m => {
+          let result = m.result;
+          if (typeof result === 'string') {
+            try { result = JSON.parse(result); } catch { result = null; }
+          }
+          return {
+            ...m,
+            result,
+            tournamentName: nameById.get(m.tournament_id) || '',
+            startingScore: m.starting_score || 501
+          };
+        })
+        .filter(m => m.result);
 
       // 4. Helper – parse checkout string to numeric value
       const getCheckoutValue = (checkout) => {
@@ -1857,15 +1919,17 @@ export const leagueService = {
         }
       }
 
-      // Add to league_members
-      await supabase.from('league_members').upsert({
-        id: generateId(),
+      // Add to league_members. No explicit id: on conflict the update must not
+      // try to rewrite the existing row's PK. left_at: null so a returning
+      // member becomes visible again (getMembers filters left_at IS NULL).
+      const { error: memberError } = await supabase.from('league_members').upsert({
         league_id: reg.league_id,
         player_id: playerId,
         role: 'player',
         is_active: true,
-        joined_at: new Date().toISOString()
+        left_at: null
       }, { onConflict: 'league_id,player_id' });
+      if (memberError) throw memberError;
 
       // Update registration status
       const { data: updated, error: updateError } = await supabase
@@ -1965,14 +2029,14 @@ export const leagueService = {
         }
       }
 
-      await supabase.from('league_members').upsert({
-        id: generateId(),
+      const { error: memberError } = await supabase.from('league_members').upsert({
         league_id: leagueId,
         player_id: existingPlayer.id,
         role: 'player',
         is_active: true,
-        joined_at: new Date().toISOString()
+        left_at: null
       }, { onConflict: 'league_id,player_id' });
+      if (memberError) throw memberError;
 
       return existingPlayer;
     } catch (error) {
