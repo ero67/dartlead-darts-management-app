@@ -145,34 +145,6 @@
     "create": "Create Tournament",
     "cancel": "Cancel"
   },
-  "tournamentManagement": {
-    "groups": "Groups",
-    "standings": "Standings",
-    "matches": "Matches",
-    "playoffs": "Playoffs",
-    "player": "Player",
-    "played": "Played",
-    "won": "Won",
-    "lost": "Lost",
-    "legsFor": "Legs For",
-    "legsAgainst": "Legs Against",
-    "points": "Points",
-    "startMatch": "Start Match",
-    "continueMatch": "Continue Match",
-    "pending": "Pending",
-    "inProgress": "In Progress",
-    "completed": "Completed",
-    "noStandings": "No matches played yet",
-    "startPlayoffs": "Start Playoffs",
-    "settings": "Settings",
-    "filterByGroup": "Filter by Group",
-    "filterByPlayer": "Filter by Player",
-    "allGroups": "All Groups",
-    "searchPlayerName": "Search player name...",
-    "clearFilter": "Clear filter",
-    "noMatchesFound": "No matches found matching the filters.",
-    "noMatchesYet": "No matches created yet."
-  },
   "registration": {
     "title": "Tournament Registration",
     "addPlayer": "Add Player",
@@ -505,6 +477,16 @@
     }
   },
   "auth": {
+    "setNewPasswordTitle": "Set a new password",
+    "newPassword": "New password",
+    "confirmNewPassword": "Confirm new password",
+    "updatePassword": "Update password",
+    "passwordMismatch": "Passwords do not match",
+    "passwordUpdatedTitle": "Password updated",
+    "passwordUpdated": "Your password has been changed. Redirecting…",
+    "resetLinkInvalidTitle": "Reset link invalid",
+    "resetLinkInvalid": "This password reset link is invalid or has expired. Request a new one from the login page.",
+    "backToLogin": "Back to login",
     "appTitle": "Darts Tournament Manager",
     "signInAsAdmin": "Administrator/Scorer Login",
     "in": "",
@@ -867,6 +849,16 @@
     "typeToSearch": "Type at least 2 characters to search",
     "addFromUsers": "Add from users",
     "addByName": "Add by name"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "message": "An unexpected error occurred. Your data is safe — reload the page to continue.",
+    "reload": "Reload page"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "message": "The page you are looking for does not exist or has been moved.",
+    "goHome": "Go to dashboard"
   },
   "scorers": {
     "title": "Scorers",

@@ -86,7 +86,17 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  };
+
+  const updatePassword = async (newPassword) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
@@ -102,6 +112,7 @@ export function AuthProvider({ children }) {
     signInWithGoogle,
     signOut,
     resetPassword,
+    updatePassword,
   };
 
   return (

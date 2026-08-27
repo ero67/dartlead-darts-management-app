@@ -26,6 +26,9 @@ import { ManagerPanel } from './components/ManagerPanel';
 import { LandingPage } from './components/LandingPage';
 import { PlayerProfile } from './components/PlayerProfile';
 import { OfflineBanner } from './components/OfflineBanner';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { NotFound } from './components/NotFound';
+import { ResetPassword } from './components/ResetPassword';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
 import './App.css';
@@ -425,6 +428,7 @@ function AppContent() {
             />
           } />
           <Route path="/login" element={<Auth />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/create-tournament" element={
             user && canCreateTournaments ? (
@@ -491,12 +495,13 @@ function AppContent() {
             )
           } />
           <Route path="/league/:id" element={
-            <LeagueDetailRoute 
+            <LeagueDetailRoute
               onBack={() => navigate('/leagues')}
               onCreateTournament={handleCreateTournamentFromLeague}
               onSelectTournament={handleSelectTournament}
             />
           } />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>
@@ -514,7 +519,9 @@ function App() {
               <LeagueProvider>
                 <TournamentProvider>
                   <LiveMatchProvider>
-                    <AppContent />
+                    <ErrorBoundary>
+                      <AppContent />
+                    </ErrorBoundary>
                   </LiveMatchProvider>
                 </TournamentProvider>
               </LeagueProvider>

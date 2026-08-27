@@ -12,19 +12,29 @@ import checkoutData from '../data/checkouts.json';
 // too long and the app offers to decide it by a bull-up. See awardLegByBullup.
 const BULLUP_VISIT_THRESHOLD = 15;
 
+// Thin wrapper: the null-check must not sit above hook calls (rules of hooks —
+// the fiber would render 0 hooks first, then all of them once the match
+// hydrates, crashing React). Keeping all scoring hooks in the inner component
+// also means its state initializers (localStorage crash recovery) run with a
+// real match instead of null.
 export function MatchInterface({ match, onMatchComplete, onBack }) {
-  // Show loading state if match is not loaded yet
+  const { t } = useLanguage();
+
   if (!match) {
     return (
       <div className="match-interface">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Loading match...</p>
+          <p>{t('common.loading')}</p>
         </div>
       </div>
     );
   }
 
+  return <MatchInterfaceInner match={match} onMatchComplete={onMatchComplete} onBack={onBack} />;
+}
+
+function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const [matchSettings, setMatchSettings] = useState({
     legsToWin: match?.legsToWin || 3,
     startingScore: match?.startingScore || 501

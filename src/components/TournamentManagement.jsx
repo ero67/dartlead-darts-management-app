@@ -7,6 +7,7 @@ import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { matchService } from '../services/tournamentService';
 import { BracketVisualization } from './BracketVisualization';
 import { BracketSeedingEditor } from './BracketSeedingEditor';
 import { TournamentSummary } from './TournamentSummary';
@@ -1615,18 +1616,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
 
-  // Show loading state if tournament is not loaded yet
-  if (!tournament) {
-    return (
-      <div className="tournament-management">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>{t('common.loading')}</p>
-        </div>
-      </div>
-    );
-  }
-
   const getMatchStatusText = (status, matchId) => {
     if (isMatchActuallyLive(matchId)) {
       if (isMatchInLocalStorage(matchId)) {
@@ -1990,8 +1979,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         onClick={() => {
                           if (window.confirm(t('manager.confirmReset', { matchId: match.id }))) {
                             matchService.resetMatchToPending(match.id).then(() => {
-                              // Refetch tournament to update state
-                              refetchTournament();
+                              return getTournament(tournament.id);
+                            }).catch((error) => {
+                              console.error('Error resetting match:', error);
+                              alert(error.message);
                             });
                           }
                         }}
@@ -2005,22 +1996,25 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         onClick={() => {
                           // Open a simple correction dialog - for now, we'll use a prompt
                           // In a full implementation, this would open a modal
-                          const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.player1_legs || 0);
+                          const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.result?.player1Legs ?? 0);
                           if (newScore1 !== null) {
-                            const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.player2_legs || 0);
+                            const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.result?.player2Legs ?? 0);
                             if (newScore2 !== null) {
                               const score1 = parseInt(newScore1, 10) || 0;
                               const score2 = parseInt(newScore2, 10) || 0;
-                              
+
                               // Validate that winner has more legs
-                              const winnerId = score1 > score2 ? match.player1_id : (score2 > score1 ? match.player2_id : null);
+                              const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
                               if (winnerId) {
                                 matchService.updateMatchResult(match.id, {
                                   winner: winnerId,
                                   player1Legs: score1,
                                   player2Legs: score2
                                 }).then(() => {
-                                  refetchTournament();
+                                  return getTournament(tournament.id);
+                                }).catch((error) => {
+                                  console.error('Error correcting match result:', error);
+                                  alert(error.message);
                                 });
                               } else {
                                 alert(t('manager.winnerMoreLegsError'));
@@ -2818,6 +2812,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     };
   }, [tournament?.id]); // Only depend on tournament ID to avoid unnecessary reloads
 
+  // Show loading state if tournament is not loaded yet. This must stay BELOW
+  // every hook call (rules of hooks): an early return above a hook makes the
+  // hook count differ between the null render and the hydrated render.
+  if (!tournament) {
+    return (
+      <div className="tournament-management">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>{t('common.loading')}</p>
+        </div>
+      </div>
+    );
+  }
+
   const renderLiveMatches = () => {
     const belongsToThisTournament = (match) => {
       const matchGroupId = match.group_id || match.group?.id;
@@ -3350,8 +3358,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             onClick={() => {
                               if (window.confirm(t('manager.confirmReset', { matchId: match.id }))) {
                                 matchService.resetMatchToPending(match.id).then(() => {
-                                  // Refetch tournament to update state
-                                  refetchTournament();
+                                  return getTournament(tournament.id);
+                                }).catch((error) => {
+                                  console.error('Error resetting match:', error);
+                                  alert(error.message);
                                 });
                               }
                             }}
@@ -3365,22 +3375,25 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             onClick={() => {
                               // Open a simple correction dialog - for now, we'll use a prompt
                               // In a full implementation, this would open a modal
-                              const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.player1_legs || 0);
+                              const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.result?.player1Legs ?? 0);
                               if (newScore1 !== null) {
-                                const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.player2_legs || 0);
+                                const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.result?.player2Legs ?? 0);
                                 if (newScore2 !== null) {
                                   const score1 = parseInt(newScore1, 10) || 0;
                                   const score2 = parseInt(newScore2, 10) || 0;
-                                  
+
                                   // Validate that winner has more legs
-                                  const winnerId = score1 > score2 ? match.player1_id : (score2 > score1 ? match.player2_id : null);
+                                  const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
                                   if (winnerId) {
                                     matchService.updateMatchResult(match.id, {
                                       winner: winnerId,
                                       player1Legs: score1,
                                       player2Legs: score2
                                     }).then(() => {
-                                      refetchTournament();
+                                      return getTournament(tournament.id);
+                                    }).catch((error) => {
+                                      console.error('Error correcting match result:', error);
+                                      alert(error.message);
                                     });
                                   } else {
                                     alert(t('manager.winnerMoreLegsError'));

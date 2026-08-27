@@ -145,27 +145,6 @@
     "create": "Vytvoriť Turnaj",
     "cancel": "Zrušiť"
   },
-  "tournamentManagement": {
-    "groups": "Skupiny",
-    "standings": "Tabuľka",
-    "matches": "Zápasy",
-    "playoffs": "Playoff",
-    "player": "Hráč",
-    "played": "Odohrané",
-    "won": "Výhry",
-    "lost": "Prehry",
-    "legsFor": "Legy Za",
-    "legsAgainst": "Legy Proti",
-    "points": "Body",
-    "startMatch": "Začať Zápas",
-    "continueMatch": "Pokračovať v Zápase",
-    "pending": "Čaká",
-    "inProgress": "Prebieha",
-    "completed": "Ukončené",
-    "noStandings": "Zatiaľ žiadne odohrané zápasy",
-    "startPlayoffs": "Začať Playoff",
-    "settings": "Nastavenia"
-  },
   "registration": {
     "title": "Registrácia Turnaja",
     "addPlayer": "Pridať Hráča",
@@ -498,6 +477,16 @@
     }
   },
   "auth": {
+    "setNewPasswordTitle": "Nastavte si nové heslo",
+    "newPassword": "Nové heslo",
+    "confirmNewPassword": "Potvrďte nové heslo",
+    "updatePassword": "Zmeniť heslo",
+    "passwordMismatch": "Heslá sa nezhodujú",
+    "passwordUpdatedTitle": "Heslo zmenené",
+    "passwordUpdated": "Vaše heslo bolo zmenené. Presmerovávame…",
+    "resetLinkInvalidTitle": "Neplatný odkaz",
+    "resetLinkInvalid": "Tento odkaz na obnovenie hesla je neplatný alebo vypršal. Vyžiadajte si nový na prihlasovacej stránke.",
+    "backToLogin": "Späť na prihlásenie",
     "appTitle": "Správca Šípkových Turnajov",
     "signInAsAdmin": "Prihlásenie ako administrátor/zapisovateľ turnaja",
     "in": "",
@@ -860,6 +849,16 @@
     "typeToSearch": "Zadajte aspoň 2 znaky na vyhľadávanie",
     "addFromUsers": "Pridať z používateľov",
     "addByName": "Pridať podľa mena"
+  },
+  "errorBoundary": {
+    "title": "Niečo sa pokazilo",
+    "message": "Nastala neočakávaná chyba. Vaše dáta sú v bezpečí — obnovte stránku a pokračujte.",
+    "reload": "Obnoviť stránku"
+  },
+  "notFound": {
+    "title": "Stránka sa nenašla",
+    "message": "Stránka, ktorú hľadáte, neexistuje alebo bola presunutá.",
+    "goHome": "Prejsť na prehľad"
   },
   "scorers": {
     "title": "Zapisovatelia",
