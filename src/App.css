@@ -4521,22 +4521,25 @@ body {
   max-width: 36rem;
 }
 
-.login-required-message {
-  display: flex;
+/* Small header pill shown to logged-out visitors instead of a start button */
+.login-hint {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.75rem;
-  background: #fef3c7;
-  color: #d97706;
-  border: 1px solid #fcd34d;
-  border-radius: 8px;
-  font-weight: 500;
-  font-size: 0.85rem;
-  margin-top: 0.25rem;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  line-height: 1.4;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
-.login-required-message svg {
+.login-hint svg {
   flex-shrink: 0;
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star } from 'lucide-react';
+import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star, Lock } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -2054,6 +2054,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           )}
                         </div>
                       )}
+                      {match.status === 'pending' && !user && !isMatchActuallyLive(match.id) && (
+                        <span className="login-hint" title={t('management.loginToStartMatch') || 'Login required to start match'}>
+                          <Lock size={11} />
+                          {t('navigation.login')}
+                        </span>
+                      )}
                     </div>
                     <div className="match-header-actions">
                       {match.status === 'completed' && match.result && (
@@ -2131,12 +2137,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <Play size={16} />
                         {t('management.startMatch')}
                       </button>
-                    ) : (
-                      <div className="login-required-message">
-                        <Eye size={16} />
-                        {t('management.loginToStartMatch') || 'Login required to start match'}
-                      </div>
-                    )
+                    ) : null
                   )}
                   {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
                     isAdmin && user ? (
@@ -3351,6 +3352,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <span className={`match-badge ${getMatchStatusClass(match.status, match.id)}`}>
                           {getMatchStatusText(match.status, match.id)}
                         </span>
+                        {match.status === 'pending' && !user && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
+                          <span className="login-hint" title={t('management.loginToStartMatch') || 'Login required to start match'}>
+                            <Lock size={11} />
+                            {t('navigation.login')}
+                          </span>
+                        )}
                         {isMatchActuallyLive(match.id) && (
                           <div className="live-indicator">
                             {isMatchInLocalStorage(match.id) ? (
@@ -3464,12 +3471,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             <Play size={16} />
                             {t('management.startMatch')}
                           </button>
-                        ) : (
-                          <div className="login-required-message">
-                            <Eye size={16} />
-                            {t('management.loginToStartMatch') || 'Login required to start match'}
-                          </div>
-                        )
+                        ) : null
                       )}
                       {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
                         isAdmin && user ? (
