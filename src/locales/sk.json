@@ -604,6 +604,7 @@
     "selectWinnerError": "Prosím vyberte víťaza",
     "legsNegativeError": "Legy nemôžu byť záporné",
     "winnerMoreLegsError": "Víťaz musí mať viac legov ako porazený.",
+    "downstreamStarted": "V ďalšom kole už prebieha alebo je dokončený zápas, ktorý závisí od tohto výsledku. Najprv resetujte ten zápas, potom opravte tento.",
     "quickScore": "Rýchle skóre (najprv vyberte víťaza)",
     "statsNotRecalculatedHint": "Uloží iba skóre — priemery hráčov a štatistiky šípok sa neprepočítajú.",
     "searchFirstError": "Prosím najprv vyhľadajte zápas",

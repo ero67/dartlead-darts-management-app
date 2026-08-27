@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Target, RotateCcw, CheckCircle, Eye } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -40,14 +40,19 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     startingScore: match?.startingScore || 501
   });
 
+  // Format loaded from the matches row on restore. Bracket-JSONB matches carry
+  // no legsToWin/startingScore after a refresh, but the DB row does (startMatch
+  // writes it) — without this a first-to-5 final resumes as first-to-3.
+  const dbSettingsRef = useRef(null);
+
   // Update match settings when match prop changes
   useEffect(() => {
     if (match) {
       console.log('Match data in MatchInterface:', match);
       console.log('Setting match settings - legsToWin:', match.legsToWin, 'startingScore:', match.startingScore);
       setMatchSettings({
-        legsToWin: match.legsToWin || 3,
-        startingScore: match.startingScore || 501
+        legsToWin: match.legsToWin || dbSettingsRef.current?.legsToWin || 3,
+        startingScore: match.startingScore || dbSettingsRef.current?.startingScore || 501
       });
     }
   }, [match]);
@@ -239,7 +244,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     try {
       const { data, error } = await supabase
         .from('matches')
-        .select('current_leg, player1_current_score, player2_current_score, player1_legs, player2_legs, current_player, started_by_user_id')
+        .select('current_leg, player1_current_score, player2_current_score, player1_legs, player2_legs, current_player, started_by_user_id, match_starter, legs_to_win, starting_score, status, winner_id')
         .eq('id', matchId)
         .single();
 
@@ -284,9 +289,20 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             }
           },
           isInProgress,
-          // If match is in progress, we can infer the match starter from the current player
-          // For leg 1, the match starter is the current player
-          matchStarter: isInProgress && data.current_leg === 1 ? data.current_player : null
+          status: data.status,
+          // The persisted starter is authoritative. Fallback for rows written
+          // before match_starter existed: on leg 1 the current player is the
+          // starter (only reliable there — later legs alternate).
+          matchStarter: data.match_starter !== null && data.match_starter !== undefined
+            ? data.match_starter
+            : (isInProgress && data.current_leg === 1 ? data.current_player : null),
+          // The row's format is authoritative for restored matches — bracket
+          // JSONB matches carry no legsToWin/startingScore, and falling back to
+          // 3/501 ends a first-to-5 final two legs early.
+          dbSettings: {
+            legsToWin: data.legs_to_win || null,
+            startingScore: data.starting_score || null
+          }
         };
       }
 
@@ -346,7 +362,44 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     const loadMatchState = async () => {
       if (!match?.id) return;
 
-      const startingScore = match?.startingScore || matchSettings.startingScore || 501;
+      // Always consult the row first: it is authoritative for the match format
+      // (restored matches lose legsToWin/startingScore from props), the leg-1
+      // starter, and completion — a stale device must not rescore a match that
+      // finished elsewhere.
+      try {
+        const { data: dbRow } = await supabase
+          .from('matches')
+          .select('legs_to_win, starting_score, status, match_starter')
+          .eq('id', match.id)
+          .maybeSingle();
+
+        if (dbRow) {
+          if (dbRow.legs_to_win || dbRow.starting_score) {
+            dbSettingsRef.current = {
+              legsToWin: dbRow.legs_to_win || null,
+              startingScore: dbRow.starting_score || null
+            };
+            if (!match?.legsToWin || !match?.startingScore) {
+              setMatchSettings({
+                legsToWin: match?.legsToWin || dbRow.legs_to_win || 3,
+                startingScore: match?.startingScore || dbRow.starting_score || 501
+              });
+            }
+          }
+          if (dbRow.status === 'completed') {
+            setMatchComplete(true);
+            setShowMatchStarter(false);
+            return;
+          }
+          if (dbRow.match_starter !== null && dbRow.match_starter !== undefined) {
+            setMatchStarter(dbRow.match_starter);
+          }
+        }
+      } catch (formatError) {
+        console.error('Error loading match row before restore:', formatError);
+      }
+
+      const startingScore = match?.startingScore || dbSettingsRef.current?.startingScore || matchSettings.startingScore || 501;
 
       // If match DB status is pending, only reset if localStorage has no real progress.
       // The DB status can be stale (e.g. startLiveMatch failed due to a missing column,
@@ -469,6 +522,18 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         currentState.currentPlayer = matchStarter;
       }
       localStorage.setItem(`match-state-${match.id}`, JSON.stringify(currentState));
+
+      // Persist to the DB too: crash recovery on another device needs the
+      // starter to alternate legs correctly (localStorage doesn't travel).
+      if (!isViewOnly) {
+        supabase
+          .from('matches')
+          .update({ match_starter: matchStarter })
+          .eq('id', match.id)
+          .then(({ error }) => {
+            if (error) console.error('Error persisting match starter:', error);
+          });
+      }
     }
   }, [matchStarter, match?.id]);
 
@@ -1183,14 +1248,27 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           restoredCurrentScore = prev[playerKey].currentScore + safeScore(lastDart?.value);
         }
 
+        // Subtract the FULL completed visit from cumulative totals: the visit
+        // (minus its last dart) moves back into currentTurn and finishTurn will
+        // add the corrected visit again in full — without this subtraction the
+        // visit is double-counted and the average tiebreaker corrupts.
+        // Bust visits store turn.score = 0, so one formula covers both cases.
+        const visitScore = safeScore(lastTurn.turn?.score);
+        const visitDarts = lastTurn.turn?.darts || 0;
+
         return {
           ...prev,
           [playerKey]: {
             ...prev[playerKey],
             currentScore: restoredCurrentScore,
-            totalDarts: Math.max(0, prev[playerKey].totalDarts - (wasBustTurn ? 1 : 0)),
-            legDarts: Math.max(0, (lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts) - (wasBustTurn ? 1 : 0)),
-            ...(wasBustTurn ? {} : { legDarts: lastTurn.legScores?.[playerKey]?.legDarts ?? prev[playerKey].legDarts })
+            totalScore: Math.max(0, prev[playerKey].totalScore - visitScore),
+            totalDarts: Math.max(0, prev[playerKey].totalDarts - visitDarts),
+            legDarts: lastTurn.legScores?.[playerKey]?.legDarts
+              ?? Math.max(0, prev[playerKey].legDarts - visitDarts),
+            oneEighties: Math.max(
+              0,
+              (prev[playerKey].oneEighties || 0) - (visitScore === 180 && !wasBustTurn ? 1 : 0)
+            )
           }
         };
       });
@@ -1239,6 +1317,14 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts
         }
       }));
+      // Record the bust in turn history (score 0, darts counted) so undo can
+      // revert it — otherwise undo silently targets the opponent's last visit.
+      setTurnHistory(prev => [...prev, {
+        player: currentPlayer,
+        turn: { ...turnData, score: 0, isBust: true, turnStartScore },
+        legScores: structuredClone(legScores),
+        leg: currentLeg
+      }]);
       // Switch to next player after bust
       setCurrentPlayer(prev => prev === 0 ? 1 : 0);
       return;
@@ -1422,8 +1508,14 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       // Leg 1: matchStarter, Leg 2: other player, Leg 3: matchStarter, etc.
       const newLegNumber = currentLeg + 1;
       setCurrentLeg(prev => prev + 1);
-      // Alternate based on leg number: odd legs = matchStarter, even legs = other player
-      const newLegStarter = (newLegNumber % 2 === 1) ? matchStarter : (1 - matchStarter);
+      // Alternate based on leg number: odd legs = matchStarter, even legs = other player.
+      // Guard against a lost starter (pre-match_starter recovery): 1 - null is 1
+      // and null currentPlayer deadlocks scoring, so fall back to the leg winner.
+      const starterBase = (matchStarter !== null && matchStarter !== undefined) ? matchStarter : currentPlayer;
+      if (starterBase !== matchStarter) {
+        console.warn('matchStarter unknown at leg change — falling back to leg winner as alternation base');
+      }
+      const newLegStarter = (newLegNumber % 2 === 1) ? starterBase : (1 - starterBase);
       setCurrentPlayer(newLegStarter); // Automatically set current player to leg starter
       
       // Sync to database when new leg starts

@@ -604,6 +604,7 @@
     "selectWinnerError": "Please select a winner",
     "legsNegativeError": "Legs cannot be negative",
     "winnerMoreLegsError": "The winner must have more legs than the loser.",
+    "downstreamStarted": "The next round already has a match in progress or completed that depends on this result. Reset that match first, then correct this one.",
     "quickScore": "Quick score (select winner first)",
     "statsNotRecalculatedHint": "Saves the score only — player averages and per-dart stats are not recalculated.",
     "searchFirstError": "Please search for a match first",

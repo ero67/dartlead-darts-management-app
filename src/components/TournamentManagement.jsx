@@ -7,7 +7,7 @@ import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { matchService } from '../services/tournamentService';
+import { tournamentService, matchService } from '../services/tournamentService';
 import { BracketVisualization } from './BracketVisualization';
 import { BracketSeedingEditor } from './BracketSeedingEditor';
 import { TournamentSummary } from './TournamentSummary';
@@ -1616,6 +1616,189 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
 
+  // ── Admin match corrections (bracket-aware) ────────────────────────────────
+  // Locate a match inside a playoffs.rounds structure. Returns null for group
+  // matches (no bracket bookkeeping needed).
+  const getBracketContext = (rounds, matchId) => {
+    if (!rounds?.length) return null;
+    for (let r = 0; r < rounds.length; r++) {
+      const all = rounds[r].matches || [];
+      const nonThird = all.filter(m => !m.isThirdPlaceMatch);
+      const idx = nonThird.findIndex(m => m.id === matchId);
+      if (idx !== -1) {
+        const isSemifinal = nonThird.length === 2 && r < rounds.length - 1;
+        const finalRound = rounds[rounds.length - 1];
+        const nextNonThird = r < rounds.length - 1
+          ? (rounds[r + 1].matches || []).filter(m => !m.isThirdPlaceMatch)
+          : [];
+        return {
+          roundIndex: r,
+          bracketIndex: idx,
+          entry: nonThird[idx],
+          isFirstOfPair: idx % 2 === 0,
+          nextMatch: nextNonThird[Math.floor(idx / 2)] || null,
+          thirdPlaceMatch: isSemifinal ? (finalRound.matches.find(m => m.isThirdPlaceMatch) || null) : null,
+          isThirdPlace: false
+        };
+      }
+      const third = all.find(m => m.isThirdPlaceMatch && m.id === matchId);
+      if (third) {
+        return { roundIndex: r, bracketIndex: -1, entry: third, isFirstOfPair: true, nextMatch: null, thirdPlaceMatch: null, isThirdPlace: true };
+      }
+    }
+    return null;
+  };
+
+  // A downstream match blocks reset/correct once it has been played or is
+  // being played — the DB row is authoritative over the bracket entry.
+  const isDownstreamBlocked = (ctx) => {
+    const started = (bracketMatch) => {
+      if (!bracketMatch) return false;
+      const row = tournament?.playoffMatches?.find(m => m.id === bracketMatch.id);
+      const status = row?.status || bracketMatch.status || 'pending';
+      return status === 'in_progress' || status === 'completed';
+    };
+    return started(ctx.nextMatch) || started(ctx.thirdPlaceMatch);
+  };
+
+  const handleAdminResetMatch = async (match) => {
+    if (!window.confirm(t('manager.confirmReset', { matchId: match.id }))) return;
+    try {
+      const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
+      if (ctx && isDownstreamBlocked(ctx)) {
+        alert(t('manager.downstreamStarted'));
+        return;
+      }
+
+      await matchService.resetMatchToPending(match.id);
+
+      if (ctx) {
+        // Sync the bracket JSONB: mark the entry pending and clear the slots
+        // its winner/loser already occupied downstream.
+        const playoffs = structuredClone(tournament.playoffs);
+        const c = getBracketContext(playoffs.rounds, match.id);
+        c.entry.status = 'pending';
+        c.entry.result = null;
+        const downstreamRowIds = [];
+        if (c.nextMatch) {
+          if (c.isFirstOfPair) c.nextMatch.player1 = null; else c.nextMatch.player2 = null;
+          c.nextMatch.status = 'pending';
+          c.nextMatch.result = null;
+          downstreamRowIds.push(c.nextMatch.id);
+        }
+        if (c.thirdPlaceMatch) {
+          if (c.bracketIndex === 0) c.thirdPlaceMatch.player1 = null; else c.thirdPlaceMatch.player2 = null;
+          c.thirdPlaceMatch.status = 'pending';
+          c.thirdPlaceMatch.result = null;
+          downstreamRowIds.push(c.thirdPlaceMatch.id);
+        }
+
+        // Downstream DB rows (pending by the guard above) still carry the old
+        // players — delete them so the UI falls back to the cleared bracket.
+        const existingDownstream = downstreamRowIds.filter(id =>
+          tournament?.playoffMatches?.some(m => m.id === id)
+        );
+        if (existingDownstream.length > 0) {
+          const { error: delError } = await supabase
+            .from('matches')
+            .delete()
+            .in('id', existingDownstream);
+          if (delError) throw delError;
+        }
+
+        await tournamentService.updateTournamentPlayoffs(tournament.id, playoffs);
+
+        // Resetting the final (or 3rd place) un-completes the tournament
+        if (tournament.status === 'completed') {
+          await tournamentService.updateTournamentStatus(tournament.id, 'started');
+        }
+      }
+
+      await getTournament(tournament.id);
+    } catch (error) {
+      console.error('Error resetting match:', error);
+      alert(error.message);
+    }
+  };
+
+  const handleAdminCorrectMatch = async (match) => {
+    const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.result?.player1Legs ?? 0);
+    if (newScore1 === null) return;
+    const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.result?.player2Legs ?? 0);
+    if (newScore2 === null) return;
+
+    const score1 = parseInt(newScore1, 10) || 0;
+    const score2 = parseInt(newScore2, 10) || 0;
+    const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
+    if (!winnerId) {
+      alert(t('manager.winnerMoreLegsError'));
+      return;
+    }
+
+    try {
+      const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
+      if (ctx && isDownstreamBlocked(ctx)) {
+        alert(t('manager.downstreamStarted'));
+        return;
+      }
+
+      await matchService.updateMatchResult(match.id, {
+        winner: winnerId,
+        player1Legs: score1,
+        player2Legs: score2
+      });
+
+      if (ctx) {
+        // Sync the bracket JSONB: patch the entry's result and re-propagate
+        // winner/loser into the downstream slots.
+        const playoffs = structuredClone(tournament.playoffs);
+        const c = getBracketContext(playoffs.rounds, match.id);
+        c.entry.status = 'completed';
+        c.entry.result = {
+          ...(c.entry.result || {}),
+          winner: winnerId,
+          player1Legs: score1,
+          player2Legs: score2,
+          manuallyCorrected: true
+        };
+
+        const winnerPlayer = c.entry.player1?.id === winnerId ? c.entry.player1 : c.entry.player2;
+        const loserPlayer = c.entry.player1?.id === winnerId ? c.entry.player2 : c.entry.player1;
+
+        const rowUpdates = [];
+        if (c.nextMatch && winnerPlayer) {
+          if (c.isFirstOfPair) c.nextMatch.player1 = winnerPlayer; else c.nextMatch.player2 = winnerPlayer;
+          rowUpdates.push({
+            id: c.nextMatch.id,
+            [c.isFirstOfPair ? 'player1_id' : 'player2_id']: winnerPlayer.id
+          });
+        }
+        if (c.thirdPlaceMatch && loserPlayer) {
+          if (c.bracketIndex === 0) c.thirdPlaceMatch.player1 = loserPlayer; else c.thirdPlaceMatch.player2 = loserPlayer;
+          rowUpdates.push({
+            id: c.thirdPlaceMatch.id,
+            [c.bracketIndex === 0 ? 'player1_id' : 'player2_id']: loserPlayer.id
+          });
+        }
+
+        // Keep existing downstream DB rows (pending by the guard) in step
+        for (const { id, ...fields } of rowUpdates) {
+          if (tournament?.playoffMatches?.some(m => m.id === id)) {
+            const { error: rowError } = await supabase.from('matches').update(fields).eq('id', id);
+            if (rowError) throw rowError;
+          }
+        }
+
+        await tournamentService.updateTournamentPlayoffs(tournament.id, playoffs);
+      }
+
+      await getTournament(tournament.id);
+    } catch (error) {
+      console.error('Error correcting match result:', error);
+      alert(error.message);
+    }
+  };
+
   const getMatchStatusText = (status, matchId) => {
     if (isMatchActuallyLive(matchId)) {
       if (isMatchInLocalStorage(matchId)) {
@@ -1976,16 +2159,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <div className="admin-controls">
                       <button
                         className="admin-btn admin-reset-btn"
-                        onClick={() => {
-                          if (window.confirm(t('manager.confirmReset', { matchId: match.id }))) {
-                            matchService.resetMatchToPending(match.id).then(() => {
-                              return getTournament(tournament.id);
-                            }).catch((error) => {
-                              console.error('Error resetting match:', error);
-                              alert(error.message);
-                            });
-                          }
-                        }}
+                        onClick={() => handleAdminResetMatch(match)}
                         title={t('manager.resetMatchToPending') || 'Reset match to pending'}
                       >
                         <RotateCcw size={16} />
@@ -1993,35 +2167,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       </button>
                       <button
                         className="admin-btn admin-correct-btn"
-                        onClick={() => {
-                          // Open a simple correction dialog - for now, we'll use a prompt
-                          // In a full implementation, this would open a modal
-                          const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.result?.player1Legs ?? 0);
-                          if (newScore1 !== null) {
-                            const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.result?.player2Legs ?? 0);
-                            if (newScore2 !== null) {
-                              const score1 = parseInt(newScore1, 10) || 0;
-                              const score2 = parseInt(newScore2, 10) || 0;
-
-                              // Validate that winner has more legs
-                              const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
-                              if (winnerId) {
-                                matchService.updateMatchResult(match.id, {
-                                  winner: winnerId,
-                                  player1Legs: score1,
-                                  player2Legs: score2
-                                }).then(() => {
-                                  return getTournament(tournament.id);
-                                }).catch((error) => {
-                                  console.error('Error correcting match result:', error);
-                                  alert(error.message);
-                                });
-                              } else {
-                                alert(t('manager.winnerMoreLegsError'));
-                              }
-                            }
-                          }
-                        }}
+                        onClick={() => handleAdminCorrectMatch(match)}
                         title={t('manager.manualMatchResult') || 'Correct match result'}
                       >
                         <Edit2 size={16} />
@@ -3355,16 +3501,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <div className="admin-controls">
                           <button
                             className="admin-btn admin-reset-btn"
-                            onClick={() => {
-                              if (window.confirm(t('manager.confirmReset', { matchId: match.id }))) {
-                                matchService.resetMatchToPending(match.id).then(() => {
-                                  return getTournament(tournament.id);
-                                }).catch((error) => {
-                                  console.error('Error resetting match:', error);
-                                  alert(error.message);
-                                });
-                              }
-                            }}
+                            onClick={() => handleAdminResetMatch(match)}
                             title={t('manager.resetMatchToPending') || 'Reset match to pending'}
                           >
                             <RotateCcw size={16} />
@@ -3372,35 +3509,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           </button>
                           <button
                             className="admin-btn admin-correct-btn"
-                            onClick={() => {
-                              // Open a simple correction dialog - for now, we'll use a prompt
-                              // In a full implementation, this would open a modal
-                              const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.result?.player1Legs ?? 0);
-                              if (newScore1 !== null) {
-                                const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.result?.player2Legs ?? 0);
-                                if (newScore2 !== null) {
-                                  const score1 = parseInt(newScore1, 10) || 0;
-                                  const score2 = parseInt(newScore2, 10) || 0;
-
-                                  // Validate that winner has more legs
-                                  const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
-                                  if (winnerId) {
-                                    matchService.updateMatchResult(match.id, {
-                                      winner: winnerId,
-                                      player1Legs: score1,
-                                      player2Legs: score2
-                                    }).then(() => {
-                                      return getTournament(tournament.id);
-                                    }).catch((error) => {
-                                      console.error('Error correcting match result:', error);
-                                      alert(error.message);
-                                    });
-                                  } else {
-                                    alert(t('manager.winnerMoreLegsError'));
-                                  }
-                                }
-                              }
-                            }}
+                            onClick={() => handleAdminCorrectMatch(match)}
                             title={t('manager.manualMatchResult') || 'Correct match result'}
                           >
                             <Edit2 size={16} />

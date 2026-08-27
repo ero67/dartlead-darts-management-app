@@ -923,6 +923,10 @@ export const tournamentService = {
               
               return {
                 id: match.id,
+                // groupId is required by COMPLETE_MATCH/applyMatchCompletion —
+                // without it, a match restored after refresh saves to the DB
+                // but cannot update local standings ("Group not found").
+                groupId: group.id,
                 player1: match.player1 || null,
                 player2: match.player2 || null,
                 status: match.status,
@@ -2318,17 +2322,35 @@ export const matchService = {
       if (matchData?.legsToWin) startUpdate.legs_to_win = matchData.legsToWin;
       if (matchData?.startingScore) startUpdate.starting_score = matchData.startingScore;
 
-      // First, try to update the existing match
+      // First, try to update the existing match. Never flip a completed match
+      // back to in_progress — a stale device (old props, leftover localStorage)
+      // opening a finished match must not resurrect it.
       const { data: existingMatch, error: updateError } = await supabase
         .from('matches')
         .update(startUpdate)
         .eq('id', matchId)
+        .neq('status', 'completed')
         .select()
         .maybeSingle()
 
       if (updateError) {
         console.error('Supabase error in startMatch update:', updateError);
         throw updateError;
+      }
+
+      // 0 rows can mean "already completed" — return the row untouched so the
+      // caller sees the real state instead of falling into the create path.
+      if (!existingMatch) {
+        const { data: completedMatch } = await supabase
+          .from('matches')
+          .select('*')
+          .eq('id', matchId)
+          .eq('status', 'completed')
+          .maybeSingle();
+        if (completedMatch) {
+          console.warn('startMatch blocked: match already completed', matchId);
+          return completedMatch;
+        }
       }
 
       // If match exists, return the updated data
@@ -2432,8 +2454,9 @@ export const matchService = {
         .from('matches')
         .update(updateData)
         .eq('id', matchId)
+        .neq('status', 'completed')
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) {
         // If the error is about a missing column, retry without that column
@@ -2444,13 +2467,18 @@ export const matchService = {
             .from('matches')
             .update(fallbackData)
             .eq('id', matchId)
+            .neq('status', 'completed')
             .select()
-            .single()
+            .maybeSingle()
 
           if (fallbackError) throw fallbackError;
           return fallbackResult;
         }
         throw error;
+      }
+      // null means the match is already completed — do not resurrect it
+      if (!data) {
+        console.warn('startLiveMatch blocked: match already completed', matchId);
       }
       return data
 
@@ -2532,11 +2560,35 @@ export const matchService = {
 // Manually update match result (for manager override)
   async updateMatchResult(matchId, matchResult) {
     try {
+      // Read paths prefer the result JSONB for leg counts, so a correction must
+      // patch it too — updating only the columns leaves standings computing leg
+      // difference from the stale pre-correction legs.
+      const { data: current, error: fetchError } = await supabase
+        .from('matches')
+        .select('result, player1_id, player2_id')
+        .eq('id', matchId)
+        .single();
+      if (fetchError) throw fetchError;
+
+      let patchedResult = null;
+      if (current?.result) {
+        const parsed = typeof current.result === 'string' ? JSON.parse(current.result) : current.result;
+        patchedResult = {
+          ...parsed,
+          winner: matchResult.winner,
+          player1Legs: matchResult.player1Legs,
+          player2Legs: matchResult.player2Legs,
+          manuallyCorrected: true
+        };
+      }
+
       const updateData = {
         status: 'completed',
         winner_id: matchResult.winner,
         player1_legs: matchResult.player1Legs,
         player2_legs: matchResult.player2Legs,
+        result: patchedResult,
+        completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
@@ -2548,6 +2600,22 @@ export const matchService = {
         .single();
 
       if (error) throw error;
+
+      // Keep the per-player stats rows consistent with the corrected legs
+      const statsUpdates = [
+        { playerId: current.player1_id, won: matchResult.player1Legs, lost: matchResult.player2Legs },
+        { playerId: current.player2_id, won: matchResult.player2Legs, lost: matchResult.player1Legs }
+      ];
+      for (const s of statsUpdates) {
+        if (!s.playerId) continue;
+        const { error: statsError } = await supabase
+          .from('match_player_stats')
+          .update({ legs_won: s.won, legs_lost: s.lost })
+          .eq('match_id', matchId)
+          .eq('player_id', s.playerId);
+        if (statsError) console.error('Error updating match_player_stats after correction:', statsError);
+      }
+
       return data;
     } catch (error) {
       console.error('Error updating match result:', error)
@@ -2567,11 +2635,13 @@ export const matchService = {
         player1_current_score: null,
         player2_current_score: null,
         current_player: 0,
+        match_starter: null,
         live_device_id: null,
         live_started_at: null,
         last_activity_at: null,
         winner_id: null,
         result: null,
+        completed_at: null,
         updated_at: new Date().toISOString()
       };
 
@@ -2583,19 +2653,19 @@ export const matchService = {
         .single();
 
       if (error) throw error;
-      
+
       // Also clear related data like legs and match_player_stats
-      // Clear legs
-      await supabase
+      const { error: legsError } = await supabase
         .from('legs')
         .delete()
         .eq('match_id', matchId);
-        
-      // Clear match player stats
-      await supabase
+      if (legsError) throw legsError;
+
+      const { error: statsError } = await supabase
         .from('match_player_stats')
         .delete()
         .eq('match_id', matchId);
+      if (statsError) throw statsError;
 
       return data;
     } catch (error) {
@@ -2756,15 +2826,20 @@ export const matchService = {
         // Clear live match tracking fields
         live_device_id: null,
         live_started_at: null,
+        completed_at: new Date().toISOString(),
         last_activity_at: new Date().toISOString()
       };
-      
+
       console.log('Updating match with data:', updateData);
-      
+
+      // Guard: never overwrite a match another device already completed with a
+      // DIFFERENT winner. Re-saving the same winner stays allowed so queued
+      // retries remain idempotent.
       const { data: updatedMatches, error: matchError } = await supabase
         .from('matches')
         .update(updateData)
         .eq('id', matchResult.matchId)
+        .or(`status.neq.completed,winner_id.eq.${matchResult.winner}`)
         .select()
 
       if (matchError) {
@@ -2784,21 +2859,33 @@ export const matchService = {
       // Check if the update actually affected any rows
       if (!updatedMatches || updatedMatches.length === 0) {
         console.error('=== NO ROWS UPDATED ===');
-        console.error('Update returned no data - possible RLS policy blocking update');
+        console.error('Update returned no data - conflict, RLS block, or missing match');
         console.error('Match ID:', matchResult.matchId);
-        
+
         // Check if match exists
         const { data: checkMatch, error: checkError } = await supabase
           .from('matches')
-          .select('id, status')
+          .select('id, status, winner_id')
           .eq('id', matchResult.matchId)
           .single();
-        
+
         if (checkError) {
           console.error('Error checking match existence:', checkError);
           throw new Error(`Match not found or RLS policy blocking: ${checkError.message}`);
         }
-        
+
+        if (checkMatch && checkMatch.status === 'completed') {
+          // Another device already completed this match with a different
+          // winner. Returning (not throwing) keeps this result out of the
+          // retry queue — retrying can never succeed and must not overwrite.
+          console.warn('⚠️ Conflict: match already completed by another device with a different winner', {
+            matchId: checkMatch.id,
+            existingWinner: checkMatch.winner_id,
+            attemptedWinner: matchResult.winner
+          });
+          return { conflict: true, match: checkMatch };
+        }
+
         if (checkMatch) {
           console.log('Match exists with status:', checkMatch.status);
           // If match exists but update didn't work, it's likely an RLS issue
