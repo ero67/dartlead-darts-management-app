@@ -295,7 +295,10 @@
     "errorGeneric": "Something went wrong. Please try again.",
     "all": "All",
     "autoScorerAssignment": "Automatic scorer assignment",
-    "autoScorerAssignmentHint": "Every pending match shows a suggested scorer: in groups a player from the same group, in playoffs a player knocked out in the previous round."
+    "autoScorerAssignmentHint": "Every pending match shows a suggested scorer: in groups a player from the same group, in playoffs a player knocked out in the previous round.",
+    "scoringMode": "Scoring input",
+    "scoringModeDart": "Dart-by-dart",
+    "scoringModeTurnTotal": "3-dart total"
   },
   "management": {
     "youAreManaging": "You are managing this tournament",

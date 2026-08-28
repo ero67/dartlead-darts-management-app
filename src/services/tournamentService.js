@@ -156,6 +156,7 @@ export const tournamentService = {
           name: tournamentData.name,
           legs_to_win: tournamentData.legsToWin || 3,
           starting_score: tournamentData.startingScore || 501,
+          default_scoring_mode: tournamentData.defaultScoringMode || 'dart',
           group_settings: tournamentData.groupSettings ? {
             ...tournamentData.groupSettings,
             standingsCriteriaOrder: tournamentData.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead']
@@ -362,6 +363,7 @@ export const tournamentService = {
         status: tournament.status,
         legsToWin: tournament.legs_to_win,
         startingScore: tournament.starting_score,
+        defaultScoringMode: tournament.default_scoring_mode || 'dart',
         groupSettings: groupSettings || {
           type: 'groups',
           value: 2,
@@ -446,6 +448,7 @@ export const tournamentService = {
           status: row.status,
           legsToWin: row.legs_to_win,
           startingScore: row.starting_score,
+          defaultScoringMode: row.default_scoring_mode || 'dart',
           groupSettings: groupSettings || null,
           playoffSettings: row.playoff_settings,
           tournamentType: row.tournament_type || 'groups_with_playoffs',
@@ -726,6 +729,7 @@ export const tournamentService = {
           status: tournament.status,
           legsToWin: tournament.legs_to_win,
           startingScore: tournament.starting_score,
+          defaultScoringMode: tournament.default_scoring_mode || 'dart',
           playoffSettings: tournament.playoff_settings,
           playoffs: tournament.playoffs,
           playoffMatches: playoffMatches,
@@ -895,6 +899,7 @@ export const tournamentService = {
           status: tournament.status,
           legsToWin: tournament.legs_to_win,
           startingScore: tournament.starting_score,
+          defaultScoringMode: tournament.default_scoring_mode || 'dart',
           groupSettings: groupSettings || {
             type: 'groups',
             value: 2,
@@ -2279,6 +2284,11 @@ export const tournamentService = {
       // Optionally update tournament type (used by the registration settings modal)
       if (settings.tournamentType) {
         updateData.tournament_type = settings.tournamentType;
+      }
+
+      // Optional default scoring input mode ('dart' | 'turnTotal')
+      if (settings.defaultScoringMode) {
+        updateData.default_scoring_mode = settings.defaultScoringMode;
       }
       
       // Optionally update tournament status if provided in settings (e.g., for playoff-only start)

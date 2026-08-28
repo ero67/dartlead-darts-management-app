@@ -295,7 +295,10 @@
     "errorNotLoggedIn": "Na registráciu musíte byť prihlásený.",
     "errorGeneric": "Niečo sa pokazilo. Skúste to znova.",
     "autoScorerAssignment": "Automatické priraďovanie zapisovateľov",
-    "autoScorerAssignmentHint": "Pri každom čakajúcom zápase sa zobrazí navrhnutý zapisovateľ: v skupinách hráč z rovnakej skupiny, v play-off hráč vyradený v predchádzajúcom kole."
+    "autoScorerAssignmentHint": "Pri každom čakajúcom zápase sa zobrazí navrhnutý zapisovateľ: v skupinách hráč z rovnakej skupiny, v play-off hráč vyradený v predchádzajúcom kole.",
+    "scoringMode": "Zapisovanie skóre",
+    "scoringModeDart": "Šípka po šípke",
+    "scoringModeTurnTotal": "Súčet 3 šípok"
   },
   "management": {
     "youAreManaging": "Spravujete tento turnaj",

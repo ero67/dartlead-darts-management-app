@@ -144,10 +144,20 @@ async function performWrite(item) {
 
     case QUEUE_TYPES.liveSync: {
       const { matchId, update } = item.payload;
-      const { error } = await supabase
+      // Same monotonic guard as the live path in MatchInterface: a queued
+      // snapshot is by definition older than any direct write that succeeded
+      // after it was enqueued — without the guard, flushing after reconnect
+      // would overwrite newer scores with stale ones. 0 rows updated is
+      // success (the row moved on), not a failure to retry.
+      let query = supabase
         .from('matches')
         .update(update)
-        .eq('id', matchId);
+        .eq('id', matchId)
+        .neq('status', 'completed');
+      if (update?.last_activity_at) {
+        query = query.or(`last_activity_at.is.null,last_activity_at.lt.${update.last_activity_at}`);
+      }
+      const { error } = await query;
       if (error) throw error;
       return;
     }

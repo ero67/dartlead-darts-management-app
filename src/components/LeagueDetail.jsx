@@ -15,6 +15,7 @@ const DEFAULT_TOURNAMENT_SETTINGS = {
   tournamentType: 'groups_with_playoffs',
   legsToWin: 3,
   startingScore: 501,
+  defaultScoringMode: 'dart',
   groupSettings: { type: 'groups', value: 2 },
   standingsCriteriaOrder: ['matchesWon', 'legDifference', 'average', 'headToHead'],
   playoffSettings: {
@@ -1456,6 +1457,31 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       <option value={501}>501</option>
                       <option value={701}>701</option>
                     </select>
+                  </div>
+                  <div className="input-group">
+                    <label>{t('registration.scoringMode')}</label>
+                    <div className="radio-group" style={{ marginBottom: 0 }}>
+                      <label>
+                        <input
+                          type="radio"
+                          name="defaultScoringModeLeague"
+                          value="dart"
+                          checked={tournamentDefaults.defaultScoringMode !== 'turnTotal'}
+                          onChange={() => setTournamentDefaults(prev => ({ ...prev, defaultScoringMode: 'dart' }))}
+                        />
+                        {t('registration.scoringModeDart')}
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="defaultScoringModeLeague"
+                          value="turnTotal"
+                          checked={tournamentDefaults.defaultScoringMode === 'turnTotal'}
+                          onChange={() => setTournamentDefaults(prev => ({ ...prev, defaultScoringMode: 'turnTotal' }))}
+                        />
+                        {t('registration.scoringModeTurnTotal')}
+                      </label>
+                    </div>
                   </div>
                 </div>
                 <div className="checkbox-group" style={{ marginTop: '0.75rem' }}>

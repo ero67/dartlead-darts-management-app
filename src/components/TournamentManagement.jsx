@@ -232,6 +232,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const [tournamentSettings, setTournamentSettings] = useState({
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
+    defaultScoringMode: tournament.defaultScoringMode || 'dart',
     // Use the tournament's real group settings — a hardcoded default here
     // silently reset type/value (and any extra flags) on every settings save.
     groupSettings: tournament.groupSettings || {
@@ -291,6 +292,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       setTournamentSettings({
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
+        defaultScoringMode: tournament.defaultScoringMode || 'dart',
         groupSettings: tournament.groupSettings || {
           type: 'groups',
           value: 2
@@ -2151,7 +2153,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           tournamentId: tournament.id,
                           groupId: match.groupId,
                           legsToWin: match.legsToWin || tournament.legsToWin,
-                          startingScore: match.startingScore || tournament.startingScore
+                          startingScore: match.startingScore || tournament.startingScore,
+                          defaultScoringMode: tournament.defaultScoringMode
                         })}
                       >
                         <Play size={16} />
@@ -2172,7 +2175,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             ...match,
                             adminOverride: true,
                             legsToWin: match.legsToWin || tournament.legsToWin,
-                            startingScore: match.startingScore || tournament.startingScore
+                            startingScore: match.startingScore || tournament.startingScore,
+                            defaultScoringMode: tournament.defaultScoringMode
                           });
                         }}
                       >
@@ -2195,7 +2199,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         ...match,
                         adminOverride: true,
                         legsToWin: match.legsToWin || tournament.legsToWin,
-                        startingScore: match.startingScore || tournament.startingScore
+                        startingScore: match.startingScore || tournament.startingScore,
+                        defaultScoringMode: tournament.defaultScoringMode
                       })}
                       title={t('management.adminOverride') || 'Admin override'}
                     >
@@ -3490,6 +3495,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                 tournamentId: tournament.id,
                                 legsToWin: legsToWin,
                                 startingScore: tournament.startingScore,
+                                defaultScoringMode: tournament.defaultScoringMode,
                                 isPlayoff: true
                               });
                             }}
@@ -3515,6 +3521,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                 adminOverride: true,
                                 legsToWin: legsToWin,
                                 startingScore: tournament.startingScore,
+                                defaultScoringMode: tournament.defaultScoringMode,
                                 isPlayoff: true
                               });
                             }}
@@ -3542,6 +3549,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                               adminOverride: true,
                               legsToWin: legsToWin,
                               startingScore: tournament.startingScore,
+                              defaultScoringMode: tournament.defaultScoringMode,
                               isPlayoff: true
                             });
                           }}
@@ -3788,6 +3796,31 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <option value={501}>501</option>
                     <option value={701}>701</option>
                   </select>
+                </div>
+                <div className="input-group">
+                  <label>{t('registration.scoringMode')}:</label>
+                  <div className="radio-group" style={{ marginBottom: 0 }}>
+                    <label>
+                      <input
+                        type="radio"
+                        name="scoringModeMgmt"
+                        value="dart"
+                        checked={tournamentSettings.defaultScoringMode !== 'turnTotal'}
+                        onChange={() => setTournamentSettings(prev => ({ ...prev, defaultScoringMode: 'dart' }))}
+                      />
+                      {t('registration.scoringModeDart')}
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="scoringModeMgmt"
+                        value="turnTotal"
+                        checked={tournamentSettings.defaultScoringMode === 'turnTotal'}
+                        onChange={() => setTournamentSettings(prev => ({ ...prev, defaultScoringMode: 'turnTotal' }))}
+                      />
+                      {t('registration.scoringModeTurnTotal')}
+                    </label>
+                  </div>
                 </div>
                 <div className="checkbox-group">
                   <label>

@@ -140,7 +140,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       turnHistory: [],
       matchComplete: false,
       inputMode: 'single',
-      scoringMode: 'dart', // 'dart' (dart-by-dart) | 'turnTotal' (enter 3-dart total)
+      // 'dart' (dart-by-dart) | 'turnTotal' (enter 3-dart total) — preselected
+      // from the tournament's default, still switchable on the start screen
+      scoringMode: match?.defaultScoringMode === 'turnTotal' ? 'turnTotal' : 'dart',
       showMatchStarter: false // Don't show match starter dialog by default
     };
   };
@@ -163,7 +165,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const [turnHistory, setTurnHistory] = useState(initialState?.turnHistory || []);
   const [matchComplete, setMatchComplete] = useState(initialState?.matchComplete || false);
   const [inputMode, setInputMode] = useState(initialState?.inputMode || 'single');
-  const [scoringMode, setScoringMode] = useState(initialState?.scoringMode || 'dart');
+  const [scoringMode, setScoringMode] = useState(initialState?.scoringMode || (match?.defaultScoringMode === 'turnTotal' ? 'turnTotal' : 'dart'));
   const [showMatchStarter, setShowMatchStarter] = useState(initialState?.showMatchStarter || false);
   const [isRemovingDart, setIsRemovingDart] = useState(false); // Prevent rapid clicks
   const [bustingPlayer, setBustingPlayer] = useState(null); // Track which player is busting (0 or 1)
@@ -341,19 +343,42 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         return;
       }
 
-      const { error } = await supabase
+      // Guarded, monotonic write: on flaky connections several PATCHes are in
+      // flight at once (turn sync, leg-completion sync, new-leg sync, 30s
+      // safety net, queued retries) and HTTP gives no ordering guarantee —
+      // whichever landed last used to win, so the row could end up with a
+      // between-legs snapshot like "winner 501 / loser 17". The filter makes
+      // older snapshots no-ops, and completed matches are never overwritten.
+      const { data, error } = await supabase
         .from('matches')
         .update(update)
-        .eq('id', matchId);
+        .eq('id', matchId)
+        .neq('status', 'completed')
+        .or(`last_activity_at.is.null,last_activity_at.lt.${update.last_activity_at}`)
+        .select('id');
 
       if (error) {
         console.error('Error updating match to database, queueing live sync:', error);
         enqueueWrite(QUEUE_TYPES.liveSync, { matchId, update }, `live:${matchId}`);
+      } else if (!data || data.length === 0) {
+        console.log('Live sync skipped (row is newer or match completed):', matchId);
       } else {
         console.log('✅ Database sync:', matchId);
       }
     } catch (error) {
-      console.error('Error updating match to database:', error);
+      console.error('Error updating match to database, queueing live sync:', error);
+      enqueueWrite(QUEUE_TYPES.liveSync, {
+        matchId,
+        update: {
+          current_leg: matchState.currentLeg,
+          player1_current_score: matchState.legScores.player1.currentScore,
+          player2_current_score: matchState.legScores.player2.currentScore,
+          player1_legs: matchState.legScores.player1.legs,
+          player2_legs: matchState.legScores.player2.legs,
+          current_player: matchState.currentPlayer,
+          last_activity_at: new Date().toISOString()
+        }
+      }, `live:${matchId}`);
     }
   };
 
@@ -496,7 +521,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
               turnHistory: [],
               matchComplete: false,
               inputMode: 'single',
-              scoringMode: 'dart',
+              scoringMode: match?.defaultScoringMode === 'turnTotal' ? 'turnTotal' : 'dart',
               showMatchStarter: false
             };
             localStorage.setItem(`match-state-${match.id}`, JSON.stringify(matchState));
@@ -1347,6 +1372,15 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts
           }
         }));
+        // Record the bust in turn history so undo targets THIS visit — without
+        // this, undo after a "hit 0 but not on a double" bust (the 3-dart-total
+        // mode reaches this branch) silently reverted the opponent's turn.
+        setTurnHistory(prev => [...prev, {
+          player: currentPlayer,
+          turn: { ...turnData, score: 0, isBust: true, turnStartScore },
+          legScores: structuredClone(legScores),
+          leg: currentLeg
+        }]);
         // Switch to next player after bust
         setCurrentPlayer(prev => prev === 0 ? 1 : 0);
         return;
@@ -1517,12 +1551,26 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       }
       const newLegStarter = (newLegNumber % 2 === 1) ? starterBase : (1 - starterBase);
       setCurrentPlayer(newLegStarter); // Automatically set current player to leg starter
-      
-      // Sync to database when new leg starts
+
+      // Sync the new-leg state. This must be an explicit snapshot — the
+      // `legScores` closure here still holds PRE-turn scores (the winner not
+      // reset, their leg not counted), and syncing that used to race the
+      // leg-completion sync and corrupt the row on slow connections.
+      const winnerIdx = currentPlayer;
+      const newLegSyncScores = {
+        player1: {
+          legs: legScores.player1.legs + (winnerIdx === 0 ? 1 : 0),
+          currentScore: matchSettings.startingScore
+        },
+        player2: {
+          legs: legScores.player2.legs + (winnerIdx === 1 ? 1 : 0),
+          currentScore: matchSettings.startingScore
+        }
+      };
       setTimeout(() => {
         updateMatchToDatabase(match.id, {
-          currentLeg: currentLeg + 1,
-          legScores: legScores,
+          currentLeg: newLegNumber,
+          legScores: newLegSyncScores,
           currentPlayer: newLegStarter
         });
       }, 100);
@@ -1880,21 +1928,21 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     return (
       <div className="leg-starter-dialog">
         <div className="dialog-content">
-          <h2>Who starts this match?</h2>
+          <h2>{t('match.whoStarts')}</h2>
           <div className="input-mode-selector" style={{ marginTop: '0.75rem' }}>
             <button
               className={`mode-btn ${scoringMode === 'dart' ? 'active' : ''}`}
               onClick={() => setScoringMode('dart')}
               type="button"
             >
-              Dart-by-dart
+              {t('registration.scoringModeDart')}
             </button>
             <button
               className={`mode-btn ${scoringMode === 'turnTotal' ? 'active' : ''}`}
               onClick={() => setScoringMode('turnTotal')}
               type="button"
             >
-              3-dart total
+              {t('registration.scoringModeTurnTotal')}
             </button>
           </div>
           <div className="player-options">

@@ -52,6 +52,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
       2: 3
     }
   });
+  const [defaultScoringMode, setDefaultScoringMode] = useState(leagueDefaults.defaultScoringMode || 'dart');
   const [selectedPlayers, setSelectedPlayers] = useState([]);
 
   // Load league if leagueId is provided
@@ -71,6 +72,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
         if (defaults.tournamentType !== undefined) setTournamentType(defaults.tournamentType);
         if (defaults.groupSettings) setGroupSettings(prev => ({ ...prev, ...defaults.groupSettings }));
         if (defaults.standingsCriteriaOrder) setStandingsCriteriaOrder(defaults.standingsCriteriaOrder);
+        if (defaults.defaultScoringMode) setDefaultScoringMode(defaults.defaultScoringMode);
         if (defaults.playoffSettings) setPlayoffSettings(prev => ({
           ...prev,
           ...defaults.playoffSettings,
@@ -131,6 +133,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
       groupSettings: groupSettings,
       playoffSettings: playoffSettings,
       tournamentType,
+      defaultScoringMode,
       standingsCriteriaOrder: standingsCriteriaOrder,
       playoffs: null, // Playoffs will be created only when user clicks "Start Playoffs"
       leagueId: leagueId || null, // Link to league if created from league
@@ -286,6 +289,31 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
               <option value={501}>501</option>
               <option value={701}>701</option>
             </select>
+          </div>
+          <div className="input-group">
+            <label>{t('registration.scoringMode')}:</label>
+            <div className="radio-group" style={{ marginBottom: 0 }}>
+              <label>
+                <input
+                  type="radio"
+                  name="scoringModeCreate"
+                  value="dart"
+                  checked={defaultScoringMode === 'dart'}
+                  onChange={() => setDefaultScoringMode('dart')}
+                />
+                {t('registration.scoringModeDart')}
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="scoringModeCreate"
+                  value="turnTotal"
+                  checked={defaultScoringMode === 'turnTotal'}
+                  onChange={() => setDefaultScoringMode('turnTotal')}
+                />
+                {t('registration.scoringModeTurnTotal')}
+              </label>
+            </div>
           </div>
           <div className="checkbox-group">
             <label>

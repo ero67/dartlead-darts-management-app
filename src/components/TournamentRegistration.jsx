@@ -38,6 +38,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   const [tournamentSettings, setTournamentSettings] = useState({
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
+    defaultScoringMode: tournament.defaultScoringMode || 'dart',
     tournamentType: tournament.tournamentType || 'groups_with_playoffs',
     groupSettings: tournament.groupSettings || {
       type: 'groups', // 'groups' or 'playersPerGroup'
@@ -215,6 +216,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       setTournamentSettings({
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
+        defaultScoringMode: tournament.defaultScoringMode || 'dart',
         tournamentType: tournament.tournamentType || 'groups_with_playoffs',
         groupSettings: tournament.groupSettings || {
           type: 'groups',
@@ -1076,6 +1078,31 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                     <option value={501}>501</option>
                     <option value={701}>701</option>
                   </select>
+                </div>
+                <div className="input-group">
+                  <label>{t('registration.scoringMode')}:</label>
+                  <div className="radio-group" style={{ marginBottom: 0 }}>
+                    <label>
+                      <input
+                        type="radio"
+                        name="scoringModeReg"
+                        value="dart"
+                        checked={tournamentSettings.defaultScoringMode !== 'turnTotal'}
+                        onChange={() => setTournamentSettings(prev => ({ ...prev, defaultScoringMode: 'dart' }))}
+                      />
+                      {t('registration.scoringModeDart')}
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="scoringModeReg"
+                        value="turnTotal"
+                        checked={tournamentSettings.defaultScoringMode === 'turnTotal'}
+                        onChange={() => setTournamentSettings(prev => ({ ...prev, defaultScoringMode: 'turnTotal' }))}
+                      />
+                      {t('registration.scoringModeTurnTotal')}
+                    </label>
+                  </div>
                 </div>
                 <div className="checkbox-group">
                   <label>
