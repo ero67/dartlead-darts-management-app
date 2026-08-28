@@ -1,12 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, Trash2 } from 'lucide-react';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserPlus, ClipboardList, Search, Trash2 } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { tournamentService } from '../services/tournamentService';
 import { UserSearchPicker } from './UserSearchPicker';
+
+const MAX_PLAYERS = 64;
+
+const parseBulkPlayerNames = (value) => {
+  return value
+    .split(/[;\n]+/)
+    .map((name) => name.trim())
+    .filter(Boolean);
+};
 
 export function TournamentRegistration({ tournament, onBack, onDeleteTournament }) {
   const { t } = useLanguage();
@@ -15,8 +24,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   const { isAdmin } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   const canManage = isAdmin || isOwner;
-  // Ensure players is always an array
-  const players = tournament.players || [];
+  // Ensure players is always an array (memoized — bulkPreview depends on it)
+  const players = useMemo(() => tournament.players || [], [tournament.players]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [bulkPlayerNames, setBulkPlayerNames] = useState('');
   const [addMode, setAddMode] = useState('name'); // 'name' or 'users'
@@ -247,59 +256,66 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     }
   }, [tournament?.id, tournament?.legsToWin, tournament?.startingScore, tournament?.tournamentType, tournament?.groupSettings, tournament?.standingsCriteriaOrder, tournament?.playoffSettings]);
 
+  const singlePlayerInputRef = useRef(null);
+  const refocusAfterAddRef = useRef(false);
+
+  // The context reload after adding a player can remount this page (loading
+  // state), so refocus the quick-add input once the fresh player list lands.
+  useEffect(() => {
+    if (refocusAfterAddRef.current) {
+      refocusAfterAddRef.current = false;
+      singlePlayerInputRef.current?.focus();
+    }
+  }, [players]);
+
   const addPlayer = async () => {
     if (!newPlayerName.trim()) {
       alert(t('registration.pleaseEnterPlayerName'));
       return;
     }
 
-    if (players.length >= 64) {
+    if (players.length >= MAX_PLAYERS) {
       alert(t('registration.tournamentFull'));
       return;
     }
 
     try {
+      refocusAfterAddRef.current = true;
       await addPlayerToTournament(newPlayerName.trim());
       setNewPlayerName('');
+      // Keep focus so a manager can type the next name right away
+      singlePlayerInputRef.current?.focus();
     } catch (error) {
       console.error('Error adding player:', error);
       alert(t('registration.failedToAddPlayer'));
     }
   };
 
-  const parseBulkPlayerNames = (value) => {
-    return value
-      .split(/[;\n]+/)
-      .map((name) => name.trim())
-      .filter(Boolean);
-  };
+  // Live preview of the pasted list: which names will be added, which are
+  // skipped as duplicates (already in the tournament or repeated in the input).
+  const bulkPreview = useMemo(() => {
+    const parsed = parseBulkPlayerNames(bulkPlayerNames);
+    const existing = new Set(players.map((player) => player.name.trim().toLowerCase()));
+    const seen = new Set();
+    const fresh = [];
+    let skipped = 0;
+    for (const name of parsed) {
+      const normalized = name.toLowerCase();
+      if (existing.has(normalized) || seen.has(normalized)) {
+        skipped += 1;
+        continue;
+      }
+      seen.add(normalized);
+      fresh.push(name);
+    }
+    return { fresh, skipped };
+  }, [bulkPlayerNames, players]);
 
   const addBulkPlayers = async () => {
-    const parsedNames = parseBulkPlayerNames(bulkPlayerNames);
+    const availableSlots = Math.max(0, MAX_PLAYERS - players.length);
+    const namesToAdd = bulkPreview.fresh.slice(0, availableSlots);
 
-    if (parsedNames.length === 0) {
-      alert(t('registration.pleaseEnterPlayerName'));
-      return;
-    }
-
-    if (players.length >= 64) {
-      alert(t('registration.tournamentFull'));
-      return;
-    }
-
-    const existingNames = new Set(players.map((player) => player.name.trim().toLowerCase()));
-    const uniqueNames = parsedNames.filter((name, index) => {
-      const normalized = name.toLowerCase();
-      return !existingNames.has(normalized) && parsedNames.findIndex((item) => item.toLowerCase() === normalized) === index;
-    });
-
-    if (uniqueNames.length === 0) {
-      setBulkPlayerNames('');
-      return;
-    }
-
-    const availableSlots = Math.max(0, 64 - players.length);
-    const namesToAdd = uniqueNames.slice(0, availableSlots);
+    if (namesToAdd.length === 0) return;
 
     try {
       for (const name of namesToAdd) {
@@ -307,7 +323,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       }
       setBulkPlayerNames('');
 
-      if (namesToAdd.length < uniqueNames.length) {
+      if (namesToAdd.length < bulkPreview.fresh.length) {
         alert(t('registration.tournamentFull'));
       }
     } catch (error) {
@@ -609,76 +625,129 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
           <div className="section-header">
             <h2>
               <Users size={20} />
-              {t('registration.players')} ({players.length})
+              {t('registration.players')}
+              <span className="player-count-badge">{players.length} / {MAX_PLAYERS}</span>
             </h2>
-            {canManage && (
-              <>
-                <div className="add-mode-toggle">
-                  <button className={addMode === 'name' ? 'active' : ''} onClick={() => setAddMode('name')}>
-                    {t('userSearch.addByName')}
-                  </button>
-                  <button className={addMode === 'users' ? 'active' : ''} onClick={() => setAddMode('users')}>
-                    {t('userSearch.addFromUsers')}
-                  </button>
-                </div>
-                {addMode === 'name' ? (
-                  <>
-                    <div className="add-player-form">
-                      <input
-                        type="text"
-                        placeholder={t('registration.enterPlayerName')}
-                        value={newPlayerName}
-                        onChange={(e) => setNewPlayerName(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
-                        maxLength={50}
-                      />
-                      <button
-                        className="add-player-btn"
-                        onClick={addPlayer}
-                        disabled={!newPlayerName.trim() || players.length >= 64}
-                      >
-                        <Plus size={16} />
-                        {t('registration.addPlayer')}
-                      </button>
-                    </div>
-                    <div className="add-player-form add-player-form--bulk">
-                      <textarea
-                        placeholder={t('registration.playersBulkPlaceholder') || 'Name Surname; Name Surname; Name Surname'}
-                        value={bulkPlayerNames}
-                        onChange={(e) => setBulkPlayerNames(e.target.value)}
-                        rows={3}
-                        maxLength={1000}
-                      />
-                      <button
-                        className="add-player-btn"
-                        onClick={addBulkPlayers}
-                        disabled={!bulkPlayerNames.trim() || players.length >= 64}
-                      >
-                        <Plus size={16} />
-                        {t('registration.addPlayers') || 'Add players'}
-                      </button>
-                    </div>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                      {t('registration.playersBulkHelp') || 'Separate players with semicolons or new lines.'}
-                    </p>
-                  </>
-                ) : (
-                  <UserSearchPicker onSelect={handleAddUserFromSearch} />
-                )}
-                {tournament.tournamentType !== 'playoff_only' && (
-                  <p className="seeded-hint">
-                    <Star size={14} />
-                    {t('registration.seededHint') || 'Seeded players will be placed into different groups'}
-                    {seededPlayerIds.size > 0 && (
-                      <span className="seeded-count">
-                        {' — '}{seededPlayerIds.size} {t('registration.seeded') || 'Seeded'}
-                      </span>
-                    )}
-                  </p>
-                )}
-              </>
+            {players.length < 2 && (
+              <span className="min-players-hint">{t('registration.minPlayersHint')}</span>
             )}
           </div>
+
+          {canManage && (
+            <div className="add-players-panel">
+              <div className="add-mode-toggle">
+                <button
+                  type="button"
+                  className={addMode === 'name' ? 'active' : ''}
+                  onClick={() => setAddMode('name')}
+                >
+                  <UserPlus size={15} />
+                  {t('registration.addModeSingle')}
+                </button>
+                <button
+                  type="button"
+                  className={addMode === 'bulk' ? 'active' : ''}
+                  onClick={() => setAddMode('bulk')}
+                >
+                  <ClipboardList size={15} />
+                  {t('registration.addModeBulk')}
+                </button>
+                <button
+                  type="button"
+                  className={addMode === 'users' ? 'active' : ''}
+                  onClick={() => setAddMode('users')}
+                >
+                  <Search size={15} />
+                  {t('registration.addModeUsers')}
+                </button>
+              </div>
+
+              {addMode === 'name' && (
+                <>
+                  <div className="add-player-form">
+                    <input
+                      ref={singlePlayerInputRef}
+                      type="text"
+                      placeholder={t('registration.enterPlayerName')}
+                      value={newPlayerName}
+                      onChange={(e) => setNewPlayerName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addPlayer()}
+                      maxLength={50}
+                    />
+                    <button
+                      className="add-player-btn"
+                      onClick={addPlayer}
+                      disabled={!newPlayerName.trim() || players.length >= MAX_PLAYERS}
+                    >
+                      <Plus size={16} />
+                      {t('registration.addPlayer')}
+                    </button>
+                  </div>
+                  <p className="add-panel-hint">{t('registration.quickAddHint')}</p>
+                </>
+              )}
+
+              {addMode === 'bulk' && (
+                <>
+                  <textarea
+                    className="bulk-players-input"
+                    placeholder={t('registration.playersBulkPlaceholder')}
+                    value={bulkPlayerNames}
+                    onChange={(e) => setBulkPlayerNames(e.target.value)}
+                    rows={4}
+                    maxLength={2000}
+                  />
+                  {bulkPreview.fresh.length > 0 && (
+                    <div className="bulk-preview">
+                      {bulkPreview.fresh.map((name) => (
+                        <span key={name.toLowerCase()} className="bulk-chip">{name}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="bulk-actions">
+                    <button
+                      className="add-player-btn"
+                      onClick={addBulkPlayers}
+                      disabled={bulkPreview.fresh.length === 0 || players.length >= MAX_PLAYERS}
+                    >
+                      <Plus size={16} />
+                      {bulkPreview.fresh.length > 0
+                        ? t('registration.addNPlayers', { count: bulkPreview.fresh.length })
+                        : t('registration.addPlayers')}
+                    </button>
+                    {bulkPreview.skipped > 0 && (
+                      <span className="bulk-skipped-note">
+                        {t('registration.bulkSkipped', { count: bulkPreview.skipped })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="add-panel-hint">{t('registration.playersBulkHelp')}</p>
+                </>
+              )}
+
+              {addMode === 'users' && (
+                <>
+                  <UserSearchPicker
+                    onSelect={handleAddUserFromSearch}
+                    excludeIds={players.map((p) => p.user_id).filter(Boolean)}
+                  />
+                  <p className="add-panel-hint">{t('registration.fromUsersHint')}</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {canManage && tournament.tournamentType !== 'playoff_only' && players.length > 0 && (
+            <p className="seeded-hint">
+              <Star size={14} />
+              {t('registration.seededHint')}
+              {seededPlayerIds.size > 0 && (
+                <span className="seeded-count">
+                  {' — '}{seededPlayerIds.size} {t('registration.seeded')}
+                </span>
+              )}
+            </p>
+          )}
 
           <div className="players-list">
             {players.length === 0 ? (

@@ -48,6 +48,108 @@ function NoPlayerProfile({ onBrowseTournaments }) {
   );
 }
 
+// Hoisted to module scope on purpose: components defined inside AppContent get
+// a new identity on every render, so React remounts the whole page subtree on
+// each context update — losing input focus and local UI state (e.g. while a
+// manager is typing player names on the registration page).
+function TournamentRoute() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const {
+    tournaments,
+    currentTournament,
+    getTournament,
+    startMatch,
+    deleteTournament
+  } = useTournament();
+
+  useEffect(() => {
+    // Hydrate the full tournament (groups + matches) when:
+    //  - it isn't the current tournament yet, OR
+    //  - the current object is only a lightweight list stub (_summary).
+    const needsHydrate =
+      !currentTournament ||
+      currentTournament.id !== id ||
+      currentTournament._summary === true;
+
+    if (id && needsHydrate) {
+      // The list now holds lightweight summaries with empty groups/matches,
+      // so we must always fetch the full tournament from the DB on open
+      // (getTournament dispatches SELECT_TOURNAMENT with the complete data).
+      // Only fetch ids present in the loaded list — the list is public-read and
+      // complete, so a missing id means deleted (the effect below redirects).
+      const existsInList = tournaments.find(t => t.id === id);
+      if (existsInList) {
+        getTournament(id).catch(error => {
+          console.error('Error loading tournament:', error);
+          // If loading fails (tournament not found), redirect to tournaments list
+          navigate('/tournaments');
+        });
+      }
+      // If tournaments.length === 0, we're still loading, so wait
+    }
+  }, [id, tournaments, currentTournament, getTournament, navigate]);
+
+  // If currentTournament is null and we have tournaments loaded,
+  // it means the tournament was deleted, so redirect
+  useEffect(() => {
+    if (id && tournaments.length > 0 && !currentTournament) {
+      const tournamentExists = tournaments.find(t => t.id === id);
+      if (!tournamentExists) {
+        navigate('/tournaments');
+      }
+    }
+  }, [id, tournaments, currentTournament, navigate]);
+
+  const handleMatchStart = (match) => {
+    startMatch(match);
+    navigate(`/match/${match.id}`);
+  };
+
+  // Confirmation and error alerts live at the call sites (they have the
+  // tournament name for a localized message).
+  const handleDeleteTournament = async (tournamentId) => {
+    try {
+      await deleteTournament(tournamentId);
+    } catch (error) {
+      console.error('Error deleting tournament:', error);
+      throw error;
+    }
+  };
+
+  // Show loading state if tournament is not loaded yet, or if we only have
+  // the lightweight list stub (full groups/matches still being hydrated).
+  if (!currentTournament || currentTournament.id !== id || currentTournament._summary === true) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading tournament...</p>
+      </div>
+    );
+  }
+
+  // Show registration component if tournament is open for registration
+  if (currentTournament.status === 'open_for_registration') {
+    return (
+      <TournamentRegistration
+        tournament={currentTournament}
+        onBack={() => navigate('/tournaments')}
+        onDeleteTournament={handleDeleteTournament}
+      />
+    );
+  }
+
+  // Show management component if tournament is started
+  return (
+    <TournamentManagement
+      tournament={currentTournament}
+      onMatchStart={handleMatchStart}
+      onBack={() => navigate('/tournaments')}
+      onDeleteTournament={handleDeleteTournament}
+    />
+  );
+}
+
 function AppContent() {
   const { user, loading } = useAuth();
   const { isAdmin, isManager, canCreateTournaments } = useAdmin();
@@ -57,7 +159,6 @@ function AppContent() {
     currentMatch,
     createTournament,
     selectTournament,
-    getTournament,
     startMatch,
     completeMatch,
     deleteTournament
@@ -94,79 +195,6 @@ function AppContent() {
       selectTournament(null);
     }
   }, [location.pathname, currentTournament, selectTournament]);
-
-  // Component to handle tournament loading
-  const TournamentRoute = () => {
-    const { id } = useParams();
-    
-    useEffect(() => {
-      // Hydrate the full tournament (groups + matches) when:
-      //  - it isn't the current tournament yet, OR
-      //  - the current object is only a lightweight list stub (_summary).
-      const needsHydrate =
-        !currentTournament ||
-        currentTournament.id !== id ||
-        currentTournament._summary === true;
-
-      if (id && needsHydrate) {
-        // The list now holds lightweight summaries with empty groups/matches,
-        // so we must always fetch the full tournament from the DB on open
-        // (getTournament dispatches SELECT_TOURNAMENT with the complete data).
-        const existsInList = tournaments.find(t => t.id === id);
-        if (existsInList || tournaments.length > 0) {
-          getTournament(id).catch(error => {
-            console.error('Error loading tournament:', error);
-            // If loading fails (tournament not found), redirect to tournaments list
-            navigate('/tournaments');
-          });
-        }
-        // If tournaments.length === 0, we're still loading, so wait
-      }
-    }, [id, tournaments, currentTournament, getTournament, navigate]);
-
-    // If currentTournament is null and we have tournaments loaded, 
-    // it means the tournament was deleted, so redirect
-    useEffect(() => {
-      if (id && tournaments.length > 0 && !currentTournament) {
-        const tournamentExists = tournaments.find(t => t.id === id);
-        if (!tournamentExists) {
-          navigate('/tournaments');
-        }
-      }
-    }, [id, tournaments, currentTournament, navigate]);
-
-    // Show loading state if tournament is not loaded yet, or if we only have
-    // the lightweight list stub (full groups/matches still being hydrated).
-    if (!currentTournament || currentTournament.id !== id || currentTournament._summary === true) {
-      return (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading tournament...</p>
-        </div>
-      );
-    }
-
-    // Show registration component if tournament is open for registration
-    if (currentTournament.status === 'open_for_registration') {
-      return (
-        <TournamentRegistration
-          tournament={currentTournament}
-          onBack={() => navigate('/tournaments')}
-          onDeleteTournament={handleDeleteTournament}
-        />
-      );
-    }
-
-    // Show management component if tournament is started
-    return (
-      <TournamentManagement 
-        tournament={currentTournament} 
-        onMatchStart={handleMatchStart}
-        onBack={() => navigate('/tournaments')}
-        onDeleteTournament={handleDeleteTournament}
-      />
-    );
-  };
 
   // Component to handle league detail loading
   const LeagueDetailRoute = ({ onBack, onCreateTournament, onSelectTournament }) => {
@@ -312,11 +340,6 @@ function AppContent() {
     // empty groups/matches. Just navigate; TournamentRoute hydrates the full
     // tournament via getTournament(id).
     navigate(`/tournament/${tournament.id}`);
-  };
-
-  const handleMatchStart = (match) => {
-    startMatch(match);
-    navigate(`/match/${match.id}`);
   };
 
   const handleMatchComplete = async (matchResult) => {
