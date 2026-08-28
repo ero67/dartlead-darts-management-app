@@ -4,6 +4,7 @@ import { useLeague } from '../contexts/LeagueContext';
 import { tournamentStatusLabel } from '../utils/tournamentStatus';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdmin } from '../contexts/AdminContext';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ScorersPanel } from './ScorersPanel';
@@ -33,6 +34,7 @@ const DEFAULT_TOURNAMENT_SETTINGS = {
 export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, getLeagueRegistrations, approveLeagueRegistration, rejectLeagueRegistration, withdrawLeagueRegistration } = useLeague();
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
   const [isEditing, setIsEditing] = useState(false);
@@ -164,7 +166,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   // League registration effects
   useEffect(() => {
     if (!currentLeague?.id || !user) return;
-    const isMgr = currentLeague.createdBy === user.id ||
+    const isMgr = isAdmin || currentLeague.createdBy === user.id ||
       (currentLeague.managerIds && currentLeague.managerIds.includes(user.id));
     if (!isMgr) {
       leagueService.getMyLeagueRegistration(currentLeague.id).then(reg => setMyLeagueRegistration(reg));
@@ -182,8 +184,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     );
   }
 
+  // Admins get the manage UI everywhere — the DB already authorizes them for
+  // every league write (can_manage_league starts with is_admin()), this only
+  // stops the frontend from hiding controls that would succeed anyway.
   const isManager = user && (
-    currentLeague.createdBy === user.id || 
+    isAdmin ||
+    currentLeague.createdBy === user.id ||
     (currentLeague.managerIds && currentLeague.managerIds.includes(user.id))
   );
 
