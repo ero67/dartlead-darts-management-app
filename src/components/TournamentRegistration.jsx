@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserPlus, ClipboardList, Search, Trash2 } from 'lucide-react';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, Check, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserPlus, ClipboardList, Search, Link2, Trash2 } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -435,6 +435,25 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     }
   };
 
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyRegistrationLink = async () => {
+    const link = `${window.location.origin}/tournament/${tournament.id}`;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      // Clipboard API can be unavailable (older browsers, non-secure origins)
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2500);
+  };
+
   const handleDeleteTournament = async () => {
     if (!tournament || !canManage) return;
 
@@ -490,7 +509,10 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
         {!user && (
           <div className="self-register-section">
             <p>{t('registration.loginToRegisterHint')}</p>
-            <button className="self-register-btn" onClick={() => navigate('/login')}>
+            <button
+              className="self-register-btn"
+              onClick={() => navigate('/login', { state: { from: `/tournament/${tournament.id}` } })}
+            >
               <UserCheck size={18} />
               {t('registration.loginToRegister')}
             </button>
@@ -571,11 +593,21 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                 <UserCheck size={18} />
                 {t('registration.registrationRequests')}
               </h3>
-              {registrations.filter(r => r.status === 'pending').length > 0 && (
-                <span className="requests-count">
-                  {registrations.filter(r => r.status === 'pending').length} {t('registration.statusPending')}
-                </span>
-              )}
+              <div className="requests-header-actions">
+                {registrations.filter(r => r.status === 'pending').length > 0 && (
+                  <span className="requests-count">
+                    {registrations.filter(r => r.status === 'pending').length} {t('registration.statusPending')}
+                  </span>
+                )}
+                <button
+                  className={`copy-link-btn${linkCopied ? ' copy-link-btn--copied' : ''}`}
+                  onClick={handleCopyRegistrationLink}
+                  title={t('registration.copyLinkHint')}
+                >
+                  {linkCopied ? <Check size={15} /> : <Link2 size={15} />}
+                  {linkCopied ? t('registration.linkCopied') : t('registration.copyRegistrationLink')}
+                </button>
+              </div>
             </div>
             {registrationError && (
               <div className="registration-error">

@@ -31,6 +31,7 @@ import { NotFound } from './components/NotFound';
 import { ResetPassword } from './components/ResetPassword';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
+import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from './utils/postLoginRedirect';
 import './App.css';
 
 // Shown when a signed-in user has no player record yet (they have never been
@@ -184,6 +185,18 @@ function AppContent() {
   
   const navigate = useNavigate();
   const location = useLocation();
+
+  // After a full-page OAuth round trip (Google) the app boots at the origin,
+  // so restore the page the player was on before logging in — e.g. a shared
+  // tournament registration link.
+  useEffect(() => {
+    if (!user) return;
+    const dest = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+    if (dest) {
+      sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+      if (isSafeRedirectPath(dest)) navigate(dest);
+    }
+  }, [user, navigate]);
 
   // Clear current tournament when navigating away from tournament routes
   useEffect(() => {
@@ -424,9 +437,17 @@ function AppContent() {
       )}
 
       {/* Navigation */}
-      <Navigation 
-        currentView={location.pathname} 
-        onViewChange={(view) => navigate(view)}
+      <Navigation
+        currentView={location.pathname}
+        onViewChange={(view) => {
+          // Logging in from the nav returns the user to the page they were on
+          // (except the landing page — the dashboard is the better default).
+          if (view === '/login' && location.pathname !== '/' && location.pathname !== '/login') {
+            navigate(view, { state: { from: location.pathname + location.search } });
+          } else {
+            navigate(view);
+          }
+        }}
         tournament={currentTournament}
         isMobileOpen={isMobileNavOpen}
         onMobileClose={() => setIsMobileNavOpen(false)}

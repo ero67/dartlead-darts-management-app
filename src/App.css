@@ -6966,6 +6966,41 @@ body {
   color: var(--accent-primary);
 }
 
+.requests-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.copy-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-link-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.copy-link-btn--copied,
+.copy-link-btn--copied:hover {
+  border-color: rgba(var(--accent-success-rgb), 0.5);
+  color: var(--accent-success);
+  background: rgba(var(--accent-success-rgb), 0.1);
+}
+
 .requests-count {
   padding: 0.15rem 0.6rem;
   border-radius: 999px;

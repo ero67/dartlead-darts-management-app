@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
+import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from '../utils/postLoginRedirect';
 import logo from '../assets/logo.png';
 
 export function Auth() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLogin, setIsLogin] = useState(true);
+
+  // Where to send the user after login (set by "log in to register" links).
+  const from = isSafeRedirectPath(location.state?.from) ? location.state.from : null;
+
+  useEffect(() => {
+    if (from) sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, from);
+  }, [from]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,8 +53,13 @@ export function Auth() {
         if (error) {
           setError(error.message);
         } else {
-          // Redirect to dashboard after successful login
-          navigate('/dashboard');
+          // Return to the page the user came from (e.g. a shared tournament
+          // registration link), or the dashboard by default. Consume the
+          // stored destination here so the OAuth-restore effect in App.jsx
+          // doesn't race us with a second navigation.
+          const stored = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+          sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+          navigate(from || (isSafeRedirectPath(stored) ? stored : '/dashboard'));
         }
       } else {
         if (formData.password !== formData.confirmPassword) {
@@ -71,7 +85,7 @@ export function Auth() {
           setSuccess(t('auth.checkEmailConfirmation'));
         }
       }
-    } catch (err) {
+    } catch {
       setError(t('auth.unexpectedError'));
     } finally {
       setLoading(false);
@@ -89,7 +103,7 @@ export function Auth() {
         setError(error.message);
         setLoading(false);
       }
-    } catch (err) {
+    } catch {
       setError(t('auth.unexpectedError'));
       setLoading(false);
     }
@@ -112,7 +126,7 @@ export function Auth() {
       } else {
         setSuccess(t('auth.passwordResetEmailSent'));
       }
-    } catch (err) {
+    } catch {
       setError(t('auth.unexpectedError'));
     } finally {
       setLoading(false);
