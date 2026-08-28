@@ -167,6 +167,14 @@ body {
   flex-shrink: 0;
   transition: width 0.3s ease, min-width 0.3s ease, transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
   z-index: 1000;
+  /* Pin to the viewport on desktop — otherwise the nav stretches with long
+     pages and the user/logout section at its bottom scrolls out of reach.
+     The mobile overlay variant overrides this with position: fixed. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
 }
 
 .navigation.collapsed {
@@ -7641,6 +7649,17 @@ body {
   border-radius: 0;
   display: block;
   margin-bottom: 0;
+}
+
+/* Small check icon next to players who are linked to a real signed-up account */
+.linked-account-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent-primary);
+  margin-left: 0.35rem;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+  cursor: help;
 }
 
 .remove-player-btn {

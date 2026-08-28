@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle, RotateCcw, BadgeCheck } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { tournamentStatusLabel } from '../utils/tournamentStatus';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -1150,6 +1150,11 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       <div>
                         <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
                           {member.player?.name || t('common.unknown')}
+                          {member.player?.user_id && (
+                            <span className="linked-account-badge" title={t('common.registeredAccount')}>
+                              <BadgeCheck size={15} />
+                            </span>
+                          )}
                         </h3>
                         {member.role === 'manager' && (
                           <span className="status-badge active" style={{ fontSize: '0.75rem' }}>{t('leagues.manager')}</span>

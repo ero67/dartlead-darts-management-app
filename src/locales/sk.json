@@ -565,7 +565,8 @@
     "pts": "b.",
     "saving": "Ukladá sa...",
     "resetting": "Resetuje sa...",
-    "back": "Späť"
+    "back": "Späť",
+    "registeredAccount": "Registrovaný účet hráča"
   },
   "deviceSettings": {
     "title": "Nastavenia zariadenia",

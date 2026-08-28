@@ -565,7 +565,8 @@
     "pts": "pts",
     "saving": "Saving...",
     "resetting": "Resetting...",
-    "back": "Back"
+    "back": "Back",
+    "registeredAccount": "Registered player account"
   },
   "deviceSettings": {
     "title": "Device Settings",

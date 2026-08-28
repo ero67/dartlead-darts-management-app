@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, Check, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserPlus, ClipboardList, Search, Link2, Crown, Trash2 } from 'lucide-react';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, Check, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserPlus, ClipboardList, Search, Link2, Crown, Trash2, BadgeCheck } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -943,6 +943,11 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                       >
                         {player.name}
                       </button>
+                      {player.user_id && (
+                        <span className="linked-account-badge" title={t('common.registeredAccount')}>
+                          <BadgeCheck size={14} />
+                        </span>
+                      )}
                     </span>
                     {tournament.status === 'open_for_registration' && canManage && tournament.tournamentType !== 'playoff_only' && (
                       <button
