@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Badge, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Badge, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save, Activity, UserCheck, ClipboardList, CreditCard, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
+import { useTournament } from '../contexts/TournamentContext';
+import { useLeague } from '../contexts/LeagueContext';
+import { ScorersPanel } from './ScorersPanel';
+import { tournamentStatusLabel } from '../utils/tournamentStatus';
 
 const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
 
@@ -12,8 +17,11 @@ export function ManagerPanel() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
+  const navigate = useNavigate();
+  const { tournaments } = useTournament();
+  const { leagues } = useLeague();
+  const [activeTab, setActiveTab] = useState('overview'); // overview | requests | scorers | matches
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [tournamentsForMatch, setTournamentsForMatch] = useState([]);
   const [selectedTournamentForMatch, setSelectedTournamentForMatch] = useState('');
   const [matchesForTournament, setMatchesForTournament] = useState([]);
   const [matchSearchTerm, setMatchSearchTerm] = useState('');
@@ -22,7 +30,6 @@ export function ManagerPanel() {
   const [matchInfo, setMatchInfo] = useState(null);
   const [loadingMatch, setLoadingMatch] = useState(false);
   const [loadingMatches, setLoadingMatches] = useState(false);
-  const [loadingTournaments, setLoadingTournaments] = useState(false);
 
   const [editMode, setEditMode] = useState(false);
   const [manualResult, setManualResult] = useState({
@@ -40,25 +47,134 @@ export function ManagerPanel() {
     { value: 'cancelled', label: t('manager.cancelled') }
   ];
 
-  const loadTournamentsForMatch = async () => {
-    setLoadingTournaments(true);
-    try {
-      // Dropdown only needs id/name/status/userId -- use the lightweight summary.
-      const allTournaments = await tournamentService.getTournamentsSummary();
-      const tournaments = isAdmin
-        ? allTournaments
-        : (allTournaments || []).filter(t => user && t.userId === user.id);
-      setTournamentsForMatch(tournaments || []);
-    } catch (err) {
-      console.error('Error loading tournaments:', err);
-      setMessage({
-        type: 'error',
-        text: t('manager.failedToLoadTournaments')
+  // --- Tournaments / leagues this user manages (admins see everything) ---
+  const myTournaments = useMemo(() => (
+    isAdmin ? tournaments : tournaments.filter(tr => user && tr.userId === user.id)
+  ), [tournaments, isAdmin, user]);
+
+  const myLeagues = useMemo(() => (
+    isAdmin
+      ? leagues
+      : leagues.filter(l => user && (l.createdBy === user.id || (l.managerIds || []).includes(user.id)))
+  ), [leagues, isAdmin, user]);
+
+  // --- Overview stats (counts come from the lightweight tournament summary) ---
+  const liveMatchesNow = myTournaments.reduce((sum, tr) => sum + (tr.inProgressMatches ?? 0), 0);
+  const pendingMatchesCount = myTournaments
+    .filter(tr => tr.status !== 'completed')
+    .reduce((sum, tr) => sum + (tr.pendingMatches ?? 0), 0);
+  const openTournaments = myTournaments.filter(tr => tr.status === 'open_for_registration');
+  const attentionTournaments = myTournaments.filter(tr => (
+    tr.status === 'open_for_registration' ||
+    (tr.inProgressMatches ?? 0) > 0 ||
+    (tr.status !== 'completed' && (tr.pendingMatches ?? 0) > 0)
+  ));
+
+  // --- My subscription (managers can read their own row via RLS) ---
+  const [subscription, setSubscription] = useState({ loaded: false, paidUntil: null });
+
+  useEffect(() => {
+    if (!user || isAdmin) {
+      setSubscription({ loaded: true, paidUntil: null });
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from('manager_subscriptions')
+      .select('paid_until')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) console.error('Error loading subscription:', error);
+        setSubscription({ loaded: true, paidUntil: data?.paid_until || null });
       });
+    return () => { cancelled = true; };
+  }, [user, isAdmin]);
+
+  const subscriptionState = useMemo(() => {
+    if (!subscription.paidUntil) return null;
+    const daysLeft = Math.ceil((new Date(subscription.paidUntil) - new Date()) / 86400000);
+    return {
+      date: new Date(subscription.paidUntil).toLocaleDateString(),
+      daysLeft,
+      level: daysLeft < 0 ? 'expired' : daysLeft <= 14 ? 'warn' : 'ok'
+    };
+  }, [subscription.paidUntil]);
+
+  // --- Pending registration requests across all my open tournaments ---
+  const [requests, setRequests] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [requestsError, setRequestsError] = useState('');
+  const [processingRegId, setProcessingRegId] = useState(null);
+
+  const openTournamentIds = useMemo(
+    () => openTournaments.map(tr => tr.id),
+    // openTournaments is derived from myTournaments each render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [myTournaments]
+  );
+
+  const loadRequests = useCallback(async () => {
+    if (openTournamentIds.length === 0) {
+      setRequests([]);
+      return;
+    }
+    setLoadingRequests(true);
+    setRequestsError('');
+    try {
+      const { data, error } = await supabase
+        .from('tournament_registrations')
+        .select('id, player_name, created_at, tournament_id, tournament:tournaments(name)')
+        .in('tournament_id', openTournamentIds)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (err) {
+      console.error('Error loading registration requests:', err);
+      setRequestsError(t('manager.requestsLoadFailed'));
     } finally {
-      setLoadingTournaments(false);
+      setLoadingRequests(false);
+    }
+    // t is recreated on language change; requests text is server data
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTournamentIds]);
+
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
+
+  const handleApproveRequest = async (regId) => {
+    setProcessingRegId(regId);
+    setRequestsError('');
+    try {
+      await tournamentService.approveRegistration(regId);
+      setRequests(prev => prev.filter(r => r.id !== regId));
+    } catch (err) {
+      console.error('Error approving registration:', err);
+      setRequestsError(t('manager.requestActionFailed'));
+    } finally {
+      setProcessingRegId(null);
     }
   };
+
+  const handleRejectRequest = async (regId) => {
+    setProcessingRegId(regId);
+    setRequestsError('');
+    try {
+      await tournamentService.rejectRegistration(regId);
+      setRequests(prev => prev.filter(r => r.id !== regId));
+    } catch (err) {
+      console.error('Error rejecting registration:', err);
+      setRequestsError(t('manager.requestActionFailed'));
+    } finally {
+      setProcessingRegId(null);
+    }
+  };
+
+  // --- Scorers hub ---
+  const [scorerTarget, setScorerTarget] = useState(''); // "t:<id>" or "l:<id>"
 
   const loadMatchesForTournament = async (tournamentId) => {
     if (!tournamentId) {
@@ -410,10 +526,6 @@ export function ManagerPanel() {
     });
   };
 
-  useEffect(() => {
-    loadTournamentsForMatch();
-  }, []);
-
   return (
     <div className="admin-panel-page">
       <div className="admin-panel-header">
@@ -424,7 +536,232 @@ export function ManagerPanel() {
         <p className="admin-panel-subtitle">{t('manager.subtitle')}</p>
       </div>
 
+      <div className="management-tabs manager-panel-tabs">
+        <button
+          className={activeTab === 'overview' ? 'active' : ''}
+          onClick={() => setActiveTab('overview')}
+        >
+          <Activity size={18} />
+          {t('manager.tabOverview')}
+        </button>
+        <button
+          className={activeTab === 'requests' ? 'active' : ''}
+          onClick={() => setActiveTab('requests')}
+        >
+          <UserCheck size={18} />
+          {t('manager.tabRequests')}
+          {requests.length > 0 && <span className="requests-count">{requests.length}</span>}
+        </button>
+        <button
+          className={activeTab === 'scorers' ? 'active' : ''}
+          onClick={() => setActiveTab('scorers')}
+        >
+          <ClipboardList size={18} />
+          {t('manager.tabScorers')}
+        </button>
+        <button
+          className={activeTab === 'matches' ? 'active' : ''}
+          onClick={() => setActiveTab('matches')}
+        >
+          <RotateCcw size={18} />
+          {t('manager.tabMatches')}
+        </button>
+      </div>
+
       <div className="admin-panel-content">
+        {activeTab === 'overview' && (
+          <div className="admin-section">
+            <div className="stats-grid manager-stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon active">
+                  <Activity size={24} />
+                </div>
+                <div className="stat-content">
+                  <h3>{liveMatchesNow}</h3>
+                  <p>{t('manager.overviewLiveNow')}</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <RotateCcw size={24} />
+                </div>
+                <div className="stat-content">
+                  <h3>{pendingMatchesCount}</h3>
+                  <p>{t('manager.overviewPendingMatches')}</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <UserCheck size={24} />
+                </div>
+                <div className="stat-content">
+                  <h3>{requests.length}</h3>
+                  <p>{t('manager.overviewPendingRequests')}</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon">
+                  <Badge size={24} />
+                </div>
+                <div className="stat-content">
+                  <h3>{openTournaments.length}</h3>
+                  <p>{t('manager.overviewOpenTournaments')}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="group-card manager-subscription-card">
+              <h3>
+                <CreditCard size={16} />
+                {t('manager.subscriptionTitle')}
+              </h3>
+              {!subscription.loaded ? (
+                <p className="manager-subscription-note">{t('common.loading')}</p>
+              ) : isAdmin ? (
+                <p className="manager-subscription-note">{t('manager.subscriptionAdmin')}</p>
+              ) : !subscriptionState ? (
+                <p className="manager-subscription-note">{t('manager.subscriptionNone')}</p>
+              ) : (
+                <div className={`subscription-status subscription-status--${subscriptionState.level}`}>
+                  {subscriptionState.level === 'expired'
+                    ? t('manager.subscriptionExpired', { date: subscriptionState.date })
+                    : t('manager.subscriptionActiveUntil', { date: subscriptionState.date })}
+                  {subscriptionState.level === 'warn' && ` — ${t('manager.subscriptionExpiresSoon')}`}
+                </div>
+              )}
+            </div>
+
+            <div className="admin-section-header" style={{ marginTop: '0.5rem' }}>
+              <Activity size={20} />
+              <h2>{t('manager.overviewActiveTitle')}</h2>
+            </div>
+            {attentionTournaments.length === 0 ? (
+              <p className="admin-section-description">{t('manager.overviewNothingActive')}</p>
+            ) : (
+              <div className="manager-overview-list">
+                {attentionTournaments.map((tr) => (
+                  <div key={tr.id} className="registration-request-card">
+                    <div className="request-info">
+                      <span className="request-name">{tr.name}</span>
+                      <span className="request-date">
+                        {tournamentStatusLabel(tr.status, t)}
+                        {(tr.inProgressMatches ?? 0) > 0 && ` · ${tr.inProgressMatches} ${t('manager.overviewLiveNow').toLowerCase()}`}
+                        {tr.status !== 'open_for_registration' && (tr.pendingMatches ?? 0) > 0 && ` · ${tr.pendingMatches} ${t('manager.overviewPendingMatches').toLowerCase()}`}
+                      </span>
+                    </div>
+                    <button
+                      className="settings-btn"
+                      onClick={() => navigate(`/tournament/${tr.id}`)}
+                    >
+                      <ExternalLink size={14} />
+                      {t('manager.openTournament')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'requests' && (
+          <div className="admin-section">
+            <div className="admin-section-header">
+              <UserCheck size={20} />
+              <h2>{t('manager.requestsTitle')}</h2>
+            </div>
+            <p className="admin-section-description">{t('manager.requestsDescription')}</p>
+
+            {requestsError && (
+              <div className="admin-message error">
+                <AlertCircle size={16} />
+                <span>{requestsError}</span>
+              </div>
+            )}
+
+            {loadingRequests ? (
+              <div className="admin-loading">
+                <Loader size={16} className="spinning" />
+                <span>{t('common.loading')}</span>
+              </div>
+            ) : requests.length === 0 ? (
+              <p className="admin-section-description">{t('manager.requestsEmpty')}</p>
+            ) : (
+              <div className="manager-overview-list">
+                {requests.map((reg) => (
+                  <div key={reg.id} className="registration-request-card status-pending">
+                    <div className="request-info">
+                      <span className="request-name">{reg.player_name}</span>
+                      <span className="request-date">
+                        {reg.tournament?.name} · {new Date(reg.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="request-actions">
+                      <button
+                        className="approve-btn"
+                        onClick={() => handleApproveRequest(reg.id)}
+                        disabled={processingRegId === reg.id}
+                      >
+                        <CheckCircle size={14} /> {t('registration.approve')}
+                      </button>
+                      <button
+                        className="reject-btn"
+                        onClick={() => handleRejectRequest(reg.id)}
+                        disabled={processingRegId === reg.id}
+                      >
+                        <XCircle size={14} /> {t('registration.reject')}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'scorers' && (
+          <div className="admin-section">
+            <div className="admin-section-header">
+              <ClipboardList size={20} />
+              <h2>{t('manager.scorersHubTitle')}</h2>
+            </div>
+            <p className="admin-section-description">{t('manager.scorersHubDescription')}</p>
+
+            <div className="form-group" style={{ maxWidth: '420px', marginBottom: '1rem' }}>
+              <label htmlFor="scorerTarget">{t('manager.scorersSelectEntity')}</label>
+              <select
+                id="scorerTarget"
+                value={scorerTarget}
+                onChange={(e) => setScorerTarget(e.target.value)}
+              >
+                <option value="">{t('manager.selectTournamentPlaceholder')}</option>
+                {myTournaments.length > 0 && (
+                  <optgroup label={t('navigation.tournaments')}>
+                    {myTournaments.map((tr) => (
+                      <option key={tr.id} value={`t:${tr.id}`}>{tr.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {myLeagues.length > 0 && (
+                  <optgroup label={t('navigation.leagues')}>
+                    {myLeagues.map((l) => (
+                      <option key={l.id} value={`l:${l.id}`}>{l.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+
+            {scorerTarget && (
+              <ScorersPanel
+                key={scorerTarget}
+                type={scorerTarget.startsWith('l:') ? 'league' : 'tournament'}
+                entityId={scorerTarget.slice(2)}
+              />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'matches' && (
         <div className="admin-section">
           <div className="admin-section-header">
                     <RotateCcw size={20} />
@@ -444,12 +781,11 @@ export function ManagerPanel() {
                 id="tournamentForMatch"
                 value={selectedTournamentForMatch}
                 onChange={(e) => handleTournamentSelectForMatch(e.target.value)}
-                disabled={loadingTournaments}
               >
                 <option value="">{t('manager.selectTournamentPlaceholder')}</option>
-                {tournamentsForMatch.map((tournament) => (
+                {myTournaments.map((tournament) => (
                   <option key={tournament.id} value={tournament.id}>
-                    {tournament.name} ({tournament.status})
+                    {tournament.name} ({tournamentStatusLabel(tournament.status, t)})
                   </option>
                 ))}
               </select>
@@ -721,6 +1057,7 @@ export function ManagerPanel() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

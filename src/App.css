@@ -1826,6 +1826,78 @@ body {
   color: #ef4444;
 }
 
+/* Manager panel */
+.manager-panel-tabs {
+  margin: 0 auto 1.25rem;
+  max-width: 1200px;
+}
+
+.manager-stats-grid {
+  margin-bottom: 1.25rem;
+}
+
+.manager-subscription-card {
+  margin-bottom: 1.25rem;
+}
+
+.manager-subscription-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.6rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.manager-subscription-card h3 svg {
+  color: var(--accent-primary);
+}
+
+.manager-subscription-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.subscription-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.subscription-status--ok {
+  background: rgba(var(--accent-success-rgb), 0.12);
+  color: var(--accent-success);
+  border-color: rgba(var(--accent-success-rgb), 0.3);
+}
+
+.subscription-status--warn {
+  background: rgba(var(--accent-warning-rgb), 0.14);
+  color: var(--accent-warning);
+  border-color: rgba(var(--accent-warning-rgb), 0.3);
+}
+
+.subscription-status--expired {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.manager-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.manager-panel-tabs .requests-count {
+  margin-left: 0.35rem;
+}
+
 /* Settings-tab action buttons (save / reset / add) — sized to their label,
    unlike .action-btn which is a fixed 30px icon button */
 .settings-btn {
