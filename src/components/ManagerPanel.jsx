@@ -5,7 +5,6 @@ import { tournamentService, matchService } from '../services/tournamentService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
-import { TournamentImport } from './TournamentImport';
 
 const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
 
@@ -722,8 +721,6 @@ export function ManagerPanel() {
             )}
           </div>
         </div>
-
-        <TournamentImport />
       </div>
     </div>
   );
