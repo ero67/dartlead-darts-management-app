@@ -139,7 +139,7 @@ export function Auth() {
         <div className="auth-header">
           <img src={logo} alt="DartLead" className="auth-icon" />
           <h1>DartLead</h1>
-          <p>{t('auth.signInAsAdmin', { action: isLogin ? t('auth.in') : t('auth.up') })}</p>
+          <p>{t('auth.signInAsAdmin')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
