@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock, AlertCircle, UserCheck } from 'lucide-react';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, Trash2 } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,7 +8,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import { tournamentService } from '../services/tournamentService';
 import { UserSearchPicker } from './UserSearchPicker';
 
-export function TournamentRegistration({ tournament, onBack }) {
+export function TournamentRegistration({ tournament, onBack, onDeleteTournament }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -419,6 +419,21 @@ export function TournamentRegistration({ tournament, onBack }) {
     }
   };
 
+  const handleDeleteTournament = async () => {
+    if (!tournament || !canManage) return;
+
+    const confirmMessage = t('management.confirmDeleteTournament', { name: tournament.name });
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      await onDeleteTournament(tournament.id);
+      onBack();
+    } catch (error) {
+      console.error('Error deleting tournament:', error);
+      alert(t('management.failedToDeleteTournament'));
+    }
+  };
+
   return (
     <div className="tournament-registration">
       <div className="registration-header">
@@ -436,6 +451,16 @@ export function TournamentRegistration({ tournament, onBack }) {
             >
               <Settings size={18} />
               {t('registration.editSettings')}
+            </button>
+          )}
+          {canManage && onDeleteTournament && (
+            <button
+              className="delete-tournament-btn"
+              onClick={handleDeleteTournament}
+              title={t('management.deleteTournament')}
+            >
+              <Trash2 size={18} />
+              {t('management.deleteTournament')}
             </button>
           )}
           <div className="tournament-status">

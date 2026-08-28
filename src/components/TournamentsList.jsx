@@ -123,7 +123,13 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                   {(isAdmin || isOwner) && (
                     <button
                       className="action-btn delete"
-                      onClick={() => onDeleteTournament(tournament.id)}
+                      onClick={() => {
+                        if (window.confirm(t('management.confirmDeleteTournament', { name: tournament.name }))) {
+                          Promise.resolve(onDeleteTournament(tournament.id)).catch(() => {
+                            alert(t('management.failedToDeleteTournament'));
+                          });
+                        }
+                      }}
                       title={t('management.deleteTournament')}
                     >
                       <Trash2 size={16} />

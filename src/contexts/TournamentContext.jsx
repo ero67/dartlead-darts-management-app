@@ -815,6 +815,12 @@ export function TournamentProvider({ children }) {
   const deleteTournament = async (tournamentId) => {
     try {
       await tournamentService.deleteTournament(tournamentId);
+      // Deleting the tournament currently being viewed: drop the persisted
+      // session id so the next page load doesn't try (and fail, noisily) to
+      // hydrate a deleted tournament.
+      if (stateRef.current?.currentTournament?.id === tournamentId) {
+        saveSessionIds(null, null);
+      }
       dispatch({ type: ACTIONS.DELETE_TOURNAMENT, payload: tournamentId });
     } catch (error) {
       console.error('Error deleting tournament:', error);

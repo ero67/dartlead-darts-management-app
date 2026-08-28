@@ -149,9 +149,10 @@ function AppContent() {
     // Show registration component if tournament is open for registration
     if (currentTournament.status === 'open_for_registration') {
       return (
-        <TournamentRegistration 
-          tournament={currentTournament} 
+        <TournamentRegistration
+          tournament={currentTournament}
           onBack={() => navigate('/tournaments')}
+          onDeleteTournament={handleDeleteTournament}
         />
       );
     }
@@ -337,14 +338,15 @@ function AppContent() {
     }
   };
 
+  // Confirmation and error alerts live at the call sites (they have the
+  // tournament name for a localized message) — confirming here too produced
+  // stacked double dialogs.
   const handleDeleteTournament = async (tournamentId) => {
-    if (window.confirm('Are you sure you want to delete this tournament? This action cannot be undone.')) {
-      try {
-        await deleteTournament(tournamentId);
-      } catch (error) {
-        console.error('Error deleting tournament:', error);
-        alert('Failed to delete tournament. Please check the console for details. Make sure the "deleted" column exists in the database.');
-      }
+    try {
+      await deleteTournament(tournamentId);
+    } catch (error) {
+      console.error('Error deleting tournament:', error);
+      throw error;
     }
   };
 
