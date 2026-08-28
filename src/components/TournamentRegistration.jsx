@@ -29,7 +29,9 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   const players = useMemo(() => tournament.players || [], [tournament.players]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [bulkPlayerNames, setBulkPlayerNames] = useState('');
-  const [addMode, setAddMode] = useState('name'); // 'name' or 'users'
+  // 'name' | 'bulk' | 'users' | 'league' — league tournaments default to
+  // picking players from the league pool.
+  const [addMode, setAddMode] = useState(tournament?.leagueId ? 'league' : 'name');
   const [showEditSettings, setShowEditSettings] = useState(false);
   const [showGroupsPreview, setShowGroupsPreview] = useState(false);
   const [draftGroups, setDraftGroups] = useState([]);

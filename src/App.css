@@ -7054,6 +7054,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
   margin-bottom: 0.75rem;
 }
 
@@ -8610,13 +8611,17 @@ body {
     align-items: stretch;
   }
 
+  /* 3-4 tabs don't fit one row on a phone — wrap into a 2-column grid */
   .add-mode-toggle {
     width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .add-mode-toggle button {
-    flex: 1;
-    padding: 0.45rem 0.5rem;
+    justify-content: center;
+    padding: 0.5rem 0.4rem;
+    white-space: normal;
   }
 
   .add-players-panel {
