@@ -1755,15 +1755,15 @@ body {
 .scoring-rules-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
 }
 
 .scoring-rule-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.85rem;
   background: var(--bg-secondary);
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -1773,6 +1773,7 @@ body {
 .scoring-rule-label {
   flex: 1;
   min-width: 0;
+  font-size: 0.9rem;
   color: var(--text-primary);
   overflow-wrap: break-word;
 }
@@ -1785,25 +1786,108 @@ body {
 }
 
 .scoring-rule-input {
-  width: 90px;
-  min-width: 90px;
-  padding: 0.5rem;
+  width: 72px;
+  min-width: 72px;
+  padding: 0.4rem;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--input-bg);
   color: var(--text-primary);
   text-align: center;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 
 .scoring-rule-remove {
-  padding: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   background: transparent;
   border: none;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.scoring-rule-remove:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+/* Settings-tab action buttons (save / reset / add) — sized to their label,
+   unlike .action-btn which is a fixed 30px icon button */
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-btn:hover:not(:disabled) {
+  border-color: var(--border-color-dark);
+}
+
+.settings-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.settings-btn--primary {
+  background: var(--accent-primary);
+  border-color: transparent;
+  color: white;
+}
+
+.settings-btn--primary:hover:not(:disabled) {
+  opacity: 0.9;
+  border-color: transparent;
+}
+
+.settings-btn--danger {
+  background: transparent;
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+}
+
+.settings-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+/* Header row of a settings card: title left, actions right, wraps on mobile */
+.settings-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.settings-card-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.settings-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .round-points-row {
@@ -4866,7 +4950,7 @@ body {
 }
 
 .checkbox-group {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .checkbox-group label {
@@ -4874,6 +4958,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
+  font-size: 0.9rem;
   color: var(--text-primary);
   cursor: pointer;
   transition: color 0.3s ease;
@@ -4888,8 +4973,8 @@ body {
 
 .playoff-options {
   border-top: 1px solid var(--border-color);
-  padding-top: 1rem;
-  margin-top: 1rem;
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
   transition: border-color 0.3s ease;
 }
 
@@ -7734,7 +7819,7 @@ body {
 }
 
 .modal-content {
-  padding: 1.5rem;
+  padding: 1.25rem 1.35rem;
   color: var(--text-primary);
   transition: color 0.3s ease;
   display: block;
@@ -7825,23 +7910,35 @@ body {
 }
 
 .modal-content p {
-  margin: 0 0 1.5rem 0;
-  color: #6b7280;
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
 }
 
+/* Settings sections render as compact cards inside modals / settings tabs */
 .group-settings {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
 }
 
 .group-settings h4 {
   color: var(--text-primary);
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0 0 1rem 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin: 0 0 0.85rem 0;
   transition: color 0.3s ease;
 }
 
+/* Per-round legs: a grid of small labeled selects instead of 5 full rows */
 .playoff-legs-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.5rem 0.75rem;
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border-color);
@@ -7849,49 +7946,84 @@ body {
 }
 
 .playoff-legs-settings h5 {
+  grid-column: 1 / -1;
   color: var(--text-primary);
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0 0 1rem 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin: 0;
   transition: color 0.3s ease;
+}
+
+.playoff-legs-settings .input-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  margin-bottom: 0;
+}
+
+.playoff-legs-settings .input-group label {
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.playoff-legs-settings .input-group select {
+  min-width: 0;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  /* reset the row-context flex-basis cap — in this column layout it would
+     become a 280px HEIGHT */
+  flex: 0 0 auto;
 }
 
 /* Radio section: a heading label + radio-group beneath it (not inside input-group) */
 .radio-section {
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .radio-section-label {
   display: block;
   color: var(--text-primary);
   font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
   transition: color 0.3s ease;
 }
 
 .radio-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 0.4rem 1.25rem;
+  margin-bottom: 0.75rem;
 }
 
 .radio-group label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   cursor: pointer;
   font-weight: 500;
+  font-size: 0.9rem;
   color: var(--text-primary);
   transition: color 0.3s ease;
+}
+
+.radio-group input[type="radio"] {
+  accent-color: var(--accent-primary);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .input-group {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
 }
 
 .input-group:last-child {
@@ -7901,14 +8033,14 @@ body {
 .input-group label {
   color: var(--text-primary);
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   min-width: 120px;
   transition: color 0.3s ease;
 }
 
 .input-group input,
 .input-group select {
-  padding: 0.75rem;
+  padding: 0.5rem 0.65rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 0.875rem;
@@ -7920,12 +8052,14 @@ body {
 }
 
 .input-group input {
-  width: 100px;
-  flex: 0 0 100px;
+  width: 90px;
+  flex: 0 0 90px;
 }
 
 .input-group select {
-  min-width: 150px;
+  min-width: 140px;
+  /* cap so a lone select doesn't stretch across the whole card */
+  flex: 0 1 280px;
 }
 
 .input-group input:hover,
@@ -9593,11 +9727,12 @@ body {
 .criteria-order-item {
   display: flex;
   align-items: center;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.7rem;
+  margin-bottom: 0.35rem;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 8px;
   background-color: var(--card-bg);
+  font-size: 0.9rem;
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -9629,15 +9764,15 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  min-height: 40px;
-  padding: 0.5rem 0.75rem;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0.25rem;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 6px;
   background-color: var(--card-bg);
   cursor: pointer;
   transition: all 0.2s ease;
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .move-btn:hover:not(.disabled) {

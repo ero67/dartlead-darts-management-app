@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle, RotateCcw } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { tournamentStatusLabel } from '../utils/tournamentStatus';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -1196,15 +1196,14 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
 
             {/* Scoring Rules Editor */}
             <div className="group-card" style={{ marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ color: 'var(--text-primary)', margin: 0 }}>{t('leagues.scoringRules')}</h3>
-                <button 
-                  className="create-tournament-btn"
+              <div className="settings-card-header">
+                <h3>{t('leagues.scoringRules')}</h3>
+                <button
+                  className="settings-btn settings-btn--primary"
                   onClick={handleSaveScoringRules}
                   disabled={isSavingScoring}
-                  style={{ padding: '0.5rem 1rem' }}
                 >
-                  <Save size={16} />
+                  <Save size={15} />
                   {isSavingScoring ? t('common.saving') : t('leagues.saveChanges')}
                 </button>
               </div>
@@ -1350,12 +1349,11 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       }}
                     />
                   </div>
-                  <button 
-                    className="action-btn play"
+                  <button
+                    className="settings-btn settings-btn--primary"
                     onClick={handleAddPlacement}
-                    style={{ padding: '0.5rem 1rem' }}
                   >
-                    <Plus size={16} />
+                    <Plus size={15} />
                     {t('common.add')}
                   </button>
                 </div>
@@ -1367,26 +1365,25 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
             
             {/* Default Tournament Settings Editor */}
             <div className="group-card" style={{ marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h3 style={{ color: 'var(--text-primary)', margin: 0 }}>{t('leagues.defaultTournamentSettings')}</h3>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className="settings-card-header">
+                <h3>{t('leagues.defaultTournamentSettings')}</h3>
+                <div className="settings-card-actions">
                   <button
-                    className="action-btn delete"
+                    className="settings-btn settings-btn--danger"
                     onClick={handleResetTournamentDefaults}
-                    style={{ padding: '0.5rem 1rem' }}
                   >
+                    <RotateCcw size={15} />
                     {t('leagues.resetDefaults')}
                   </button>
                   <button
-                    className="create-tournament-btn"
+                    className="settings-btn settings-btn--primary"
                     onClick={handleSaveTournamentDefaults}
                     disabled={isSavingDefaults}
-                    style={{ padding: '0.5rem 1rem' }}
                   >
-                    <Save size={16} />
+                    <Save size={15} />
                     {isSavingDefaults ? t('common.saving') : t('leagues.saveChanges')}
                   </button>
-              </div>
+                </div>
               </div>
 
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>

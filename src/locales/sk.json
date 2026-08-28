@@ -790,7 +790,7 @@
     "defaultStartingRoundPlayers": "Predvolené Štartovacie Kolo",
     "defaultsSaved": "Predvolené nastavenia turnajov boli úspešne uložené!",
     "defaultsSaveFailed": "Nepodarilo sa uložiť predvolené nastavenia turnajov",
-    "resetDefaults": "Resetovať na Predvolené",
+    "resetDefaults": "Obnoviť predvolené",
     "noDefaultsSet": "Zatiaľ nie sú nakonfigurované žiadne predvolené nastavenia turnajov. Nakonfigurujte predvolené hodnoty nižšie, aby turnaje v tejto lige začínali s predvyplnenými nastaveniami.",
     "defaultSeedingMethod": "Predvolená Metóda Nasadenia",
     "roundPointsTitle": "Body podľa kola playoff",
