@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Trophy, ArrowLeft, ChevronUp, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Trophy, ArrowLeft, ChevronUp, ChevronDown, Check, Plus, Users } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLocation } from 'react-router-dom';
@@ -80,15 +80,40 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
           }
         }));
       }
-      // Auto-select active league members
-      if (currentLeague.members) {
-        const activeMembers = currentLeague.members
-          .filter(m => m.isActive)
-          .map(m => m.player);
-        setSelectedPlayers(activeMembers);
-      }
+      // Players are NOT auto-selected — the manager picks who is coming
+      // from the league pool below.
     }
   }, [currentLeague, leagueId]);
+
+  // Active league members, alphabetical — the pool to pick attendees from.
+  const leaguePlayerPool = useMemo(() => {
+    if (!leagueId || !currentLeague || currentLeague.id !== leagueId) return [];
+    return (currentLeague.members || [])
+      .filter(m => m.isActive && m.player)
+      .map(m => m.player)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [currentLeague, leagueId]);
+
+  const [playerFilter, setPlayerFilter] = useState('');
+
+  const visiblePoolPlayers = useMemo(() => {
+    const query = playerFilter.trim().toLowerCase();
+    if (!query) return leaguePlayerPool;
+    return leaguePlayerPool.filter(p => p.name.toLowerCase().includes(query));
+  }, [leaguePlayerPool, playerFilter]);
+
+  const selectedPlayerIds = useMemo(
+    () => new Set(selectedPlayers.map(p => p.id)),
+    [selectedPlayers]
+  );
+
+  const togglePlayerSelection = (player) => {
+    setSelectedPlayers(prev => (
+      prev.some(p => p.id === player.id)
+        ? prev.filter(p => p.id !== player.id)
+        : [...prev, player]
+    ));
+  };
 
   const createTournament = () => {
     if (!tournamentName.trim()) {
@@ -169,6 +194,67 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
             maxLength={50}
           />
         </div>
+
+        {leaguePlayerPool.length > 0 && (
+          <div className="form-section">
+            <h3>
+              <Users size={18} />
+              {t('tournaments.leaguePlayersTitle')}
+            </h3>
+            <p className="settings-description">
+              {t('tournaments.leaguePlayersHint')}
+            </p>
+            <div className="league-players-controls">
+              <span className="league-players-count">
+                {t('tournaments.selectedCount', { selected: selectedPlayers.length, total: leaguePlayerPool.length })}
+              </span>
+              <button
+                type="button"
+                className="league-players-action"
+                onClick={() => setSelectedPlayers([...leaguePlayerPool])}
+                disabled={selectedPlayers.length === leaguePlayerPool.length}
+              >
+                {t('tournaments.selectAllPlayers')}
+              </button>
+              <button
+                type="button"
+                className="league-players-action"
+                onClick={() => setSelectedPlayers([])}
+                disabled={selectedPlayers.length === 0}
+              >
+                {t('tournaments.clearSelection')}
+              </button>
+            </div>
+            {leaguePlayerPool.length > 12 && (
+              <input
+                type="text"
+                className="league-players-filter"
+                placeholder={t('tournaments.filterPlayers')}
+                value={playerFilter}
+                onChange={(e) => setPlayerFilter(e.target.value)}
+              />
+            )}
+            <div className="league-players-grid">
+              {visiblePoolPlayers.map(player => {
+                const isSelected = selectedPlayerIds.has(player.id);
+                return (
+                  <button
+                    key={player.id}
+                    type="button"
+                    className={`league-player-chip${isSelected ? ' league-player-chip--selected' : ''}`}
+                    onClick={() => togglePlayerSelection(player)}
+                  >
+                    {isSelected ? <Check size={14} /> : <Plus size={14} />}
+                    {player.name}
+                  </button>
+                );
+              })}
+              {visiblePoolPlayers.length === 0 && (
+                <span className="league-players-empty">{t('tournaments.noPlayersMatchFilter')}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="form-section">
           <h3>{t('registration.matchSettings')}</h3>

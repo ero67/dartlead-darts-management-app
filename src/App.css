@@ -1314,6 +1314,108 @@ body {
   transition: color 0.3s ease;
 }
 
+/* League player picker (tournament creation from a league) */
+.form-section h3 svg {
+  vertical-align: -0.15em;
+  margin-right: 0.35rem;
+  color: var(--accent-primary);
+}
+
+.league-players-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.league-players-count {
+  padding: 0.15rem 0.6rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.league-players-action {
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.league-players-action:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.league-players-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.league-players-filter {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.league-players-filter:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.league-players-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.league-player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.league-player-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.league-player-chip--selected {
+  background: rgba(var(--accent-primary-rgb), 0.12);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.league-players-empty {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
 .form-section label {
   font-weight: 600;
   color: var(--text-primary);
