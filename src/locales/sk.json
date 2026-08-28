@@ -795,7 +795,12 @@
     "statVs": "vs",
     "statIn": "v",
     "statDarts": "šípok",
-    "youAreMember": "Ste členom tejto ligy"
+    "youAreMember": "Ste členom tejto ligy",
+    "loadingLeagues": "Načítavajú sa ligy...",
+    "noLeaguesFound": "Nenašli sa žiadne ligy",
+    "createFirstLeagueHint": "Vytvorte svoju prvú ligu na organizovanie turnajov a sledovanie poradia hráčov.",
+    "viewLeague": "Zobraziť Ligu",
+    "createLeague": "Vytvoriť Ligu"
   },
   "playerProfile": {
     "title": "Profil hráča",

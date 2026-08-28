@@ -40,7 +40,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading leagues...</p>
+        <p>{t('leagues.loadingLeagues')}</p>
       </div>
     );
   }
@@ -48,11 +48,11 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
   return (
     <div className="tournaments-list">
       <div className="list-header">
-        <h1>Leagues</h1>
+        <h1>{t('leagues.title')}</h1>
         {user && canCreateTournaments && (
           <button className="create-tournament-btn" onClick={onCreateLeague}>
             <Plus size={20} />
-            Create League
+            {t('leagues.createLeague')}
           </button>
         )}
       </div>
@@ -97,12 +97,12 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
       {filteredLeagues.length === 0 ? (
         <div className="empty-state">
           <Trophy size={48} />
-          <h3>No leagues found</h3>
-          <p>Create your first league to organize tournaments and track player standings.</p>
+          <h3>{t('leagues.noLeaguesFound')}</h3>
+          <p>{t('leagues.createFirstLeagueHint')}</p>
           {user && canCreateTournaments && (
             <button className="create-first-btn" onClick={onCreateLeague}>
               <Plus size={20} />
-              Create League
+              {t('leagues.createLeague')}
             </button>
           )}
         </div>
@@ -148,7 +148,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
                     handleSelectLeague(league);
                   }}
                 >
-                  View League
+                  {t('leagues.viewLeague')}
                 </button>
               </div>
             </div>

@@ -795,7 +795,12 @@
     "statVs": "vs",
     "statIn": "in",
     "statDarts": "darts",
-    "youAreMember": "You are a member of this league"
+    "youAreMember": "You are a member of this league",
+    "loadingLeagues": "Loading leagues...",
+    "noLeaguesFound": "No leagues found",
+    "createFirstLeagueHint": "Create your first league to organize tournaments and track player standings.",
+    "viewLeague": "View League",
+    "createLeague": "Create League"
   },
   "playerProfile": {
     "title": "Player Profile",

@@ -3028,6 +3028,7 @@ body {
 /* Authentication */
 .auth-container {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3293,6 +3294,96 @@ body {
   margin-top: 2rem;
   padding-top: 2rem;
   border-top: 1px solid #e5e7eb;
+}
+
+/* Compact login on phones — the whole card should fit one viewport without
+   scrolling. Inputs stay at 16px so iOS doesn't zoom the page on focus. */
+@media (max-width: 600px) {
+  .auth-container {
+    padding: 0.75rem;
+    /* Don't force viewport height — the app's mobile top bar sits above this
+       container, so 100dvh here guarantees a scrollbar. Let the card size it. */
+    min-height: 0;
+    align-items: flex-start;
+  }
+
+  .auth-card {
+    padding: 1.25rem 1.25rem;
+    border-radius: 16px;
+  }
+
+  .auth-header {
+    margin-bottom: 1.1rem;
+  }
+
+  .auth-icon {
+    width: 42px;
+    height: 42px;
+    margin-bottom: 0.5rem;
+  }
+
+  .auth-header h1 {
+    font-size: 1.45rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .auth-header p {
+    font-size: 0.85rem;
+  }
+
+  .auth-form {
+    gap: 0.75rem;
+  }
+
+  .form-group {
+    gap: 0.3rem;
+  }
+
+  .input-wrapper input {
+    padding: 0.7rem 0.9rem 0.7rem 2.7rem;
+    border-radius: 10px;
+    font-size: 16px;
+  }
+
+  .input-icon {
+    left: 0.8rem;
+    width: 18px;
+    height: 18px;
+  }
+
+  .auth-button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    margin-top: 0.25rem;
+  }
+
+  .forgot-password {
+    margin-top: 0;
+    font-size: 0.85rem;
+  }
+
+  .auth-divider {
+    margin: 0.7rem 0 0.5rem;
+  }
+
+  .google-button {
+    padding: 0.65rem 1rem;
+  }
+
+  .google-icon {
+    width: 22px;
+    height: 22px;
+    font-size: 0.8rem;
+  }
+
+  .auth-footer {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+  }
+
+  .auth-footer p {
+    font-size: 0.85rem;
+  }
 }
 
 .auth-footer p {
