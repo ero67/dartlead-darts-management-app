@@ -122,12 +122,27 @@ function tournamentReducer(state, action) {
         currentMatch: action.payload ? state.currentMatch : null
       };
 
-    case ACTIONS.START_MATCH:
+    case ACTIONS.START_MATCH: {
       saveSessionIds(state.currentTournament?.id || null, action.payload?.id || null);
+      // Optimistically mark the match in_progress in the cached tournament.
+      // Without this, backing out of the match view mid-match rendered the
+      // stale 'pending' card (no continue button) until the next refetch.
+      const startedMatchId = action.payload?.id;
+      let currentTournament = state.currentTournament;
+      if (currentTournament && startedMatchId) {
+        const bump = (m) => (m.id === startedMatchId && m.status === 'pending' ? { ...m, status: 'in_progress' } : m);
+        currentTournament = {
+          ...currentTournament,
+          groups: (currentTournament.groups || []).map(g => ({ ...g, matches: (g.matches || []).map(bump) })),
+          playoffMatches: (currentTournament.playoffMatches || []).map(bump)
+        };
+      }
       return {
         ...state,
+        currentTournament,
         currentMatch: action.payload
       };
+    }
 
     case ACTIONS.COMPLETE_MATCH: {
       if (!state.currentTournament) {

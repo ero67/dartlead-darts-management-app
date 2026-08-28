@@ -359,19 +359,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const playoffMatch = tournament?.playoffMatches?.find(m => m.id === matchId);
     const match = groupMatch || playoffMatch;
     
-    if (match?.status === 'completed' || match?.status === 'pending') {
-      // If match was reset to pending, also clean up any stale localStorage
-      if (match?.status === 'pending') {
-        localStorage.removeItem(`match-state-${matchId}`);
-      }
+    if (match?.status === 'completed') {
       return false;
     }
-    
+    // NOTE: a 'pending' status must NOT short-circuit here, and must never
+    // delete the saved state — the cached tournament can be stale (the scorer
+    // started the match and came back before any refetch), and deleting from
+    // this render path destroyed their in-progress match. Real progress in
+    // localStorage wins below; a truly fresh pending match has none.
+
     // Then check if it's in the live matches context
     if (isMatchLive(matchId)) {
       return true;
     }
-    
+
     // If not in live context, check if it exists in localStorage and is not completed
     const savedState = localStorage.getItem(`match-state-${matchId}`);
     if (savedState) {
@@ -2162,6 +2163,25 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       </button>
                     ) : null
                   )}
+                  {/* Same device, match in progress here (scorer backed out of the
+                      match view) — resume from the locally saved state. This state
+                      previously rendered NO button, stranding the scorer. */}
+                  {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && user && (
+                    <button
+                      className="continue-match-btn"
+                      onClick={() => onMatchStart({
+                        ...match,
+                        tournamentId: tournament.id,
+                        groupId: match.groupId,
+                        legsToWin: match.legsToWin || tournament.legsToWin,
+                        startingScore: match.startingScore || tournament.startingScore,
+                        defaultScoringMode: tournament.defaultScoringMode
+                      })}
+                    >
+                      <Play size={16} />
+                      {t('management.continueMatch')}
+                    </button>
+                  )}
                   {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
                     isAdmin && user ? (
                       <button
@@ -3504,6 +3524,26 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             {t('management.startMatch')}
                           </button>
                         ) : null
+                      )}
+                      {/* Same device resume — see the group-match card note */}
+                      {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && user && (
+                        <button
+                          className="continue-match-btn"
+                          onClick={() => {
+                            const roundSize = getRoundSize(round);
+                            const legsToWin = getPlayoffLegsToWin(roundSize);
+                            onMatchStart({
+                              ...match,
+                              legsToWin: legsToWin,
+                              startingScore: tournament.startingScore,
+                              defaultScoringMode: tournament.defaultScoringMode,
+                              isPlayoff: true
+                            });
+                          }}
+                        >
+                          <Play size={16} />
+                          {t('management.continueMatch')}
+                        </button>
                       )}
                       {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
                         isAdmin && user ? (
