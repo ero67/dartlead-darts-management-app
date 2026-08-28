@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Target, RotateCcw, CheckCircle, Eye } from 'lucide-react';
+import { ArrowLeft, Target, RotateCcw, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -1973,45 +1973,66 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     <div className="match-interface mobile-optimized">
       {pendingCheckout !== null && (
         <div className="leg-starter-dialog checkout-modal">
-          <div className="dialog-content checkout-modal-content">
-            <h2>{t('match.checkout.title')}</h2>
-            <p style={{ marginTop: '0.5rem' }}>
-              {t('match.checkout.prompt', { total: pendingCheckout.total })}
-            </p>
+          <div className="dialog-content checkout-card">
+            <div className="checkout-card__header">
+              <span className="checkout-card__title">{t('match.checkout.title')}</span>
+              <span className="checkout-card__total">{pendingCheckout.total}</span>
+            </div>
 
-            <div className="checkout-btn-row checkout-darts-row">
-              {[1, 2, 3].map(n => (
+            <div className="checkout-card__section">
+              <span className="checkout-card__section-label">{t('match.checkout.dartsLabel')}</span>
+              <div className="checkout-darts-picker">
+                {[1, 2, 3].map(n => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`checkout-dart-option ${pendingCheckout.dartsUsed === n ? 'active' : ''}`}
+                    onClick={() => setPendingCheckout(prev => ({ ...prev, dartsUsed: n }))}
+                  >
+                    <span className="checkout-dart-option__num">{n}</span>
+                    <span className="checkout-dart-option__unit">
+                      {t(n === 1 ? 'match.checkout.dartUnitOne' : 'match.checkout.dartUnitMany')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="checkout-card__section">
+              <span className="checkout-card__section-label">{t('match.checkout.outcomeLabel')}</span>
+              <div className="checkout-outcome-picker">
                 <button
-                  key={n}
-                  className={`mode-btn checkout-darts-btn ${pendingCheckout.dartsUsed === n ? 'active' : ''}`}
-                  onClick={() => setPendingCheckout(prev => ({ ...prev, dartsUsed: n }))}
                   type="button"
+                  className={`checkout-outcome-card checkout-outcome-card--double ${pendingCheckout.finishedOnDouble ? 'active' : ''}`}
+                  onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: true }))}
                 >
-                  {t(n === 1 ? 'match.checkout.dartsUsedOne' : 'match.checkout.dartsUsedMany', { count: n })}
+                  <CheckCircle size={22} />
+                  <span className="checkout-outcome-card__title">{t('match.checkout.doubleOut')}</span>
+                  <span className="checkout-outcome-card__hint">{t('match.checkout.doubleOutHint')}</span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={`checkout-outcome-card checkout-outcome-card--bust ${!pendingCheckout.finishedOnDouble ? 'active' : ''}`}
+                  onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: false }))}
+                >
+                  <XCircle size={22} />
+                  <span className="checkout-outcome-card__title">{t('match.checkout.bust')}</span>
+                  <span className="checkout-outcome-card__hint">{t('match.checkout.bustHint')}</span>
+                </button>
+              </div>
             </div>
 
-            <div className="checkout-btn-row checkout-outcome-row">
+            <div className="checkout-card__actions">
               <button
-                className={`mode-btn checkout-outcome-btn checkout-outcome-double ${pendingCheckout.finishedOnDouble ? 'active' : ''}`}
-                onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: true }))}
                 type="button"
+                className="checkout-card__cancel"
+                onClick={() => setPendingCheckout(null)}
               >
-                {t('match.checkout.doubleOut')}
+                {t('common.cancel')}
               </button>
               <button
-                className={`mode-btn checkout-outcome-btn checkout-outcome-bust ${!pendingCheckout.finishedOnDouble ? 'active' : ''}`}
-                onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: false }))}
                 type="button"
-              >
-                {t('match.checkout.bust')}
-              </button>
-            </div>
-
-            <div className="checkout-btn-row checkout-confirm-row">
-              <button
-                className="create-tournament-btn checkout-confirm-btn"
+                className={`checkout-card__confirm ${pendingCheckout.finishedOnDouble ? '' : 'checkout-card__confirm--bust'}`}
                 onClick={() => {
                   applyTurnTotal(pendingCheckout.total, {
                     finishedOnDouble: pendingCheckout.finishedOnDouble,
@@ -2019,16 +2040,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                   });
                   setPendingCheckout(null);
                 }}
-                type="button"
               >
                 {t('match.checkout.confirm')}
-              </button>
-              <button
-                className="mode-btn checkout-cancel-btn"
-                onClick={() => setPendingCheckout(null)}
-                type="button"
-              >
-                {t('common.cancel')}
               </button>
             </div>
           </div>

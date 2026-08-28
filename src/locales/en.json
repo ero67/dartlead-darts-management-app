@@ -135,7 +135,13 @@
       "dartsUsedMany": "{{count}} darts",
       "doubleOut": "Double-out",
       "bust": "Bust",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "dartsLabel": "Darts used to finish",
+      "outcomeLabel": "How did the visit end?",
+      "doubleOutHint": "Leg won",
+      "bustHint": "No double — score goes back",
+      "dartUnitOne": "dart",
+      "dartUnitMany": "darts"
     },
     "bullup": {
       "offer": "This leg has gone long (15+ visits each).",

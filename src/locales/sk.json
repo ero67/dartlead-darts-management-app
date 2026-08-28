@@ -135,7 +135,13 @@
       "dartsUsedMany": "{{count}} šípky",
       "doubleOut": "Double-out",
       "bust": "Bust",
-      "confirm": "Potvrdiť"
+      "confirm": "Potvrdiť",
+      "dartsLabel": "Počet šípok na ukončenie",
+      "outcomeLabel": "Ako to dopadlo?",
+      "doubleOutHint": "Leg vyhraný",
+      "bustHint": "Bez doublu — skóre sa vráti",
+      "dartUnitOne": "šípka",
+      "dartUnitMany": "šípky"
     },
     "bullup": {
       "offer": "Tento leg je príliš dlhý (15+ kôl pre oboch).",
