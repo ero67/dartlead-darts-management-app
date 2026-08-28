@@ -1707,9 +1707,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       </div>
                     </div>
 
-                    {/* Prepared seeding configs (library) */}
-                    <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                      <label>{t('registration.presetLibraryLabel')}</label>
+                    {/* Prepared seeding configs (library) — NOT an .input-group:
+                        that class is a flex row for label+control pairs and its
+                        select styles would leak into the library's own selects */}
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                        {t('registration.presetLibraryLabel')}
+                      </label>
                       <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
                         {t('registration.presetLibraryDescription')}
                       </p>

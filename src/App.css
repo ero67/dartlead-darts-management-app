@@ -7970,7 +7970,7 @@ body {
   color: var(--text-secondary);
 }
 
-.playoff-legs-settings .input-group select {
+.playoff-legs-settings .input-group > select {
   min-width: 0;
   width: 100%;
   padding: 0.45rem 0.6rem;
@@ -8038,8 +8038,11 @@ body {
   transition: color 0.3s ease;
 }
 
-.input-group input,
-.input-group select {
+/* Direct children only — descendant selectors here leaked flex sizing into
+   selects of components nested inside an .input-group (e.g. the seeding
+   preset library), where flex-basis became a huge HEIGHT in column layouts */
+.input-group > input,
+.input-group > select {
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -8051,24 +8054,24 @@ body {
   flex: 1;
 }
 
-.input-group input {
+.input-group > input {
   width: 90px;
   flex: 0 0 90px;
 }
 
-.input-group select {
+.input-group > select {
   min-width: 140px;
   /* cap so a lone select doesn't stretch across the whole card */
   flex: 0 1 280px;
 }
 
-.input-group input:hover,
-.input-group select:hover {
+.input-group > input:hover,
+.input-group > select:hover {
   border-color: var(--border-color-dark);
 }
 
-.input-group input:focus,
-.input-group select:focus {
+.input-group > input:focus,
+.input-group > select:focus {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.1);
