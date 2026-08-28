@@ -1458,6 +1458,20 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                     </select>
                   </div>
                 </div>
+                <div className="checkbox-group" style={{ marginTop: '0.75rem' }}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={tournamentDefaults.groupSettings?.autoScorerAssignment === true}
+                      onChange={(e) => setTournamentDefaults({
+                        ...tournamentDefaults,
+                        groupSettings: { ...tournamentDefaults.groupSettings, autoScorerAssignment: e.target.checked }
+                      })}
+                    />
+                    {t('registration.autoScorerAssignment')}
+                  </label>
+                  <p className="add-panel-hint">{t('registration.autoScorerAssignmentHint')}</p>
+                </div>
               </div>
 
               {/* Group Settings - only for groups_with_playoffs */}

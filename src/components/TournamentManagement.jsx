@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star, Lock } from 'lucide-react';
+import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star, Lock, ClipboardList } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { BracketVisualization } from './BracketVisualization';
 import { BracketSeedingEditor } from './BracketSeedingEditor';
+import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { TournamentSummary } from './TournamentSummary';
 import { ScorersPanel } from './ScorersPanel';
 import { isValidLegDartCount } from '../utils/dartStats';
@@ -110,6 +111,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       return true;
     });
   }, [tournament?.groups]);
+
+  // Suggested scorers ("Automatic scorer assignment") — computed, not stored
+  const autoScorersEnabled = tournament?.groupSettings?.autoScorerAssignment === true;
+  const groupScorerByMatch = useMemo(
+    () => (autoScorersEnabled ? assignGroupScorers(tournament?.groups) : new Map()),
+    [autoScorersEnabled, tournament?.groups]
+  );
+  const playoffScorerByMatch = useMemo(
+    () => (autoScorersEnabled ? assignPlayoffScorers(tournament?.playoffs) : new Map()),
+    [autoScorersEnabled, tournament?.playoffs]
+  );
 
   // Fast lookup sets for current tournament scope
   const tournamentGroupIds = useMemo(() => new Set(uniqueGroups?.map(g => g.id) || []), [uniqueGroups]);
@@ -220,7 +232,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const [tournamentSettings, setTournamentSettings] = useState({
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
-    groupSettings: {
+    // Use the tournament's real group settings — a hardcoded default here
+    // silently reset type/value (and any extra flags) on every settings save.
+    groupSettings: tournament.groupSettings || {
       type: 'groups',
       value: 2
     },
@@ -277,7 +291,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       setTournamentSettings({
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
-        groupSettings: {
+        groupSettings: tournament.groupSettings || {
           type: 'groups',
           value: 2
         },
@@ -2122,6 +2136,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       <span className="player">{match.player2?.name || t('common.unknown')}</span>
                     </div>
                   )}
+                  {match.status === 'pending' && groupScorerByMatch.has(match.id) && (
+                    <div className="scorer-hint" title={t('management.suggestedScorerHint')}>
+                      <ClipboardList size={12} />
+                      {t('management.scorerLabel')}: <strong>{groupScorerByMatch.get(match.id).name}</strong>
+                    </div>
+                  )}
                   {match.status === 'pending' && !isMatchActuallyLive(match.id) && (
                     user ? (
                       <button 
@@ -3440,7 +3460,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       </div>
                       </div>
                     )}
-                    
+                    {match.status === 'pending' && match.player1 && match.player2 && playoffScorerByMatch.has(match.id) && (
+                      <div className="scorer-hint" title={t('management.suggestedScorerHint')}>
+                        <ClipboardList size={12} />
+                        {t('management.scorerLabel')}: <strong>{playoffScorerByMatch.get(match.id).name}</strong>
+                      </div>
+                    )}
+
                     <div className="match-actions">
                       {match.status === 'pending' && ((match.player1 && !match.player2) || (!match.player1 && match.player2)) && (
                         <button
@@ -3751,7 +3777,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 </div>
                 <div className="input-group">
                   <label>{t('tournaments.startingScore')}:</label>
-                  <select 
+                  <select
                     value={tournamentSettings.startingScore}
                     onChange={(e) => setTournamentSettings({
                       ...tournamentSettings,
@@ -3762,6 +3788,23 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <option value={501}>501</option>
                     <option value={701}>701</option>
                   </select>
+                </div>
+                <div className="checkbox-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={tournamentSettings.groupSettings?.autoScorerAssignment === true}
+                      onChange={(e) => setTournamentSettings({
+                        ...tournamentSettings,
+                        groupSettings: {
+                          ...tournamentSettings.groupSettings,
+                          autoScorerAssignment: e.target.checked
+                        }
+                      })}
+                    />
+                    {t('registration.autoScorerAssignment')}
+                  </label>
+                  <p className="add-panel-hint">{t('registration.autoScorerAssignmentHint')}</p>
                 </div>
               </div>
 

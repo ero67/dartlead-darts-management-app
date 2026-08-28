@@ -7651,6 +7651,35 @@ body {
   margin-bottom: 0;
 }
 
+/* Suggested scorer on pending match cards (automatic scorer assignment) */
+.scorer-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 0.25rem 0.45rem;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  width: fit-content;
+}
+
+.scorer-hint svg {
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.scorer-hint strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Hint paragraph under a settings checkbox */
+.checkbox-group .add-panel-hint {
+  margin: 0.25rem 0 0 1.6rem;
+}
+
 /* Small check icon next to players who are linked to a real signed-up account */
 .linked-account-badge {
   display: inline-flex;

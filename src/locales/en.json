@@ -293,7 +293,9 @@
     "errorWithdrawNotAllowed": "This registration can no longer be withdrawn.",
     "errorNotLoggedIn": "You must be logged in to register.",
     "errorGeneric": "Something went wrong. Please try again.",
-    "all": "All"
+    "all": "All",
+    "autoScorerAssignment": "Automatic scorer assignment",
+    "autoScorerAssignmentHint": "Every pending match shows a suggested scorer: in groups a player from the same group, in playoffs a player knocked out in the previous round."
   },
   "management": {
     "youAreManaging": "You are managing this tournament",
@@ -427,7 +429,9 @@
     "bracket": "Bracket",
     "confirmResetPlayoffs": "Are you sure you want to reset the playoffs? This will clear all playoff matches and results. Group stage data will be preserved.",
     "playoffsResetSuccess": "Playoffs have been reset. You can now start them again.",
-    "failedToResetPlayoffs": "Failed to reset playoffs. Please try again."
+    "failedToResetPlayoffs": "Failed to reset playoffs. Please try again.",
+    "scorerLabel": "Scorer",
+    "suggestedScorerHint": "Suggested scorer for this match"
   },
   "summary": {
     "tab": "Summary",

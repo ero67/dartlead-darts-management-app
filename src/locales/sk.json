@@ -293,7 +293,9 @@
     "errorRegistrationClosed": "Tento turnaj už neprijíma registrácie.",
     "errorWithdrawNotAllowed": "Túto registráciu už nie je možné zrušiť.",
     "errorNotLoggedIn": "Na registráciu musíte byť prihlásený.",
-    "errorGeneric": "Niečo sa pokazilo. Skúste to znova."
+    "errorGeneric": "Niečo sa pokazilo. Skúste to znova.",
+    "autoScorerAssignment": "Automatické priraďovanie zapisovateľov",
+    "autoScorerAssignmentHint": "Pri každom čakajúcom zápase sa zobrazí navrhnutý zapisovateľ: v skupinách hráč z rovnakej skupiny, v play-off hráč vyradený v predchádzajúcom kole."
   },
   "management": {
     "youAreManaging": "Spravujete tento turnaj",
@@ -427,7 +429,9 @@
     "bracket": "Pavúk",
     "confirmResetPlayoffs": "Naozaj chcete resetovať playoff? Tým sa vymažú všetky playoff zápasy a výsledky. Dáta skupinovej fázy zostanú zachované.",
     "playoffsResetSuccess": "Playoff bol resetovaný. Teraz ho môžete spustiť znova.",
-    "failedToResetPlayoffs": "Nepodarilo sa resetovať playoff. Skúste to prosím znova."
+    "failedToResetPlayoffs": "Nepodarilo sa resetovať playoff. Skúste to prosím znova.",
+    "scorerLabel": "Zapisuje",
+    "suggestedScorerHint": "Navrhnutý zapisovateľ tohto zápasu"
   },
   "summary": {
     "tab": "Súhrn",

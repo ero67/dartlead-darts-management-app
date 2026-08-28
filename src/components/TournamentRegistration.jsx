@@ -1065,7 +1065,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                 </div>
                 <div className="input-group">
                   <label>{t('registration.startingScore')}:</label>
-                  <select 
+                  <select
                     value={tournamentSettings.startingScore}
                     onChange={(e) => setTournamentSettings({
                       ...tournamentSettings,
@@ -1076,6 +1076,23 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                     <option value={501}>501</option>
                     <option value={701}>701</option>
                   </select>
+                </div>
+                <div className="checkbox-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={tournamentSettings.groupSettings?.autoScorerAssignment === true}
+                      onChange={(e) => setTournamentSettings({
+                        ...tournamentSettings,
+                        groupSettings: {
+                          ...tournamentSettings.groupSettings,
+                          autoScorerAssignment: e.target.checked
+                        }
+                      })}
+                    />
+                    {t('registration.autoScorerAssignment')}
+                  </label>
+                  <p className="add-panel-hint">{t('registration.autoScorerAssignmentHint')}</p>
                 </div>
               </div>
 

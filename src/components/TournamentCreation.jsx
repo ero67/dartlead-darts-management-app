@@ -287,6 +287,20 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
               <option value={701}>701</option>
             </select>
           </div>
+          <div className="checkbox-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={groupSettings.autoScorerAssignment === true}
+                onChange={(e) => setGroupSettings({
+                  ...groupSettings,
+                  autoScorerAssignment: e.target.checked
+                })}
+              />
+              {t('registration.autoScorerAssignment')}
+            </label>
+            <p className="add-panel-hint">{t('registration.autoScorerAssignmentHint')}</p>
+          </div>
         </div>
 
         <div className="form-section">
