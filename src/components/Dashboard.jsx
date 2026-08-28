@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLeague } from '../contexts/LeagueContext';
+import { tournamentStatusLabel } from '../utils/tournamentStatus';
 
 export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeague, onSelectLeague, onNavigate }) {
   const { t } = useLanguage();
@@ -152,7 +153,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
                     <div className="tournament-info">
                       <h3>{league.name}</h3>
                       <span className={`status-badge ${league.status}`}>
-                        {league.status}
+                        {tournamentStatusLabel(league.status, t)}
                       </span>
                     </div>
                   </div>
@@ -216,7 +217,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
                         <div className="tournament-info">
                           <h3>{tournament.name}</h3>
                           <span className={`status-badge ${tournament.status}`}>
-                            {tournament.status}
+                            {tournamentStatusLabel(tournament.status, t)}
                           </span>
                         </div>
                       </div>

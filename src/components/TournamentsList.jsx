@@ -4,6 +4,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLeague } from '../contexts/LeagueContext';
+import { tournamentStatusLabel } from '../utils/tournamentStatus';
 
 export function TournamentsList({ tournaments, onCreateTournament, onSelectTournament, onDeleteTournament }) {
   const { t } = useLanguage();
@@ -107,7 +108,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                     {isOwner && <span className="owner-badge">{t('tournaments.yours')}</span>}
                   </h3>
                   <span className={`status-badge ${tournament.status}`}>
-                    {tournament.status}
+                    {tournamentStatusLabel(tournament.status, t)}
                   </span>
                 </div>
                 <div className="card-actions">

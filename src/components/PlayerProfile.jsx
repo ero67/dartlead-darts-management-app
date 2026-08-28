@@ -6,19 +6,13 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { tournamentService } from '../services/tournamentService';
+import { tournamentStatusLabel as statusLabel } from '../utils/tournamentStatus';
 
 const getInitials = (name) => {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
-
-const statusLabel = (status, t) => {
-  if (status === 'open_for_registration') return t('tournaments.statusOpenForRegistration');
-  if (status === 'started') return t('tournaments.statusStarted');
-  if (status === 'completed') return t('tournaments.statusCompleted');
-  return status;
 };
 
 const placementLabel = (placement, t) => {

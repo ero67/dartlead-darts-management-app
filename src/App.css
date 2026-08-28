@@ -922,6 +922,18 @@ body {
   border-color: rgba(var(--accent-warning-rgb), 0.3);
 }
 
+/* Tournament cards get the raw DB status as a class — style it like the
+   registration page's "open" badge (amber = action needed) */
+.status-badge.open_for_registration {
+  background: rgba(var(--accent-warning-rgb), 0.14);
+  color: var(--accent-warning);
+  border-color: rgba(var(--accent-warning-rgb), 0.3);
+}
+
+.status-badge.open_for_registration::before {
+  animation: status-pulse-warn 1.8s ease-in-out infinite;
+}
+
 .tournament-stats {
   display: flex;
   flex-direction: column;

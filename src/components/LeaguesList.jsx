@@ -4,6 +4,7 @@ import { useLeague } from '../contexts/LeagueContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { tournamentStatusLabel } from '../utils/tournamentStatus';
 
 export function LeaguesList({ onCreateLeague, onSelectLeague }) {
   const { t } = useLanguage();
@@ -113,7 +114,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
                 <div className="tournament-info">
                   <h3>{league.name}</h3>
                   <span className={`status-badge ${league.status}`}>
-                    {league.status}
+                    {tournamentStatusLabel(league.status, t)}
                   </span>
                 </div>
               </div>

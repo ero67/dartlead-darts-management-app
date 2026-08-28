@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
+import { tournamentStatusLabel } from '../utils/tournamentStatus';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { leagueService } from '../services/leagueService';
@@ -537,7 +538,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <h2>{currentLeague.name}</h2>
                 <span className={`status-badge ${currentLeague.status}`}>
-                  {currentLeague.status}
+                  {tournamentStatusLabel(currentLeague.status, t)}
                 </span>
                 {isManager && (
                   <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
@@ -890,7 +891,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                         <div className="tournament-info">
                           <h3>{tournament.name}</h3>
                           <span className={`status-badge ${tournament.status}`}>
-                            {tournament.status}
+                            {tournamentStatusLabel(tournament.status, t)}
                           </span>
                         </div>
                       </div>
