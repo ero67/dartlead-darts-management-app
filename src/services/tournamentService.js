@@ -1356,6 +1356,42 @@ export const tournamentService = {
     }
   },
 
+  // Add existing players (by id) to a tournament in one batch — used by the
+  // league player picker on the registration page. Idempotent: the composite
+  // PK (tournament_id, player_id) makes duplicate rows no-ops.
+  async addExistingPlayersToTournament(tournamentId, playerIds) {
+    try {
+      if (!playerIds || playerIds.length === 0) return;
+
+      const { data: tournament, error: tournamentError } = await supabase
+        .from('tournaments')
+        .select('status')
+        .eq('id', tournamentId)
+        .eq('deleted', false)
+        .single();
+
+      if (tournamentError) throw tournamentError;
+      if (!tournament) throw new Error('Tournament not found or has been deleted');
+      if (tournament.status !== 'open_for_registration') {
+        throw new Error('Tournament is no longer accepting new players');
+      }
+
+      const rows = playerIds.map((playerId) => ({
+        tournament_id: tournamentId,
+        player_id: playerId
+      }));
+
+      const { error: tpError } = await supabase
+        .from('tournament_players')
+        .upsert(rows, { onConflict: 'tournament_id,player_id', ignoreDuplicates: true });
+
+      if (tpError) throw tpError;
+    } catch (error) {
+      console.error('Error adding players to tournament:', error);
+      throw error;
+    }
+  },
+
   // Remove player from tournament
   async removePlayerFromTournament(tournamentId, playerId) {
     try {

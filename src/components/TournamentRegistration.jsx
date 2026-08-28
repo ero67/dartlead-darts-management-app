@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, Check, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserPlus, ClipboardList, Search, Link2, Trash2 } from 'lucide-react';
+import { Plus, Users, Play, ArrowLeft, Settings, ChevronUp, ChevronDown, X, Star, Check, CheckCircle, XCircle, Clock, AlertCircle, UserCheck, UserPlus, ClipboardList, Search, Link2, Crown, Trash2 } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { tournamentService } from '../services/tournamentService';
+import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 
 const MAX_PLAYERS = 64;
@@ -435,6 +436,67 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     }
   };
 
+  // --- League player pool (for tournaments linked to a league) ---
+  const [leagueMembers, setLeagueMembers] = useState([]);
+  const [selectedLeaguePlayerIds, setSelectedLeaguePlayerIds] = useState(new Set());
+  const [leaguePlayerFilter, setLeaguePlayerFilter] = useState('');
+  const [addingLeaguePlayers, setAddingLeaguePlayers] = useState(false);
+
+  useEffect(() => {
+    if (!tournament?.leagueId || !canManage) return;
+    let cancelled = false;
+    leagueService.getMembers(tournament.leagueId)
+      .then((members) => { if (!cancelled) setLeagueMembers(members || []); })
+      .catch((error) => console.error('Error loading league members:', error));
+    return () => { cancelled = true; };
+  }, [tournament?.leagueId, canManage]);
+
+  // Active league players who are not in the tournament yet, alphabetical.
+  const leaguePlayerPool = useMemo(() => {
+    const inTournament = new Set(players.map((p) => p.id));
+    return leagueMembers
+      .filter((m) => m.isActive && m.player && !inTournament.has(m.player.id))
+      .map((m) => m.player)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [leagueMembers, players]);
+
+  const visibleLeaguePool = useMemo(() => {
+    const query = leaguePlayerFilter.trim().toLowerCase();
+    if (!query) return leaguePlayerPool;
+    return leaguePlayerPool.filter((p) => p.name.toLowerCase().includes(query));
+  }, [leaguePlayerPool, leaguePlayerFilter]);
+
+  // Only count selections that are still in the pool (someone may have been
+  // added through another mode in the meantime).
+  const selectedInPool = useMemo(() => {
+    const poolIds = new Set(leaguePlayerPool.map((p) => p.id));
+    return [...selectedLeaguePlayerIds].filter((id) => poolIds.has(id));
+  }, [leaguePlayerPool, selectedLeaguePlayerIds]);
+
+  const toggleLeaguePlayer = (playerId) => {
+    setSelectedLeaguePlayerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  };
+
+  const handleAddLeaguePlayers = async () => {
+    if (selectedInPool.length === 0) return;
+    setAddingLeaguePlayers(true);
+    try {
+      await tournamentService.addExistingPlayersToTournament(tournament.id, selectedInPool);
+      setSelectedLeaguePlayerIds(new Set());
+      await getTournament(tournament.id);
+    } catch (error) {
+      console.error('Error adding league players:', error);
+      alert(t('registration.failedToAddPlayer'));
+    } finally {
+      setAddingLeaguePlayers(false);
+    }
+  };
+
   const [linkCopied, setLinkCopied] = useState(false);
 
   const handleCopyRegistrationLink = async () => {
@@ -692,6 +754,16 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                   <Search size={15} />
                   {t('registration.addModeUsers')}
                 </button>
+                {tournament.leagueId && (
+                  <button
+                    type="button"
+                    className={addMode === 'league' ? 'active' : ''}
+                    onClick={() => setAddMode('league')}
+                  >
+                    <Crown size={15} />
+                    {t('registration.addModeLeague')}
+                  </button>
+                )}
               </div>
 
               {addMode === 'name' && (
@@ -765,6 +837,75 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                   />
                   <p className="add-panel-hint">{t('registration.fromUsersHint')}</p>
                 </>
+              )}
+
+              {addMode === 'league' && (
+                leaguePlayerPool.length === 0 ? (
+                  <p className="add-panel-hint">{t('registration.allLeaguePlayersAdded')}</p>
+                ) : (
+                  <>
+                    <div className="league-players-controls">
+                      <span className="league-players-count">
+                        {t('tournaments.selectedCount', { selected: selectedInPool.length, total: leaguePlayerPool.length })}
+                      </span>
+                      <button
+                        type="button"
+                        className="league-players-action"
+                        onClick={() => setSelectedLeaguePlayerIds(new Set(leaguePlayerPool.map((p) => p.id)))}
+                        disabled={selectedInPool.length === leaguePlayerPool.length}
+                      >
+                        {t('tournaments.selectAllPlayers')}
+                      </button>
+                      <button
+                        type="button"
+                        className="league-players-action"
+                        onClick={() => setSelectedLeaguePlayerIds(new Set())}
+                        disabled={selectedInPool.length === 0}
+                      >
+                        {t('tournaments.clearSelection')}
+                      </button>
+                    </div>
+                    {leaguePlayerPool.length > 12 && (
+                      <input
+                        type="text"
+                        className="league-players-filter"
+                        placeholder={t('tournaments.filterPlayers')}
+                        value={leaguePlayerFilter}
+                        onChange={(e) => setLeaguePlayerFilter(e.target.value)}
+                      />
+                    )}
+                    <div className="league-players-grid">
+                      {visibleLeaguePool.map((player) => {
+                        const isSelected = selectedLeaguePlayerIds.has(player.id);
+                        return (
+                          <button
+                            key={player.id}
+                            type="button"
+                            className={`league-player-chip${isSelected ? ' league-player-chip--selected' : ''}`}
+                            onClick={() => toggleLeaguePlayer(player.id)}
+                          >
+                            {isSelected ? <Check size={14} /> : <Plus size={14} />}
+                            {player.name}
+                          </button>
+                        );
+                      })}
+                      {visibleLeaguePool.length === 0 && (
+                        <span className="league-players-empty">{t('tournaments.noPlayersMatchFilter')}</span>
+                      )}
+                    </div>
+                    <button
+                      className="add-player-btn"
+                      onClick={handleAddLeaguePlayers}
+                      disabled={selectedInPool.length === 0 || addingLeaguePlayers || players.length >= MAX_PLAYERS}
+                    >
+                      <Plus size={16} />
+                      {addingLeaguePlayers
+                        ? t('common.loading')
+                        : t('registration.addSelectedPlayers', { count: selectedInPool.length })}
+                    </button>
+                    <p className="add-panel-hint">{t('registration.leaguePoolHint')}</p>
+                  </>
+                )
               )}
             </div>
           )}
