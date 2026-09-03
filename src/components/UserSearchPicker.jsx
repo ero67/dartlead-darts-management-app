@@ -11,6 +11,7 @@ export function UserSearchPicker({ onSelect, excludeIds = [] }) {
   const [showResults, setShowResults] = useState(false);
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
+  const latestQueryRef = useRef(''); // drop responses for anything but the newest query
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -35,15 +36,17 @@ export function UserSearchPicker({ onSelect, excludeIds = [] }) {
     }
 
     setShowResults(true);
+    latestQueryRef.current = value;
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
         const users = await tournamentService.searchUsers(value);
+        if (latestQueryRef.current !== value) return; // a newer search is in flight
         setResults(users.filter(u => !excludeIds.includes(u.id)));
       } catch {
-        setResults([]);
+        if (latestQueryRef.current === value) setResults([]);
       } finally {
-        setLoading(false);
+        if (latestQueryRef.current === value) setLoading(false);
       }
     }, 300);
   };
@@ -95,7 +98,9 @@ export function UserSearchPicker({ onSelect, excludeIds = [] }) {
                 )}
               </div>
               {user.role && user.role !== 'user' && (
-                <span className="role-label">{user.role}</span>
+                <span className="role-label">
+                  {user.role === 'admin' ? t('common.roleAdmin') : user.role === 'manager' ? t('common.roleManager') : user.role}
+                </span>
               )}
             </div>
           ))}

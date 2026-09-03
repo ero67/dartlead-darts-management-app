@@ -4,12 +4,18 @@ import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLeague } from '../contexts/LeagueContext';
-import { tournamentStatusLabel } from '../utils/tournamentStatus';
+import { tournamentStatusLabel, isTournamentRunning } from '../utils/tournamentStatus';
 
 export function TournamentsList({ tournaments, onCreateTournament, onSelectTournament, onDeleteTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed'
+  const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed', 'mine'
+  const filterLabels = {
+    all: t('tournaments.all'),
+    active: t('common.active'),
+    completed: t('common.completed'),
+    mine: t('tournaments.myTournaments')
+  };
   const [sortBy, setSortBy] = useState('updated'); // 'updated', 'created', 'name'
   const { isAdmin, canCreateTournaments } = useAdmin();
   const { leagues } = useLeague();
@@ -17,6 +23,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
   const filteredTournaments = tournaments.filter(tournament => {
     if (filter === 'all') return true;
     if (filter === 'mine') return user && tournament.userId && user.id === tournament.userId;
+    if (filter === 'active') return isTournamentRunning(tournament.status);
     return tournament.status === filter;
   });
 
@@ -63,7 +70,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
             className={`filter-btn ${filter === 'active' ? 'active' : ''}`}
             onClick={() => setFilter('active')}
           >
-            {t('common.active')} ({tournaments.filter(t => t.status === 'active').length})
+            {t('common.active')} ({tournaments.filter(t => isTournamentRunning(t.status)).length})
           </button>
           <button
             className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
@@ -116,7 +123,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                     <button
                       className="action-btn play"
                       onClick={() => onSelectTournament(tournament)}
-                      title="Continue Tournament"
+                      title={t('tournaments.continueTournament')}
                     >
                       <Play size={16} />
                     </button>
@@ -182,7 +189,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                   className="view-tournament-btn"
                   onClick={() => onSelectTournament(tournament)}
                 >
-                  {tournament.status === 'active' ? t('tournaments.continue') : t('tournaments.view')} {t('tournaments.tournament')}
+                  {isTournamentRunning(tournament.status) ? t('tournaments.continue') : t('tournaments.view')} {t('tournaments.tournament')}
                 </button>
                 {tournament.status === 'open_for_registration' && user && !isOwner && (
                   <span className="registration-open-badge">{t('registration.openForRegistration')}</span>
@@ -200,10 +207,10 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
           <p>
             {filter === 'all' 
               ? t('tournaments.createFirstToGetStarted')
-              : t('tournaments.noFilteredTournaments', { filter })
+              : t('tournaments.noFilteredTournaments', { filter: filterLabels[filter].toLowerCase() })
             }
           </p>
-          {filter === 'all' && user && (
+          {filter === 'all' && user && canCreateTournaments && (
             <button className="create-first-btn" onClick={onCreateTournament}>
               <Plus size={20} />
               {t('tournaments.create')}

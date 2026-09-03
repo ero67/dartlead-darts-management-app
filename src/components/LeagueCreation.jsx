@@ -24,7 +24,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
 
   const createLeague = () => {
     if (!leagueName.trim()) {
-      alert('Please enter a league name');
+      alert(t('leagues.pleaseEnterLeagueName'));
       return;
     }
 
@@ -57,47 +57,47 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
       <div className="creation-header">
         <button className="back-btn" onClick={onBack}>
           <ArrowLeft size={20} />
-          Back to Leagues
+          {t('leagues.backToLeagues')}
         </button>
         <div className="header-content">
           <Trophy className="header-icon" />
-          <h2>Create New League</h2>
+          <h2>{t('leagues.createNewLeague')}</h2>
         </div>
       </div>
 
       <div className="creation-form">
         <div className="form-section">
-          <label htmlFor="league-name">League Name *</label>
+          <label htmlFor="league-name">{t('leagues.leagueName')} *</label>
           <input
             id="league-name"
             type="text"
             value={leagueName}
             onChange={(e) => setLeagueName(e.target.value)}
-            placeholder="Enter league name"
+            placeholder={t('leagues.enterLeagueName')}
             maxLength={100}
           />
         </div>
 
         <div className="form-section">
-          <label htmlFor="league-description">Description (Optional)</label>
+          <label htmlFor="league-description">{t('leagues.descriptionOptional')}</label>
           <textarea
             id="league-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe the league..."
+            placeholder={t('leagues.describeLeague')}
             rows={3}
             maxLength={500}
           />
         </div>
 
         <div className="form-section">
-          <h3>Scoring Rules</h3>
+          <h3>{t('leagues.scoringRules')}</h3>
           <p className="settings-description" style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-            Set points awarded for each placement. Players who don't participate receive no points (neutral).
+            {t('leagues.scoringRulesCreateDescription')}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div className="input-group">
-              <label>1st Place:</label>
+              <label>{t('leagues.1stPlace')}:</label>
               <input
                 type="number"
                 min="0"
@@ -106,7 +106,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
               />
             </div>
             <div className="input-group">
-              <label>2nd Place:</label>
+              <label>{t('leagues.2ndPlace')}:</label>
               <input
                 type="number"
                 min="0"
@@ -115,7 +115,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
               />
             </div>
             <div className="input-group">
-              <label>3rd Place:</label>
+              <label>{t('leagues.3rdPlace')}:</label>
               <input
                 type="number"
                 min="0"
@@ -124,7 +124,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
               />
             </div>
             <div className="input-group">
-              <label>4th Place:</label>
+              <label>{t('leagues.4thPlace')}:</label>
               <input
                 type="number"
                 min="0"
@@ -133,7 +133,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
               />
             </div>
             <div className="input-group">
-              <label>5th Place:</label>
+              <label>{t('leagues.5thPlace')}:</label>
               <input
                 type="number"
                 min="0"
@@ -142,7 +142,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
               />
             </div>
             <div className="input-group">
-              <label>Default (6th+):</label>
+              <label>{t('leagues.defaultSixthPlus')}:</label>
               <input
                 type="number"
                 min="0"
@@ -159,7 +159,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
           disabled={!leagueName.trim()}
         >
           <Save size={20} />
-          Create League
+          {t('leagues.createLeague')}
         </button>
       </div>
     </div>

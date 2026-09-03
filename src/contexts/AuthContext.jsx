@@ -104,9 +104,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Stored under `display_name`: Supabase re-copies the Google identity
+  // (full_name, name, …) into user_metadata on every OAuth sign-in, so an
+  // edit to full_name alone would be reverted at the next login.
+  const updateDisplayName = async (displayName) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: { display_name: displayName, full_name: displayName }
+      });
+      if (error) throw error;
+      if (data?.user) setUser(data.user);
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  };
+
   const value = {
     user,
     loading,
+    updateDisplayName,
     signUp,
     signIn,
     signInWithGoogle,

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle, RotateCcw, BadgeCheck } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { tournamentStatusLabel } from '../utils/tournamentStatus';
@@ -10,6 +11,8 @@ import { UserSearchPicker } from './UserSearchPicker';
 import { ScorersPanel } from './ScorersPanel';
 import { HeadToHead } from './HeadToHead';
 import { SeedingPresetLibrary } from './SeedingPresetLibrary';
+import { DisplayNameEditor } from './DisplayNameEditor';
+import { getUserDisplayName } from '../utils/userDisplayName';
 
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
@@ -35,13 +38,21 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
-  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, getLeagueRegistrations, approveLeagueRegistration, rejectLeagueRegistration, withdrawLeagueRegistration } = useLeague();
+  const navigate = useNavigate();
+  const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, approveLeagueRegistration, rejectLeagueRegistration, withdrawLeagueRegistration } = useLeague();
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '' });
   const [newPlayerName, setNewPlayerName] = useState('');
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
   const [addMode, setAddMode] = useState('name'); // 'name' or 'users'
+  // In-flight guards — every one of these actions used to be double-clickable
+  const [isSavingLeague, setIsSavingLeague] = useState(false);
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [pendingMemberIds, setPendingMemberIds] = useState(() => new Set());
+  const [isLinking, setIsLinking] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [showNameEditor, setShowNameEditor] = useState(false);
   const [myLeagueRegistration, setMyLeagueRegistration] = useState(null);
   const [leagueRegistrations, setLeagueRegistrations] = useState([]);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -70,11 +81,27 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [leagueStats, setLeagueStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const requestedLeagueIdRef = useRef(null);
+
+  // The DB already authorizes admins for every league write; mirrored here so
+  // the manage UI is shown. Computed before the early return so effects can
+  // depend on it.
+  const isManager = !!(user && currentLeague && (
+    isAdmin ||
+    currentLeague.createdBy === user.id ||
+    (currentLeague.managerIds && currentLeague.managerIds.includes(user.id))
+  ));
 
   useEffect(() => {
-    if (leagueId && (!currentLeague || currentLeague.id !== leagueId)) {
-      selectLeague(leagueId);
-    }
+    if (!leagueId || (currentLeague && currentLeague.id === leagueId)) return;
+    // selectLeague is a fresh function on every provider render, so without
+    // this guard the (heavy) getLeague fetch fired once per render until the
+    // league arrived.
+    if (requestedLeagueIdRef.current === leagueId) return;
+    requestedLeagueIdRef.current = leagueId;
+    setLoadError(false);
+    selectLeague(leagueId).catch(() => setLoadError(true));
   }, [leagueId, currentLeague, selectLeague]);
 
   useEffect(() => {
@@ -95,13 +122,17 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         .map(([position, pts]) => ({ position: parseInt(position), points: pts }))
         .sort((a, b) => a.position - b.position);
 
+      // Show what resolvePoints actually awards when a key is missing (a
+      // missing playoffDefault falls through to default, then 0) — a made-up
+      // "1" here used to differ from the points really handed out.
+      const effectiveDefault = points.default !== undefined ? points.default : 0;
       rulesArray.push({
         position: 'playoffDefault',
-        points: points.playoffDefault !== undefined ? points.playoffDefault : 1
+        points: points.playoffDefault !== undefined ? points.playoffDefault : effectiveDefault
       });
       rulesArray.push({
         position: 'default',
-        points: points.default !== undefined ? points.default : 0
+        points: effectiveDefault
       });
 
       setScoringRules(rulesArray);
@@ -164,18 +195,33 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   }, [leagueId]);
 
   // League registration effects
+  const currentLeagueId = currentLeague?.id;
+  const userId = user?.id;
   useEffect(() => {
-    if (!currentLeague?.id || !user) return;
-    const isMgr = isAdmin || currentLeague.createdBy === user.id ||
-      (currentLeague.managerIds && currentLeague.managerIds.includes(user.id));
-    if (!isMgr) {
-      leagueService.getMyLeagueRegistration(currentLeague.id).then(reg => setMyLeagueRegistration(reg));
+    if (!currentLeagueId || !userId) return;
+    let cancelled = false;
+    if (!isManager) {
+      leagueService.getMyLeagueRegistration(currentLeagueId).then(reg => { if (!cancelled) setMyLeagueRegistration(reg); });
     } else {
-      getLeagueRegistrations(currentLeague.id).then(regs => setLeagueRegistrations(regs || []));
+      leagueService.getLeagueRegistrations(currentLeagueId)
+        .then(regs => { if (!cancelled) setLeagueRegistrations(regs || []); })
+        .catch(err => console.error('Error loading league registrations:', err));
     }
-  }, [currentLeague?.id, user]);
+    return () => { cancelled = true; };
+  }, [currentLeagueId, userId, isManager]);
 
   if (!currentLeague) {
+    if (loadError) {
+      return (
+        <div className="unauthorized-container">
+          <h2>{t('leagues.notFound')}</h2>
+          <button className="primary-btn" onClick={onBack}>
+            <ArrowLeft size={18} />
+            {t('leagues.backToLeagues')}
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
@@ -184,31 +230,46 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     );
   }
 
-  // Admins get the manage UI everywhere — the DB already authorizes them for
-  // every league write (can_manage_league starts with is_admin()), this only
-  // stops the frontend from hiding controls that would succeed anyway.
-  const isManager = user && (
-    isAdmin ||
-    currentLeague.createdBy === user.id ||
-    (currentLeague.managerIds && currentLeague.managerIds.includes(user.id))
-  );
-
   // The league member linked to my account — the real "I'm in this league",
   // as opposed to a registration that is still waiting for approval.
   const myMembership = user
     ? (currentLeague.members || []).find(m => m.player?.user_id === user.id)
     : null;
 
+  // Player names open the player's profile (same affordance as tournament views)
+  const renderPlayerLink = (player, className = '') => {
+    if (!player?.id) return <span className={className}>{player?.name || t('common.unknown')}</span>;
+    return (
+      <button
+        type="button"
+        className={`player-profile-link ${className}`}
+        onClick={(e) => { e.stopPropagation(); navigate(`/player/${player.id}`); }}
+        title={t('playerProfile.viewProfile')}
+      >
+        {player.name}
+      </button>
+    );
+  };
+
   const handleUpdateLeague = async () => {
+    if (isSavingLeague) return;
+    const name = editForm.name.trim();
+    if (!name) {
+      alert(t('leagues.leagueNameRequired'));
+      return;
+    }
+    setIsSavingLeague(true);
     try {
       await updateLeague(currentLeague.id, {
-        name: editForm.name,
-        description: editForm.description
+        name,
+        description: editForm.description.trim()
       });
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating league:', error);
       alert(t('leagues.failedToUpdateLeague'));
+    } finally {
+      setIsSavingLeague(false);
     }
   };
 
@@ -233,12 +294,19 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     return t('registration.errorGeneric');
   };
 
-  const handleSelfRegisterLeague = async () => {
-    if (!user || !currentLeague) return;
+  const handleSelfRegisterLeague = async (nameOverride) => {
+    if (!user || !currentLeague || registerLoading) return;
+    // The player name becomes public (leaderboards, brackets), so never fall
+    // back to the account email — ask for a name first.
+    const playerName = typeof nameOverride === 'string' ? nameOverride : getUserDisplayName(user);
+    if (!playerName) {
+      setShowNameEditor(true);
+      return;
+    }
+    setShowNameEditor(false);
     setRegisterLoading(true);
     setRegistrationError('');
     try {
-      const playerName = user.user_metadata?.full_name || user.email;
       const reg = await registerForLeague(currentLeague.id, playerName);
       setMyLeagueRegistration(reg);
     } catch (error) {
@@ -294,6 +362,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   };
 
   const handleAddUserFromSearch = async (selectedUser) => {
+    if (isAddingMember) return;
+    setIsAddingMember(true);
     try {
       await leagueService.addUserToLeague(currentLeague.id, selectedUser.id, selectedUser.fullName);
       // Refresh league to pick up new member
@@ -301,11 +371,14 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     } catch (error) {
       console.error('Error adding user to league:', error);
       alert(t('leagues.failedToAddPlayer'));
+    } finally {
+      setIsAddingMember(false);
     }
   };
 
   const handleAddPlayer = async () => {
-    if (!newPlayerName.trim()) return;
+    if (!newPlayerName.trim() || isAddingMember) return;
+    setIsAddingMember(true);
     try {
       await addMembers(currentLeague.id, [{ name: newPlayerName.trim() }]);
       setNewPlayerName('');
@@ -313,10 +386,28 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     } catch (error) {
       console.error('Error adding player:', error);
       alert(t('leagues.failedToAddPlayer'));
+    } finally {
+      setIsAddingMember(false);
     }
   };
 
-  const handleTogglePlayerActive = async (playerId, currentActive) => {
+  // One request per member at a time — overlapping toggles let a stale
+  // response win.
+  const withMemberPending = async (playerId, action) => {
+    if (pendingMemberIds.has(playerId)) return;
+    setPendingMemberIds(prev => new Set(prev).add(playerId));
+    try {
+      await action();
+    } finally {
+      setPendingMemberIds(prev => {
+        const next = new Set(prev);
+        next.delete(playerId);
+        return next;
+      });
+    }
+  };
+
+  const handleTogglePlayerActive = (playerId, currentActive) => withMemberPending(playerId, async () => {
     try {
       await updateMemberStatus(currentLeague.id, playerId, {
         isActive: !currentActive
@@ -325,17 +416,18 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       console.error('Error updating player status:', error);
       alert(t('leagues.failedToUpdatePlayerStatus'));
     }
-  };
+  });
 
-  const handleRemovePlayer = async (playerId) => {
-    if (window.confirm(t('leagues.confirmRemovePlayer'))) {
+  const handleRemovePlayer = (playerId) => {
+    if (!window.confirm(t('leagues.confirmRemovePlayer'))) return;
+    return withMemberPending(playerId, async () => {
       try {
         await removeMember(currentLeague.id, playerId);
       } catch (error) {
         console.error('Error removing player:', error);
         alert(t('leagues.failedToRemovePlayer'));
       }
-    }
+    });
   };
 
   const handleScoringRuleChange = (index, field, value) => {
@@ -377,7 +469,11 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     setNewPlacement({ position: '', points: '' });
   };
 
+  // The two fallback rows always exist (the scorer falls back to them), so
+  // only numbered placements can be removed.
+  const isFallbackRule = (rule) => rule.position === 'playoffDefault' || rule.position === 'default';
   const handleRemovePlacement = (index) => {
+    if (isFallbackRule(scoringRules[index])) return;
     const updated = scoringRules.filter((_, i) => i !== index);
     setScoringRules(updated);
   };
@@ -448,28 +544,45 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     }
   };
 
+  // Statistics are computed from linked tournaments, so re-fetch them lazily
+  // after anything that changes that set or the results.
+  const invalidateStats = () => {
+    setStatsLoaded(false);
+    setLeagueStats(null);
+  };
+
   const handleLinkTournament = async () => {
-    if (!selectedTournamentToLink || !currentLeague) return;
+    if (!selectedTournamentToLink || !currentLeague || isLinking) return;
+    setIsLinking(true);
     try {
       await linkTournamentToLeague(currentLeague.id, selectedTournamentToLink);
       // Refresh the league to get updated tournament list
       await selectLeague(currentLeague.id);
+      invalidateStats();
       setIsLinkingTournament(false);
       setSelectedTournamentToLink('');
       setUnlinkedTournaments([]);
     } catch (error) {
       console.error('Error linking tournament:', error);
+      alert(t('leagues.linkFailed'));
+    } finally {
+      setIsLinking(false);
     }
   };
 
-  const handleUnlinkTournament = async (tournamentId, tournamentName) => {
-    if (!window.confirm(t('leagues.confirmUnlinkTournament') || `Remove "${tournamentName}" from this league?`)) return;
+  const handleUnlinkTournament = async (tournamentId) => {
+    if (!window.confirm(t('leagues.confirmUnlinkTournament')) || isLinking) return;
+    setIsLinking(true);
     try {
       await unlinkTournamentFromLeague(currentLeague.id, tournamentId);
       // Refresh the league to get updated tournament list
       await selectLeague(currentLeague.id);
+      invalidateStats();
     } catch (error) {
       console.error('Error unlinking tournament:', error);
+      alert(t('leagues.unlinkFailed'));
+    } finally {
+      setIsLinking(false);
     }
   };
 
@@ -525,6 +638,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                 <button 
                   className="action-btn play"
                   onClick={handleUpdateLeague}
+                  disabled={isSavingLeague || !editForm.name.trim()}
                   style={{ padding: '0.5rem 1rem' }}
                 >
                   <Check size={16} />
@@ -641,19 +755,25 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               {isManager && (
                 <button 
                   className="create-tournament-btn" 
+                  disabled={isRecalculating}
                   onClick={async () => {
+                    if (isRecalculating) return;
+                    setIsRecalculating(true);
                     try {
                       await refreshLeaderboard(currentLeague.id);
+                      invalidateStats();
                       alert(t('leagues.recalculateSuccess'));
                     } catch (error) {
                       console.error('Error refreshing leaderboard:', error);
                       alert(t('leagues.recalculateFailed'));
+                    } finally {
+                      setIsRecalculating(false);
                     }
                   }}
                   title={t('leagues.recalculate')}
                 >
                   <TrendingUp size={18} />
-                  {t('leagues.recalculate')}
+                  {isRecalculating ? t('common.loading') : t('leagues.recalculate')}
                 </button>
               )}
             </div>
@@ -680,7 +800,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                           <td>
                             <span className={`lb-rank${rank <= 3 ? ` rank-${rank}` : ''}`}>{rank}</span>
                           </td>
-                          <td><span className="lb-player-name">{entry.player?.name || t('common.unknown')}</span></td>
+                          <td>{renderPlayerLink(entry.player, 'lb-player-name')}</td>
                           <td className="lb-col-form">
                             <div className="form-dots">
                               {(entry.last5 || []).map((win, i) => (
@@ -755,7 +875,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                               <td>
                                 <span className={`lb-rank${idx < 3 ? ` rank-${idx + 1}` : ''}`}>{idx + 1}</span>
                               </td>
-                              <td><span className="lb-player-name">{row.player?.name || '?'}</span></td>
+                              <td>{renderPlayerLink(row.player, 'lb-player-name')}</td>
                               <td><span className="lb-points" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>{valueFn(row)}</span></td>
                               <td className="ls-col-details"><span className="ls-detail-text">{detailFn(row)}</span></td>
                             </tr>
@@ -879,8 +999,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                     <button
                       className="action-btn play"
                       onClick={handleLinkTournament}
-                      disabled={!selectedTournamentToLink}
-                      style={{ opacity: selectedTournamentToLink ? 1 : 0.5 }}
+                      disabled={!selectedTournamentToLink || isLinking}
+                      style={{ opacity: selectedTournamentToLink && !isLinking ? 1 : 0.5 }}
                     >
                       <Check size={16} />
                     </button>
@@ -911,7 +1031,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                     </div>
                     {isManager && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleUnlinkTournament(tournament.id, tournament.name); }}
+                        onClick={(e) => { e.stopPropagation(); handleUnlinkTournament(tournament.id); }}
+                        disabled={isLinking}
                         title={t('leagues.unlinkTournament') || 'Remove from league'}
                         style={{
                           position: 'absolute',
@@ -986,10 +1107,22 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                   </div>
                 ) : (
                   <>
-                    {!myLeagueRegistration && (
+                    {showNameEditor && (
+                      <div className="self-register-name">
+                        <p>{t('registration.nameRequiredHint')}</p>
+                        <DisplayNameEditor
+                          currentName=""
+                          onSaved={(newName) => handleSelfRegisterLeague(newName)}
+                          onCancel={() => setShowNameEditor(false)}
+                        />
+                      </div>
+                    )}
+                    {/* No request yet, or an approved one whose membership was
+                        since removed — either way the user can (re)apply. */}
+                    {(!myLeagueRegistration || myLeagueRegistration.status === 'approved') && !showNameEditor && (
                       <button
                         className="self-register-btn"
-                        onClick={handleSelfRegisterLeague}
+                        onClick={() => handleSelfRegisterLeague()}
                         disabled={registerLoading}
                       >
                         <Plus size={20} />
@@ -1013,12 +1146,6 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                         </button>
                       </>
                     )}
-                    {myLeagueRegistration?.status === 'approved' && (
-                      <div className="registration-status-badge approved">
-                        <CheckCircle size={16} />
-                        {t('leagues.registrationApproved')}
-                      </div>
-                    )}
                     {myLeagueRegistration?.status === 'rejected' && (
                       <>
                         <div className="registration-status-badge rejected">
@@ -1026,6 +1153,16 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                           {t('leagues.registrationRejected')}
                         </div>
                         <p>{t('registration.registrationRejectedHint')}</p>
+                        {!showNameEditor && (
+                          <button
+                            className="self-register-btn"
+                            onClick={() => handleSelfRegisterLeague()}
+                            disabled={registerLoading}
+                          >
+                            <RotateCcw size={18} />
+                            {registerLoading ? t('common.loading') : t('leagues.applyAgain')}
+                          </button>
+                        )}
                       </>
                     )}
                   </>
@@ -1130,7 +1267,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                             }}
                             onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
                           />
-                          <button className="action-btn play" onClick={handleAddPlayer}>
+                          <button className="action-btn play" onClick={handleAddPlayer} disabled={isAddingMember || !newPlayerName.trim()}>
                             <Check size={16} />
                           </button>
                         </div>
@@ -1156,7 +1293,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
-                          {member.player?.name || t('common.unknown')}
+                          {renderPlayerLink(member.player)}
                           {member.player?.user_id && (
                             <span className="linked-account-badge" title={t('common.registeredAccount')}>
                               <BadgeCheck size={15} />
@@ -1173,6 +1310,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                             <input
                               type="checkbox"
                               checked={member.isActive}
+                              disabled={pendingMemberIds.has(member.player?.id)}
                               onChange={() => handleTogglePlayerActive(member.player.id, member.isActive)}
                               style={{ cursor: 'pointer' }}
                             />
@@ -1181,6 +1319,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                           <button
                             className="action-btn delete"
                             onClick={() => handleRemovePlayer(member.player.id)}
+                            disabled={pendingMemberIds.has(member.player?.id)}
                             title={t('leagues.removePlayer')}
                           >
                             <X size={16} />
@@ -1240,13 +1379,15 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                         className="scoring-rule-input"
                       />
                       <span style={{ color: 'var(--text-secondary)' }}>{t('common.pts')}</span>
-                      <button
-                        onClick={() => handleRemovePlacement(index)}
-                        className="scoring-rule-remove"
-                        title={t('leagues.removePlacement')}
-                      >
-                        <X size={18} />
-                      </button>
+                      {!isFallbackRule(rule) && (
+                        <button
+                          onClick={() => handleRemovePlacement(index)}
+                          className="scoring-rule-remove"
+                          title={t('leagues.removePlacement')}
+                        >
+                          <X size={18} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

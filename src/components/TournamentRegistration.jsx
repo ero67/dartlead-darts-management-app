@@ -8,6 +8,8 @@ import { useAdmin } from '../contexts/AdminContext';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
+import { getUserDisplayName } from '../utils/userDisplayName';
+import { DisplayNameEditor } from './DisplayNameEditor';
 
 const MAX_PLAYERS = 64;
 
@@ -90,6 +92,13 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   const [myRegistration, setMyRegistration] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [showNameEditor, setShowNameEditor] = useState(false);
+  // In-flight guards: start/settings/bulk-add were double-clickable, and the
+  // service's duplicate check on start is read-then-insert, not atomic.
+  const [isStarting, setIsStarting] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
+  const [isAddingUser, setIsAddingUser] = useState(false);
   const [registrationError, setRegistrationError] = useState('');
   const [processingRegId, setProcessingRegId] = useState(null);
 
@@ -141,21 +150,32 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   }, [playerCount, user, canManage, refreshMyRegistration]);
 
   const handleAddUserFromSearch = async (selectedUser) => {
+    if (isAddingUser) return;
+    setIsAddingUser(true);
     try {
       await tournamentService.addUserToTournament(tournament.id, selectedUser.id, selectedUser.fullName);
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error adding user to tournament:', error);
       setRegistrationError(describeRegistrationError(error));
+    } finally {
+      setIsAddingUser(false);
     }
   };
 
-  const handleSelfRegister = async () => {
-    if (!user) return;
+  const handleSelfRegister = async (nameOverride) => {
+    if (!user || registerLoading) return;
+    // The player name is public (standings, brackets, profiles), so never
+    // fall back to the account email — ask for a name first.
+    const playerName = typeof nameOverride === 'string' ? nameOverride : getUserDisplayName(user);
+    if (!playerName) {
+      setShowNameEditor(true);
+      return;
+    }
+    setShowNameEditor(false);
     setRegisterLoading(true);
     setRegistrationError('');
     try {
-      const playerName = user.user_metadata?.full_name || user.email;
       const reg = await registerForTournament(tournament.id, playerName);
       setMyRegistration(reg);
     } catch (error) {
@@ -248,8 +268,11 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
             qualificationMode: 'perGroup',
             playersPerGroup: 1,
             totalPlayersToAdvance: 8,
+            seedingMethod: 'groupBased',
+            groupMatchups: [],
             startingRoundPlayers: tournament.playoffSettings?.startingRoundPlayers || 8,
             legsToWinByRound: {
+              32: 3,  // Round of 32
               16: 3,  // Round of 16
               8: 3,   // Quarter-finals
               4: 3,   // Semi-finals
@@ -320,8 +343,9 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     const availableSlots = Math.max(0, MAX_PLAYERS - players.length);
     const namesToAdd = bulkPreview.fresh.slice(0, availableSlots);
 
-    if (namesToAdd.length === 0) return;
+    if (namesToAdd.length === 0 || isBulkAdding) return;
 
+    setIsBulkAdding(true);
     try {
       for (const name of namesToAdd) {
         await addPlayerToTournament(name);
@@ -334,6 +358,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     } catch (error) {
       console.error('Error adding players in bulk:', error);
       alert(t('registration.failedToAddPlayer'));
+    } finally {
+      setIsBulkAdding(false);
     }
   };
 
@@ -372,7 +398,9 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       alert(t('registration.needsAtLeast2Players'));
       return;
     }
+    if (isStarting) return;
 
+    setIsStarting(true);
     try {
       // For playoff-only tournaments, there is no group stage to generate
       if (tournament.tournamentType === 'playoff_only') {
@@ -390,6 +418,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     } catch (error) {
       console.error('Error starting tournament:', error);
       alert(t('registration.failedToStartTournament'));
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -420,16 +450,22 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   };
 
   const confirmStartWithGroups = async () => {
+    if (isStarting) return;
+    setIsStarting(true);
     try {
       await startTournament(tournamentSettings.groupSettings, draftGroups);
       setShowGroupsPreview(false);
     } catch (error) {
       console.error('Error starting tournament with custom groups:', error);
       alert(t('registration.failedToStartTournament'));
+    } finally {
+      setIsStarting(false);
     }
   };
 
   const updateSettings = async () => {
+    if (isSavingSettings) return;
+    setIsSavingSettings(true);
     try {
       await updateTournamentSettings(tournament.id, tournamentSettings);
       setShowEditSettings(false);
@@ -437,6 +473,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     } catch (error) {
       console.error('Error updating tournament settings:', error);
       alert(t('registration.failedToUpdateSettings'));
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -597,14 +635,25 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               <>
                 {!myRegistration && (
                   <>
-                    <button
-                      className="self-register-btn"
-                      onClick={handleSelfRegister}
-                      disabled={registerLoading}
-                    >
-                      <Plus size={20} />
-                      {registerLoading ? t('common.loading') : t('registration.registerForTournament')}
-                    </button>
+                    {showNameEditor ? (
+                      <div className="self-register-name">
+                        <p>{t('registration.nameRequiredHint')}</p>
+                        <DisplayNameEditor
+                          currentName=""
+                          onSaved={(newName) => handleSelfRegister(newName)}
+                          onCancel={() => setShowNameEditor(false)}
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        className="self-register-btn"
+                        onClick={() => handleSelfRegister()}
+                        disabled={registerLoading}
+                      >
+                        <Plus size={20} />
+                        {registerLoading ? t('common.loading') : t('registration.registerForTournament')}
+                      </button>
+                    )}
                     <p>{t('registration.selfRegisterHint')}</p>
                   </>
                 )}
@@ -816,7 +865,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                     <button
                       className="add-player-btn"
                       onClick={addBulkPlayers}
-                      disabled={bulkPreview.fresh.length === 0 || players.length >= MAX_PLAYERS}
+                      disabled={isBulkAdding || bulkPreview.fresh.length === 0 || players.length >= MAX_PLAYERS}
                     >
                       <Plus size={16} />
                       {bulkPreview.fresh.length > 0
@@ -981,9 +1030,10 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
             <button
               className="start-tournament-btn"
               onClick={handleStartTournament}
+              disabled={isStarting}
             >
               <Play size={20} />
-              {t('registration.startTournament')}
+              {isStarting ? t('common.loading') : t('registration.startTournament')}
             </button>
           </div>
         )}
@@ -1525,8 +1575,9 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               <button 
                 className="confirm-btn"
                 onClick={updateSettings}
+                disabled={isSavingSettings}
               >
-                {t('registration.updateSettings')}
+                {isSavingSettings ? t('common.loading') : t('registration.updateSettings')}
               </button>
             </div>
           </div>
@@ -1591,9 +1642,9 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               <button className="cancel-btn" onClick={() => setShowGroupsPreview(false)}>
                 {t('registration.cancel') || 'Cancel'}
               </button>
-              <button className="save-btn" onClick={confirmStartWithGroups}>
+              <button className="save-btn" onClick={confirmStartWithGroups} disabled={isStarting}>
                 <Play size={18} />
-                {t('registration.startTournament') || 'Start Tournament'}
+                {isStarting ? t('common.loading') : t('registration.startTournament')}
               </button>
             </div>
           </div>

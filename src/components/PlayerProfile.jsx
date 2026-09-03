@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Trophy, Target, Crown, Calendar, TrendingUp, Award, Medal,
-  Flame, Zap, Percent, Swords, ShieldCheck, ChevronRight, Activity
+  Flame, Zap, Percent, Swords, ShieldCheck, ChevronRight, Activity, Pencil
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { tournamentService } from '../services/tournamentService';
 import { tournamentStatusLabel as statusLabel } from '../utils/tournamentStatus';
+import { DisplayNameEditor } from './DisplayNameEditor';
 
 const getInitials = (name) => {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
@@ -27,6 +28,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const { user } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isEditingName, setIsEditingName] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,7 +141,31 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
         <div className="profile-hero-main">
           <div className="profile-avatar">{getInitials(player.name)}</div>
           <div className="profile-identity">
-            <h1>{player.name}</h1>
+            {isOwnProfile && isEditingName ? (
+              <DisplayNameEditor
+                currentName={player.name}
+                onSaved={(newName) => {
+                  setProfileData(prev => prev ? { ...prev, player: { ...prev.player, name: newName } } : prev);
+                  setIsEditingName(false);
+                }}
+                onCancel={() => setIsEditingName(false)}
+              />
+            ) : (
+              <h1>
+                {player.name}
+                {isOwnProfile && (
+                  <button
+                    type="button"
+                    className="profile-edit-name-btn"
+                    onClick={() => setIsEditingName(true)}
+                    title={t('playerProfile.editName')}
+                    aria-label={t('playerProfile.editName')}
+                  >
+                    <Pencil size={16} />
+                  </button>
+                )}
+              </h1>
+            )}
             <div className="profile-meta">
               {isOwnProfile && (
                 <span className="profile-chip profile-chip--you">{t('playerProfile.yourProfile')}</span>

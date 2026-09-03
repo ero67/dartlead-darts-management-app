@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { DeviceSettings } from './DeviceSettings';
 import logoIcon from '../assets/logo-icon.png';
+import { getUserDisplayName } from '../utils/userDisplayName';
 
 export function Navigation({ currentView, onViewChange, tournament, isMobileOpen, onMobileClose }) {
   const { user, signOut } = useAuth();
@@ -118,7 +119,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             title={isCollapsed ? t('navigation.managerPanel') : ''}
           >
             <Badge size={18} />
-            {(!isCollapsed || isMobile) && <span>{t('navigation.managerPanel') || 'Manager'}</span>}
+            {(!isCollapsed || isMobile) && <span>{t('navigation.managerPanel')}</span>}
           </button>
         )}
         {isAdmin && (
@@ -149,17 +150,17 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
               {(!isCollapsed || isMobile) && (
                 <div className="user-details">
                   <div className="user-name-row">
-                    <span className="user-name">{user?.user_metadata?.full_name || user?.email || 'User'}</span>
+                    <span className="user-name">{getUserDisplayName(user) || user?.email || t('common.user')}</span>
                     {isAdmin && (
                       <>
-                        <Crown size={14} className="admin-icon" title="Administrator" />
-                        <span className="role-label">Admin</span>
+                        <Crown size={14} className="admin-icon" title={t('common.roleAdministrator')} />
+                        <span className="role-label">{t('common.roleAdmin')}</span>
                       </>
                     )}
                     {!isAdmin && isManager && (
                       <>
-                        <Badge size={14} className="manager-icon" title="Manager" />
-                        <span className="role-label">Manager</span>
+                        <Badge size={14} className="manager-icon" title={t('common.roleManager')} />
+                        <span className="role-label">{t('common.roleManager')}</span>
                       </>
                     )}
                   </div>
@@ -169,14 +170,14 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
                 <Crown 
                   size={14} 
                   className="admin-icon" 
-                  title="Administrator"
+                  title={t('common.roleAdministrator')}
                 />
               )}
               {isCollapsed && !isAdmin && isManager && (
                 <Badge 
                   size={14} 
                   className="manager-icon" 
-                  title="Manager"
+                  title={t('common.roleManager')}
                 />
               )}
             </div>
@@ -191,7 +192,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             <button
               className="device-settings-btn"
               onClick={() => { setShowDeviceSettings(true); if (onMobileClose) onMobileClose(); }}
-              title={isCollapsed ? t('deviceSettings.title', 'Nastavenia zariadenia') : ''}
+              title={isCollapsed ? t('deviceSettings.title') : ''}
             >
               <Monitor size={16} />
               {(!isCollapsed || isMobile) && (
@@ -202,7 +203,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
                       {boardNumber}
                     </span>
                   ) : (
-                    <span>{t('deviceSettings.title', 'Zariadenie')}</span>
+                    <span>{t('deviceSettings.title')}</span>
                   )}
                 </>
               )}
@@ -241,7 +242,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             <button 
               className="device-settings-btn" 
               onClick={() => { setShowDeviceSettings(true); if (onMobileClose) onMobileClose(); }}
-              title={isCollapsed ? t('deviceSettings.title', 'Nastavenia zariadenia') : ''}
+              title={isCollapsed ? t('deviceSettings.title') : ''}
             >
               <Monitor size={16} />
               {(!isCollapsed || isMobile) && (
@@ -252,7 +253,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
                       {boardNumber}
                     </span>
                   ) : (
-                    <span>{t('deviceSettings.title', 'Zariadenie')}</span>
+                    <span>{t('deviceSettings.title')}</span>
                   )}
                 </>
               )}

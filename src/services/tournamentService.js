@@ -1776,6 +1776,21 @@ export const tournamentService = {
     }
   },
 
+  // Rename the player row linked to the signed-in account (RPC: players RLS
+  // only lets the row's owner/admin update it, and a player's own row is
+  // normally owned by the manager who registered them). Resolves to null when
+  // the account has no linked player yet.
+  async renameMyPlayer(newName) {
+    try {
+      const { data, error } = await supabase.rpc('rename_my_player', { new_name: newName });
+      if (error) throw error;
+      return data?.[0] || null;
+    } catch (error) {
+      console.error('Error renaming linked player:', error);
+      throw error;
+    }
+  },
+
   // Claim an existing player record — and therefore its whole match history —
   // for an auth account. Used by the admin tool that attaches historical
   // results (played under a plain name, before the player had a login) to the
@@ -1860,25 +1875,36 @@ export const tournamentService = {
         tournaments = tournamentsData || [];
       }
 
-      // Match stats for career aggregation
-      const { data: matchStats } = await supabase
-        .from('match_player_stats')
-        .select('*')
-        .eq('player_id', playerId);
+      // Everything below is scoped to tournaments that still exist — the
+      // history list already hides soft-deleted ones, and career numbers
+      // and recent form must not count games from them either.
+      const activeTournamentIds = tournaments.map(tourn => tourn.id);
+      // A never-matching id keeps `.in()` valid when the player has no tournaments.
+      const scopeIds = activeTournamentIds.length > 0 ? activeTournamentIds : ['00000000-0000-0000-0000-000000000000'];
 
       // Win/loss from matches
       const { data: matchesAsP1 } = await supabase
         .from('matches')
         .select('id, winner_id')
         .eq('player1_id', playerId)
-        .eq('status', 'completed');
+        .eq('status', 'completed')
+        .in('tournament_id', scopeIds);
       const { data: matchesAsP2 } = await supabase
         .from('matches')
         .select('id, winner_id')
         .eq('player2_id', playerId)
-        .eq('status', 'completed');
+        .eq('status', 'completed')
+        .in('tournament_id', scopeIds);
 
       const allMatches = [...(matchesAsP1 || []), ...(matchesAsP2 || [])];
+      const allMatchIds = new Set(allMatches.map(m => m.id));
+
+      // Match stats for career aggregation (no tournament_id column — scope by match)
+      const { data: matchStatsRaw } = await supabase
+        .from('match_player_stats')
+        .select('*')
+        .eq('player_id', playerId);
+      const matchStats = (matchStatsRaw || []).filter(st => allMatchIds.has(st.match_id));
       const wins = allMatches.filter(m => m.winner_id === playerId).length;
       const losses = allMatches.length - wins;
 
@@ -1907,6 +1933,7 @@ export const tournamentService = {
         .select('player1_id, player2_id, result')
         .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
         .eq('status', 'completed')
+        .in('tournament_id', scopeIds)
         .not('result', 'is', null);
 
       (matchesWithResults || []).forEach(m => {
@@ -1978,6 +2005,7 @@ export const tournamentService = {
         `)
         .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
         .eq('status', 'completed')
+        .in('tournament_id', scopeIds)
         .order('updated_at', { ascending: false })
         .limit(10);
 
@@ -2185,12 +2213,12 @@ export const tournamentService = {
   // Reset tournament playoffs (clear all playoff data)
   async resetTournamentPlayoffs(tournamentId) {
     try {
-      // Clear the playoffs data and reset status to in_progress
+      // Clear the playoffs data and put the tournament back into the running state
       const { data, error } = await supabase
         .from('tournaments')
         .update({ 
           playoffs: null,
-          status: 'in_progress',
+          status: 'started',
           league_points_calculated: false,
           updated_at: new Date().toISOString()
         })
@@ -3065,32 +3093,43 @@ export const matchService = {
         .single();
       const startingScore = matchData?.starting_score || 501;
       
-      for (let legNum = 1; legNum <= Math.max(matchResult.player1Legs, matchResult.player2Legs); legNum++) {
+      // Per-leg details recorded by the scorer: { leg, darts, checkout, average,
+      // isWin, remainingScore }. legAverages only holds the legs a player WON,
+      // so it cannot be indexed by leg number (the old code did, producing
+      // rows whose winner/darts belonged to a different leg).
+      const player1LegDetails = matchResult.player1Stats?.legs || [];
+      const player2LegDetails = matchResult.player2Stats?.legs || [];
+      const totalLegs = (matchResult.player1Legs || 0) + (matchResult.player2Legs || 0);
+
+      for (let legNum = 1; legNum <= totalLegs; legNum++) {
         const legId = generateId()
-        const winnerId = legNum <= matchResult.player1Legs ? 
-          (matchResult.winner === matchResult.player1Id ? matchResult.player1Id : matchResult.player2Id) :
-          (matchResult.winner === matchResult.player1Id ? matchResult.player2Id : matchResult.player1Id)
-        
-        // Find checkout for this leg
+        const p1Leg = player1LegDetails.find(l => l.leg === legNum);
+        const p2Leg = player2LegDetails.find(l => l.leg === legNum);
+
+        let winnerId;
+        if (p1Leg?.isWin) winnerId = matchResult.player1Id;
+        else if (p2Leg?.isWin) winnerId = matchResult.player2Id;
+        else {
+          // Legacy payload without per-leg details: best effort, winner's legs first
+          const winnerWonFirst = legNum <= (matchResult.winner === matchResult.player1Id ? matchResult.player1Legs : matchResult.player2Legs);
+          winnerId = winnerWonFirst
+            ? matchResult.winner
+            : (matchResult.winner === matchResult.player1Id ? matchResult.player2Id : matchResult.player1Id);
+        }
+
         const player1Checkout = player1Checkouts.find(c => c.leg === legNum);
         const player2Checkout = player2Checkouts.find(c => c.leg === legNum);
-        
-        // Calculate darts for this leg from leg average
-        let player1Darts = 0;
-        let player2Darts = 0;
-        let player1Average = 0;
-        let player2Average = 0;
-        
-        if (legNum <= player1LegAverages.length && player1LegAverages[legNum - 1] > 0) {
-          player1Average = player1LegAverages[legNum - 1];
-          player1Darts = Math.round((startingScore / player1Average) * 3);
-        }
-        
-        if (legNum <= player2LegAverages.length && player2LegAverages[legNum - 1] > 0) {
-          player2Average = player2LegAverages[legNum - 1];
-          player2Darts = Math.round((startingScore / player2Average) * 3);
-        }
-        
+
+        const legAverageFallback = (legAverages, wonLegsBefore) =>
+          legAverages[wonLegsBefore] > 0 ? legAverages[wonLegsBefore] : 0;
+        const p1WonBefore = player1LegDetails.length ? 0 : Math.min(legNum - 1, player1LegAverages.length - 1);
+        const p2WonBefore = player2LegDetails.length ? 0 : Math.min(legNum - 1, player2LegAverages.length - 1);
+
+        const player1Average = p1Leg ? (p1Leg.average || 0) : (winnerId === matchResult.player1Id ? legAverageFallback(player1LegAverages, Math.max(p1WonBefore, 0)) : 0);
+        const player2Average = p2Leg ? (p2Leg.average || 0) : (winnerId === matchResult.player2Id ? legAverageFallback(player2LegAverages, Math.max(p2WonBefore, 0)) : 0);
+        const player1Darts = p1Leg ? (p1Leg.darts || 0) : (player1Average > 0 ? Math.round((startingScore / player1Average) * 3) : 0);
+        const player2Darts = p2Leg ? (p2Leg.darts || 0) : (player2Average > 0 ? Math.round((startingScore / player2Average) * 3) : 0);
+
         legPromises.push(
           supabase
             .from('legs')
@@ -3101,10 +3140,13 @@ export const matchService = {
               winner_id: winnerId,
               player1_id: matchResult.player1Id,
               player2_id: matchResult.player2Id,
+              // remaining score at the end of the leg (0 for the winner)
+              player1_score: winnerId === matchResult.player1Id ? 0 : (p1Leg?.remainingScore ?? startingScore),
+              player2_score: winnerId === matchResult.player2Id ? 0 : (p2Leg?.remainingScore ?? startingScore),
               player1_darts: player1Darts,
               player2_darts: player2Darts,
-              player1_average: player1Average,
-              player2_average: player2Average,
+              player1_average: Math.round(player1Average * 100) / 100,
+              player2_average: Math.round(player2Average * 100) / 100,
               player1_checkout: player1Checkout?.checkout || null,
               player2_checkout: player2Checkout?.checkout || null
             })

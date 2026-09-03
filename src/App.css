@@ -7110,6 +7110,105 @@ body {
   color: var(--text-tertiary);
 }
 
+.self-register-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.self-register-name > p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+/* --- Own-profile name editing --- */
+.profile-edit-name-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  padding: 0.3rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  vertical-align: middle;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.profile-edit-name-btn:hover {
+  color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.1);
+}
+
+.display-name-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 420px;
+  text-align: left;
+}
+
+.display-name-editor-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.display-name-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.display-name-editor-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.display-name-editor-row input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.display-name-editor-hint,
+.display-name-editor-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.display-name-editor-error {
+  color: var(--accent-danger);
+}
+
+.no-profile-name {
+  display: flex;
+  justify-content: center;
+  margin: 1.25rem 0;
+}
+
+.no-profile-name p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.no-profile-name-label {
+  color: var(--text-tertiary);
+}
+
 /* --- Inline profile links (used across tournament views too) --- */
 .player-profile-link,
 .profile-link-btn {

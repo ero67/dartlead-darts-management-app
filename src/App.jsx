@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { Menu, Pencil } from 'lucide-react';
 import { TournamentProvider, useTournament } from './contexts/TournamentContext';
 import { LeagueProvider, useLeague } from './contexts/LeagueContext';
 import { LiveMatchProvider } from './contexts/LiveMatchContext';
@@ -32,16 +32,40 @@ import { ResetPassword } from './components/ResetPassword';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
 import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from './utils/postLoginRedirect';
+import { getUserDisplayName } from './utils/userDisplayName';
+import { DisplayNameEditor } from './components/DisplayNameEditor';
 import './App.css';
 
 // Shown when a signed-in user has no player record yet (they have never been
 // approved into a tournament, so there are no stats to display).
 function NoPlayerProfile({ onBrowseTournaments }) {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const [isEditingName, setIsEditingName] = useState(false);
+  const displayName = getUserDisplayName(user);
   return (
     <div className="unauthorized-container">
       <h2>{t('playerProfile.noLinkedProfile')}</h2>
       <p>{t('playerProfile.registerForTournamentToCreate')}</p>
+      {/* The name is still editable here — it is what the manager sees when
+          adding this account to a league or tournament. */}
+      <div className="no-profile-name">
+        {isEditingName ? (
+          <DisplayNameEditor
+            currentName={displayName}
+            onSaved={() => setIsEditingName(false)}
+            onCancel={() => setIsEditingName(false)}
+          />
+        ) : (
+          <p>
+            <span className="no-profile-name-label">{t('playerProfile.yourName')}:</span>{' '}
+            <strong>{displayName || user?.email}</strong>
+            <button type="button" className="profile-edit-name-btn" onClick={() => setIsEditingName(true)} title={t('playerProfile.editName')} aria-label={t('playerProfile.editName')}>
+              <Pencil size={14} />
+            </button>
+          </p>
+        )}
+      </div>
       <button className="primary-btn" onClick={onBrowseTournaments}>
         {t('navigation.tournaments')}
       </button>
@@ -54,6 +78,7 @@ function NoPlayerProfile({ onBrowseTournaments }) {
 // each context update — losing input focus and local UI state (e.g. while a
 // manager is typing player names on the registration page).
 function TournamentRoute() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const navigate = useNavigate();
   const {
@@ -124,7 +149,7 @@ function TournamentRoute() {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading tournament...</p>
+        <p>{t('common.loadingTournament')}</p>
       </div>
     );
   }
@@ -151,16 +176,130 @@ function TournamentRoute() {
   );
 }
 
+// Same reason as TournamentRoute above: these must live at module scope so
+// that context updates (e.g. adding a league member re-fetches the league)
+// don't remount the page and wipe its local UI state such as the active tab.
+function LeagueDetailRoute({ onBack, onCreateTournament, onSelectTournament }) {
+  const { id } = useParams();
+  return (
+    <LeagueDetail
+      leagueId={id}
+      onBack={onBack}
+      onCreateTournament={onCreateTournament}
+      onSelectTournament={onSelectTournament}
+    />
+  );
+}
+
+function MatchRoute({ onMatchComplete }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { tournaments, currentTournament, currentMatch, startMatch } = useTournament();
+
+  useEffect(() => {
+    if (id && (!currentMatch || currentMatch.id !== id)) {
+      // Wait for the full tournament to hydrate -- a lightweight list stub
+      // has empty groups, so searching it would falsely "not find" the match
+      // and redirect away. The loader / TournamentRoute will replace the stub.
+      if (currentTournament && currentTournament._summary === true) {
+        return;
+      }
+      // Find match in current tournament
+      if (currentTournament) {
+        // Search in group matches
+        let match = currentTournament.groups
+          .flatMap(group => group.matches)
+          .find(m => m.id === id);
+
+        // Also search playoff matches
+        if (!match && currentTournament.playoffs?.rounds) {
+          for (const round of currentTournament.playoffs.rounds) {
+            match = (round.matches || []).find(m => m.id === id);
+            if (match) break;
+          }
+        }
+
+        if (match) {
+          startMatch(match);
+        } else {
+          // Match not found, redirect to tournament
+          navigate(`/tournament/${currentTournament.id}`);
+        }
+      } else if (tournaments.length > 0) {
+        // Tournaments have loaded but currentTournament is null and wasn't restored
+        // from sessionStorage – this means the user navigated here without a valid
+        // tournament context. Redirect to tournaments list.
+        navigate('/tournaments');
+      }
+      // If tournaments.length === 0, we're still loading – don't redirect yet,
+      // the LOAD_TOURNAMENTS action will restore currentTournament from sessionStorage.
+    }
+  }, [id, currentTournament, currentMatch, startMatch, navigate, tournaments.length]);
+
+  return (
+    <MatchInterface
+      match={currentMatch}
+      onMatchComplete={onMatchComplete}
+      onBack={() => navigate(`/tournament/${currentTournament?.id}`)}
+    />
+  );
+}
+
+function PlayerProfileRoute() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  return (
+    <PlayerProfile
+      playerId={id}
+      onBack={() => navigate(-1)}
+      onSelectTournament={(tourn) => navigate(`/tournament/${tourn.id}`)}
+      onSelectLeague={(league) => navigate(`/league/${league.id}`)}
+      onSelectPlayer={(player) => navigate(`/player/${player.id}`)}
+    />
+  );
+}
+
+// My profile redirect - looks up the player linked to current user
+function MyProfileRedirect() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const findMyPlayer = async () => {
+      const player = await tournamentService.getPlayerByUserId(user.id);
+      if (cancelled) return;
+      if (player) {
+        navigate(`/player/${player.id}`, { replace: true });
+      } else {
+        setProfileLoading(false);
+      }
+    };
+    if (user) findMyPlayer();
+    else setProfileLoading(false);
+    return () => { cancelled = true; };
+  }, [user, navigate]);
+
+  if (profileLoading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+  return <NoPlayerProfile onBrowseTournaments={() => navigate('/tournaments')} />;
+}
+
 function AppContent() {
+  const { t } = useLanguage();
   const { user, loading } = useAuth();
   const { isAdmin, isManager, canCreateTournaments } = useAdmin();
   const {
     tournaments,
     currentTournament,
-    currentMatch,
     createTournament,
     selectTournament,
-    startMatch,
     completeMatch,
     deleteTournament
   } = useTournament();
@@ -209,122 +348,12 @@ function AppContent() {
     }
   }, [location.pathname, currentTournament, selectTournament]);
 
-  // Component to handle league detail loading
-  const LeagueDetailRoute = ({ onBack, onCreateTournament, onSelectTournament }) => {
-    const { id } = useParams();
-    return (
-      <LeagueDetail 
-        leagueId={id}
-        onBack={onBack}
-        onCreateTournament={onCreateTournament}
-        onSelectTournament={onSelectTournament}
-      />
-    );
-  };
-
-  // Component to handle match loading
-  const MatchRoute = () => {
-    const { id } = useParams();
-    
-    useEffect(() => {
-      if (id && (!currentMatch || currentMatch.id !== id)) {
-        // Wait for the full tournament to hydrate -- a lightweight list stub
-        // has empty groups, so searching it would falsely "not find" the match
-        // and redirect away. The loader / TournamentRoute will replace the stub.
-        if (currentTournament && currentTournament._summary === true) {
-          return;
-        }
-        // Find match in current tournament
-        if (currentTournament) {
-          // Search in group matches
-          let match = currentTournament.groups
-            .flatMap(group => group.matches)
-            .find(m => m.id === id);
-          
-          // Also search playoff matches
-          if (!match && currentTournament.playoffs?.rounds) {
-            for (const round of currentTournament.playoffs.rounds) {
-              match = (round.matches || []).find(m => m.id === id);
-              if (match) break;
-            }
-          }
-
-          if (match) {
-            startMatch(match);
-          } else {
-            // Match not found, redirect to tournament
-            navigate(`/tournament/${currentTournament.id}`);
-          }
-        } else if (tournaments.length > 0) {
-          // Tournaments have loaded but currentTournament is null and wasn't restored
-          // from sessionStorage – this means the user navigated here without a valid
-          // tournament context. Redirect to tournaments list.
-          navigate('/tournaments');
-        }
-        // If tournaments.length === 0, we're still loading – don't redirect yet,
-        // the LOAD_TOURNAMENTS action will restore currentTournament from sessionStorage.
-      }
-    }, [id, currentTournament, currentMatch, startMatch, navigate, tournaments.length]);
-
-    return (
-      <MatchInterface 
-        match={currentMatch} 
-        onMatchComplete={handleMatchComplete}
-        onBack={() => navigate(`/tournament/${currentTournament?.id}`)}
-      />
-    );
-  };
-
-  // Player profile route
-  const PlayerProfileRoute = () => {
-    const { id } = useParams();
-    return (
-      <PlayerProfile
-        playerId={id}
-        onBack={() => navigate(-1)}
-        onSelectTournament={(tourn) => navigate(`/tournament/${tourn.id}`)}
-        onSelectLeague={(league) => navigate(`/league/${league.id}`)}
-        onSelectPlayer={(player) => navigate(`/player/${player.id}`)}
-      />
-    );
-  };
-
-  // My profile redirect - looks up the player linked to current user
-  const MyProfileRedirect = () => {
-    const [profileLoading, setProfileLoading] = useState(true);
-
-    useEffect(() => {
-      let cancelled = false;
-      const findMyPlayer = async () => {
-        const player = await tournamentService.getPlayerByUserId(user.id);
-        if (cancelled) return;
-        if (player) {
-          navigate(`/player/${player.id}`, { replace: true });
-        } else {
-          setProfileLoading(false);
-        }
-      };
-      if (user) findMyPlayer();
-      else setProfileLoading(false);
-      return () => { cancelled = true; };
-    }, []);
-
-    if (profileLoading) {
-      return (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-        </div>
-      );
-    }
-    return <NoPlayerProfile onBrowseTournaments={() => navigate('/tournaments')} />;
-  };
-
   // Show loading spinner while checking authentication
   if (loading) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -396,7 +425,7 @@ function AppContent() {
       navigate(`/league/${leagueData.id}`);
     } catch (error) {
       console.error('Error creating league:', error);
-      alert('Failed to create league');
+      alert(t('leagues.failedToCreateLeague'));
     }
   };
 
@@ -484,9 +513,9 @@ function AppContent() {
               />
             ) : user ? (
               <div className="unauthorized-container">
-                <h2>Access Restricted</h2>
-                <p>Only managers and administrators can create tournaments.</p>
-                <p>Please contact an administrator to request manager permissions.</p>
+                <h2>{t('auth.accessRestricted')}</h2>
+                <p>{t('auth.onlyManagersCreateTournaments')}</p>
+                <p>{t('auth.contactAdminForManager')}</p>
               </div>
             ) : (
               <Auth />
@@ -497,8 +526,8 @@ function AppContent() {
               <AdminPanel />
             ) : (
               <div className="unauthorized-container">
-                <h2>Access Denied</h2>
-                <p>You must be an administrator to access this page.</p>
+                <h2>{t('auth.accessDenied')}</h2>
+                <p>{t('auth.adminOnlyPage')}</p>
               </div>
             )
           } />
@@ -507,13 +536,13 @@ function AppContent() {
               <ManagerPanel />
             ) : (
               <div className="unauthorized-container">
-                <h2>Access Denied</h2>
-                <p>You must be a manager or administrator to access this page.</p>
+                <h2>{t('auth.accessDenied')}</h2>
+                <p>{t('auth.managerOnlyPage')}</p>
               </div>
             )
           } />
           <Route path="/tournament/:id" element={<TournamentRoute />} />
-          <Route path="/match/:id" element={<MatchRoute />} />
+          <Route path="/match/:id" element={<MatchRoute onMatchComplete={handleMatchComplete} />} />
           {/* Profiles are public, like tournaments and leagues */}
           <Route path="/player/:id" element={<PlayerProfileRoute />} />
           <Route path="/my-profile" element={
@@ -533,8 +562,8 @@ function AppContent() {
               />
             ) : user ? (
               <div className="unauthorized-container">
-                <h2>Access Restricted</h2>
-                <p>Only managers and administrators can create leagues.</p>
+                <h2>{t('auth.accessRestricted')}</h2>
+                <p>{t('auth.onlyManagersCreateLeagues')}</p>
               </div>
             ) : (
               <Auth />

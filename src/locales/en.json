@@ -100,7 +100,8 @@
     "startWhenReady": "Start the tournament when ready",
     "statusOpenForRegistration": "Registration",
     "statusStarted": "In progress",
-    "statusCompleted": "Completed"
+    "statusCompleted": "Completed",
+    "continueTournament": "Continue Tournament"
   },
   "liveMatches": {
     "title": "Live Matches",
@@ -148,7 +149,21 @@
       "decideButton": "Decide by bull-up",
       "title": "Decide leg by bull-up",
       "prompt": "Both players throw at the bull — closest wins the leg. Who won the bull-up? (No checkout is recorded.)"
-    }
+    },
+    "viewOnlyMode": "View Only Mode",
+    "viewOnlyStartDescription": "You must be logged in to start or score matches. You can view live matches and standings without logging in.",
+    "viewOnlyScoreDescription": "You must be logged in to score matches. You can view live matches and standings without logging in.",
+    "player1": "Player 1",
+    "player2": "Player 2",
+    "undo": "Undo",
+    "turnTotalLabel": "3-dart total",
+    "turnTotalInvalid": "Invalid total (allowed: 0–180)",
+    "turnTotalKeypadHint": "Enter 0–180, then press OK",
+    "turnTotalTypeHint": "Type 0–180 and press Enter",
+    "clear": "Clear",
+    "ok": "OK",
+    "undoLastVisit": "Undo last visit",
+    "dartsCount": "{{count}} darts"
   },
   "tournamentCreation": {
     "title": "Create Tournament",
@@ -159,6 +174,7 @@
     "cancel": "Cancel"
   },
   "registration": {
+    "nameRequiredHint": "Enter the name you want to play under. It will be shown in standings, brackets and your profile.",
     "title": "Tournament Registration",
     "addPlayer": "Add Player",
     "playerName": "Player Name",
@@ -440,7 +456,10 @@
     "playoffsResetSuccess": "Playoffs have been reset. You can now start them again.",
     "failedToResetPlayoffs": "Failed to reset playoffs. Please try again.",
     "scorerLabel": "Scorer",
-    "suggestedScorerHint": "Suggested scorer for this match"
+    "suggestedScorerHint": "Suggested scorer for this match",
+    "detailedView": "Detailed View",
+    "tbd": "TBD",
+    "plusThirdPlace": "+ 3rd Place"
   },
   "summary": {
     "tab": "Summary",
@@ -548,7 +567,14 @@
     "checkEmailConfirmation": "Check your email for the confirmation link!",
     "enterEmailFirst": "Please enter your email address first",
     "passwordResetEmailSent": "Password reset email sent! Check your inbox.",
-    "unexpectedError": "An unexpected error occurred"
+    "unexpectedError": "An unexpected error occurred",
+    "accessRestricted": "Access Restricted",
+    "accessDenied": "Access Denied",
+    "onlyManagersCreateTournaments": "Only managers and administrators can create tournaments.",
+    "onlyManagersCreateLeagues": "Only managers and administrators can create leagues.",
+    "contactAdminForManager": "Please contact an administrator to request manager permissions.",
+    "adminOnlyPage": "You must be an administrator to access this page.",
+    "managerOnlyPage": "You must be a manager or administrator to access this page."
   },
   "common": {
     "save": "Save",
@@ -577,7 +603,17 @@
     "saving": "Saving...",
     "resetting": "Resetting...",
     "back": "Back",
-    "registeredAccount": "Registered player account"
+    "registeredAccount": "Registered player account",
+    "archived": "Archived",
+    "vs": "vs",
+    "user": "User",
+    "roleAdmin": "Admin",
+    "roleManager": "Manager",
+    "roleAdministrator": "Administrator",
+    "loadingTournament": "Loading tournament...",
+    "matchCountOne": "{{count}} match",
+    "matchCountFew": "{{count}} matches",
+    "matchCountMany": "{{count}} matches"
   },
   "deviceSettings": {
     "title": "Device Settings",
@@ -679,6 +715,11 @@
     "scorersSelectEntity": "Tournament or league"
   },
   "leagues": {
+    "notFound": "League not found. It may have been deleted.",
+    "leagueNameRequired": "Please enter a league name.",
+    "linkFailed": "Failed to add the tournament to the league. It may already belong to another league.",
+    "unlinkFailed": "Failed to remove the tournament from the league.",
+    "applyAgain": "Apply again",
     "title": "Leagues",
     "myLeagues": "My Leagues",
     "backToLeagues": "Back to Leagues",
@@ -798,7 +839,16 @@
     "noLeaguesFound": "No leagues found",
     "createFirstLeagueHint": "Create your first league to organize tournaments and track player standings.",
     "viewLeague": "View League",
-    "createLeague": "Create League"
+    "createLeague": "Create League",
+    "createNewLeague": "Create New League",
+    "enterLeagueName": "Enter league name",
+    "describeLeague": "Describe the league...",
+    "scoringRulesCreateDescription": "Set points awarded for each placement. Players who don't participate receive no points (neutral).",
+    "4thPlace": "4th Place",
+    "5thPlace": "5th Place",
+    "defaultSixthPlus": "Default (6th+)",
+    "pleaseEnterLeagueName": "Please enter a league name",
+    "failedToCreateLeague": "Failed to create league"
   },
   "playerProfile": {
     "title": "Player Profile",
@@ -822,6 +872,11 @@
     "tournamentWins": "Tournament Wins",
     "viewProfile": "View player profile",
     "yourProfile": "Your profile",
+    "editName": "Edit name",
+    "yourName": "Your name",
+    "nameHint": "This name is shown in tournaments, leagues and statistics.",
+    "nameInvalid": "The name must be 2 to 60 characters long.",
+    "nameSaveFailed": "Failed to save the name. Please try again.",
     "dartsThrown": "Darts Thrown",
     "recentMatches": "Recent Matches",
     "noMatches": "No matches played yet.",

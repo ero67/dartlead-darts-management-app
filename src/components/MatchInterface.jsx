@@ -164,6 +164,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   });
   const [turnHistory, setTurnHistory] = useState(initialState?.turnHistory || []);
   const [matchComplete, setMatchComplete] = useState(initialState?.matchComplete || false);
+  const [completedWinnerId, setCompletedWinnerId] = useState(null); // winner per DB row when re-opening a finished match
   const [inputMode, setInputMode] = useState(initialState?.inputMode || 'single');
   const [scoringMode, setScoringMode] = useState(initialState?.scoringMode || (match?.defaultScoringMode === 'turnTotal' ? 'turnTotal' : 'dart'));
   const [showMatchStarter, setShowMatchStarter] = useState(initialState?.showMatchStarter || false);
@@ -394,7 +395,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       try {
         const { data: dbRow } = await supabase
           .from('matches')
-          .select('legs_to_win, starting_score, status, match_starter')
+          .select('legs_to_win, starting_score, status, match_starter, player1_legs, player2_legs, winner_id')
           .eq('id', match.id)
           .maybeSingle();
 
@@ -412,6 +413,13 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             }
           }
           if (dbRow.status === 'completed') {
+            // Show the real result — the in-memory scores are still zero here,
+            // so without this the summary named the wrong winner with 0-0.
+            setLegScores(prev => ({
+              player1: { ...prev.player1, legs: dbRow.player1_legs || 0 },
+              player2: { ...prev.player2, legs: dbRow.player2_legs || 0 }
+            }));
+            setCompletedWinnerId(dbRow.winner_id || null);
             setMatchComplete(true);
             setShowMatchStarter(false);
             return;
@@ -797,6 +805,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
   const applyTurnTotal = (total, { finishedOnDouble = false, dartsUsed = 3 } = {}) => {
     if (isViewOnly) return;
+    if (bustingPlayer !== null) return; // bust animation in progress
     if (currentPlayer === null || currentPlayer === undefined || !currentPlayerData) return;
     if (!Number.isInteger(total) || total < 0 || total > 180) return;
     if (![1, 2, 3].includes(dartsUsed)) return;
@@ -895,6 +904,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         });
       }
       matchService.startMatch(match.id, user.id, match).catch(error => {
+        console.error('Error marking match as started:', error);
       });
     }
     
@@ -902,7 +912,10 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     return () => {
       endLiveMatch(match.id);
     };
-  }, [user]);
+    // Keyed on the ids only: AuthContext hands out a new user object on every
+    // token refresh, and re-running this mid-match rewrote who started it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, match?.id]);
 
   // Update live match data whenever match state changes (only if match is not completed and user is logged in)
   useEffect(() => {
@@ -926,6 +939,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
   const addScore = (number) => {
     if (isViewOnly) return; // Non-logged-in users cannot score
+    // A bust is being animated: the score/turn switch is applied when the
+    // timeout fires, so a dart entered now would land on the wrong player.
+    if (bustingPlayer !== null) return;
     if (currentTurn.darts >= 3) return;
     if (currentPlayer === null || currentPlayer === undefined || !currentPlayerData) return;
 
@@ -1166,6 +1182,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
   const removeLastDart = () => {
     if (isViewOnly) return; // Non-logged-in users cannot modify scores
+    if (bustingPlayer !== null) return; // bust animation in progress
     // Prevent rapid clicks
     if (isRemovingDart) {
       return;
@@ -1797,7 +1814,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
     // Start the next leg — alternate who starts, same rule as the checkout path.
     const newLegNumber = currentLeg + 1;
-    const newLegStarter = (newLegNumber % 2 === 1) ? matchStarter : (1 - matchStarter);
+    // Same fallback as the checkout path: a null starter here left
+    // currentPlayer null and nobody could score.
+    const bullupStarterBase = (matchStarter !== null && matchStarter !== undefined) ? matchStarter : (currentPlayer ?? 0);
+    if (bullupStarterBase !== matchStarter) setMatchStarter(bullupStarterBase);
+    const newLegStarter = (newLegNumber % 2 === 1) ? bullupStarterBase : (1 - bullupStarterBase);
     setCurrentLeg(newLegNumber);
     setCurrentPlayer(newLegStarter);
     setTurnHistory([]);
@@ -1891,11 +1912,14 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       <div className="match-complete">
         <div className="complete-header">
           <CheckCircle size={48} className="success-icon" />
-          <h2>Match Complete!</h2>
+          <h2>{t('match.matchComplete')}</h2>
         </div>
         <div className="final-result">
           <div className="winner">
-            Winner: {legScores.player1.legs > legScores.player2.legs ? (match.player1?.name || 'Player 1') : (match.player2?.name || 'Player 2')}
+            {t('match.winner')}: {(completedWinnerId
+              ? completedWinnerId === match.player1?.id
+              : legScores.player1.legs > legScores.player2.legs)
+              ? (match.player1?.name || t('match.player1')) : (match.player2?.name || t('match.player2'))}
           </div>
           <div className="final-score">
             {legScores.player1.legs} - {legScores.player2.legs}
@@ -1903,7 +1927,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         </div>
         <button className="back-btn" onClick={onBack}>
           <ArrowLeft size={20} />
-          Back to Tournament
+          {t('match.backToTournament')}
         </button>
       </div>
     );
@@ -1915,11 +1939,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       return (
         <div className="leg-starter-dialog">
           <div className="dialog-content">
-            <h2>View Only Mode</h2>
-            <p>You must be logged in to start or score matches. You can view live matches and standings without logging in.</p>
+            <h2>{t('match.viewOnlyMode')}</h2>
+            <p>{t('match.viewOnlyStartDescription')}</p>
             <button className="back-btn" onClick={onBack}>
               <ArrowLeft size={20} />
-              Back to Tournament
+              {t('match.backToTournament')}
             </button>
           </div>
         </div>
@@ -1950,15 +1974,15 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
               className="player-option"
               onClick={() => selectMatchStarter(0)}
             >
-              <div className="player-name">{match.player1?.name || 'Player 1'}</div>
-              <div className="player-legs">{legScores.player1.legs} legs</div>
+              <div className="player-name">{match.player1?.name || t('match.player1')}</div>
+              <div className="player-legs">{legScores.player1.legs} {t('match.legs')}</div>
             </button>
             <button 
               className="player-option"
               onClick={() => selectMatchStarter(1)}
             >
-              <div className="player-name">{match.player2?.name || 'Player 2'}</div>
-              <div className="player-legs">{legScores.player2.legs} legs</div>
+              <div className="player-name">{match.player2?.name || t('match.player2')}</div>
+              <div className="player-legs">{legScores.player2.legs} {t('match.legs')}</div>
             </button>
           </div>
         </div>
@@ -2050,7 +2074,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       <div className="match-scoreboard match-scoreboard--compact">
         <div className={`player-score player1 ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
           <div className="player-header">
-            <div className="player-name">{match.player1?.name || 'Player 1'}</div>
+            <div className="player-name">{match.player1?.name || t('match.player1')}</div>
             <div className="legs-won">{legScores.player1.legs}</div>
           </div>
           <div className="current-score">{safeScore(legScores.player1.currentScore, matchSettings.startingScore)}</div>
@@ -2067,19 +2091,19 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             </div>
           )}
           <div className="player-stats-row">
-            <span>Avg: {getAverage('player1').toFixed(1)}</span>
-            <span>Darts: {legScores.player1.legDarts}</span>
+            <span>{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
+            <span>{t('match.darts')}: {legScores.player1.legDarts}</span>
           </div>
         </div>
 
         <div className="vs-divider mobile-hidden">
-          <span>Leg {currentLeg}</span>
-          <span className="match-settings-text">First to {matchSettings.legsToWin} legs</span>
+          <span>{t('match.leg')} {currentLeg}</span>
+          <span className="match-settings-text">{t(matchSettings.legsToWin === 1 ? 'tournaments.firstToLeg' : 'tournaments.firstToLegs', { count: matchSettings.legsToWin })}</span>
         </div>
 
         <div className={`player-score player2 ${currentPlayer === 1 ? 'active-player' : ''} ${bustingPlayer === 1 ? 'bust' : ''}`}>
           <div className="player-header">
-            <div className="player-name">{match.player2?.name || 'Player 2'}</div>
+            <div className="player-name">{match.player2?.name || t('match.player2')}</div>
             <div className="legs-won">{legScores.player2.legs}</div>
           </div>
           <div className="current-score">{safeScore(legScores.player2.currentScore, matchSettings.startingScore)}</div>
@@ -2096,8 +2120,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             </div>
           )}
           <div className="player-stats-row">
-            <span>Avg: {getAverage('player2').toFixed(1)}</span>
-            <span>Darts: {legScores.player2.legDarts}</span>
+            <span>{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
+            <span>{t('match.darts')}: {legScores.player2.legDarts}</span>
           </div>
         </div>
       </div>
@@ -2127,14 +2151,14 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                 className="create-tournament-btn"
                 onClick={() => awardLegByBullup(0)}
               >
-                {match.player1?.name || 'Player 1'}
+                {match.player1?.name || t('match.player1')}
               </button>
               <button
                 type="button"
                 className="create-tournament-btn"
                 onClick={() => awardLegByBullup(1)}
               >
-                {match.player2?.name || 'Player 2'}
+                {match.player2?.name || t('match.player2')}
               </button>
             </div>
             <div className="checkout-btn-row" style={{ marginTop: '0.75rem' }}>
@@ -2163,7 +2187,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         </div>
 
         <div className="vs-divider mobile-hidden">
-          <span>vs</span>
+          <span>{t('common.vs')}</span>
         </div>
 
         <div className={`player-stats-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
@@ -2180,17 +2204,17 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       {/* Average and Darts Section */}
       <div className="match-avg-section">
         <div className={`player-avg-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
-          <span className="avg-text">Avg: {getAverage('player1').toFixed(1)}</span>
-          <span className="darts-text">{legScores.player1.legDarts} darts</span>
+          <span className="avg-text">{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
+          <span className="darts-text">{t('match.dartsCount', { count: legScores.player1.legDarts })}</span>
         </div>
 
         <div className="vs-divider mobile-hidden">
-          <span>vs</span>
+          <span>{t('common.vs')}</span>
         </div>
 
         <div className={`player-avg-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
-          <span className="avg-text">Avg: {getAverage('player2').toFixed(1)}</span>
-          <span className="darts-text">{legScores.player2.legDarts} darts</span>
+          <span className="avg-text">{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
+          <span className="darts-text">{t('match.dartsCount', { count: legScores.player2.legDarts })}</span>
         </div>
       </div>
 
@@ -2199,8 +2223,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         {isViewOnly ? (
           <div className="view-only-message">
             <Eye size={48} />
-            <h3>View Only Mode</h3>
-            <p>You must be logged in to score matches. You can view live matches and standings without logging in.</p>
+            <h3>{t('match.viewOnlyMode')}</h3>
+            <p>{t('match.viewOnlyScoreDescription')}</p>
           </div>
         ) : (
           <>
@@ -2225,13 +2249,13 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                     className={`mode-btn-inline ${inputMode === 'double' ? 'active' : ''}`}
                     onClick={() => setInputMode(inputMode === 'double' ? 'single' : 'double')}
                   >
-                    Double
+                    {t('match.double')}
                   </button>
                   <button 
                     className={`mode-btn-inline ${inputMode === 'triple' ? 'active' : ''}`}
                     onClick={() => setInputMode(inputMode === 'triple' ? 'single' : 'triple')}
                   >
-                    Triple
+                    {t('match.triple')}
                   </button>
                 </div>
                 {/* Remove button - separate row */}
@@ -2242,21 +2266,21 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                     disabled={currentTurn.scores.length === 0 && turnHistory.length === 0 || isRemovingDart}
                   >
                     <ArrowLeft size={20} />
-                    <span>Undo</span>
+                    <span>{t('match.undo')}</span>
                   </button>
                 </div>
               </>
             ) : (
               <div className="turn-total-container">
                 <div className="turn-total-display">
-                  <div className="turn-total-label">3-dart total</div>
+                  <div className="turn-total-label">{t('match.turnTotalLabel')}</div>
                   <div className={`turn-total-value ${isTurnTotalInvalid ? 'invalid' : ''}`}>
                     {turnTotalInput || '—'}
                   </div>
                   <div className="turn-total-hint">
                     {isTurnTotalInvalid
-                      ? 'Invalid total (allowed: 0–180)'
-                      : (useOnScreenKeypad ? 'Enter 0–180, then press OK' : 'Type 0–180 and press Enter')}
+                      ? t('match.turnTotalInvalid')
+                      : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
                   </div>
                 </div>
 
@@ -2267,7 +2291,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                         {n}
                       </button>
                     ))}
-                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button">Clear</button>
+                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button">{t('match.clear')}</button>
                     <button className="dart-btn" onClick={() => appendTurnTotalDigit(0)} type="button">0</button>
                     <button className="dart-btn turn-total-backspace" onClick={backspaceTurnTotal} type="button">⌫</button>
                     <button
@@ -2276,7 +2300,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                       disabled={getTurnTotalValue() === null}
                       type="button"
                     >
-                      OK
+                      {t('match.ok')}
                     </button>
                   </div>
                 ) : (
@@ -2304,10 +2328,10 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                       disabled={getTurnTotalValue() === null}
                       type="button"
                     >
-                      OK
+                      {t('match.ok')}
                     </button>
                     <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button">
-                      Clear
+                      {t('match.clear')}
                     </button>
                   </div>
                 )}
@@ -2319,7 +2343,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                     disabled={turnHistory.length === 0 || currentTurn.score > 0}
                     type="button"
                   >
-                    Undo last visit
+                    {t('match.undoLastVisit')}
                   </button>
                 </div>
               </div>

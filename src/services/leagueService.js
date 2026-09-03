@@ -54,7 +54,19 @@ export const leagueService = {
 
       if (error) throw error;
 
-      // Get member counts and tournament counts for each league
+      // One aggregate query for the list counts instead of two count
+      // round-trips per league (get_leagues_summary, migration 20260903).
+      const { data: summary, error: summaryError } = await supabase.rpc('get_leagues_summary');
+      if (!summaryError && Array.isArray(summary)) {
+        const countsById = new Map(summary.map(row => [row.league_id, row]));
+        return leagues.map(league => ({
+          ...this.transformLeague(league),
+          memberCount: Number(countsById.get(league.id)?.member_count || 0),
+          tournamentCount: Number(countsById.get(league.id)?.tournament_count || 0)
+        }));
+      }
+      console.warn('get_leagues_summary unavailable, falling back to per-league counts:', summaryError?.message);
+
       const leaguesWithStats = await Promise.all(
         leagues.map(async (league) => {
           const [memberCount, tournamentCount] = await Promise.all([
@@ -155,6 +167,15 @@ export const leagueService = {
         .single();
 
       if (error) throw error;
+
+      // Detach the league's tournaments so they stay usable (linkable to
+      // another league); a dangling league_id hid them from every league view.
+      const { error: detachError } = await supabase
+        .from('tournaments')
+        .update({ league_id: null, league_points_calculated: false, updated_at: new Date().toISOString() })
+        .eq('league_id', leagueId);
+      if (detachError) throw detachError;
+
       return true;
     } catch (error) {
       console.error('Error deleting league:', error);
@@ -391,33 +412,41 @@ export const leagueService = {
 
       if (error) throw error;
 
-      // Get league tournament IDs for form indicator
-      const { data: leagueTournaments } = await supabase
-        .from('tournaments')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('deleted', false);
-      const ltIds = (leagueTournaments || []).map(t => t.id);
-
-      // Fetch last 5 matches per player for form indicator
-      let allRecentMatches = [];
-      if (ltIds.length > 0) {
-        const { data: recentData } = await supabase
-          .from('matches')
-          .select('player1_id, player2_id, winner_id, completed_at')
-          .in('tournament_id', ltIds)
-          .eq('status', 'completed')
-          .order('completed_at', { ascending: false })
-          .limit(10000);
-        allRecentMatches = recentData || [];
+      // Form dots: last 5 results per player, aggregated in the database
+      // (get_league_recent_form) instead of pulling every league match row.
+      const last5ByPlayer = new Map();
+      const { data: formRows, error: formError } = await supabase.rpc('get_league_recent_form', { l_id: leagueId });
+      if (!formError && Array.isArray(formRows)) {
+        formRows.forEach(row => last5ByPlayer.set(row.player_id, row.last5 || []));
+      } else {
+        console.warn('get_league_recent_form unavailable, falling back to client-side form:', formError?.message);
+        const { data: leagueTournaments } = await supabase
+          .from('tournaments')
+          .select('id')
+          .eq('league_id', leagueId)
+          .eq('deleted', false);
+        const ltIds = (leagueTournaments || []).map(t => t.id);
+        if (ltIds.length > 0) {
+          const { data: recentData } = await supabase
+            .from('matches')
+            .select('player1_id, player2_id, winner_id, completed_at')
+            .in('tournament_id', ltIds)
+            .eq('status', 'completed')
+            .order('completed_at', { ascending: false })
+            .limit(2000);
+          (recentData || []).forEach(m => {
+            [m.player1_id, m.player2_id].forEach(pid => {
+              if (!pid) return;
+              const list = last5ByPlayer.get(pid) || [];
+              if (list.length < 5) { list.push(m.winner_id === pid); last5ByPlayer.set(pid, list); }
+            });
+          });
+        }
       }
 
       const mapped = (data || []).map(l => {
         const playerId = l.player_id;
-        const playerMatches = allRecentMatches
-          .filter(m => m.player1_id === playerId || m.player2_id === playerId)
-          .slice(0, 5);
-        const last5 = playerMatches.map(m => m.winner_id === playerId);
+        const last5 = last5ByPlayer.get(playerId) || [];
 
         return {
           player: l.player,
@@ -449,53 +478,6 @@ export const leagueService = {
     }
   },
 
-  // Record tournament results and calculate points
-  async recordTournamentResults(leagueId, tournamentId) {
-    try {
-      // Get tournament data
-      const { data: tournament, error: tournamentError } = await supabase
-        .from('tournaments')
-        .select('*')
-        .eq('id', tournamentId)
-        .eq('league_id', leagueId)
-        .single();
-
-      if (tournamentError) throw tournamentError;
-      if (!tournament) throw new Error('Tournament not found or not part of this league');
-
-      // Check if already calculated
-      if (tournament.league_points_calculated) {
-        console.log('Tournament results already calculated');
-        return;
-      }
-
-      // Get tournament with full data (groups, standings, playoffs)
-      // We'll need to use tournamentService.getTournament for this
-      // For now, we'll calculate placements from the tournament data structure
-      // This should be called after tournament completion
-
-      // Get league scoring rules
-      const { data: league } = await supabase
-        .from('leagues')
-        .select('scoring_rules')
-        .eq('id', leagueId)
-        .single();
-
-      if (!league) throw new Error('League not found');
-
-      const scoringRules = league.scoring_rules || {
-        placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
-        allowManualOverride: true
-      };
-
-      // This function will be called from tournament completion handler
-      // For now, return a placeholder
-      return { message: 'Results calculation will be implemented in tournament completion flow' };
-    } catch (error) {
-      console.error('Error recording tournament results:', error);
-      throw error;
-    }
-  },
 
   // Calculate placements from tournament data and award points
   async calculateTournamentPlacements(leagueId, tournamentId, tournamentData) {
@@ -547,6 +529,14 @@ export const leagueService = {
         .from('tournaments')
         .update({ league_points_calculated: true })
         .eq('id', tournamentId);
+
+      // The leaderboard tab reads the cache, so rebuild it now — otherwise the
+      // new points only show up after a manual Recalculate.
+      try {
+        await this.updateLeaderboardCache(leagueId);
+      } catch (cacheError) {
+        console.error('Placements saved but leaderboard cache refresh failed:', cacheError);
+      }
 
       return resultsToInsert;
     } catch (error) {
@@ -807,12 +797,15 @@ export const leagueService = {
 
       // For other playoff players, rank by round eliminated (earlier rounds first = worse)
       const placedPlayerIds = new Set(placements.map(p => p.playerId));
-      let currentPlacement = Math.max(...placements.map(p => p.placement), 0) + 1;
+      // Shared 3rd (no 3rd-place match) occupies two slots, so the next free
+      // position is 5, not 4.
+      let currentPlacement = Math.max(Math.max(...placements.map(p => p.placement), 0), placements.length) + 1;
       
-      // Iterate rounds from earliest to second-to-last (skip final round which is already handled)
-      // Also skip the semifinal round (rounds.length - 2) since those losers are
-      // either in the 3rd-place match (handled above) or shared-3rd.
-      for (let i = 0; i < rounds.length - 1; i++) {
+      // Walk the bracket backwards: losing later means placing higher, so
+      // quarter-final losers come before round-of-16 losers, and so on. The
+      // final is handled above; SF losers are handled above too when there is
+      // a 3rd-place match or shared 3rd.
+      for (let i = rounds.length - 2; i >= 0; i--) {
         // Skip the semifinal round if a 3rd place match exists,
         // because SF losers are the 3rd-place-match participants (already handled or will be)
         if (rawThirdPlaceMatch && i === rounds.length - 2) continue;
@@ -1805,7 +1798,34 @@ export const leagueService = {
       // Idempotent: league_registrations has UNIQUE(league_id, user_id), so a
       // second insert would fail with an opaque constraint error.
       const existing = await this.getMyLeagueRegistration(leagueId);
-      if (existing) return existing;
+      if (existing) {
+        if (existing.status === 'pending') return existing;
+
+        // A rejected request, or an approved one whose membership was later
+        // removed, may be submitted again — otherwise the user is locked out
+        // of the league for good.
+        let canReapply = existing.status === 'rejected';
+        if (existing.status === 'approved') {
+          const { data: activeMembership, error: membershipError } = await supabase
+            .from('league_members')
+            .select('player_id, players!inner(user_id)')
+            .eq('league_id', leagueId)
+            .eq('is_active', true)
+            .is('left_at', null)
+            .eq('players.user_id', user.id)
+            .limit(1);
+          if (membershipError) throw membershipError;
+          if (activeMembership && activeMembership.length > 0) return existing;
+          canReapply = true;
+        }
+        if (!canReapply) return existing;
+
+        const { error: deleteError } = await supabase
+          .from('league_registrations')
+          .delete()
+          .eq('id', existing.id);
+        if (deleteError) throw deleteError;
+      }
 
       const { data: registration, error } = await supabase
         .from('league_registrations')

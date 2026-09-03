@@ -5,7 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLeague } from '../contexts/LeagueContext';
-import { tournamentStatusLabel } from '../utils/tournamentStatus';
+import { tournamentStatusLabel, isTournamentRunning } from '../utils/tournamentStatus';
+import { getUserDisplayName } from '../utils/userDisplayName';
 
 export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeague, onSelectLeague, onNavigate }) {
   const { t } = useLanguage();
@@ -24,7 +25,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
     ? leagues.filter(l => l.createdBy === user.id || (l.managerIds && l.managerIds.includes(user.id)))
     : [];
 
-  const myActiveTournaments = myTournaments.filter(tr => tr.status === 'active');
+  const myActiveTournaments = myTournaments.filter(tr => isTournamentRunning(tr.status));
   // Counts come from the lightweight summary (getTournamentsSummary).
   const myActiveMatches = myTournaments.reduce(
     (sum, tr) => sum + (tr.inProgressMatches ?? 0),
@@ -71,7 +72,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
   }
 
   // Manager / Admin dashboard
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Manager';
+  const displayName = getUserDisplayName(user) || user?.email?.split('@')[0] || t('common.roleManager');
 
   return (
     <div className="dashboard">
@@ -79,7 +80,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
         <div>
           <h1>{t('dashboard.welcomeManager', { name: displayName })}</h1>
           <span className="role-label">
-            {isAdmin ? 'Admin' : 'Manager'}
+            {isAdmin ? t('common.roleAdmin') : t('common.roleManager')}
           </span>
         </div>
       </div>
@@ -259,7 +260,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
                           className="view-tournament-btn"
                           onClick={(e) => { e.stopPropagation(); onSelectTournament(tournament); }}
                         >
-                          {tournament.status === 'active'
+                          {isTournamentRunning(tournament.status)
                             ? t('dashboard.manage')
                             : t('dashboard.viewResults')} {t('tournaments.tournament')}
                         </button>

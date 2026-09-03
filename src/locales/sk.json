@@ -100,7 +100,8 @@
     "startWhenReady": "Spustiť turnaj keď ste pripravení",
     "statusOpenForRegistration": "Registrácia",
     "statusStarted": "Prebieha",
-    "statusCompleted": "Ukončený"
+    "statusCompleted": "Ukončený",
+    "continueTournament": "Pokračovať v turnaji"
   },
   "liveMatches": {
     "title": "Live Zápasy",
@@ -148,7 +149,21 @@
       "decideButton": "Rozhodnúť o bull",
       "title": "Rozhodnúť leg hodom na bull",
       "prompt": "Obaja hráči hádžu na bull — bližší vyhráva leg. Kto vyhral hod na bull? (Nezaznamenáva sa žiadny checkout.)"
-    }
+    },
+    "viewOnlyMode": "Režim iba na prezeranie",
+    "viewOnlyStartDescription": "Na spustenie alebo zapisovanie zápasov musíte byť prihlásený. Živé zápasy a tabuľky si môžete prezerať aj bez prihlásenia.",
+    "viewOnlyScoreDescription": "Na zapisovanie zápasov musíte byť prihlásený. Živé zápasy a tabuľky si môžete prezerať aj bez prihlásenia.",
+    "player1": "Hráč 1",
+    "player2": "Hráč 2",
+    "undo": "Späť",
+    "turnTotalLabel": "Súčet 3 šípok",
+    "turnTotalInvalid": "Neplatný súčet (povolené: 0–180)",
+    "turnTotalKeypadHint": "Zadajte 0–180 a stlačte OK",
+    "turnTotalTypeHint": "Napíšte 0–180 a stlačte Enter",
+    "clear": "Vymazať",
+    "ok": "OK",
+    "undoLastVisit": "Vrátiť posledný náhod",
+    "dartsCount": "{{count}} šípok"
   },
   "tournamentCreation": {
     "title": "Vytvoriť Turnaj",
@@ -159,6 +174,7 @@
     "cancel": "Zrušiť"
   },
   "registration": {
+    "nameRequiredHint": "Zadajte meno, pod ktorým chcete hrať. Zobrazí sa v tabuľkách, pavúkoch a vo vašom profile.",
     "title": "Registrácia Turnaja",
     "addPlayer": "Pridať Hráča",
     "playerName": "Meno Hráča",
@@ -440,7 +456,10 @@
     "playoffsResetSuccess": "Playoff bol resetovaný. Teraz ho môžete spustiť znova.",
     "failedToResetPlayoffs": "Nepodarilo sa resetovať playoff. Skúste to prosím znova.",
     "scorerLabel": "Zapisuje",
-    "suggestedScorerHint": "Navrhnutý zapisovateľ tohto zápasu"
+    "suggestedScorerHint": "Navrhnutý zapisovateľ tohto zápasu",
+    "detailedView": "Podrobné zobrazenie",
+    "tbd": "Neurčené",
+    "plusThirdPlace": "+ zápas o 3. miesto"
   },
   "summary": {
     "tab": "Súhrn",
@@ -548,7 +567,14 @@
     "checkEmailConfirmation": "Skontrolujte svoj email pre potvrdzovací odkaz!",
     "enterEmailFirst": "Prosím najprv zadajte vašu emailovú adresu",
     "passwordResetEmailSent": "Email na obnovenie hesla bol odoslaný! Skontrolujte svoju schránku.",
-    "unexpectedError": "Vyskytla sa neočakávaná chyba"
+    "unexpectedError": "Vyskytla sa neočakávaná chyba",
+    "accessRestricted": "Prístup obmedzený",
+    "accessDenied": "Prístup zamietnutý",
+    "onlyManagersCreateTournaments": "Turnaje môžu vytvárať iba manažéri a administrátori.",
+    "onlyManagersCreateLeagues": "Ligy môžu vytvárať iba manažéri a administrátori.",
+    "contactAdminForManager": "Ak chcete získať oprávnenia manažéra, kontaktujte administrátora.",
+    "adminOnlyPage": "Na prístup k tejto stránke musíte byť administrátor.",
+    "managerOnlyPage": "Na prístup k tejto stránke musíte byť manažér alebo administrátor."
   },
   "common": {
     "save": "Uložiť",
@@ -577,7 +603,17 @@
     "saving": "Ukladá sa...",
     "resetting": "Resetuje sa...",
     "back": "Späť",
-    "registeredAccount": "Registrovaný účet hráča"
+    "registeredAccount": "Registrovaný účet hráča",
+    "archived": "Archivované",
+    "vs": "vs",
+    "user": "Používateľ",
+    "roleAdmin": "Admin",
+    "roleManager": "Manažér",
+    "roleAdministrator": "Administrátor",
+    "loadingTournament": "Načítava sa turnaj...",
+    "matchCountOne": "{{count}} zápas",
+    "matchCountFew": "{{count}} zápasy",
+    "matchCountMany": "{{count}} zápasov"
   },
   "deviceSettings": {
     "title": "Nastavenia zariadenia",
@@ -679,6 +715,11 @@
     "scorersSelectEntity": "Turnaj alebo liga"
   },
   "leagues": {
+    "notFound": "Liga sa nenašla. Možno bola odstránená.",
+    "leagueNameRequired": "Zadajte názov ligy.",
+    "linkFailed": "Turnaj sa nepodarilo pridať do ligy. Možno už patrí do inej ligy.",
+    "unlinkFailed": "Turnaj sa nepodarilo odstrániť z ligy.",
+    "applyAgain": "Požiadať znova",
     "title": "Ligy",
     "myLeagues": "Moje Ligy",
     "backToLeagues": "Späť na Ligy",
@@ -798,7 +839,16 @@
     "noLeaguesFound": "Nenašli sa žiadne ligy",
     "createFirstLeagueHint": "Vytvorte svoju prvú ligu na organizovanie turnajov a sledovanie poradia hráčov.",
     "viewLeague": "Zobraziť Ligu",
-    "createLeague": "Vytvoriť Ligu"
+    "createLeague": "Vytvoriť Ligu",
+    "createNewLeague": "Vytvoriť novú ligu",
+    "enterLeagueName": "Zadajte názov ligy",
+    "describeLeague": "Popíšte ligu...",
+    "scoringRulesCreateDescription": "Nastavte body za jednotlivé umiestnenia. Hráči, ktorí sa nezúčastnia, nezískajú žiadne body (neutrálne).",
+    "4thPlace": "4. miesto",
+    "5thPlace": "5. miesto",
+    "defaultSixthPlus": "Ostatní (6. miesto a nižšie)",
+    "pleaseEnterLeagueName": "Zadajte názov ligy",
+    "failedToCreateLeague": "Nepodarilo sa vytvoriť ligu"
   },
   "playerProfile": {
     "title": "Profil hráča",
@@ -822,6 +872,11 @@
     "tournamentWins": "Výhry v turnajoch",
     "viewProfile": "Zobraziť profil hráča",
     "yourProfile": "Váš profil",
+    "editName": "Upraviť meno",
+    "yourName": "Vaše meno",
+    "nameHint": "Toto meno sa zobrazuje v turnajoch, ligách a štatistikách.",
+    "nameInvalid": "Meno musí mať 2 až 60 znakov.",
+    "nameSaveFailed": "Meno sa nepodarilo uložiť. Skúste to znova.",
     "dartsThrown": "Hodené šípky",
     "recentMatches": "Posledné zápasy",
     "noMatches": "Zatiaľ žiadne odohraté zápasy.",

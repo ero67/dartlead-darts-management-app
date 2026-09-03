@@ -17,7 +17,6 @@ const ACTIONS = {
   COMPLETE_MATCH: 'COMPLETE_MATCH',
   APPLY_REMOTE_MATCH_RESULT: 'APPLY_REMOTE_MATCH_RESULT',
   DELETE_TOURNAMENT: 'DELETE_TOURNAMENT',
-  UPDATE_TOURNAMENT_STATUS: 'UPDATE_TOURNAMENT_STATUS',
   START_PLAYOFFS: 'START_PLAYOFFS'
 };
 
@@ -212,17 +211,6 @@ function tournamentReducer(state, action) {
         currentTournament: state.currentTournament?.id === action.payload ? null : state.currentTournament
       };
 
-    case ACTIONS.UPDATE_TOURNAMENT_STATUS:
-      const tournamentToUpdate = state.tournaments.find(t => t.id === action.payload.id);
-      if (tournamentToUpdate) {
-        tournamentToUpdate.status = action.payload.status;
-        tournamentToUpdate.updatedAt = new Date().toISOString();
-      }
-      return {
-        ...state,
-        tournaments: [...state.tournaments]
-      };
-
     case ACTIONS.START_PLAYOFFS:
       if (!state.currentTournament) {
         console.error('No current tournament to start playoffs');
@@ -231,7 +219,9 @@ function tournamentReducer(state, action) {
       
       const tournamentWithPlayoffs = {
         ...state.currentTournament,
-        playoffs: action.payload.playoffs
+        playoffs: action.payload.playoffs,
+        // A tournament whose bracket has just been generated is running again
+        status: state.currentTournament.status === 'completed' ? 'started' : state.currentTournament.status
       };
       
       return {
@@ -465,12 +455,15 @@ function applyMatchCompletion(currentTournament, matchResult) {
       const playoffsEnabled = updatedTournament.playoffSettings?.enabled;
       const hasPlayoffs = updatedTournament.playoffs && updatedTournament.playoffs.rounds && updatedTournament.playoffs.rounds.length > 0;
 
-      // Tournament is complete if:
-      // 1. Playoffs are not enabled, OR
-      // 2. Playoffs are enabled but not started (no rounds), OR
-      // 3. Playoffs are enabled and all playoff matches are complete (handled in playoff section above)
-      if (!playoffsEnabled || !hasPlayoffs) {
+      // Only a group-only tournament finishes here. With playoffs enabled the
+      // bracket still has to be generated and played (completion is handled in
+      // the playoff section above) — marking it completed now awarded league
+      // points from the group stage alone and hid the bracket behind Summary.
+      if (!playoffsEnabled) {
         updatedTournament.status = 'completed';
+      } else if (!hasPlayoffs && updatedTournament.status === 'completed') {
+        // Repair rows completed prematurely by the old logic.
+        updatedTournament.status = 'started';
       }
     }
   }
@@ -844,15 +837,15 @@ export function TournamentProvider({ children }) {
     }
   };
 
-  const updateTournamentStatus = (tournamentId, status) => {
-    dispatch({ type: ACTIONS.UPDATE_TOURNAMENT_STATUS, payload: { id: tournamentId, status } });
-  };
-
   const startPlayoffs = async (playoffsData) => {
     // Save playoff data to Supabase FIRST — dispatching a bracket that never
     // persisted means matches get played against a bracket that vanishes on
     // refresh (and other devices never see the playoffs at all).
     await tournamentService.updateTournamentPlayoffs(state.currentTournament.id, playoffsData);
+    if (state.currentTournament.status === 'completed') {
+      // Rows completed prematurely (group stage done, bracket not yet generated)
+      await tournamentService.updateTournamentStatus(state.currentTournament.id, 'started');
+    }
 
     // Update local state only after the DB write succeeded
     dispatch({ type: ACTIONS.START_PLAYOFFS, payload: { playoffs: playoffsData } });
@@ -1000,7 +993,6 @@ export function TournamentProvider({ children }) {
     completeMatch,
     applyRemoteMatchResult,
     deleteTournament,
-    updateTournamentStatus,
     startPlayoffs,
     resetPlayoffs,
     startTournament,

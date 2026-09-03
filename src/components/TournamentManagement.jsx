@@ -472,10 +472,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
       await contextStartPlayoffs(updatedPlayoffs);
       setEditingMatch(null);
-      alert(t('management.playoffMatchUpdated') || 'Playoff match updated successfully');
+      alert(t('management.playoffMatchUpdated'));
     } catch (error) {
       console.error('Error updating playoff match:', error);
-      alert(t('management.failedToUpdatePlayoffMatch') || 'Failed to update playoff match');
+      alert(t('management.failedToUpdatePlayoffMatch'));
     }
   };
 
@@ -1500,10 +1500,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     if (window.confirm(confirmMessage)) {
       try {
         await contextResetPlayoffs();
-        alert(t('management.playoffsResetSuccess') || 'Playoffs have been reset. You can now start them again.');
+        alert(t('management.playoffsResetSuccess'));
       } catch (error) {
         console.error('Error resetting playoffs:', error);
-        alert(t('management.failedToResetPlayoffs') || 'Failed to reset playoffs. Please try again.');
+        alert(t('management.failedToResetPlayoffs'));
       }
     }
   };
@@ -1729,11 +1729,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         }
 
         await tournamentService.updateTournamentPlayoffs(tournament.id, playoffs);
+      }
 
-        // Resetting the final (or 3rd place) un-completes the tournament
-        if (tournament.status === 'completed') {
-          await tournamentService.updateTournamentStatus(tournament.id, 'started');
-        }
+      // Any reset on a finished tournament (final, 3rd place, or a group match
+      // of a group-only tournament) means it is no longer complete.
+      if (tournament.status === 'completed') {
+        await tournamentService.updateTournamentStatus(tournament.id, 'started');
       }
 
       await getTournament(tournament.id);
@@ -1744,9 +1745,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
 
   const handleAdminCorrectMatch = async (match) => {
-    const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || 'Player 1' }), match.result?.player1Legs ?? 0);
+    const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || t('management.player1') }), match.result?.player1Legs ?? 0);
     if (newScore1 === null) return;
-    const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || 'Player 2' }), match.result?.player2Legs ?? 0);
+    const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || t('management.player2') }), match.result?.player2Legs ?? 0);
     if (newScore2 === null) return;
 
     const score1 = parseInt(newScore1, 10) || 0;
@@ -1873,7 +1874,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           {hasFavorites && (
             <div className="favorites-indicator">
               <Star size={14} className="filled" />
-              <span>{t('favorites.showingFavorites', 'Obľúbené skupiny sú hore')}</span>
+              <span>{t('favorites.showingFavorites')}</span>
             </div>
           )}
         </div>
@@ -1888,7 +1889,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <button
                       className={`favorite-btn ${isFavorite ? 'active' : ''}`}
                       onClick={() => toggleFavoriteGroup(tournament.id, group.id)}
-                      title={isFavorite ? t('favorites.removeFromFavorites', 'Odstrániť z obľúbených') : t('favorites.addToFavorites', 'Pridať do obľúbených')}
+                      title={isFavorite ? t('favorites.removeFromFavorites') : t('favorites.addToFavorites')}
                     >
                       <Star size={16} className={isFavorite ? 'filled' : ''} />
                     </button>
@@ -1917,7 +1918,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             );
           }) : (
             <div className="no-groups">
-              <p>{t('management.noGroupsYet') || 'No groups created yet. Start the tournament to create groups.'}</p>
+              <p>{t('management.noGroupsYet')}</p>
             </div>
           )}
         </div>
@@ -1988,16 +1989,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           <h3>{t('management.allMatches')}</h3>
           <div className="matches-filters">
             <div className="filter-group">
-              <label htmlFor="group-filter">{t('management.filterByGroup') || 'Filter by Group'}:</label>
+              <label htmlFor="group-filter">{t('management.filterByGroup')}:</label>
               <select
                 id="group-filter"
                 className="filter-select"
                 value={matchGroupFilter}
                 onChange={(e) => setMatchGroupFilter(e.target.value)}
               >
-                <option value="all">{t('management.allGroups') || 'All Groups'}</option>
+                <option value="all">{t('management.allGroups')}</option>
                 {hasFavorites && (
-                  <option value="favorites">⭐ {t('favorites.favoriteGroups', 'Obľúbené skupiny')}</option>
+                  <option value="favorites">⭐ {t('favorites.favoriteGroups')}</option>
                 )}
                 {uniqueGroups.map(group => {
                   const isFav = favoriteGroupIds.includes(group.id);
@@ -2010,14 +2011,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               </select>
             </div>
             <div className="filter-group">
-              <label htmlFor="player-filter">{t('management.filterByPlayer') || 'Filter by Player'}:</label>
+              <label htmlFor="player-filter">{t('management.filterByPlayer')}:</label>
               <div className="filter-input-wrapper">
                 <Search size={16} className="filter-icon" />
                 <input
                   id="player-filter"
                   type="text"
                   className="filter-input"
-                  placeholder={t('management.searchPlayerName') || 'Search player name...'}
+                  placeholder={t('management.searchPlayerName')}
                   value={matchPlayerFilter}
                   onChange={(e) => setMatchPlayerFilter(e.target.value)}
                 />
@@ -2025,7 +2026,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   <button
                     className="filter-clear-btn"
                     onClick={() => setMatchPlayerFilter('')}
-                    title={t('management.clearFilter') || 'Clear filter'}
+                    title={t('management.clearFilter')}
                   >
                     <X size={14} />
                   </button>
@@ -2045,7 +2046,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 <button
                   className={`favorite-btn-small ${groupData.isFavorite ? 'active' : ''}`}
                   onClick={() => toggleFavoriteGroup(tournament.id, groupData.groupId)}
-                  title={groupData.isFavorite ? t('favorites.removeFromFavorites', 'Odstrániť z obľúbených') : t('favorites.addToFavorites', 'Pridať do obľúbených')}
+                  title={groupData.isFavorite ? t('favorites.removeFromFavorites') : t('favorites.addToFavorites')}
                 >
                   <Star size={14} className={groupData.isFavorite ? 'filled' : ''} />
                 </button>
@@ -2072,7 +2073,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         </div>
                       )}
                       {match.status === 'pending' && !user && !isMatchActuallyLive(match.id) && (
-                        <span className="login-hint" title={t('management.loginToStartMatch') || 'Login required to start match'}>
+                        <span className="login-hint" title={t('management.loginToStartMatch')}>
                           <Lock size={11} />
                           {t('navigation.login')}
                         </span>
@@ -2083,7 +2084,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <button
                           className="view-statistics-btn"
                           onClick={() => setMatchStatistics(match)}
-                          title={t('management.viewStatistics') || 'View Statistics'}
+                          title={t('management.viewStatistics')}
                         >
                           <BarChart3 size={16} />
                         </button>
@@ -2094,8 +2095,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             <button
                               className="admin-btn admin-reset-btn"
                               onClick={() => handleAdminResetMatch(match)}
-                              title={t('manager.resetMatchToPending') || 'Reset match to pending'}
-                              aria-label={t('manager.resetMatchToPending') || 'Reset match to pending'}
+                              title={t('manager.resetMatchToPending')}
+                              aria-label={t('manager.resetMatchToPending')}
                             >
                               <RotateCcw size={15} />
                             </button>
@@ -2103,8 +2104,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <button
                             className="admin-btn admin-correct-btn"
                             onClick={() => handleAdminCorrectMatch(match)}
-                            title={t('manager.manualMatchResult') || 'Correct match result'}
-                            aria-label={t('manager.manualMatchResult') || 'Correct match result'}
+                            title={t('manager.manualMatchResult')}
+                            aria-label={t('manager.manualMatchResult')}
                           >
                             <Edit2 size={15} />
                           </button>
@@ -2135,7 +2136,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   ) : (
                     <div className="match-players-compact">
                       <span className="player">{match.player1?.name || t('common.unknown')}</span>
-                      <span className="vs">vs</span>
+                      <span className="vs">{t('common.vs')}</span>
                       <span className="player">{match.player2?.name || t('common.unknown')}</span>
                     </div>
                   )}
@@ -2188,7 +2189,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         className="continue-match-btn admin-override-btn"
                         onClick={() => {
                           const ok = window.confirm(
-                            (t('management.adminTakeOverConfirm') || 'Admin takeover: this will let you continue scoring this match on this device. Continue?')
+                            t('management.adminTakeOverConfirm')
                           );
                           if (!ok) return;
                           onMatchStart({
@@ -2201,12 +2202,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         }}
                       >
                         <Play size={16} />
-                        {t('management.adminTakeOver') || 'Admin take over'}
+                        {t('management.adminTakeOver')}
                       </button>
                     ) : (
                       <button className="view-match-btn" disabled>
                         <Eye size={16} />
-                        {t('management.liveOtherDevice') || 'Live (Other Device)'}
+                        {t('management.liveOtherDevice')}
                       </button>
                     )
                   )}
@@ -2222,10 +2223,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         startingScore: match.startingScore || tournament.startingScore,
                         defaultScoringMode: tournament.defaultScoringMode
                       })}
-                      title={t('management.adminOverride') || 'Admin override'}
+                      title={t('management.adminOverride')}
                     >
                       <Play size={16} />
-                      {t('management.adminScore') || 'Admin score'}
+                      {t('management.adminScore')}
                     </button>
                   )}
                   
@@ -2236,8 +2237,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         )) : (
           <div className="no-matches">
             <p>{matchGroupFilter !== 'all' || matchPlayerFilter ? 
-              (t('management.noMatchesFound') || 'No matches found matching the filters.') :
-              (t('management.noMatchesYet') || 'No matches created yet.')
+              t('management.noMatchesFound') :
+              t('management.noMatchesYet')
             }</p>
           </div>
         )}
@@ -2248,7 +2249,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
   const renderStandings = () => {
     const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
-    const qualifyCount = tournament?.playoffSettings?.playersPerGroup || 1;
+    // Highlight the players who actually qualify under the configured mode
+    // (per group or best N overall) — not a fixed per-group count.
     return (
     <div className="standings-view">
       <div className="standings-view-header">
@@ -2257,11 +2259,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           <div className="standings-legend">
             <span className="standings-legend-item">
               <span className="standings-legend-dot qualify" />
-              {t('management.qualifies') || 'Qualifies'}
+              {t('management.qualifies')}
             </span>
             <span className="standings-legend-item">
               <span className="standings-legend-dot eliminate" />
-              {t('management.eliminated') || 'Eliminated'}
+              {t('management.eliminated')}
             </span>
           </div>
         )}
@@ -2277,7 +2279,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <h4>{group.name}</h4>
               {hasData && (
                 <span className="group-standings-count">
-                  {standings.length} {t('common.players') || 'players'}
+                  {standings.length} {t('common.players')}
                 </span>
               )}
             </div>
@@ -2296,7 +2298,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               {hasData ? (
                 standings.map((standing, index) => {
                   const rank = index + 1;
-                  const isQualify = playoffsEnabled && index < qualifyCount;
+                  const qualifyCount = standings.filter(st => defaultQualifierIdSet.has(st.player?.id)).length;
+                  const isQualify = playoffsEnabled && defaultQualifierIdSet.has(standing.player?.id);
                   const rowClass = playoffsEnabled ? (isQualify ? 'qualify-row' : 'eliminate-row') : '';
                   const isCutLine = playoffsEnabled && rank === qualifyCount && standings.length > qualifyCount;
                   const legDiff = standing.legsWon - standing.legsLost;
@@ -2331,7 +2334,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           );
         }) : (
           <div className="no-standings">
-            <p>{t('management.noGroupsYet') || 'No groups created yet. Start the tournament to create groups.'}</p>
+            <p>{t('management.noGroupsYet')}</p>
           </div>
         )}
       </div>
@@ -2613,18 +2616,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
     return (
       <div className="statistics-view">
-        <h3>{t('management.statistics') || 'Tournament Statistics'}</h3>
+        <h3>{t('management.statistics')}</h3>
         
         {/* Best Averages Leaderboard */}
         <div className="statistics-section">
-          <h4>{t('management.bestAverages') || 'Best Match Averages'}</h4>
+          <h4>{t('management.bestAverages')}</h4>
           {bestAverages.length > 0 ? (
             <div className="leaderboard">
               <div className="leaderboard-header">
                 <span>#</span>
                 <span>{t('management.player')}</span>
                 <span>{t('management.avg')}</span>
-                <span>{t('management.opponent') || 'Opponent'}</span>
+                <span>{t('management.opponent')}</span>
               </div>
               {bestAverages.map((entry, index) => (
                 <div key={`avg-${index}`} className="leaderboard-row">
@@ -2636,19 +2639,19 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               ))}
             </div>
           ) : (
-            <p className="no-stats">{t('management.noStatisticsYet') || 'No statistics available yet.'}</p>
+            <p className="no-stats">{t('management.noStatisticsYet')}</p>
           )}
         </div>
 
         {/* Best Checkouts Leaderboard */}
         <div className="statistics-section">
-          <h4>{t('management.bestCheckouts') || 'Best Checkouts'}</h4>
+          <h4>{t('management.bestCheckouts')}</h4>
           {bestCheckouts.length > 0 ? (
             <div className="leaderboard">
               <div className="leaderboard-header">
                 <span>#</span>
                 <span>{t('management.player')}</span>
-                <span>{t('management.checkout') || 'Checkout'}</span>
+                <span>{t('management.checkout')}</span>
               </div>
               {bestCheckouts.map((entry, index) => (
                 <div key={`checkout-${index}`} className="leaderboard-row">
@@ -2659,20 +2662,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               ))}
             </div>
           ) : (
-            <p className="no-stats">{t('management.noStatisticsYet') || 'No statistics available yet.'}</p>
+            <p className="no-stats">{t('management.noStatisticsYet')}</p>
           )}
         </div>
 
         {/* Fewest Darts Leaderboard */}
         <div className="statistics-section">
-          <h4>{t('management.fewestDarts') || 'Legs with Fewest Darts'}</h4>
+          <h4>{t('management.fewestDarts')}</h4>
           {fewestDarts.length > 0 ? (
             <div className="leaderboard">
               <div className="leaderboard-header">
                 <span>#</span>
                 <span>{t('management.player')}</span>
-                <span>{t('management.darts') || 'Darts'}</span>
-                <span>{t('management.opponent') || 'Opponent'}</span>
+                <span>{t('management.darts')}</span>
+                <span>{t('management.opponent')}</span>
               </div>
               {fewestDarts.map((entry, index) => (
                 <div key={`darts-${index}`} className="leaderboard-row">
@@ -2684,19 +2687,19 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               ))}
             </div>
           ) : (
-            <p className="no-stats">{t('management.noStatisticsYet') || 'No statistics available yet.'}</p>
+            <p className="no-stats">{t('management.noStatisticsYet')}</p>
           )}
         </div>
 
         {/* 180s Leaderboard */}
         <div className="statistics-section">
-          <h4>{t('management.most180s') || 'Most 180s'}</h4>
+          <h4>{t('management.most180s')}</h4>
           {most180s.length > 0 ? (
             <div className="leaderboard">
               <div className="leaderboard-header">
                 <span>#</span>
                 <span>{t('management.player')}</span>
-                <span>{t('management.hit180s') || '180s'}</span>
+                <span>{t('management.hit180s')}</span>
               </div>
               {most180s.map((entry, index) => (
                 <div key={`180-${entry.player?.id || index}`} className="leaderboard-row">
@@ -2707,7 +2710,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               ))}
             </div>
           ) : (
-            <p className="no-stats">{t('management.noStatisticsYet') || 'No statistics available yet.'}</p>
+            <p className="no-stats">{t('management.noStatisticsYet')}</p>
           )}
         </div>
       </div>
@@ -3047,18 +3050,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="live-matches-header">
           <h3>
             <Activity size={20} />
-            {t('management.liveMatches') || 'Live Matches'}
+            {t('management.liveMatches')}
           </h3>
           <p className="live-matches-count">
-            {filteredLiveMatches.length} {t('management.matchesInProgress') || 'matches currently in progress'}
+            {filteredLiveMatches.length} {t('management.matchesInProgress')}
           </p>
         </div>
 
         {filteredLiveMatches.length === 0 ? (
           <div className="no-live-matches">
             <Activity size={48} className="no-matches-icon" />
-            <h4>{t('management.noLiveMatches') || 'No Live Matches'}</h4>
-            <p>{t('management.noLiveMatchesDescription') || 'There are no matches currently in progress for this tournament.'}</p>
+            <h4>{t('management.noLiveMatches')}</h4>
+            <p>{t('management.noLiveMatchesDescription')}</p>
           </div>
         ) : (
           <div className="live-matches-grid">
@@ -3068,35 +3071,35 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   {match.live_board_number ? (
                     <div className="board-indicator">
                       <Target size={14} />
-                      <span>{t('deviceSettings.board', 'Board')} {match.live_board_number}</span>
+                      <span>{t('deviceSettings.board')} {match.live_board_number}</span>
                     </div>
                   ) : (
-                    <div className="match-format">{t('management.firstTo', 'First to')} {match.legs_to_win || 3}</div>
+                    <div className="match-format">{t('management.firstTo')} {match.legs_to_win || 3}</div>
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <button
                       className={`live-match-favorite-btn${favoriteMatchIds.has(match.id) ? ' active' : ''}`}
                       onClick={() => toggleFavoriteMatch(match.id)}
-                      title={t('management.toggleFavorite') || 'Toggle favorite'}
+                      title={t('management.toggleFavorite')}
                     >
                       <Star size={14} fill={favoriteMatchIds.has(match.id) ? 'currentColor' : 'none'} />
                     </button>
                     <div className="live-badge">
                       <Activity size={12} />
-                      <span>{t('management.live', 'LIVE')}</span>
+                      <span>{t('management.live')}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="scoreboard-content">
                   <div className="scoreboard-row">
-                    <div className="scoreboard-label">{t('management.legs') || 'Legs'}</div>
+                    <div className="scoreboard-label">{t('management.legs')}</div>
                   </div>
 
                   <div className={`player-row player1-row${match.current_player === 0 ? ' is-active-turn' : ''}`}>
                     <div className="player-info">
                       {match.current_player === 0 && (
-                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn', 'Player to throw')} />
+                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn')} />
                       )}
                       <div className="player-name-large">{match.player1?.name || t('common.unknown')}</div>
                     </div>
@@ -3109,7 +3112,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   <div className={`player-row player2-row${match.current_player === 1 ? ' is-active-turn' : ''}`}>
                     <div className="player-info">
                       {match.current_player === 1 && (
-                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn', 'Player to throw')} />
+                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn')} />
                       )}
                       <div className="player-name-large">{match.player2?.name || t('common.unknown')}</div>
                     </div>
@@ -3125,7 +3128,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     <span className="group-name">{match.group.name}</span>
                   )}
                   {match.live_board_number && (
-                    <span className="match-format-footer">{t('management.firstTo', 'First to')} {match.legs_to_win || 3}</span>
+                    <span className="match-format-footer">{t('management.firstTo')} {match.legs_to_win || 3}</span>
                   )}
                   {match.live_device_name && (
                     <span className="device-name-footer">{match.live_device_name}</span>
@@ -3163,7 +3166,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           <span className="player-name">{player.name}</span>
           {isAutoQualified && (
             <span className="qualifier-tag">
-              {t('management.autoQualifiedTag') || 'Auto'}
+              {t('management.autoQualifiedTag')}
             </span>
           )}
         </label>
@@ -3184,7 +3187,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               groupPlayers.map(({ player, position }) => renderQualifierRow(player, position))
             ) : (
               <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                {t('management.noPlayersInGroup') || 'No players in this group'}
+                {t('management.noPlayersInGroup')}
               </div>
             )}
           </div>
@@ -3216,25 +3219,25 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             onClick={resetQualifierSelection}
             disabled={!qualifiersTouched}
           >
-            {t('management.resetQualifiers') || 'Reset to automatic'}
+            {t('management.resetQualifiers')}
           </button>
         </div>
 
         <div className="qualifying-players">
           <h4>{t('management.qualifyingPlayers')}:</h4>
           <p className="qualifying-hint">
-            {t('management.qualifyingAdjustHint') || 'Select which players advance. You can change this list before starting playoffs.'}
+            {t('management.qualifyingAdjustHint')}
           </p>
           <div className="players-grid">
             {tournament.tournamentType === 'playoff_only' ? (
               <div className="group-qualifiers">
-                <h5>{t('management.allPlayers') || 'All Players'}</h5>
+                <h5>{t('management.allPlayers')}</h5>
                 <div className="qualifiers-list">
                   {playoffOnlyPlayers.length > 0 ? (
                     playoffOnlyPlayers.map((player, index) => renderQualifierRow(player, index + 1))
                   ) : (
                     <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                      {t('management.noPlayersInGroup') || 'No players in this group'}
+                      {t('management.noPlayersInGroup')}
                     </div>
                   )}
                 </div>
@@ -3244,7 +3247,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 uniqueGroups.map(group => renderGroupQualifiers(group))
               ) : (
                 <div className="no-groups">
-                  <p>{t('management.noGroupsYet') || 'No groups created yet.'}</p>
+                  <p>{t('management.noGroupsYet')}</p>
                 </div>
               )
             )}
@@ -3340,7 +3343,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             <button
               className={`view-toggle-btn ${bracketViewMode === 'detailed' ? 'active' : ''}`}
               onClick={() => setBracketViewMode('detailed')}
-              title="Detailed View"
+              title={t('management.detailedView')}
             >
               <List size={18} />
               {t('management.detailed')}
@@ -3376,8 +3379,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <div className="round-header">
                 <h4>{round.name}</h4>
                 <span className="match-count">
-                  {round.matches.filter(m => !m.isThirdPlaceMatch).length} {round.matches.filter(m => !m.isThirdPlaceMatch).length === 1 ? 'match' : 'matches'}
-                  {round.matches.some(m => m.isThirdPlaceMatch) && ' + 3rd Place'}
+                  {(() => {
+                    const count = round.matches.filter(m => !m.isThirdPlaceMatch).length;
+                    return t(count === 1 ? 'common.matchCountOne' : count < 5 ? 'common.matchCountFew' : 'common.matchCountMany', { count });
+                  })()}
+                  {round.matches.some(m => m.isThirdPlaceMatch) && ` ${t('management.plusThirdPlace')}`}
                 </span>
               </div>
               
@@ -3389,7 +3395,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                   <div key={match.id} className={`playoff-match ${match.status} ${bracketMatch.isThirdPlaceMatch ? 'third-place-match' : ''}`}>
                     {bracketMatch.isThirdPlaceMatch && (
                       <div className="match-label">
-                        {t('management.thirdPlaceMatch') || '3rd Place Match'}
+                        {t('management.thirdPlaceMatch')}
                       </div>
                     )}
                     <div className="match-header">
@@ -3398,7 +3404,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           {getMatchStatusText(match.status, match.id)}
                         </span>
                         {match.status === 'pending' && !user && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
-                          <span className="login-hint" title={t('management.loginToStartMatch') || 'Login required to start match'}>
+                          <span className="login-hint" title={t('management.loginToStartMatch')}>
                             <Lock size={11} />
                             {t('navigation.login')}
                           </span>
@@ -3418,7 +3424,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <button
                             className="edit-match-icon-btn"
                             onClick={() => setEditingMatch({ ...match, isThirdPlaceMatch: bracketMatch.isThirdPlaceMatch })}
-                            title={t('management.editMatchPlayers') || 'Edit match players'}
+                            title={t('management.editMatchPlayers')}
                           >
                             <Edit2 size={16} />
                           </button>
@@ -3427,7 +3433,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <button
                             className="view-statistics-btn"
                             onClick={() => setMatchStatistics(match)}
-                            title={t('management.viewStatistics') || 'View Statistics'}
+                            title={t('management.viewStatistics')}
                           >
                             <BarChart3 size={16} />
                           </button>
@@ -3437,16 +3443,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             <button
                               className="admin-btn admin-reset-btn"
                               onClick={() => handleAdminResetMatch(match)}
-                              title={t('manager.resetMatchToPending') || 'Reset match to pending'}
-                              aria-label={t('manager.resetMatchToPending') || 'Reset match to pending'}
+                              title={t('manager.resetMatchToPending')}
+                              aria-label={t('manager.resetMatchToPending')}
                             >
                               <RotateCcw size={15} />
                             </button>
                             <button
                               className="admin-btn admin-correct-btn"
                               onClick={() => handleAdminCorrectMatch(match)}
-                              title={t('manager.manualMatchResult') || 'Correct match result'}
-                              aria-label={t('manager.manualMatchResult') || 'Correct match result'}
+                              title={t('manager.manualMatchResult')}
+                              aria-label={t('manager.manualMatchResult')}
                             >
                               <Edit2 size={15} />
                             </button>
@@ -3458,18 +3464,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       match.result.isBye ? (
                         <div className="playoff-match-result bye-result">
                           <div className="playoff-player-row winner">
-                            <span className="playoff-player-name">{(match.player1 || match.player2)?.name || 'TBD'}</span>
+                            <span className="playoff-player-name">{(match.player1 || match.player2)?.name || t('management.tbd')}</span>
                             <span className="playoff-player-score bye-badge">{t('management.bye')}</span>
                           </div>
                         </div>
                       ) : (
                         <div className="playoff-match-result">
                           <div className={`playoff-player-row ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
-                            <span className="playoff-player-name">{match.player1?.name || 'TBD'}</span>
+                            <span className="playoff-player-name">{match.player1?.name || t('management.tbd')}</span>
                             <span className="playoff-player-score">{match.result.player1Legs}</span>
                           </div>
                           <div className={`playoff-player-row ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
-                            <span className="playoff-player-name">{match.player2?.name || 'TBD'}</span>
+                            <span className="playoff-player-name">{match.player2?.name || t('management.tbd')}</span>
                             <span className="playoff-player-score">{match.result.player2Legs}</span>
                           </div>
                         </div>
@@ -3477,11 +3483,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     ) : (
                       <div className="playoff-match-players">
                         <div className="playoff-player-row">
-                          <span className="playoff-player-name">{match.player1?.name || (!match.player2 ? 'TBD' : t('management.bye'))}</span>
+                          <span className="playoff-player-name">{match.player1?.name || (!match.player2 ? t('management.tbd') : t('management.bye'))}</span>
                     </div>
-                        <div className="playoff-vs">vs</div>
+                        <div className="playoff-vs">{t('common.vs')}</div>
                         <div className="playoff-player-row">
-                          <span className="playoff-player-name">{match.player2?.name || (!match.player1 ? 'TBD' : t('management.bye'))}</span>
+                          <span className="playoff-player-name">{match.player2?.name || (!match.player1 ? t('management.tbd') : t('management.bye'))}</span>
                       </div>
                       </div>
                     )}
@@ -3551,7 +3557,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             className="continue-match-btn admin-override-btn"
                             onClick={() => {
                               const ok = window.confirm(
-                                (t('management.adminTakeOverConfirm') || 'Admin takeover: this will let you continue scoring this match on this device. Continue?')
+                                t('management.adminTakeOverConfirm')
                               );
                               if (!ok) return;
                               const roundSize = getRoundSize(round);
@@ -3567,12 +3573,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             }}
                           >
                             <Play size={16} />
-                            {t('management.adminTakeOver') || 'Admin take over'}
+                            {t('management.adminTakeOver')}
                           </button>
                         ) : (
                           <button className="view-match-btn" disabled>
                             <Eye size={16} />
-                            {t('management.liveOtherDevice') || 'Live (Other Device)'}
+                            {t('management.liveOtherDevice')}
                           </button>
                         )
                       )}
@@ -3593,10 +3599,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                               isPlayoff: true
                             });
                           }}
-                          title={t('management.adminOverride') || 'Admin override'}
+                          title={t('management.adminOverride')}
                         >
                           <Play size={16} />
-                          {t('management.adminScore') || 'Admin score'}
+                          {t('management.adminScore')}
                         </button>
                       )}
                       
@@ -3699,14 +3705,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           className={activeTab === 'statistics' ? 'active' : ''}
           onClick={() => handleTabChange('statistics')}
         >
-          {t('management.statistics') || 'Statistics'}
+          {t('management.statistics')}
         </button>
         <button 
           className={activeTab === 'liveMatches' ? 'active' : ''}
           onClick={() => handleTabChange('liveMatches')}
         >
           <Activity size={16} />
-          {t('management.liveMatches') || 'Live Matches'}
+          {t('management.liveMatches')}
         </button>
         {tournament.status === 'completed' && (
           <button 
@@ -3714,7 +3720,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             onClick={() => handleTabChange('summary')}
           >
             <Trophy size={16} />
-            {t('summary.tab') || 'Summary'}
+            {t('summary.tab')}
           </button>
         )}
       </div>
@@ -3739,7 +3745,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="modal-overlay" onClick={cancelStartMatch}>
           <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{t('management.confirmStartMatch') || 'Start Match?'}</h3>
+              <h3>{t('management.confirmStartMatch')}</h3>
               <button 
                 className="close-btn"
                 onClick={cancelStartMatch}
@@ -3750,9 +3756,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             <div className="modal-content confirm-modal-content">
               <div className="confirm-match-info">
                 <div className="confirm-match-players">
-                  <span className="confirm-player">{matchToConfirm.player1?.name || 'Player 1'}</span>
-                  <span className="confirm-vs">vs</span>
-                  <span className="confirm-player">{matchToConfirm.player2?.name || 'Player 2'}</span>
+                  <span className="confirm-player">{matchToConfirm.player1?.name || t('management.player1')}</span>
+                  <span className="confirm-vs">{t('common.vs')}</span>
+                  <span className="confirm-player">{matchToConfirm.player2?.name || t('management.player2')}</span>
                 </div>
                 {matchToConfirm.groupName && (
                   <div className="confirm-match-group">
@@ -3761,12 +3767,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 )}
                 {matchToConfirm.isPlayoff && (
                   <div className="confirm-match-playoff">
-                    {t('management.playoffMatch') || 'Playoff Match'}
+                    {t('management.playoffMatch')}
                   </div>
                 )}
               </div>
               <p className="confirm-message">
-                {t('management.confirmStartMatchMessage') || 'Are you sure you want to start this match?'}
+                {t('management.confirmStartMatchMessage')}
               </p>
             </div>
             <div className="modal-actions confirm-modal-actions">
@@ -3884,7 +3890,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <div className="group-settings">
                 <h4>{t('registration.standingsCriteriaOrder')}</h4>
                 <p className="settings-description" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  {t('registration.standingsCriteriaOrderDescription') || 'Nastavte poradie kritérií pre zoradenie v tabuľke skupín. Kritériá sa použijú v tomto poradí pri rovnakých hodnotách.'}
+                  {t('registration.standingsCriteriaOrderDescription')}
                 </p>
                 <div className="criteria-order-list" style={{ marginBottom: '1.5rem' }}>
                   {tournamentSettings.standingsCriteriaOrder.map((criterion, index) => {
@@ -3946,7 +3952,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 <h4>{t('registration.groupSettings')}</h4>
                 {hasTournamentStarted && (
                   <p className="settings-description" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                    {t('registration.groupSettingsLocked') || 'Group count is locked after matches have started.'}
+                    {t('registration.groupSettingsLocked')}
                   </p>
                 )}
                 <div className="radio-group">
@@ -4126,7 +4132,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       )}
                       
                       <div className="input-group">
-                        <label>{t('registration.seedingMethod') || 'Seeding Method'}</label>
+                        <label>{t('registration.seedingMethod')}</label>
                         <div className="radio-group">
                           <label>
                             <input
@@ -4142,7 +4148,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                 }
                               })}
                             />
-                            {t('registration.seedingMethodStandard') || 'Standard Tournament Seeding'}
+                            {t('registration.seedingMethodStandard')}
                           </label>
                           <label>
                             <input
@@ -4158,18 +4164,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                 }
                               })}
                             />
-                            {t('registration.seedingMethodGroupBased') || 'Group-Based Seeding'}
+                            {t('registration.seedingMethodGroupBased')}
                           </label>
                         </div>
                       </div>
 
                       {tournamentSettings.playoffSettings.seedingMethod === 'groupBased' && (
                         <div className="input-group">
-                          <label>{t('registration.groupMatchups') || 'Group Matchups'}</label>
+                          <label>{t('registration.groupMatchups')}</label>
                           {tournament?.groups && tournament.groups.length > 0 ? (
                             <>
                               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                                {t('registration.groupMatchupsDescription') || 'Configure which groups play against each other. 1st from Group A vs last advancing from Group D, etc.'}
+                                {t('registration.groupMatchupsDescription')}
                               </p>
                           <div className="group-matchups-config" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                             {(() => {
@@ -4237,7 +4243,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                         <option key={groupName} value={groupName}>{groupName}</option>
                                       ))}
                                     </select>
-                                    <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>vs</span>
+                                    <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{t('common.vs')}</span>
                                     <select
                                       value={matchup.group2}
                                       onChange={(e) => {
@@ -4334,13 +4340,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                                 e.target.style.backgroundColor = 'var(--card-bg)';
                               }}
                             >
-                              {t('registration.addGroupMatchup') || '+ Add Group Matchup'}
+                              {t('registration.addGroupMatchup')}
                             </button>
                           </div>
                             </>
                           ) : (
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                              {t('registration.groupMatchupsNote') || 'Note: Groups must be created first (start the tournament) before you can configure group matchups.'}
+                              {t('registration.groupMatchupsNote')}
                             </p>
                           )}
                         </div>
@@ -4516,7 +4522,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
-              <h3>{t('management.editMatchPlayers') || 'Edit Match Players'}</h3>
+              <h3>{t('management.editMatchPlayers')}</h3>
               <button 
                 className="close-btn"
                 onClick={() => setEditingMatch(null)}
@@ -4542,7 +4548,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="modal-overlay">
           <div className="modal match-statistics-modal">
             <div className="modal-header">
-              <h3>{t('management.matchStatistics') || 'Match Statistics'}</h3>
+              <h3>{t('management.matchStatistics')}</h3>
               <button 
                 className="close-btn"
                 onClick={() => setMatchStatistics(null)}
@@ -4554,13 +4560,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <div className="match-statistics-header">
                 <div className="match-players-header">
                   <div className="player-header">
-                    <div className="player-name-stat">{matchStatistics.player1?.name || 'Player 1'}</div>
+                    <div className="player-name-stat">{matchStatistics.player1?.name || t('management.player1')}</div>
                     <div className="player-legs-stat">{matchStatistics.result.player1Legs}</div>
                   </div>
-                  <div className="vs-stat">vs</div>
+                  <div className="vs-stat">{t('common.vs')}</div>
                   <div className="player-header">
                     <div className="player-legs-stat">{matchStatistics.result.player2Legs}</div>
-                    <div className="player-name-stat">{matchStatistics.player2?.name || 'Player 2'}</div>
+                    <div className="player-name-stat">{matchStatistics.player2?.name || t('management.player2')}</div>
                   </div>
                 </div>
               </div>
@@ -4568,12 +4574,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <div className="statistics-sections">
                 {/* Match Averages */}
                 <div className="statistics-section">
-                  <h4>{t('management.matchAverage') || 'Match Average'}</h4>
+                  <h4>{t('management.matchAverage')}</h4>
                   <div className="statistics-row">
                     <div className="stat-value">
                       {matchStatistics.result.player1Stats?.average ? matchStatistics.result.player1Stats.average.toFixed(2) : '0.00'}
                     </div>
-                    <div className="stat-label">Avg</div>
+                    <div className="stat-label">{t('management.avg')}</div>
                     <div className="stat-value">
                       {matchStatistics.result.player2Stats?.average ? matchStatistics.result.player2Stats.average.toFixed(2) : '0.00'}
                     </div>
@@ -4582,17 +4588,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
                 {/* Legs Won */}
                 <div className="statistics-section">
-                  <h4>{t('management.legsWon') || 'Legs Won'}</h4>
+                  <h4>{t('management.legsWon')}</h4>
                   <div className="statistics-row">
                     <div className="stat-value">{matchStatistics.result.player1Legs || 0}</div>
-                    <div className="stat-label">Legs</div>
+                    <div className="stat-label">{t('management.legs')}</div>
                     <div className="stat-value">{matchStatistics.result.player2Legs || 0}</div>
                   </div>
                 </div>
 
                 {/* Checkouts */}
                 <div className="statistics-section">
-                  <h4>{t('management.checkouts') || 'Checkouts'}</h4>
+                  <h4>{t('management.checkouts')}</h4>
                   <div className="statistics-row checkouts-row">
                     <div className="checkouts-list">
                       {matchStatistics.result.player1Stats?.checkouts && matchStatistics.result.player1Stats.checkouts.length > 0 ? (
@@ -4603,7 +4609,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           .join(', ') || '-'
                       ) : '-'}
                     </div>
-                    <div className="stat-label">Checkouts</div>
+                    <div className="stat-label">{t('management.checkouts')}</div>
                     <div className="checkouts-list">
                       {matchStatistics.result.player2Stats?.checkouts && matchStatistics.result.player2Stats.checkouts.length > 0 ? (
                         matchStatistics.result.player2Stats.checkouts
@@ -4618,7 +4624,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
                 {/* Darts per Leg */}
                 <div className="statistics-section">
-                  <h4>{t('management.dartsPerLeg') || 'Darts per Leg'}</h4>
+                  <h4>{t('management.dartsPerLeg')}</h4>
                   <div className="legs-details">
                     {Array.from({ length: Math.max(
                       matchStatistics.result.player1Stats?.legs?.length || 0,
@@ -4636,7 +4642,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                           <div className={`leg-darts ${player1Won ? 'winner' : ''}`}>
                             {player1Darts}
                           </div>
-                          <div className="leg-number">Leg {legNum}</div>
+                          <div className="leg-number">{t('management.leg')} {legNum}</div>
                           <div className={`leg-darts ${player2Won ? 'winner' : ''}`}>
                             {player2Darts}
                           </div>
@@ -4785,10 +4791,10 @@ function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onC
         <div className={`info-message ${!previousRoundComplete ? 'warning' : ''}`}>
           {/* We still show a warning if previous round isn't complete, but allow manual selection. */}
           {!previousRoundComplete
-            ? (t('management.completePreviousRoundFirst', { 
+            ? t('management.completePreviousRoundFirst', { 
                 roundName: allRounds[currentRoundIndex - 1]?.name || t('management.previousRound')
-              }) || 'Previous round is not complete yet.')
-            : (t('management.youCanSelectAnyPlayoffPlayer') || 'You can select any player from the playoffs pool.')}
+              })
+            : t('management.youCanSelectAnyPlayoffPlayer')}
         </div>
       )}
       <div className="input-group">

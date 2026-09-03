@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Trophy, Users, Calendar } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useAdmin } from '../contexts/AdminContext';
@@ -12,10 +12,6 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
   const { canCreateTournaments } = useAdmin();
   const { leagues, loading, selectLeague } = useLeague();
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed', 'archived'
-
-  useEffect(() => {
-    // Leagues are loaded in LeagueContext
-  }, []);
 
   const isMyLeague = (league) => user && (
     league.createdBy === user.id || (league.managerIds && league.managerIds.includes(user.id))
@@ -63,25 +59,25 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
             className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
             onClick={() => setFilter('all')}
           >
-            All ({leagues.length})
+            {t('tournaments.all')} ({leagues.length})
           </button>
           <button 
             className={`filter-btn ${filter === 'active' ? 'active' : ''}`}
             onClick={() => setFilter('active')}
           >
-            Active ({leagues.filter(l => l.status === 'active').length})
+            {t('common.active')} ({leagues.filter(l => l.status === 'active').length})
           </button>
           <button 
             className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
             onClick={() => setFilter('completed')}
           >
-            Completed ({leagues.filter(l => l.status === 'completed').length})
+            {t('common.completed')} ({leagues.filter(l => l.status === 'completed').length})
           </button>
           <button
             className={`filter-btn ${filter === 'archived' ? 'active' : ''}`}
             onClick={() => setFilter('archived')}
           >
-            Archived ({leagues.filter(l => l.status === 'archived').length})
+            {t('common.archived')} ({leagues.filter(l => l.status === 'archived').length})
           </button>
           {user && canCreateTournaments && (
             <button
@@ -128,11 +124,11 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
               <div className="tournament-stats">
                 <div className="stat">
                   <Users size={16} />
-                  <span>{league.memberCount || 0} members</span>
+                  <span>{league.memberCount || 0} {t('leagues.members')}</span>
                 </div>
                 <div className="stat">
                   <Trophy size={16} />
-                  <span>{league.tournamentCount || 0} tournaments</span>
+                  <span>{league.tournamentCount || 0} {t('leagues.tournaments')}</span>
                 </div>
                 <div className="stat">
                   <Calendar size={16} />

@@ -98,7 +98,7 @@ export function HeadToHead({ leagueId, players }) {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <span className="h2h-vs">vs</span>
+        <span className="h2h-vs">{t('leagues.statVs')}</span>
         <select value={player2Id} onChange={(e) => setPlayer2Id(e.target.value)}>
           <option value="">{t('leagues.selectPlayer')}</option>
           {players.map(p => (
@@ -123,7 +123,7 @@ export function HeadToHead({ leagueId, players }) {
               <span className="h2h-player-wins">{stats.p1Wins}</span>
             </div>
             <div className="h2h-center">
-              <span className="h2h-matches-count">{stats.matches} {stats.matches === 1 ? 'match' : 'matches'}</span>
+              <span className="h2h-matches-count">{t(stats.matches === 1 ? 'common.matchCountOne' : stats.matches < 5 ? 'common.matchCountFew' : 'common.matchCountMany', { count: stats.matches })}</span>
             </div>
             <div className={`h2h-player ${stats.p2Wins > stats.p1Wins ? 'h2h-player--leading' : ''}`}>
               <span className="h2h-player-wins">{stats.p2Wins}</span>

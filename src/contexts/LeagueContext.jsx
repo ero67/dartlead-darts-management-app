@@ -22,7 +22,7 @@ const ACTIONS = {
 const initialState = {
   leagues: [],
   currentLeague: null,
-  loading: false,
+  loading: true, // until the first LOAD_LEAGUES — avoids flashing the empty state
   error: null
 };
 
@@ -155,7 +155,6 @@ export function LeagueProvider({ children }) {
   useEffect(() => {
     const loadLeagues = async () => {
       try {
-        dispatch({ type: ACTIONS.LOAD_LEAGUES, payload: [] });
         const leagues = await leagueService.getLeagues();
         dispatch({ type: ACTIONS.LOAD_LEAGUES, payload: leagues });
       } catch (error) {
@@ -245,21 +244,6 @@ export function LeagueProvider({ children }) {
       }
     } catch (error) {
       console.error('Error removing member:', error);
-      throw error;
-    }
-  };
-
-  const calculateTournamentResults = async (leagueId, tournamentId, tournamentData) => {
-    try {
-      const results = await leagueService.calculateTournamentPlacements(leagueId, tournamentId, tournamentData);
-      // Refresh leaderboard
-      const leaderboard = await leagueService.getLeaderboard(leagueId);
-      if (state.currentLeague?.id === leagueId) {
-        dispatch({ type: ACTIONS.UPDATE_LEADERBOARD, payload: leaderboard });
-      }
-      return results;
-    } catch (error) {
-      console.error('Error calculating tournament results:', error);
       throw error;
     }
   };
@@ -379,7 +363,6 @@ export function LeagueProvider({ children }) {
     addMembers,
     updateMemberStatus,
     removeMember,
-    calculateTournamentResults,
     refreshLeaderboard,
     getUnlinkedTournaments,
     linkTournamentToLeague,

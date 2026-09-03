@@ -16,8 +16,11 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
   const searchParams = new URLSearchParams(location.search);
   const leagueId = searchParams.get('leagueId');
   
-  // Initialize with league defaults if available
-  const leagueDefaults = currentLeague?.defaultTournamentSettings || {};
+  // Seed from league defaults only when creating FOR that league — currentLeague
+  // otherwise still holds whatever league was viewed last.
+  const leagueDefaults = (leagueId && currentLeague?.id === leagueId)
+    ? (currentLeague.defaultTournamentSettings || {})
+    : {};
   
   const [tournamentName, setTournamentName] = useState('');
   const [legsToWin, setLegsToWin] = useState(leagueDefaults.legsToWin || 3);
