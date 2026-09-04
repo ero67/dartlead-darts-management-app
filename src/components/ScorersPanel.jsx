@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { UserPlus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { UserSearchPicker } from './UserSearchPicker';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 
@@ -10,7 +11,6 @@ import { leagueService } from '../services/leagueService';
 export function ScorersPanel({ type, entityId }) {
   const { t } = useLanguage();
   const [scorers, setScorers] = useState([]);
-  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState('');
@@ -40,17 +40,16 @@ export function ScorersPanel({ type, entityId }) {
     loadScorers();
   }, [loadScorers]);
 
-  const handleAddScorer = async (e) => {
-    e.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail || isAdding) return;
+  // Called when the manager picks a user from the search dropdown. The RPC
+  // still resolves the account by email; the picker only saves typing it.
+  const handleAddScorer = async (user) => {
+    if (!user?.email || isAdding) return;
 
     setIsAdding(true);
     setError('');
     try {
-      const result = await service.addScorer(entityId, trimmedEmail);
+      const result = await service.addScorer(entityId, user.email);
       if (result?.success) {
-        setEmail('');
         setScorers(prev => {
           if (prev.some(s => s.userId === result.user_id)) return prev;
           return [...prev, { userId: result.user_id, email: result.email, fullName: result.full_name }];
@@ -88,31 +87,15 @@ export function ScorersPanel({ type, entityId }) {
         {type === 'league' ? t('scorers.descriptionLeague') : t('scorers.descriptionTournament')}
       </p>
 
-      <form onSubmit={handleAddScorer} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder={t('scorers.emailPlaceholder')}
-          style={{
-            flex: '1 1 200px',
-            padding: '0.5rem 0.75rem',
-            borderRadius: '6px',
-            border: '1px solid var(--border-color)',
-            background: 'var(--bg-secondary)',
-            color: 'var(--text-primary)'
-          }}
+      <div style={{ marginBottom: '1rem' }}>
+        <UserSearchPicker
+          onSelect={handleAddScorer}
+          excludeIds={scorers.map(s => s.userId)}
         />
-        <button
-          type="submit"
-          className="create-tournament-btn"
-          disabled={isAdding || !email.trim()}
-          style={{ padding: '0.5rem 1rem' }}
-        >
-          <UserPlus size={16} />
-          {isAdding ? t('common.saving') : t('scorers.add')}
-        </button>
-      </form>
+        {isAdding && (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{t('common.saving')}</p>
+        )}
+      </div>
 
       {error && (
         <p style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.875rem', marginBottom: '1rem' }}>{error}</p>
