@@ -74,7 +74,10 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      // 'local' signs out this device only. The default ('global') revokes every
+      // session of the account, which kicks out the other tablets a venue runs
+      // on the same login — possibly mid-match.
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) throw error;
     } catch (error) {
       console.error('Error signing out:', error);
