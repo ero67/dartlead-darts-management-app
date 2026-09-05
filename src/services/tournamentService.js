@@ -2186,6 +2186,23 @@ export const tournamentService = {
   },
 
   // Update tournament playoffs
+  // Atomically record a completed playoff match and advance the winner (and
+  // semifinal loser) in the database. The RPC locks the tournament row, so two
+  // boards finishing at the same time can no longer overwrite each other's
+  // next-round slot. Returns { success, playoffs, status } on success.
+  async completePlayoffMatch(tournamentId, matchId, matchResult) {
+    const { data, error } = await supabase.rpc('complete_playoff_match', {
+      t_id: tournamentId,
+      m_id: matchId,
+      p_result: matchResult
+    });
+    if (error) throw error;
+    if (!data?.success) {
+      throw new Error(`complete_playoff_match failed: ${data?.error || 'unknown'}`);
+    }
+    return data;
+  },
+
   async updateTournamentPlayoffs(tournamentId, playoffsData) {
     try {
       const { data, error } = await supabase

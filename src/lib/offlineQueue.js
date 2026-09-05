@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { matchService } from '../services/tournamentService.js';
+import { matchService, tournamentService } from '../services/tournamentService.js';
 
 // A small, durable queue for Supabase writes that must not be lost on bad WiFi.
 //
@@ -20,7 +20,8 @@ const QUEUE_TYPES = {
   saveMatchResult: 'saveMatchResult',
   liveSync: 'liveSync',
   startLiveMatch: 'startLiveMatch',
-  playoffSync: 'playoffSync'
+  playoffSync: 'playoffSync',
+  playoffAdvance: 'playoffAdvance'
 };
 
 let listeners = new Set();
@@ -159,6 +160,14 @@ async function performWrite(item) {
       }
       const { error } = await query;
       if (error) throw error;
+      return;
+    }
+
+    case QUEUE_TYPES.playoffAdvance: {
+      // Idempotent on the server: replaying a result whose winner is already
+      // recorded returns the current bracket without touching anything.
+      const { tournamentId, matchId, matchResult } = item.payload;
+      await tournamentService.completePlayoffMatch(tournamentId, matchId, matchResult);
       return;
     }
 

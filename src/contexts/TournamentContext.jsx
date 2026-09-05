@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { tournamentService, matchService } from '../services/tournamentService.js';
 import { leagueService } from '../services/leagueService.js';
-import { supabase } from '../lib/supabase.js';
 import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue.js';
 
 
@@ -17,7 +16,8 @@ const ACTIONS = {
   COMPLETE_MATCH: 'COMPLETE_MATCH',
   APPLY_REMOTE_MATCH_RESULT: 'APPLY_REMOTE_MATCH_RESULT',
   DELETE_TOURNAMENT: 'DELETE_TOURNAMENT',
-  START_PLAYOFFS: 'START_PLAYOFFS'
+  START_PLAYOFFS: 'START_PLAYOFFS',
+  SET_PLAYOFFS: 'SET_PLAYOFFS'
 };
 
 // Session persistence helpers – keep tournament/match IDs across re-mounts
@@ -187,11 +187,6 @@ function tournamentReducer(state, action) {
         return state;
       }
 
-      // Watchers must never write to the DB – the scoring device owns bracket sync
-      if (updatedTournament.playoffs) {
-        delete updatedTournament.playoffs._matchesNeedingDbSync;
-      }
-
       const updatedTournaments = state.tournaments.map(t =>
         t.id === updatedTournament.id ? updatedTournament : t
       );
@@ -210,6 +205,25 @@ function tournamentReducer(state, action) {
         tournaments: state.tournaments.filter(t => t.id !== action.payload),
         currentTournament: state.currentTournament?.id === action.payload ? null : state.currentTournament
       };
+
+    case ACTIONS.SET_PLAYOFFS: {
+      // Replace the bracket with the server's copy after complete_playoff_match.
+      // The RPC result already contains every other device's advancements, so
+      // this only ever adds information to the optimistic local bracket.
+      if (!state.currentTournament || state.currentTournament.id !== action.payload.tournamentId) {
+        return state;
+      }
+      const synced = {
+        ...state.currentTournament,
+        playoffs: action.payload.playoffs,
+        status: action.payload.status || state.currentTournament.status
+      };
+      return {
+        ...state,
+        currentTournament: synced,
+        tournaments: state.tournaments.map(t => (t.id === synced.id ? synced : t))
+      };
+    }
 
     case ACTIONS.START_PLAYOFFS:
       if (!state.currentTournament) {
@@ -328,9 +342,6 @@ function applyMatchCompletion(currentTournament, matchResult) {
         const nonThirdPlaceMatches = currentRound?.matches?.filter(m => !m.isThirdPlaceMatch) || [];
         const isSemifinal = nonThirdPlaceMatches.length === 2 && foundRoundIndex < rounds.length - 1;
 
-        // Track matches that need DB sync after JSONB save
-        const matchesNeedingDbSync = [];
-
         // Use the match's index among non-3rd-place matches for bracket mapping
         const bracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === foundMatch.id);
 
@@ -350,7 +361,6 @@ function applyMatchCompletion(currentTournament, matchResult) {
                 nextMatch.player2 = winnerPlayer;
               }
               nextMatch.status = 'pending';
-              matchesNeedingDbSync.push(nextMatch);
             }
           }
         }
@@ -370,12 +380,8 @@ function applyMatchCompletion(currentTournament, matchResult) {
             if (thirdPlaceMatch.player1 && thirdPlaceMatch.player2) {
               thirdPlaceMatch.status = 'pending';
             }
-            matchesNeedingDbSync.push(thirdPlaceMatch);
           }
         }
-
-        // Attach sync list to playoffs so the async handler can update DB
-        updatedTournament.playoffs._matchesNeedingDbSync = matchesNeedingDbSync;
 
         // Advance playoffs currentRound if all matches in the found round are completed
         const playoffCurrentRound = updatedTournament.playoffs.currentRound;
@@ -733,45 +739,32 @@ export function TournamentProvider({ children }) {
         // Get the updated tournament from state after dispatch
         const currentState = stateRef.current;
         if (currentState.currentTournament) {
-          // If this is a playoff match, save updated playoff rounds
+          // Playoff match: let the database advance the bracket atomically.
+          // Previously each device wrote its own copy of the whole playoffs
+          // JSONB here, so two boards finishing the two quarterfinals of one
+          // semifinal pair overwrote each other's winner. The RPC locks the
+          // tournament row and only writes the slots this result owns; we then
+          // replace the optimistic local bracket with what the server returns.
           if (matchResult.isPlayoff && currentState.currentTournament.playoffs) {
-            const playoffs = currentState.currentTournament.playoffs;
-
-            // Sync advanced players to the matches table so DB matches
-            // stay consistent with the JSONB bracket after advancement
-            const toSync = playoffs._matchesNeedingDbSync || [];
-            for (const m of toSync) {
-              if (m.player1?.id || m.player2?.id) {
-                const upsertRow = {
-                  id: m.id,
-                  tournament_id: currentState.currentTournament.id,
-                  player1_id: m.player1?.id || null,
-                  player2_id: m.player2?.id || null,
-                  status: m.status || 'pending',
-                  is_playoff: true,
-                  playoff_round: m.playoffRound,
-                  playoff_match_number: m.playoffMatchNumber,
-                  legs_to_win: currentState.currentTournament.legsToWin || 3,
-                  starting_score: currentState.currentTournament.startingScore || 501
-                };
-                try {
-                  const { error: upsertErr } = await supabase
-                    .from('matches')
-                    .upsert(upsertRow, { onConflict: 'id' });
-                  if (upsertErr) throw upsertErr;
-                } catch (syncErr) {
-                  console.warn('Could not sync next-round match to DB, queueing for retry:', syncErr);
-                  // Queue so the bracket advancement is not lost offline.
-                  enqueueWrite(QUEUE_TYPES.playoffSync, upsertRow, `playoff:${m.id}`);
-                }
-              }
+            const tournamentId = currentState.currentTournament.id;
+            try {
+              const advanced = await tournamentService.completePlayoffMatch(
+                tournamentId,
+                matchResult.matchId,
+                matchResult
+              );
+              dispatch({
+                type: ACTIONS.SET_PLAYOFFS,
+                payload: { tournamentId, playoffs: advanced.playoffs, status: advanced.status }
+              });
+            } catch (advanceErr) {
+              console.warn('Could not advance playoff bracket in DB, queueing for retry:', advanceErr);
+              enqueueWrite(
+                QUEUE_TYPES.playoffAdvance,
+                { tournamentId, matchId: matchResult.matchId, matchResult },
+                `advance:${matchResult.matchId}`
+              );
             }
-            delete playoffs._matchesNeedingDbSync;
-
-            await tournamentService.updateTournamentPlayoffs(
-              currentState.currentTournament.id,
-              playoffs
-            );
           }
           
           // If tournament is completed, update status in database
