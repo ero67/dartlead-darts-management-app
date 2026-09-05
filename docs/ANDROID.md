@@ -64,7 +64,12 @@ Only these places branch on it:
   origin. Put it in `.env.production.local` next to the Supabase variables.
 
 - `src/lib/haptics.js` — keypad tap / bust / leg / match feedback on the match
-  screen (`@capacitor/haptics`); intentionally silent in browsers.
+  screen (`@capacitor/haptics`); intentionally silent in browsers. Strength is a
+  per-device choice in Device Settings (off / light / medium / strong).
+- Device Settings also shows the build identity: `package.json` version plus
+  the short commit (`__APP_VERSION__` / `__BUILD_SHA__`, defined in
+  `vite.config.js`). Bump `version` in `package.json` and `versionName` /
+  `versionCode` in `android/app/build.gradle` together for a store release.
 
 Planned next:
 

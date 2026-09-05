@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Monitor, Target, Save, X, Settings } from 'lucide-react';
+import { Monitor, Target, Save, X, Settings, Vibrate } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { HAPTIC_LEVELS, getHapticsLevel, setHapticsLevel, isHapticsAvailable, hapticTap } from '../lib/haptics';
 
 export function DeviceSettings({ isOpen, onClose }) {
   const { deviceId, deviceName, boardNumber, setDeviceInfo } = useLiveMatch();
@@ -10,6 +11,15 @@ export function DeviceSettings({ isOpen, onClose }) {
   const [localDeviceName, setLocalDeviceName] = useState(deviceName || '');
   const [localBoardNumber, setLocalBoardNumber] = useState(boardNumber || '');
   const [saved, setSaved] = useState(false);
+  const [hapticsLevel, setHapticsLevelState] = useState(getHapticsLevel());
+
+  // Applies immediately (per device, not per account) and plays a sample so
+  // the user can compare strengths without leaving the dialog.
+  const handleHapticsChange = (next) => {
+    setHapticsLevel(next);
+    setHapticsLevelState(next);
+    hapticTap();
+  };
 
   // Update local state when context changes
   useEffect(() => {
@@ -91,6 +101,32 @@ export function DeviceSettings({ isOpen, onClose }) {
             </small>
           </div>
 
+          {isHapticsAvailable() && (
+            <div className="form-group">
+              <label>
+                <Vibrate size={16} />
+                {t('deviceSettings.haptics', 'Vibration feedback')}
+              </label>
+              <div className="haptics-options" role="radiogroup" aria-label={t('deviceSettings.haptics', 'Vibration feedback')}>
+                {HAPTIC_LEVELS.map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    role="radio"
+                    aria-checked={hapticsLevel === lvl}
+                    className={`haptics-option${hapticsLevel === lvl ? ' active' : ''}`}
+                    onClick={() => handleHapticsChange(lvl)}
+                  >
+                    {t(`deviceSettings.haptics_${lvl}`, lvl)}
+                  </button>
+                ))}
+              </div>
+              <small className="form-hint">
+                {t('deviceSettings.hapticsHint', 'Keypad taps, busts and won legs on the match screen. Applies to this device only.')}
+              </small>
+            </div>
+          )}
+
           <div className="device-preview">
             <div className="preview-label">{t('deviceSettings.preview', 'Náhľad zobrazenia')}:</div>
             <div className="preview-content">
@@ -107,6 +143,10 @@ export function DeviceSettings({ isOpen, onClose }) {
               )}
             </div>
           </div>
+        </div>
+
+        <div className="app-version" title={`${__APP_VERSION__} (${__BUILD_SHA__})`}>
+          {t('deviceSettings.version', 'Version')} {__APP_VERSION__} · {__BUILD_SHA__}
         </div>
 
         <div className="modal-footer">

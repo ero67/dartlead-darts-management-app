@@ -7924,6 +7924,35 @@ body {
   gap: 1rem;
 }
 
+/* Device settings: haptics strength + build identity */
+.haptics-options {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.haptics-option {
+  flex: 1 1 4.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.haptics-option.active {
+  border-color: var(--primary-color, #3b82f6);
+  background: var(--primary-color, #3b82f6);
+  color: #fff;
+}
+.app-version {
+  padding: 0 1.5rem 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Manual refresh (header) — same footprint as the settings button */
 .refresh-btn {
   display: inline-flex;

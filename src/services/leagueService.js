@@ -513,30 +513,21 @@ export const leagueService = {
         };
       });
 
-      // Upsert results (in case of recalculation)
-      if (resultsToInsert.length > 0) {
-        const { error: insertError } = await supabase
-          .from('league_tournament_results')
-          .upsert(resultsToInsert, {
-            onConflict: 'league_id,tournament_id,player_id'
-          });
-
-        if (insertError) throw insertError;
-      }
-
-      // Mark tournament as calculated
-      await supabase
-        .from('tournaments')
-        .update({ league_points_calculated: true })
-        .eq('id', tournamentId);
-
-      // The leaderboard tab reads the cache, so rebuild it now — otherwise the
-      // new points only show up after a manual Recalculate.
-      try {
-        await this.updateLeaderboardCache(leagueId);
-      } catch (cacheError) {
-        console.error('Placements saved but leaderboard cache refresh failed:', cacheError);
-      }
+      // Persist through the database function: it runs with the tournament's
+      // scorer permission (the device that finished the final is often a
+      // scorer, not a league manager, and RLS on the results/leaderboard
+      // tables is manager-only), marks the tournament as calculated and
+      // rebuilds the leaderboard cache server-side in the same transaction.
+      const { data, error } = await supabase.rpc('record_league_tournament_results', {
+        t_id: tournamentId,
+        results: resultsToInsert.map(r => ({
+          player_id: r.player_id,
+          placement: r.placement,
+          points_awarded: r.points_awarded
+        }))
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(`record_league_tournament_results failed: ${data?.error || 'unknown'}`);
 
       return resultsToInsert;
     } catch (error) {

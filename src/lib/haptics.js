@@ -7,27 +7,51 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 // Android phones vibrate on the live website, a behaviour change nobody asked
 // for. Every call swallows errors — a device without a vibrator must never
 // break scoring.
+//
+// Strength is a per-device preference (Device Settings): 'off' | 'light' |
+// 'medium' | 'strong'. Devices differ a lot, and some venues want silence.
 const native = Capacitor.isNativePlatform();
 const fire = (promise) => promise.catch(() => {});
 
+export const HAPTICS_STORAGE_KEY = 'dartlead-haptics';
+export const HAPTIC_LEVELS = ['off', 'light', 'medium', 'strong'];
+const DEFAULT_LEVEL = 'medium';
+
+let level = DEFAULT_LEVEL;
+try {
+  const saved = localStorage.getItem(HAPTICS_STORAGE_KEY);
+  if (HAPTIC_LEVELS.includes(saved)) level = saved;
+} catch {
+  // storage unavailable — keep the default
+}
+
+export const isHapticsAvailable = () => native;
+export const getHapticsLevel = () => level;
+export const setHapticsLevel = (next) => {
+  if (!HAPTIC_LEVELS.includes(next)) return;
+  level = next;
+  try { localStorage.setItem(HAPTICS_STORAGE_KEY, next); } catch { /* ignore */ }
+};
+
+const enabled = () => native && level !== 'off';
+const tapStyle = () => (level === 'light' ? ImpactStyle.Light : level === 'strong' ? ImpactStyle.Heavy : ImpactStyle.Medium);
+
 // Keypad tap: confirms the entry registered while the scorer looks at the board.
-// Medium, not Light: the plugin's light pulse (50 ms at ~40% strength) is
-// barely noticeable on many phones and not at all through a case.
 export const hapticTap = () => {
-  if (native) fire(Haptics.impact({ style: ImpactStyle.Medium }));
+  if (enabled()) fire(Haptics.impact({ style: tapStyle() }));
 };
 
 // Bust: distinct "something went wrong" pattern.
 export const hapticBust = () => {
-  if (native) fire(Haptics.notification({ type: NotificationType.Error }));
+  if (enabled()) fire(Haptics.notification({ type: NotificationType.Error }));
 };
 
 // Leg won.
 export const hapticLegWon = () => {
-  if (native) fire(Haptics.notification({ type: NotificationType.Success }));
+  if (enabled()) fire(Haptics.notification({ type: NotificationType.Success }));
 };
 
-// Match won: one long buzz.
+// Match won: one long buzz (shorter on the light setting).
 export const hapticMatchWon = () => {
-  if (native) fire(Haptics.vibrate({ duration: 400 }));
+  if (enabled()) fire(Haptics.vibrate({ duration: level === 'light' ? 200 : level === 'strong' ? 600 : 400 }));
 };

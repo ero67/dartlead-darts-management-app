@@ -2203,6 +2203,21 @@ export const tournamentService = {
     return data;
   },
 
+  // Manual bracket edit, done atomically in the database (see
+  // set_playoff_match_players). Pass null for an empty slot.
+  async setPlayoffMatchPlayers(tournamentId, matchId, player1, player2) {
+    const slot = (p) => (p ? { id: p.id, name: p.name } : null);
+    const { data, error } = await supabase.rpc('set_playoff_match_players', {
+      t_id: tournamentId,
+      m_id: matchId,
+      p1: slot(player1),
+      p2: slot(player2)
+    });
+    if (error) throw error;
+    if (!data?.success) throw new Error(`set_playoff_match_players failed: ${data?.error || 'unknown'}`);
+    return data;
+  },
+
   async updateTournamentPlayoffs(tournamentId, playoffsData) {
     try {
       const { data, error } = await supabase

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { tournamentService, matchService } from '../services/tournamentService.js';
 import { leagueService } from '../services/leagueService.js';
+import { supabase } from '../lib/supabase.js';
 import { enqueueWrite, hasPending, QUEUE_TYPES } from '../lib/offlineQueue.js';
 
 
@@ -621,6 +622,7 @@ export function TournamentProvider({ children }) {
   // Silent refresh bookkeeping (see refreshCurrentTournament)
   const refreshSeqRef = useRef(0);
   const completionsInFlightRef = useRef(0);
+  const leaguePointsInFlightRef = useRef(new Set());
 
   // Keep a ref to the latest state so async callbacks don't use stale closures
   useEffect(() => {
@@ -879,12 +881,46 @@ export function TournamentProvider({ children }) {
       if (seq !== refreshSeqRef.current) return false; // a newer refresh is in flight
       if (stateRef.current.currentTournament?.id !== current.id) return false; // user moved on
       dispatch({ type: ACTIONS.SELECT_TOURNAMENT, payload: fresh });
+      ensureLeaguePoints(fresh);
       return true;
     } catch (error) {
       console.warn('Background tournament refresh failed:', error);
       return false;
     }
   };
+
+  // Realtime for the open tournament beyond match rows (which the management
+  // page handles granularly): the tournament row itself (bracket edits,
+  // settings, status), its player list and its registrations. Any change on
+  // another device triggers a debounced silent re-fetch here, so the
+  // registration page, the match screen and the bracket stay current without
+  // anyone pulling to refresh.
+  const currentTournamentId = state.currentTournament?.id || null;
+  useEffect(() => {
+    if (!currentTournamentId) return undefined;
+    let timer = null;
+    const scheduleRefresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => refreshCurrentTournament(currentTournamentId), 400);
+    };
+    const channel = supabase
+      .channel(`tournament-row-${currentTournamentId}`)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${currentTournamentId}` },
+        scheduleRefresh)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tournament_players', filter: `tournament_id=eq.${currentTournamentId}` },
+        scheduleRefresh)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tournament_registrations', filter: `tournament_id=eq.${currentTournamentId}` },
+        scheduleRefresh)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTournamentId]);
 
   // Refresh when the app comes back to the foreground or regains network —
   // the moments a device that sat idle through other boards' results needs it.
@@ -905,6 +941,7 @@ export function TournamentProvider({ children }) {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('online', handleOnline);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const deleteTournament = async (tournamentId) => {
@@ -995,10 +1032,27 @@ export function TournamentProvider({ children }) {
     }
   };
 
+  // A completed league tournament whose points were never recorded (the
+  // finishing device was offline, or — before record_league_tournament_results
+  // existed — a scorer without league-manager rights) gets them recorded by
+  // the next device that loads it and is allowed to. Idempotent; failures are
+  // expected for plain viewers and stay silent.
+  const ensureLeaguePoints = (tournament) => {
+    if (!tournament?.id || !tournament.leagueId) return;
+    if (tournament.status !== 'completed' || tournament.league_points_calculated !== false) return;
+    if (!stateRef.current || leaguePointsInFlightRef.current.has(tournament.id)) return;
+    leaguePointsInFlightRef.current.add(tournament.id);
+    leagueService
+      .calculateTournamentPlacements(tournament.leagueId, tournament.id, tournament)
+      .catch(() => {})
+      .finally(() => leaguePointsInFlightRef.current.delete(tournament.id));
+  };
+
   const getTournament = async (tournamentId) => {
     try {
       const tournament = await tournamentService.getTournament(tournamentId);
       dispatch({ type: ACTIONS.SELECT_TOURNAMENT, payload: tournament });
+      ensureLeaguePoints(tournament);
       return tournament;
     } catch (error) {
       console.error('Error loading tournament:', error);

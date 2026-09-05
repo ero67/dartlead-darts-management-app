@@ -627,7 +627,14 @@
     "boardNumberPlaceholder": "napr. 1, 2, 3...",
     "boardNumberHint": "Číslo terča pri ktorom je toto zariadenie",
     "preview": "Náhľad zobrazenia",
-    "board": "Terč"
+    "board": "Terč",
+    "haptics": "Vibračná odozva",
+    "haptics_off": "Vypnuté",
+    "haptics_light": "Slabá",
+    "haptics_medium": "Stredná",
+    "haptics_strong": "Silná",
+    "hapticsHint": "Klepnutia na klávesnici, busty a vyhraté legy na obrazovke zápasu. Platí len pre toto zariadenie.",
+    "version": "Verzia"
   },
   "favorites": {
     "favoriteGroups": "Obľúbené skupiny",

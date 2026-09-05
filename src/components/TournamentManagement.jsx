@@ -420,58 +420,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
   // Update playoff match players
   const updatePlayoffMatchPlayers = async (matchId, player1, player2) => {
-    if (!tournament || !tournament.playoffs || !tournament.playoffs.rounds) return;
-
-    const updatedRounds = tournament.playoffs.rounds.map(round => ({
-      ...round,
-      matches: round.matches.map(match => {
-        if (match.id === matchId) {
-          return {
-            ...match,
-            player1: player1,
-            player2: player2,
-            // Editing players always resets the match to pending. A match with
-            // only one player is a bye and is advanced via the "Advance Player" button.
-            status: 'pending'
-          };
-        }
-        return match;
-      })
-    }));
-
-    const updatedPlayoffs = {
-      ...tournament.playoffs,
-      rounds: updatedRounds
-    };
-
+    if (!tournament?.playoffs?.rounds) return;
     try {
-      // Also update the matches DB record so player IDs stay in sync.
-      // This prevents bracket propagation from breaking after tournament refresh,
-      // and keeps a previously-created DB row from overriding a bye edit (the
-      // bracket display prefers the DB row when one exists).
-      if (player1?.id || player2?.id) {
-        const { error: matchUpdateError } = await supabase
-          .from('matches')
-          .update({
-            player1_id: player1?.id || null,
-            player2_id: player2?.id || null,
-            status: 'pending',
-            // Clear any stale result data from a previous play
-            winner_id: null,
-            player1_legs: 0,
-            player2_legs: 0,
-            result: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', matchId);
-
-        if (matchUpdateError) {
-          console.warn('Could not update matches table (match may not exist in DB yet):', matchUpdateError);
-          // Not fatal — the match row is created on first startMatch call
-        }
-      }
-
-      await contextStartPlayoffs(updatedPlayoffs);
+      // Atomic in the database: locks the tournament row and rewrites only this
+      // match (players, pending status, cleared result) plus its matches row.
+      // Writing the whole bracket from here raced with boards finishing
+      // matches at the same moment.
+      await tournamentService.setPlayoffMatchPlayers(tournament.id, matchId, player1, player2);
+      await getTournament(tournament.id);
       setEditingMatch(null);
       alert(t('management.playoffMatchUpdated'));
     } catch (error) {
@@ -1509,64 +1465,34 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
 
-  const handleAdvanceBye = async (match, roundIndex) => {
+  const handleAdvanceBye = async (match) => {
     if (!tournament?.playoffs?.rounds) return;
 
     const player = match.player1 || match.player2;
     if (!player) return;
 
-    const rounds = tournament.playoffs.rounds.map(r => ({
-      ...r,
-      matches: r.matches.map(m => ({ ...m }))
-    }));
-
-    const currentRound = rounds[roundIndex];
-    const matchIndex = currentRound.matches.findIndex(m => m.id === match.id);
-    if (matchIndex === -1) return;
-
-    currentRound.matches[matchIndex] = {
-      ...currentRound.matches[matchIndex],
-      status: 'completed',
-      result: {
+    // A bye is just a completed match with one player: the same database
+    // function that scores real matches records it, places the player in the
+    // next round and bumps currentRound — atomically, unlike the old
+    // whole-bracket write from this device.
+    try {
+      await tournamentService.completePlayoffMatch(tournament.id, match.id, {
+        matchId: match.id,
         winner: player.id,
+        player1Id: match.player1?.id || null,
+        player2Id: match.player2?.id || null,
+        player1Name: match.player1?.name || null,
+        player2Name: match.player2?.name || null,
         player1Legs: 0,
         player2Legs: 0,
-        isBye: true
-      }
-    };
-
-    // Advance winner to next round
-    const nonThirdPlaceMatches = currentRound.matches.filter(m => !m.isThirdPlaceMatch);
-    const bracketIndex = nonThirdPlaceMatches.findIndex(m => m.id === match.id);
-
-    if (roundIndex < rounds.length - 1 && bracketIndex !== -1) {
-      const nextRound = rounds[roundIndex + 1];
-      const nextNonThird = nextRound.matches.filter(m => !m.isThirdPlaceMatch);
-      const nextMatchIndex = Math.floor(bracketIndex / 2);
-      const nextMatch = nextNonThird[nextMatchIndex];
-
-      if (nextMatch) {
-        const slot = bracketIndex % 2 === 0 ? 'player1' : 'player2';
-        nextMatch[slot] = player;
-        nextMatch.status = 'pending';
-      }
-    }
-
-    // Check if current round is complete to advance currentRound counter
-    const updatedPlayoffs = { ...tournament.playoffs, rounds };
-    const crIdx = Math.max(0, (updatedPlayoffs.currentRound || 1) - 1);
-    const crObj = rounds[crIdx];
-    if (crObj) {
-      const allDone = crObj.matches.filter(m => !m.isThirdPlaceMatch).every(m => m.status === 'completed');
-      if (allDone && updatedPlayoffs.currentRound < rounds.length) {
-        updatedPlayoffs.currentRound = (updatedPlayoffs.currentRound || 1) + 1;
-      }
-    }
-
-    try {
-      await contextStartPlayoffs(updatedPlayoffs);
+        isBye: true,
+        isPlayoff: true,
+        playoffRound: match.playoffRound
+      });
+      await getTournament(tournament.id);
     } catch (error) {
       console.error('Error advancing bye:', error);
+      alert(error.message);
     }
   };
 
@@ -3503,7 +3429,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                       {match.status === 'pending' && ((match.player1 && !match.player2) || (!match.player1 && match.player2)) && (
                         <button
                           className="start-match-btn bye-advance-btn"
-                          onClick={() => handleAdvanceBye(match, index)}
+                          onClick={() => handleAdvanceBye(match)}
                         >
                           <CheckCircle size={16} />
                           {t('management.advancePlayer')}

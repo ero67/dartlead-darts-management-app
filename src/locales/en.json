@@ -627,7 +627,14 @@
     "boardNumberPlaceholder": "e.g. 1, 2, 3...",
     "boardNumberHint": "Board number where this device is located",
     "preview": "Display preview",
-    "board": "Board"
+    "board": "Board",
+    "haptics": "Vibration feedback",
+    "haptics_off": "Off",
+    "haptics_light": "Light",
+    "haptics_medium": "Medium",
+    "haptics_strong": "Strong",
+    "hapticsHint": "Keypad taps, busts and won legs on the match screen. Applies to this device only.",
+    "version": "Version"
   },
   "favorites": {
     "favoriteGroups": "Favorite Groups",
