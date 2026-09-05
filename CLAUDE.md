@@ -17,6 +17,11 @@ npm run test:e2e:headed  # Tests with visible browser
 
 # Single test file
 npx cypress run --spec "cypress/e2e/<test-file>.cy.js"
+
+# Android app (Capacitor wrapper of the same build) - see docs/ANDROID.md
+npm run android:sync     # build + copy dist into android/
+npm run android:open     # open in Android Studio
+npm run android:assets   # regenerate launcher icons/splash (gitignored binaries)
 ```
 
 ## Architecture

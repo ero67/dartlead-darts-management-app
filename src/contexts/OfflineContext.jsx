@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { registerSW } from 'virtual:pwa-register';
 import { initOfflineQueue, flushQueue, subscribe, getQueueLength } from '../lib/offlineQueue.js';
 
@@ -54,6 +55,11 @@ export function OfflineProvider({ children }) {
   // (registerType 'prompt'); we keep asking the server for one periodically and
   // apply it ourselves at a safe moment — see the effect below.
   useEffect(() => {
+    // Inside the Android/iOS shell (Capacitor) the web bundle is packaged with
+    // the app and updated through the store, so there is no service worker to
+    // register and nothing to poll for.
+    if (Capacitor.isNativePlatform()) return undefined;
+
     let intervalId = null;
     let registration = null;
 

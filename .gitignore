@@ -37,3 +37,14 @@ cypress.env.json
 
 # Playwright MCP artifacts
 .playwright-mcp
+
+# Android (Capacitor). Binary build inputs are regenerated, not committed:
+#   gradle-wrapper.jar  -> Android Studio / `gradle wrapper` restores it
+#   launcher icons & splash -> `npm run android:assets`
+android/gradle/wrapper/gradle-wrapper.jar
+android/app/src/main/res/mipmap-*/*.png
+android/app/src/main/res/drawable*/splash.png
+android/app/release/
+android/app/*.keystore
+android/app/*.jks
+.cap-assets-tmp/

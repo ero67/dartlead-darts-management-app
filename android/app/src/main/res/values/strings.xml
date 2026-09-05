@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DartLead</string>
+    <string name="title_activity_main">DartLead</string>
+    <string name="package_name">com.dartlead.app</string>
+    <string name="custom_url_scheme">com.dartlead.app</string>
+</resources>
