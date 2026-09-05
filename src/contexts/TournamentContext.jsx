@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { tournamentService, matchService } from '../services/tournamentService.js';
 import { leagueService } from '../services/leagueService.js';
-import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue.js';
+import { enqueueWrite, hasPending, QUEUE_TYPES } from '../lib/offlineQueue.js';
 
 
 const TournamentContext = createContext();
@@ -618,6 +618,9 @@ function updateGroupStandings(group, tournament = null) {
 export function TournamentProvider({ children }) {
   const [state, dispatch] = useReducer(tournamentReducer, initialState);
   const stateRef = useRef(state);
+  // Silent refresh bookkeeping (see refreshCurrentTournament)
+  const refreshSeqRef = useRef(0);
+  const completionsInFlightRef = useRef(0);
 
   // Keep a ref to the latest state so async callbacks don't use stale closures
   useEffect(() => {
@@ -714,6 +717,11 @@ export function TournamentProvider({ children }) {
   const completeMatch = async (matchResult) => {
     // Clear match from session – the match is done, no need to restore it
     saveSessionIds(state.currentTournament?.id || null, null);
+
+    // Block silent refreshes until the deferred DB side-effects below have
+    // run: the route we navigate back to would otherwise re-fetch a bracket
+    // the server has not advanced yet and could apply it after SET_PLAYOFFS.
+    completionsInFlightRef.current += 1;
 
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       // Known offline – don't even attempt; queue the result so it syncs later.
@@ -823,9 +831,58 @@ export function TournamentProvider({ children }) {
         }
       } catch (error) {
         console.error('Error updating tournament in database:', error);
+      } finally {
+        completionsInFlightRef.current = Math.max(0, completionsInFlightRef.current - 1);
+        // Now that everything this device knows is persisted, pull the server's
+        // view (which includes what other boards saved meanwhile).
+        refreshCurrentTournament();
       }
     }, 500); // Allow the COMPLETE_MATCH dispatch to settle before DB side-effects
   };
+
+  // Re-fetch the current tournament in the background and swap it into state,
+  // without any loading UI. Skipped when it could do harm: offline or with
+  // queued writes (the server copy would hide results only this device has),
+  // while a match completion is still being persisted, or on the match screen
+  // (scoring works off currentMatch; nothing there needs the fresh copy).
+  // Stale responses are dropped so two overlapping refreshes cannot regress.
+  // Returns true when a fresh copy was applied.
+  const refreshCurrentTournament = async (expectedId = null) => {
+    const current = stateRef.current.currentTournament;
+    if (!current?.id || current._summary === true) return false;
+    if (expectedId && current.id !== expectedId) return false;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+    if (hasPending()) return false;
+    if (completionsInFlightRef.current > 0) return false;
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/match/')) return false;
+
+    const seq = ++refreshSeqRef.current;
+    try {
+      const fresh = await tournamentService.getTournament(current.id);
+      if (seq !== refreshSeqRef.current) return false; // a newer refresh is in flight
+      if (stateRef.current.currentTournament?.id !== current.id) return false; // user moved on
+      dispatch({ type: ACTIONS.SELECT_TOURNAMENT, payload: fresh });
+      return true;
+    } catch (error) {
+      console.warn('Background tournament refresh failed:', error);
+      return false;
+    }
+  };
+
+  // Refresh when the app comes back to the foreground or regains network —
+  // the moments a device that sat idle through other boards' results needs it.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshCurrentTournament();
+    };
+    const handleOnline = () => refreshCurrentTournament();
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
 
   const deleteTournament = async (tournamentId) => {
     try {
@@ -1006,6 +1063,7 @@ export function TournamentProvider({ children }) {
     addPlayerToTournament,
     removePlayerFromTournament,
     updateTournamentSettings,
+    refreshCurrentTournament,
     registerForTournament,
     getTournamentRegistrations,
     approveRegistration,

@@ -7919,6 +7919,38 @@ body {
   gap: 1rem;
 }
 
+/* Manual refresh (header) — same footprint as the settings button */
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.refresh-btn:hover { background: var(--bg-tertiary, var(--bg-secondary)); }
+.refresh-btn:disabled { opacity: 0.7; cursor: default; }
+.refresh-btn__icon--spinning { animation: spin 0.9s linear infinite; }
+
+/* Pull-to-refresh (touch) — indicator grows out of the top of the page */
+.pull-to-refresh { min-height: 100%; }
+.pull-to-refresh__indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  transition: height 0.15s ease-out;
+}
+.pull-to-refresh__indicator--visible { transition: none; }
+
 .edit-settings-btn {
   display: flex;
   align-items: center;

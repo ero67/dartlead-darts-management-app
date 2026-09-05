@@ -612,7 +612,11 @@
     "loadingTournament": "Loading tournament...",
     "matchCountOne": "{{count}} match",
     "matchCountFew": "{{count}} matches",
-    "matchCountMany": "{{count}} matches"
+    "matchCountMany": "{{count}} matches",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "pullToRefresh": "Pull down to refresh",
+    "releaseToRefresh": "Release to refresh"
   },
   "deviceSettings": {
     "title": "Device Settings",

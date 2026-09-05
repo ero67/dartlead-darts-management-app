@@ -26,6 +26,7 @@ import { ManagerPanel } from './components/ManagerPanel';
 import { LandingPage } from './components/LandingPage';
 import { PlayerProfile } from './components/PlayerProfile';
 import { OfflineBanner } from './components/OfflineBanner';
+import { PullToRefresh } from './components/PullToRefresh';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { NotFound } from './components/NotFound';
 import { ResetPassword } from './components/ResetPassword';
@@ -85,9 +86,18 @@ function TournamentRoute() {
     tournaments,
     currentTournament,
     getTournament,
+    refreshCurrentTournament,
     startMatch,
     deleteTournament
   } = useTournament();
+
+  // Already-loaded tournament being opened again (back from the list, from a
+  // match, from a league): re-fetch it silently so results other devices saved
+  // meanwhile show up without anyone reloading the page.
+  useEffect(() => {
+    if (id) refreshCurrentTournament(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     // Hydrate the full tournament (groups + matches) when:
@@ -157,22 +167,26 @@ function TournamentRoute() {
   // Show registration component if tournament is open for registration
   if (currentTournament.status === 'open_for_registration') {
     return (
-      <TournamentRegistration
-        tournament={currentTournament}
-        onBack={() => navigate('/tournaments')}
-        onDeleteTournament={handleDeleteTournament}
-      />
+      <PullToRefresh onRefresh={refreshCurrentTournament}>
+        <TournamentRegistration
+          tournament={currentTournament}
+          onBack={() => navigate('/tournaments')}
+          onDeleteTournament={handleDeleteTournament}
+        />
+      </PullToRefresh>
     );
   }
 
   // Show management component if tournament is started
   return (
-    <TournamentManagement
-      tournament={currentTournament}
-      onMatchStart={handleMatchStart}
-      onBack={() => navigate('/tournaments')}
-      onDeleteTournament={handleDeleteTournament}
-    />
+    <PullToRefresh onRefresh={refreshCurrentTournament}>
+      <TournamentManagement
+        tournament={currentTournament}
+        onMatchStart={handleMatchStart}
+        onBack={() => navigate('/tournaments')}
+        onDeleteTournament={handleDeleteTournament}
+      />
+    </PullToRefresh>
   );
 }
 

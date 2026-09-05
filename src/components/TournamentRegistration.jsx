@@ -9,6 +9,7 @@ import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ScorersPanel } from './ScorersPanel';
+import { RefreshButton } from './RefreshButton';
 import { getUserDisplayName } from '../utils/userDisplayName';
 import { DisplayNameEditor } from './DisplayNameEditor';
 
@@ -583,6 +584,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
         </button>
         <h1>{tournament.name}</h1>
         <div className="header-actions">
+          <RefreshButton />
           {canManage && (
             <button
               className="edit-settings-btn"

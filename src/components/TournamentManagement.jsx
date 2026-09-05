@@ -13,6 +13,7 @@ import { BracketSeedingEditor } from './BracketSeedingEditor';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { TournamentSummary } from './TournamentSummary';
 import { ScorersPanel } from './ScorersPanel';
+import { RefreshButton } from './RefreshButton';
 import { isValidLegDartCount } from '../utils/dartStats';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 
@@ -3647,6 +3648,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           </div>
         </div>
         <div className="header-actions">
+          <RefreshButton />
           {canManage && user && (
             <button
               className="edit-settings-btn"

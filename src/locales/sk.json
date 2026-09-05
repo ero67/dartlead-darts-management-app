@@ -612,7 +612,11 @@
     "loadingTournament": "Načítava sa turnaj...",
     "matchCountOne": "{{count}} zápas",
     "matchCountFew": "{{count}} zápasy",
-    "matchCountMany": "{{count}} zápasov"
+    "matchCountMany": "{{count}} zápasov",
+    "refresh": "Obnoviť",
+    "refreshing": "Obnovujem…",
+    "pullToRefresh": "Potiahnite nadol pre obnovenie",
+    "releaseToRefresh": "Pustite pre obnovenie"
   },
   "deviceSettings": {
     "title": "Nastavenia zariadenia",
