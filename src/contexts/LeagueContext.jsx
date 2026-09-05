@@ -171,7 +171,6 @@ export function LeagueProvider({ children }) {
   // Load leagues from Supabase on mount
   useEffect(() => {
     reloadLeagues({ emptyOnError: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Pick up leagues created or changed elsewhere when the app comes back.
@@ -185,7 +184,6 @@ export function LeagueProvider({ children }) {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('online', reloadLeagues);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Actions
