@@ -63,9 +63,12 @@ Only these places branch on it:
   `VITE_PUBLIC_APP_URL` (the website's address) instead of the shell's local
   origin. Put it in `.env.production.local` next to the Supabase variables.
 
+- `src/lib/haptics.js` — keypad tap / bust / leg / match feedback on the match
+  screen (`@capacitor/haptics`); intentionally silent in browsers.
+
 Planned next:
 
-- Haptic feedback on the keypad.
+- Push notifications (needs FCM + a server-side sender).
 
 ## Identity
 

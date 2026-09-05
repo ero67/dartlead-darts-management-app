@@ -8,6 +8,7 @@ import { matchService } from '../services/tournamentService';
 import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import checkoutData from '../data/checkouts.json';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
+import { hapticTap, hapticBust, hapticLegWon, hapticMatchWon } from '../lib/haptics';
 
 // When both players have thrown this many visits in a single leg, the leg has run
 // too long and the app offers to decide it by a bull-up. See awardLegByBullup.
@@ -670,6 +671,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const dartNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 0]; // Ascending order: 1-20, 25 (bull), 0 (miss)
 
   const appendTurnTotalDigit = (digit) => {
+    hapticTap();
     setTurnTotalInput(prev => {
       const next = `${prev}${digit}`;
       // keep it to max 3 digits (max is 180 anyway)
@@ -681,8 +683,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     });
   };
 
-  const backspaceTurnTotal = () => setTurnTotalInput(prev => prev.slice(0, -1));
-  const clearTurnTotal = () => setTurnTotalInput('');
+  const backspaceTurnTotal = () => { hapticTap(); setTurnTotalInput(prev => prev.slice(0, -1)); }
+  const clearTurnTotal = () => { hapticTap(); setTurnTotalInput(''); }
 
   const getTurnTotalValue = () => {
     if (!turnTotalInput) return null;
@@ -711,6 +713,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   };
 
   const undoLastVisit = () => {
+    hapticTap();
     if (isViewOnly) return;
     if (turnHistory.length === 0) return;
 
@@ -830,6 +833,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     }
 
     if (isBust) {
+      hapticBust();
       setBustingPlayer(currentPlayer);
       setTimeout(() => setBustingPlayer(null), 900);
     }
@@ -854,6 +858,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   };
 
   const submitTurnTotal = () => {
+    hapticTap();
     const total = getTurnTotalValue();
     if (total === null) return;
     if (!currentPlayerData) return;
@@ -942,6 +947,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   }, [currentLeg, legScores, currentPlayer, currentTurn, matchComplete, user]);
 
   const addScore = (number) => {
+    hapticTap();
     if (isViewOnly) return; // Non-logged-in users cannot score
     // A bust is being animated: the score/turn switch is applied when the
     // timeout fires, so a dart entered now would land on the wrong player.
@@ -1026,6 +1032,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       setInputMode('single');
       
       // Show red background for bust
+      hapticBust();
       setBustingPlayer(currentPlayer);
       
       // Show visual feedback, restore score to start of turn, add darts to count, and switch player
@@ -1090,6 +1097,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         setInputMode('single');
         
         // Show red background for bust
+        hapticBust();
         setBustingPlayer(currentPlayer);
         
         // Show visual feedback, restore score to start of turn, add darts to count, and switch player
@@ -1185,6 +1193,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   };
 
   const removeLastDart = () => {
+    hapticTap();
     if (isViewOnly) return; // Non-logged-in users cannot modify scores
     if (bustingPlayer !== null) return; // bust animation in progress
     // Prevent rapid clicks
@@ -1414,6 +1423,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       
       // Calculate leg average: (501 / darts) * 3
       const legAverage = (matchSettings.startingScore / dartsUsed) * 3;
+      hapticLegWon();
       
       setLegScores(prev => {
         const winnerKey = `player${currentPlayer + 1}`;
@@ -1538,6 +1548,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             legDetails: finalOpponentLegDetails
           }
         };
+        hapticMatchWon();
         completeMatch(finalLegScores);
         return;
       }
@@ -1812,6 +1823,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     setLegScores(finalLegScores);
 
     if (matchOver) {
+      hapticMatchWon();
       completeMatch(finalLegScores);
       return;
     }
