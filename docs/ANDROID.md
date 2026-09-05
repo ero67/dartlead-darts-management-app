@@ -54,10 +54,18 @@ Only these places branch on it:
   Supabase → Authentication → URL Configuration → Redirect URLs. Email/password
   login is unchanged.
 
+- `src/contexts/ThemeContext.jsx` — status-bar icon style follows the theme
+  (`@capacitor/status-bar`). Android 15+ is edge-to-edge, so the bar's colour is
+  the page background; `.app` pads by the injected `--safe-area-inset-*`.
+- `src/hooks/useKeepScreenAwake.js` — match screen keeps the display on
+  (`@capacitor-community/keep-awake`; Screen Wake Lock API in browsers).
+- `src/utils/publicUrl.js` — share links and password-reset emails use
+  `VITE_PUBLIC_APP_URL` (the website's address) instead of the shell's local
+  origin. Put it in `.env.production.local` next to the Supabase variables.
+
 Planned next:
 
-- Keep screen awake on the match screen and haptic feedback on the keypad
-  (Capacitor plugins, guarded by the same switch).
+- Haptic feedback on the keypad.
 
 ## Identity
 

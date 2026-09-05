@@ -3654,9 +3654,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               className="edit-settings-btn"
               onClick={() => setShowEditSettings(true)}
               title={t('registration.editTournamentSettings')}
+              aria-label={t('registration.editSettings')}
             >
               <Settings size={18} />
-              {t('registration.editSettings')}
+              <span className="btn-label">{t('registration.editSettings')}</span>
             </button>
           )}
           {canManage && user && (
@@ -3664,9 +3665,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               className="delete-tournament-btn"
               onClick={handleDeleteTournament}
               title={t('management.deleteTournament')}
+              aria-label={t('management.deleteTournament')}
             >
               <Trash2 size={20} />
-              {t('management.deleteTournament')}
+              <span className="btn-label">{t('management.deleteTournament')}</span>
             </button>
           )}
         </div>

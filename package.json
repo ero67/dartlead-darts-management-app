@@ -16,10 +16,12 @@
     "android:open": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor-community/keep-awake": "8.0.1",
     "@capacitor/android": "8.5.1",
     "@capacitor/app": "8.1.1",
     "@capacitor/browser": "8.0.4",
     "@capacitor/core": "8.5.1",
+    "@capacitor/status-bar": "8.0.3",
     "@supabase/supabase-js": "^2.76.1",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.546.0",

@@ -10,6 +10,7 @@ import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
+import { getPublicAppUrl } from '../utils/publicUrl';
 import { getUserDisplayName } from '../utils/userDisplayName';
 import { DisplayNameEditor } from './DisplayNameEditor';
 
@@ -544,7 +545,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   const [linkCopied, setLinkCopied] = useState(false);
 
   const handleCopyRegistrationLink = async () => {
-    const link = `${window.location.origin}/tournament/${tournament.id}`;
+    const link = `${getPublicAppUrl()}/tournament/${tournament.id}`;
     try {
       await navigator.clipboard.writeText(link);
     } catch {
@@ -590,9 +591,10 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               className="edit-settings-btn"
               onClick={() => setShowEditSettings(true)}
               title={t('registration.editTournamentSettings')}
+              aria-label={t('registration.editSettings')}
             >
               <Settings size={18} />
-              {t('registration.editSettings')}
+              <span className="btn-label">{t('registration.editSettings')}</span>
             </button>
           )}
           {canManage && onDeleteTournament && (
@@ -600,9 +602,10 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               className="delete-tournament-btn"
               onClick={handleDeleteTournament}
               title={t('management.deleteTournament')}
+              aria-label={t('management.deleteTournament')}
             >
               <Trash2 size={18} />
-              {t('management.deleteTournament')}
+              <span className="btn-label">{t('management.deleteTournament')}</span>
             </button>
           )}
           <div className="tournament-status">

@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { matchService } from '../services/tournamentService';
 import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import checkoutData from '../data/checkouts.json';
+import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
 
 // When both players have thrown this many visits in a single leg, the leg has run
 // too long and the app offers to decide it by a bull-up. See awardLegByBullup.
@@ -35,6 +36,9 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 }
 
 function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
+  // A board tablet must not dim or lock while a match is being scored.
+  useKeepScreenAwake(true);
+
   const [matchSettings, setMatchSettings] = useState({
     legsToWin: match?.legsToWin || 3,
     startingScore: match?.startingScore || 501

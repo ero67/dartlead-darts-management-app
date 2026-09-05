@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 const ThemeContext = createContext();
 
@@ -24,6 +26,13 @@ export function ThemeProvider({ children }) {
       root.classList.remove('dark-mode');
     }
     localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+
+    // Native shell: Android 15+ draws the app under a transparent status bar,
+    // so its colour is simply our page background (see the safe-area padding
+    // on .app). Only the icon style has to be told which theme we are on.
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setStyle({ style: isDarkMode ? Style.Dark : Style.Light }).catch(() => {});
+    }
   }, [isDarkMode]);
 
   const toggleTheme = () => {

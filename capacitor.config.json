@@ -1,5 +1,6 @@
 {
   "appId": "com.dartlead.app",
   "appName": "DartLead",
-  "webDir": "dist"
+  "webDir": "dist",
+  "backgroundColor": "#0f172a"
 }

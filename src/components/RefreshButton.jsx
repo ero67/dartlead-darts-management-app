@@ -32,7 +32,7 @@ export function RefreshButton() {
       aria-label={t('common.refresh')}
     >
       <RefreshCw size={18} className={isRefreshing ? 'refresh-btn__icon--spinning' : ''} />
-      <span>{isRefreshing ? t('common.refreshing') : t('common.refresh')}</span>
+      <span className="btn-label">{isRefreshing ? t('common.refreshing') : t('common.refresh')}</span>
     </button>
   );
 }

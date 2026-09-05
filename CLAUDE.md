@@ -81,3 +81,5 @@ See `AGENTS.md` for full details. Key points:
 ## Environment
 
 Requires `.env.local` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+Optional `VITE_PUBLIC_APP_URL` (public website address) — required for the
+Android build, where outgoing links must not use the shell's local origin.

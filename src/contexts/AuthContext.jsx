@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { isNativePlatform, startNativeOAuth, listenForNativeSignIn } from '../lib/nativeAuth.js';
+import { getPublicAppUrl } from '../utils/publicUrl.js';
 
 const AuthContext = createContext();
 
@@ -104,7 +105,7 @@ export function AuthProvider({ children }) {
   const resetPassword = async (email) => {
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${getPublicAppUrl()}/reset-password`,
       });
 
       if (error) throw error;
