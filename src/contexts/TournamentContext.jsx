@@ -739,6 +739,11 @@ export function TournamentProvider({ children }) {
         // Get the updated tournament from state after dispatch
         const currentState = stateRef.current;
         if (currentState.currentTournament) {
+          // The tournament as we know it after this match. For playoff matches
+          // it is replaced below by the server's version, which also knows the
+          // results other devices saved.
+          let finalTournament = currentState.currentTournament;
+
           // Playoff match: let the database advance the bracket atomically.
           // Previously each device wrote its own copy of the whole playoffs
           // JSONB here, so two boards finishing the two quarterfinals of one
@@ -757,6 +762,11 @@ export function TournamentProvider({ children }) {
                 type: ACTIONS.SET_PLAYOFFS,
                 payload: { tournamentId, playoffs: advanced.playoffs, status: advanced.status }
               });
+              finalTournament = {
+                ...finalTournament,
+                playoffs: advanced.playoffs,
+                status: advanced.status || finalTournament.status
+              };
             } catch (advanceErr) {
               console.warn('Could not advance playoff bracket in DB, queueing for retry:', advanceErr);
               enqueueWrite(
@@ -767,8 +777,12 @@ export function TournamentProvider({ children }) {
             }
           }
           
-          // If tournament is completed, update status in database
-          if (currentState.currentTournament.status === 'completed') {
+          // If tournament is completed, update status in database and settle
+          // league points. Decided on finalTournament, not the local snapshot:
+          // when the final and the 3rd-place match were played on different
+          // boards, neither device's local bracket had both results, so the
+          // tournament never completed on its own (seen on 2026-09-04).
+          if (finalTournament.status === 'completed') {
             try {
               await tournamentService.updateTournamentStatus(
                 currentState.currentTournament.id,
@@ -791,7 +805,7 @@ export function TournamentProvider({ children }) {
                 await leagueService.calculateTournamentPlacements(
                   currentState.currentTournament.leagueId,
                   currentState.currentTournament.id,
-                  currentState.currentTournament
+                  finalTournament
                 );
               } catch (error) {
                 console.error('Error calculating league points:', error);
