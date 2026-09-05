@@ -4,8 +4,7 @@
     "scoresQueued": "scores will sync when you're back online",
     "pendingCount": "{{count}} change(s) waiting to sync",
     "backOnline": "Back online — syncing",
-    "updateAvailable": "A new version is available",
-    "refresh": "Refresh",
+    "updateAvailable": "A new version is ready — it will load when you leave this match",
     "waitingForConnection": "Waiting for connection"
   },
   "navigation": {

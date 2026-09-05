@@ -7,10 +7,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // Generate an updated service worker on each build. We deliberately do NOT
-      // skipWaiting / clientsClaim: a new SW waits until the user accepts the
-      // in-app "refresh" banner, so an update never reloads the page mid-match.
-      registerType: 'autoUpdate',
+      // 'prompt': a new service worker WAITS until the app tells it to take over
+      // (see OfflineContext), so an update can never reload the page mid-match.
+      // NB: 'autoUpdate' would silently force skipWaiting/clientsClaim on and
+      // reload as soon as the new worker activates, ignoring the workbox flags
+      // below — that is what the previous config did, despite its comment.
+      registerType: 'prompt',
       injectRegister: null, // we register manually via virtual:pwa-register in OfflineContext
       includeAssets: ['favicon.ico', 'favicon.png', 'apple-touch-icon.png'],
       manifest: {
@@ -33,7 +35,7 @@ export default defineConfig({
         ]
       },
       workbox: {
-        // Updates wait for user acceptance (see OfflineContext.applyUpdate)
+        // Updates wait until OfflineContext applies them at a safe moment
         skipWaiting: false,
         clientsClaim: false,
         // Precache the app shell so it loads/reloads with no network
