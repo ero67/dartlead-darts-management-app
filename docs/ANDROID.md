@@ -129,9 +129,20 @@ The clipboard now holds the value for `ANDROID_KEYSTORE_BASE64`.
 
 ## Play Store release
 
+Each CI run also publishes `DartLead.aab`, the bundle format Play requires,
+signed with the same upload key. URLs the Play Console asks for:
+
+- Privacy policy: `https://dartlead.app/privacy`
+- Account deletion (data-safety form): `https://dartlead.app/delete-account`
+  (in-app: My profile → Account → Delete my account; backed by the
+  `delete_my_account()` RPC, which keeps tournaments/leagues/results and
+  removes the login and its links)
+
+The contact address on the privacy and deletion pages is `info@dartlead.app`
+(default in `src/utils/publicUrl.js`; `VITE_SUPPORT_EMAIL` overrides it).
+
 Still to do: Play Console account, listing (SK/EN), screenshots, feature
-graphic, content rating and data-safety forms, a public privacy policy URL.
-The workflow can then be extended with `bundleRelease` (AAB) and a Play upload
-step. Updates ship via the store, so a web-only fix does not reach Android
+graphic, content rating and data-safety forms. A Play upload step can be added
+to the workflow later (service account + internal track). Updates ship via the store, so a web-only fix does not reach Android
 users until a new version is published; everything server-side (RLS, RPCs,
 league scoring) applies to both immediately.

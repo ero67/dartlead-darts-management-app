@@ -947,5 +947,31 @@
     "loadError": "Failed to load scorers",
     "addError": "Failed to add scorer",
     "removeError": "Failed to remove scorer"
+  },
+  "account": {
+    "title": "Account",
+    "deleteIntro": "Deleting your account removes your login and personal data. Tournaments and results you took part in stay, with your player name no longer linked to an account.",
+    "deleteButton": "Delete my account",
+    "confirmTitle": "Delete your account?",
+    "confirmIntro": "This deletes your DartLead account immediately.",
+    "confirmRemoved": "Removed: your login (email, password, Google sign-in), display name, registrations, scorer permissions and subscription records.",
+    "confirmKept": "Kept: tournaments, leagues and match results, as the organiser's record of the event. Your player name stays in those results, unlinked from any account.",
+    "confirmIrreversible": "This cannot be undone.",
+    "confirmCheckbox": "I understand and want to delete my account",
+    "confirmButton": "Delete permanently",
+    "deleting": "Deleting…",
+    "deleteError": "Deleting the account failed. Please try again or contact us.",
+    "pageTitle": "Delete your DartLead account",
+    "pageIntro": "You can delete your account yourself, in the app or on the website. It takes effect immediately.",
+    "stepsTitle": "How to delete your account",
+    "step1": "Sign in to DartLead with the account you want to delete.",
+    "step2": "Open My profile from the menu.",
+    "step3": "In the Account section press \"Delete my account\" and confirm.",
+    "goToProfile": "Go to my profile",
+    "signInFirst": "Sign in to continue",
+    "whatHappensTitle": "What is deleted and what is kept",
+    "timing": "Deletion is immediate. Backups held by our database provider expire within 7 days.",
+    "noAccessTitle": "Can't sign in?",
+    "noAccessText": "If you no longer have access to your login, send a deletion request from the email address you registered with and we will verify and delete the account."
   }
 }

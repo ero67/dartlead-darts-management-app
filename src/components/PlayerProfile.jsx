@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { tournamentService } from '../services/tournamentService';
 import { tournamentStatusLabel as statusLabel } from '../utils/tournamentStatus';
 import { DisplayNameEditor } from './DisplayNameEditor';
+import { AccountDeletion } from './AccountDeletion';
 
 const getInitials = (name) => {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
@@ -367,6 +368,8 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
           </div>
         </section>
       )}
+
+      {isOwnProfile && <AccountDeletion />}
     </div>
   );
 }

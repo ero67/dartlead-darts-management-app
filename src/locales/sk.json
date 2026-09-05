@@ -947,5 +947,31 @@
     "loadError": "Nepodarilo sa načítať zapisovateľov",
     "addError": "Nepodarilo sa pridať zapisovateľa",
     "removeError": "Nepodarilo sa odstrániť zapisovateľa"
+  },
+  "account": {
+    "title": "Účet",
+    "deleteIntro": "Zmazaním účtu odstránite svoje prihlásenie a osobné údaje. Turnaje a výsledky, ktorých ste sa zúčastnili, zostanú, no vaše hráčske meno už nebude prepojené so žiadnym účtom.",
+    "deleteButton": "Zmazať môj účet",
+    "confirmTitle": "Zmazať účet?",
+    "confirmIntro": "Váš účet DartLead sa zmaže okamžite.",
+    "confirmRemoved": "Odstráni sa: prihlásenie (e-mail, heslo, prihlásenie cez Google), zobrazované meno, registrácie, oprávnenia zapisovateľa a záznamy o predplatnom.",
+    "confirmKept": "Zostane: turnaje, ligy a výsledky zápasov ako záznam organizátora o podujatí. Vaše hráčske meno v týchto výsledkoch zostane, bez prepojenia na účet.",
+    "confirmIrreversible": "Túto akciu nie je možné vrátiť späť.",
+    "confirmCheckbox": "Rozumiem a chcem zmazať svoj účet",
+    "confirmButton": "Natrvalo zmazať",
+    "deleting": "Mažem…",
+    "deleteError": "Zmazanie účtu sa nepodarilo. Skúste to znova alebo nás kontaktujte.",
+    "pageTitle": "Zmazanie účtu DartLead",
+    "pageIntro": "Účet si môžete zmazať sami, v aplikácii alebo na webe. Zmazanie je okamžité.",
+    "stepsTitle": "Ako zmazať účet",
+    "step1": "Prihláste sa do DartLead účtom, ktorý chcete zmazať.",
+    "step2": "V menu otvorte Môj profil.",
+    "step3": "V sekcii Účet stlačte „Zmazať môj účet“ a potvrďte.",
+    "goToProfile": "Prejsť na môj profil",
+    "signInFirst": "Prihláste sa, aby ste mohli pokračovať",
+    "whatHappensTitle": "Čo sa zmaže a čo zostane",
+    "timing": "Zmazanie je okamžité. Zálohy u nášho poskytovateľa databázy expirujú do 7 dní.",
+    "noAccessTitle": "Nemôžete sa prihlásiť?",
+    "noAccessText": "Ak už nemáte prístup k svojmu prihláseniu, pošlite žiadosť o zmazanie z e-mailovej adresy, ktorou ste sa registrovali; overíme ju a účet zmažeme."
   }
 }

@@ -30,6 +30,8 @@ import { PullToRefresh } from './components/PullToRefresh';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { NotFound } from './components/NotFound';
 import { ResetPassword } from './components/ResetPassword';
+import { DeleteAccountInfo } from './components/DeleteAccountInfo';
+import { AccountDeletion } from './components/AccountDeletion';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
 import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from './utils/postLoginRedirect';
@@ -70,6 +72,7 @@ function NoPlayerProfile({ onBrowseTournaments }) {
       <button className="primary-btn" onClick={onBrowseTournaments}>
         {t('navigation.tournaments')}
       </button>
+      <AccountDeletion />
     </div>
   );
 }
@@ -528,6 +531,7 @@ function AppContent() {
           <Route path="/login" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/delete-account" element={<DeleteAccountInfo />} />
           <Route path="/create-tournament" element={
             user && canCreateTournaments ? (
               <TournamentCreation 

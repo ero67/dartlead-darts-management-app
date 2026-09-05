@@ -121,23 +121,29 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          gradle assembleRelease --no-daemon \
+          gradle assembleRelease bundleRelease --no-daemon \
             -PappVersionCode=${{ steps.version.outputs.code }} \
             -PappVersionName=${{ steps.version.outputs.name }}
 
-      - name: Collect APK
+      - name: Collect APK and AAB
         run: |
           mkdir -p out
           APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          AAB=$(ls android/app/build/outputs/bundle/release/*.aab | head -1)
           cp "$APK" out/DartLead.apk
           cp "$APK" "out/DartLead-${{ steps.version.outputs.name }}.apk"
+          # The .aab is what Google Play accepts; same key, same version.
+          cp "$AAB" out/DartLead.aab
+          cp "$AAB" "out/DartLead-${{ steps.version.outputs.name }}.aab"
           ls -la out
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: DartLead-${{ steps.version.outputs.name }}
-          path: out/DartLead-*.apk
+          path: |
+            out/DartLead-*.apk
+            out/DartLead-*.aab
           retention-days: 30
 
       - name: Publish to rolling release
@@ -150,11 +156,14 @@ jobs:
           files: |
             out/DartLead.apk
             out/DartLead-${{ steps.version.outputs.name }}.apk
+            out/DartLead.aab
+            out/DartLead-${{ steps.version.outputs.name }}.aab
           body: |
             Automatic build of `main` — commit ${{ github.sha }}.
 
             - Version: **${{ steps.version.outputs.name }}** (versionCode ${{ steps.version.outputs.code }})
             - Signing: **${{ steps.keystore.outputs.signing }}**${{ steps.keystore.outputs.signing == 'debug' && ' — uninstall the previous build before installing this one' || '' }}
             - Stable download link: `DartLead.apk` on this release always points at the newest build.
+            - `DartLead.aab` is the Play Store upload bundle (same key, same version).
 
             Install: download `DartLead.apk` on the phone, open it, allow installing from this source when asked.
