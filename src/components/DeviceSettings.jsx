@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Monitor, Target, Save, X, Settings, Vibrate } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -42,8 +43,13 @@ export function DeviceSettings({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
+  // Portal: this dialog is opened from inside the navigation drawer, which on
+  // phones is a transformed, 280px-wide fixed panel. A position:fixed overlay
+  // rendered inside it is positioned relative to the drawer — squeezed to its
+  // width and sliding off-screen with it. Rendering at document.body makes it
+  // a real full-screen sheet.
+  return createPortal(
+    <div className="modal-overlay device-settings-overlay" onClick={onClose}>
       <div className="modal-content device-settings-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>
@@ -164,7 +170,8 @@ export function DeviceSettings({ isOpen, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -157,12 +157,14 @@
     "undo": "Undo",
     "turnTotalLabel": "3-dart total",
     "turnTotalInvalid": "Invalid total (allowed: 0–180)",
-    "turnTotalKeypadHint": "Enter 0–180, then press OK",
-    "turnTotalTypeHint": "Type 0–180 and press Enter",
+    "turnTotalKeypadHint": "Enter the 3-dart total and press OK. Nothing entered = 0.",
+    "turnTotalTypeHint": "Type 0–180 and press Enter. Empty = 0.",
     "clear": "Clear",
     "ok": "OK",
     "undoLastVisit": "Undo last visit",
-    "dartsCount": "{{count}} darts"
+    "dartsCount": "{{count}} darts",
+    "okZero": "no score (0)",
+    "backspace": "Delete last digit"
   },
   "tournamentCreation": {
     "title": "Create Tournament",

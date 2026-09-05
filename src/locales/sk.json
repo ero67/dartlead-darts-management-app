@@ -157,12 +157,14 @@
     "undo": "Späť",
     "turnTotalLabel": "Súčet 3 šípok",
     "turnTotalInvalid": "Neplatný súčet (povolené: 0–180)",
-    "turnTotalKeypadHint": "Zadajte 0–180 a stlačte OK",
-    "turnTotalTypeHint": "Napíšte 0–180 a stlačte Enter",
+    "turnTotalKeypadHint": "Zadajte súčet 3 šípok a stlačte OK. Bez čísla = 0.",
+    "turnTotalTypeHint": "Napíšte 0–180 a stlačte Enter. Prázdne = 0.",
     "clear": "Vymazať",
     "ok": "OK",
     "undoLastVisit": "Vrátiť posledný náhod",
-    "dartsCount": "{{count}} šípok"
+    "dartsCount": "{{count}} šípok",
+    "okZero": "bez bodov (0)",
+    "backspace": "Zmazať poslednú číslicu"
   },
   "tournamentCreation": {
     "title": "Vytvoriť Turnaj",

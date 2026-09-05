@@ -686,8 +686,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const backspaceTurnTotal = () => { hapticTap(); setTurnTotalInput(prev => prev.slice(0, -1)); }
   const clearTurnTotal = () => { hapticTap(); setTurnTotalInput(''); }
 
+  // Empty input counts as 0: a bust or three misses is entered with a bare OK.
   const getTurnTotalValue = () => {
-    if (!turnTotalInput) return null;
+    if (!turnTotalInput) return 0;
     const n = Number.parseInt(turnTotalInput, 10);
     if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
     if (n < 0 || n > 180) return null;
@@ -2289,9 +2290,23 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             ) : (
               <div className="turn-total-container">
                 <div className="turn-total-display">
-                  <div className="turn-total-label">{t('match.turnTotalLabel')}</div>
-                  <div className={`turn-total-value ${isTurnTotalInvalid ? 'invalid' : ''}`}>
-                    {turnTotalInput || '—'}
+                  <div className="turn-total-display-row">
+                    <div className="turn-total-label">{t('match.turnTotalLabel')}</div>
+                    {/* Undo lives up here, away from OK: it used to sit right
+                        under the big green button and got hit by mistake. */}
+                    <button
+                      className="turn-total-undo"
+                      onClick={undoLastVisit}
+                      disabled={turnHistory.length === 0 || currentTurn.score > 0}
+                      type="button"
+                      title={t('match.undoLastVisit')}
+                    >
+                      <RotateCcw size={14} />
+                      {t('match.undoLastVisit')}
+                    </button>
+                  </div>
+                  <div className={`turn-total-value ${isTurnTotalInvalid ? 'invalid' : ''} ${turnTotalInput ? '' : 'empty'}`}>
+                    {turnTotalInput || '0'}
                   </div>
                   <div className="turn-total-hint">
                     {isTurnTotalInvalid
@@ -2307,16 +2322,21 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                         {n}
                       </button>
                     ))}
-                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button">{t('match.clear')}</button>
+                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button" disabled={!turnTotalInput}>
+                      {t('match.clear')}
+                    </button>
                     <button className="dart-btn" onClick={() => appendTurnTotalDigit(0)} type="button">0</button>
-                    <button className="dart-btn turn-total-backspace" onClick={backspaceTurnTotal} type="button">⌫</button>
+                    <button className="dart-btn turn-total-backspace" onClick={backspaceTurnTotal} type="button" disabled={!turnTotalInput} aria-label={t('match.backspace')}>
+                      ⌫
+                    </button>
                     <button
                       className="dart-btn turn-total-ok"
                       onClick={submitTurnTotal}
-                      disabled={getTurnTotalValue() === null}
+                      disabled={isTurnTotalInvalid}
                       type="button"
                     >
-                      {t('match.ok')}
+                      <span>{t('match.ok')}</span>
+                      {!turnTotalInput && <span className="turn-total-ok-sub">{t('match.okZero')}</span>}
                     </button>
                   </div>
                 ) : (
@@ -2341,27 +2361,17 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                     <button
                       className="dart-btn turn-total-ok"
                       onClick={submitTurnTotal}
-                      disabled={getTurnTotalValue() === null}
+                      disabled={isTurnTotalInvalid}
                       type="button"
                     >
-                      {t('match.ok')}
+                      <span>{t('match.ok')}</span>
+                      {!turnTotalInput && <span className="turn-total-ok-sub">{t('match.okZero')}</span>}
                     </button>
-                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button">
+                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button" disabled={!turnTotalInput}>
                       {t('match.clear')}
                     </button>
                   </div>
                 )}
-
-                <div className="turn-total-footer">
-                  <button
-                    className="remove-last-btn"
-                    onClick={undoLastVisit}
-                    disabled={turnHistory.length === 0 || currentTurn.score > 0}
-                    type="button"
-                  >
-                    {t('match.undoLastVisit')}
-                  </button>
-                </div>
               </div>
             )}
           </>
