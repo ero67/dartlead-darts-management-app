@@ -11,8 +11,10 @@ const native = Capacitor.isNativePlatform();
 const fire = (promise) => promise.catch(() => {});
 
 // Keypad tap: confirms the entry registered while the scorer looks at the board.
+// Medium, not Light: the plugin's light pulse (50 ms at ~40% strength) is
+// barely noticeable on many phones and not at all through a case.
 export const hapticTap = () => {
-  if (native) fire(Haptics.impact({ style: ImpactStyle.Light }));
+  if (native) fire(Haptics.impact({ style: ImpactStyle.Medium }));
 };
 
 // Bust: distinct "something went wrong" pattern.
