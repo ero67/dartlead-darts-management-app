@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// CI passes -PappVersionCode / -PappVersionName (see .github/workflows/android.yml);
+// local builds fall back to the values below.
+def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : 1
+def appVersionName = project.hasProperty('appVersionName') ? project.property('appVersionName').toString() : "1.0.0"
+
+// Release signing from the environment (CI keystore decoded from a secret).
+// Without it, release builds fall back to the debug key so `assembleRelease`
+// always yields an installable APK — but debug keys differ per machine, so
+// only the env-signed builds upgrade cleanly over each other.
+def releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+def hasReleaseKeystore = releaseKeystorePath != null && file(releaseKeystorePath).exists()
+
 android {
     namespace = "com.dartlead.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +19,8 @@ android {
         applicationId "com.dartlead.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +28,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile file(releaseKeystorePath)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
 }

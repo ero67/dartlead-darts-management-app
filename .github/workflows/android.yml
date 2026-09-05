@@ -1,0 +1,160 @@
+# Builds the Android app on every push to main and publishes the APK to a
+# rolling GitHub Release, so the latest build is always at
+#   https://github.com/<owner>/<repo>/releases/download/android-latest/DartLead.apk
+#
+# Repository settings needed (Settings → Secrets and variables → Actions):
+#   Secrets
+#     VITE_SUPABASE_ANON_KEY     the project's anon key (required)
+#     ANDROID_KEYSTORE_BASE64    keystore file, base64-encoded (recommended)
+#     ANDROID_KEYSTORE_PASSWORD  (with the keystore)
+#     ANDROID_KEY_ALIAS          (with the keystore)
+#     ANDROID_KEY_PASSWORD       (with the keystore)
+#   Variables (optional, defaults below)
+#     VITE_SUPABASE_URL, VITE_PUBLIC_APP_URL
+#
+# Without the keystore secrets the APK is signed with a throw-away debug key,
+# which means each build must be uninstalled before the next one installs.
+# With them, every build is signed identically and installs over the previous
+# one — and the same key can later become the Play Store upload key.
+
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write production environment
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://hdorqfkaiigjlwobupnq.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          PUBLIC_APP_URL: ${{ vars.VITE_PUBLIC_APP_URL || 'https://dartlead.app' }}
+        run: |
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Missing repository secret VITE_SUPABASE_ANON_KEY (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          {
+            echo "VITE_SUPABASE_URL=$SUPABASE_URL"
+            echo "VITE_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+            echo "VITE_PUBLIC_APP_URL=$PUBLIC_APP_URL"
+          } > .env.production.local
+
+      - name: Build web bundle and sync into Android
+        run: |
+          npm run android:assets
+          npm run build
+          npx cap sync android
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-36 build-tools;36.0.0 platform-tools
+
+      # The Gradle wrapper jar is not committed (binary), so use a pinned Gradle
+      # from the action instead of ./gradlew.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      - name: Prepare signing key
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "path=$RUNNER_TEMP/release.jks" >> "$GITHUB_OUTPUT"
+            echo "signing=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — APK will be debug-signed (uninstall before installing a newer build)."
+            echo "signing=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute version
+        id: version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "name=${PKG_VERSION}+${{ github.run_number }}.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "pkg=${PKG_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          gradle assembleRelease --no-daemon \
+            -PappVersionCode=${{ steps.version.outputs.code }} \
+            -PappVersionName=${{ steps.version.outputs.name }}
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          APK=$(ls android/app/build/outputs/apk/release/*.apk | head -1)
+          cp "$APK" out/DartLead.apk
+          cp "$APK" "out/DartLead-${{ steps.version.outputs.name }}.apk"
+          ls -la out
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DartLead-${{ steps.version.outputs.name }}
+          path: out/DartLead-*.apk
+          retention-days: 30
+
+      - name: Publish to rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: DartLead Android — latest main build
+          prerelease: true
+          make_latest: false
+          files: |
+            out/DartLead.apk
+            out/DartLead-${{ steps.version.outputs.name }}.apk
+          body: |
+            Automatic build of `main` — commit ${{ github.sha }}.
+
+            - Version: **${{ steps.version.outputs.name }}** (versionCode ${{ steps.version.outputs.code }})
+            - Signing: **${{ steps.keystore.outputs.signing }}**${{ steps.keystore.outputs.signing == 'debug' && ' — uninstall the previous build before installing this one' || '' }}
+            - Stable download link: `DartLead.apk` on this release always points at the newest build.
+
+            Install: download `DartLead.apk` on the phone, open it, allow installing from this source when asked.

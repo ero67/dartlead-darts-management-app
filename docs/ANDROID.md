@@ -81,10 +81,57 @@ Planned next:
 - App name: `DartLead` (`android/app/src/main/res/values/strings.xml`).
 - Config: `capacitor.config.json` at the repo root.
 
-## Releasing
+## Continuous builds (GitHub Actions)
 
-Not set up yet. Needs a signing keystore (never commit it — `android/app/*.jks`
-and `*.keystore` are gitignored), a Play Console account, and the store
-listing. Updates ship via the store, so a web-only fix does not reach Android
+`.github/workflows/android.yml` builds the app on every push to `main` and
+publishes the APK to a rolling GitHub Release:
+
+- Stable link to the newest build:
+  `https://github.com/ero67/dartlead-darts-management-app/releases/download/android-latest/DartLead.apk`
+- Release page (also shows version, commit and how it was signed):
+  `https://github.com/ero67/dartlead-darts-management-app/releases/tag/android-latest`
+- Each run also keeps a `DartLead-<version>.apk` artifact for 30 days.
+
+Version: `versionName` = `package.json` version + `+<run number>.<short sha>`,
+`versionCode` = the workflow run number (always increasing, so installs upgrade).
+
+### One-time setup — repository secrets
+
+GitHub → repository → Settings → Secrets and variables → Actions:
+
+| Secret                      | What                                            |
+|-----------------------------|-------------------------------------------------|
+| `VITE_SUPABASE_ANON_KEY`    | anon key of the production project (required)   |
+| `ANDROID_KEYSTORE_BASE64`   | signing keystore, base64 (recommended, see below) |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password                               |
+| `ANDROID_KEY_ALIAS`         | key alias (e.g. `dartlead`)                      |
+| `ANDROID_KEY_PASSWORD`      | key password                                    |
+
+Optional variables `VITE_SUPABASE_URL` and `VITE_PUBLIC_APP_URL` override the
+defaults baked into the workflow.
+
+### Signing key
+
+Without the keystore secrets the workflow signs with a throw-away debug key,
+so a newer build cannot be installed over an older one (uninstall first). With
+a fixed key every build upgrades in place, and the same key becomes the Play
+Store *upload key* later. Generate it once (PowerShell, using Android Studio's
+bundled JDK), keep the `.jks` and both passwords in a password manager, never
+commit it (`*.jks` is gitignored):
+
+```powershell
+& "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe" -genkeypair -v `
+  -keystore dartlead-upload.jks -alias dartlead -keyalg RSA -keysize 2048 -validity 10000
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("dartlead-upload.jks")) | Set-Clipboard
+```
+
+The clipboard now holds the value for `ANDROID_KEYSTORE_BASE64`.
+
+## Play Store release
+
+Still to do: Play Console account, listing (SK/EN), screenshots, feature
+graphic, content rating and data-safety forms, a public privacy policy URL.
+The workflow can then be extended with `bundleRelease` (AAB) and a Play upload
+step. Updates ship via the store, so a web-only fix does not reach Android
 users until a new version is published; everything server-side (RLS, RPCs,
 league scoring) applies to both immediately.
