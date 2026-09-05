@@ -30,7 +30,7 @@ export function Auth() {
     fullName: '',
   });
 
-  const { signIn, signUp, resetPassword, signInWithGoogle } = useAuth();
+  const { signIn, signUp, resetPassword, signInWithGoogle, nativeAuthError } = useAuth();
 
   const handleInputChange = (e) => {
     setFormData({
@@ -98,9 +98,13 @@ export function Auth() {
     setSuccess('');
 
     try {
-      const { error } = await signInWithGoogle();
+      const { error, pending } = await signInWithGoogle();
       if (error) {
         setError(error.message);
+        setLoading(false);
+      } else if (pending) {
+        // Native shell: the system browser is open now; the user may also
+        // cancel there, so don't leave the form stuck in a loading state.
         setLoading(false);
       }
     } catch {
@@ -218,7 +222,7 @@ export function Auth() {
             </div>
           )}
 
-          {error && <div className="error-message">{error}</div>}
+          {(error || nativeAuthError) && <div className="error-message">{error || nativeAuthError}</div>}
           {success && <div className="success-message">{success}</div>}
 
           <button

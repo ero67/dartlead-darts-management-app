@@ -47,13 +47,15 @@ Only these places branch on it:
 
 - `src/contexts/OfflineContext.jsx` — no service-worker registration or update
   polling in the shell; the bundle ships with the app.
+- `src/contexts/AuthContext.jsx` + `src/lib/nativeAuth.js` — Google login opens
+  the system browser and returns through the deep link
+  `com.dartlead.app://auth/callback` (intent filter in `AndroidManifest.xml`,
+  scheme in `res/values/strings.xml`). That URL must be listed under
+  Supabase → Authentication → URL Configuration → Redirect URLs. Email/password
+  login is unchanged.
 
 Planned next:
 
-- Google login: the OAuth redirect must come back through the custom URL scheme
-  `com.dartlead.app` (see `android/app/src/main/res/values/strings.xml`) and be
-  allowed in Supabase Auth → URL configuration. Email/password login already
-  works unchanged.
 - Keep screen awake on the match screen and haptic feedback on the keypad
   (Capacitor plugins, guarded by the same switch).
 

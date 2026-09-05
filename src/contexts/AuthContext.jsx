@@ -1,11 +1,21 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
+import { isNativePlatform, startNativeOAuth, listenForNativeSignIn } from '../lib/nativeAuth.js';
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Error from a native (Capacitor) OAuth round-trip; surfaced by the login page
+  const [nativeAuthError, setNativeAuthError] = useState('');
+
+  // In the Android/iOS shell the OAuth provider returns to the app through a
+  // deep link rather than a page load — listen for it for the app's lifetime.
+  useEffect(() => {
+    if (!isNativePlatform()) return undefined;
+    return listenForNativeSignIn((message) => setNativeAuthError(message));
+  }, []);
 
   useEffect(() => {
     // Get initial session
@@ -58,6 +68,13 @@ export function AuthProvider({ children }) {
 
   const signInWithGoogle = async () => {
     try {
+      setNativeAuthError('');
+      if (isNativePlatform()) {
+        // System browser + deep link back; the session shows up through
+        // onAuthStateChange once the callback is processed.
+        const data = await startNativeOAuth('google');
+        return { data, error: null, pending: true };
+      }
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -131,6 +148,7 @@ export function AuthProvider({ children }) {
     signIn,
     signInWithGoogle,
     signOut,
+    nativeAuthError,
     resetPassword,
     updatePassword,
   };
