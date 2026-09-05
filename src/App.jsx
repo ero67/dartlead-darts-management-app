@@ -195,13 +195,16 @@ function TournamentRoute() {
 // don't remount the page and wipe its local UI state such as the active tab.
 function LeagueDetailRoute({ onBack, onCreateTournament, onSelectTournament }) {
   const { id } = useParams();
+  const { selectLeague } = useLeague();
   return (
-    <LeagueDetail
-      leagueId={id}
-      onBack={onBack}
-      onCreateTournament={onCreateTournament}
-      onSelectTournament={onSelectTournament}
-    />
+    <PullToRefresh onRefresh={() => selectLeague(id).catch(() => {})}>
+      <LeagueDetail
+        leagueId={id}
+        onBack={onBack}
+        onCreateTournament={onCreateTournament}
+        onSelectTournament={onSelectTournament}
+      />
+    </PullToRefresh>
   );
 }
 
@@ -315,9 +318,11 @@ function AppContent() {
     createTournament,
     selectTournament,
     completeMatch,
+    reloadTournaments,
     deleteTournament
   } = useTournament();
   const {
+    reloadLeagues,
     createLeague,
     selectLeague
   } = useLeague();
@@ -500,21 +505,25 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={
-            <Dashboard
-              onCreateTournament={handleCreateTournament}
-              onSelectTournament={handleSelectTournament}
-              onCreateLeague={handleCreateLeague}
-              onSelectLeague={handleSelectLeague}
-              onNavigate={(path) => navigate(path)}
-            />
+            <PullToRefresh onRefresh={() => Promise.all([reloadTournaments(), reloadLeagues()])}>
+              <Dashboard
+                onCreateTournament={handleCreateTournament}
+                onSelectTournament={handleSelectTournament}
+                onCreateLeague={handleCreateLeague}
+                onSelectLeague={handleSelectLeague}
+                onNavigate={(path) => navigate(path)}
+              />
+            </PullToRefresh>
           } />
           <Route path="/tournaments" element={
-            <TournamentsList 
-              tournaments={tournaments}
-              onCreateTournament={handleCreateTournament}
-              onSelectTournament={handleSelectTournament}
-              onDeleteTournament={handleDeleteTournament}
-            />
+            <PullToRefresh onRefresh={reloadTournaments}>
+              <TournamentsList 
+                tournaments={tournaments}
+                onCreateTournament={handleCreateTournament}
+                onSelectTournament={handleSelectTournament}
+                onDeleteTournament={handleDeleteTournament}
+              />
+            </PullToRefresh>
           } />
           <Route path="/login" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -563,10 +572,12 @@ function AppContent() {
             user ? <MyProfileRedirect /> : <Auth />
           } />
           <Route path="/leagues" element={
-            <LeaguesList 
-              onCreateLeague={handleCreateLeague}
-              onSelectLeague={handleSelectLeague}
-            />
+            <PullToRefresh onRefresh={reloadLeagues}>
+              <LeaguesList 
+                onCreateLeague={handleCreateLeague}
+                onSelectLeague={handleSelectLeague}
+              />
+            </PullToRefresh>
           } />
           <Route path="/create-league" element={
             user && canCreateTournaments ? (

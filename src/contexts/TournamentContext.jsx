@@ -627,6 +627,23 @@ export function TournamentProvider({ children }) {
     stateRef.current = state;
   }, [state]);
 
+  // Re-fetch the lightweight tournament list (dashboard / list pages). Keeps
+  // currentTournament as is — LOAD_TOURNAMENTS only restores it when missing.
+  // Used on mount, on pull-to-refresh and when the app returns to the
+  // foreground. Returns true when the list was replaced.
+  const reloadTournaments = async () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+    try {
+      // Lightweight summary for the list/dashboard -- no nested match rows.
+      const tournaments = await tournamentService.getTournamentsSummary();
+      dispatch({ type: ACTIONS.LOAD_TOURNAMENTS, payload: tournaments });
+      return true;
+    } catch (error) {
+      console.error('Error loading tournaments:', error);
+      return false;
+    }
+  };
+
   // Load tournaments from Supabase on mount
   useEffect(() => {
     const loadTournaments = async () => {
@@ -873,9 +890,15 @@ export function TournamentProvider({ children }) {
   // the moments a device that sat idle through other boards' results needs it.
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') refreshCurrentTournament();
+      if (document.visibilityState === 'visible') {
+        refreshCurrentTournament();
+        reloadTournaments();
+      }
     };
-    const handleOnline = () => refreshCurrentTournament();
+    const handleOnline = () => {
+      refreshCurrentTournament();
+      reloadTournaments();
+    };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('online', handleOnline);
     return () => {
@@ -1064,6 +1087,7 @@ export function TournamentProvider({ children }) {
     removePlayerFromTournament,
     updateTournamentSettings,
     refreshCurrentTournament,
+    reloadTournaments,
     registerForTournament,
     getTournamentRegistrations,
     approveRegistration,

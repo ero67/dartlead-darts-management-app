@@ -151,19 +151,41 @@ function leagueReducer(state, action) {
 export function LeagueProvider({ children }) {
   const [state, dispatch] = useReducer(leagueReducer, initialState);
 
+  // Re-fetch the league list. Used on mount, on pull-to-refresh and when the
+  // app returns to the foreground. Returns true when the list was replaced.
+  const reloadLeagues = async ({ emptyOnError = false } = {}) => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+    try {
+      const leagues = await leagueService.getLeagues();
+      dispatch({ type: ACTIONS.LOAD_LEAGUES, payload: leagues });
+      return true;
+    } catch (error) {
+      console.error('Error loading leagues:', error);
+      // On first load an error must still end the loading state; on a later
+      // refresh keep whatever the user already sees.
+      if (emptyOnError) dispatch({ type: ACTIONS.LOAD_LEAGUES, payload: [] });
+      return false;
+    }
+  };
+
   // Load leagues from Supabase on mount
   useEffect(() => {
-    const loadLeagues = async () => {
-      try {
-        const leagues = await leagueService.getLeagues();
-        dispatch({ type: ACTIONS.LOAD_LEAGUES, payload: leagues });
-      } catch (error) {
-        console.error('Error loading leagues:', error);
-        dispatch({ type: ACTIONS.LOAD_LEAGUES, payload: [] });
-      }
-    };
+    reloadLeagues({ emptyOnError: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    loadLeagues();
+  // Pick up leagues created or changed elsewhere when the app comes back.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') reloadLeagues();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', reloadLeagues);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', reloadLeagues);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Actions
@@ -364,6 +386,7 @@ export function LeagueProvider({ children }) {
     updateMemberStatus,
     removeMember,
     refreshLeaderboard,
+    reloadLeagues,
     getUnlinkedTournaments,
     linkTournamentToLeague,
     unlinkTournamentFromLeague,
