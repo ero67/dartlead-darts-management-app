@@ -8,6 +8,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
+import { ScorersPanel } from './ScorersPanel';
 import { getUserDisplayName } from '../utils/userDisplayName';
 import { DisplayNameEditor } from './DisplayNameEditor';
 
@@ -1024,6 +1025,11 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
             )}
           </div>
         </div>
+
+        {/* Scorers can be set up before the first dart is thrown, not only
+            once the tournament is running (previously this panel lived on the
+            completed-tournament summary tab, which was far too late). */}
+        {canManage && <ScorersPanel type="tournament" entityId={tournament.id} />}
 
         {players.length >= 2 && canManage && (
           <div className="start-tournament-section">

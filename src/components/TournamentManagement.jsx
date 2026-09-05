@@ -54,7 +54,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
   
   // Valid tabs (will be filtered for playoff-only tournaments)
-  const validTabs = ['groups', 'matches', 'standings', 'playoffs', 'statistics', 'liveMatches', 'summary'];
+  const validTabs = ['groups', 'matches', 'standings', 'playoffs', 'statistics', 'liveMatches', 'scorers', 'summary'];
   
   // Initialize activeTab from URL or default
   const getInitialTab = () => {
@@ -3714,6 +3714,15 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           <Activity size={16} />
           {t('management.liveMatches')}
         </button>
+        {canManage && (
+          <button
+            className={activeTab === 'scorers' ? 'active' : ''}
+            onClick={() => handleTabChange('scorers')}
+          >
+            <ClipboardList size={16} />
+            {t('scorers.title')}
+          </button>
+        )}
         {tournament.status === 'completed' && (
           <button 
             className={`summary-tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
@@ -3732,12 +3741,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         {activeTab === 'playoffs' && renderPlayoffs()}
         {activeTab === 'statistics' && renderStatistics()}
         {activeTab === 'liveMatches' && renderLiveMatches()}
-        {activeTab === 'summary' && (
-          <>
-            {(isOwner || isAdmin) && <ScorersPanel type="tournament" entityId={tournament.id} />}
-            <TournamentSummary tournament={tournament} />
-          </>
+        {activeTab === 'scorers' && canManage && (
+          <ScorersPanel type="tournament" entityId={tournament.id} />
         )}
+        {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}
       </div>
 
       {/* Match Start Confirmation Modal */}
