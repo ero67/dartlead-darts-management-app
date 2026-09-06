@@ -993,5 +993,22 @@
     "fullscreen": "Fullscreen (F)",
     "loadError": "Could not load the tournament",
     "pinned": "Fixed view — remove ?view= from the address to rotate"
+  },
+  "export": {
+    "title": "Share / export",
+    "shareImage": "Share as image",
+    "standingsCsv": "Standings (CSV)",
+    "resultsCsv": "Results (CSV)",
+    "failed": "Export failed. Please try again.",
+    "colGroup": "Group",
+    "colLegsWon": "Legs won",
+    "colLegsLost": "Legs lost",
+    "colStage": "Stage",
+    "colPlayer1": "Player 1",
+    "colPlayer2": "Player 2",
+    "colLegs1": "Legs 1",
+    "colLegs2": "Legs 2",
+    "colWinner": "Winner",
+    "thirdPlace": "3rd place match"
   }
 }

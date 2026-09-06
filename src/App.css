@@ -8115,6 +8115,68 @@ body {
   }
 }
 
+/* Share / export dropdown (standings, bracket) */
+.export-menu {
+  position: relative;
+  margin-left: auto;
+}
+.export-menu__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.export-menu__btn:hover { background: var(--bg-tertiary); }
+.export-menu__list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 220px;
+  padding: 0.35rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px -12px rgba(15, 23, 42, 0.35);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.export-menu__list button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+.export-menu__list button:hover:not(:disabled) { background: var(--bg-tertiary); }
+.export-menu__list button:disabled { opacity: 0.5; cursor: default; }
+.export-menu__error {
+  margin: 0.3rem 0.7rem 0.4rem;
+  color: var(--accent-danger);
+  font-size: 0.8rem;
+}
+.standings-view-header .export-menu { margin-left: auto; margin-right: 0.75rem; }
+.playoffs-header .export-menu { margin-left: auto; margin-right: 0.75rem; }
+@media (max-width: 640px) {
+  .export-menu__btn .btn-label { display: none; }
+  .export-menu__btn { padding: 0.5rem; }
+}
+
 /* TV mode link in the tournament header renders like the settings button */
 a.tv-mode-btn { text-decoration: none; }
 

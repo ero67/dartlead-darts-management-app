@@ -14,6 +14,7 @@ import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignm
 import { TournamentSummary } from './TournamentSummary';
 import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
+import { ExportMenu } from './ExportMenu';
 import { isValidLegDartCount } from '../utils/dartStats';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 
@@ -76,6 +77,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   
   const [activeTab, setActiveTab] = useState(() => getInitialTab());
   const [showEditSettings, setShowEditSettings] = useState(false);
+  // Targets for "share as image" (ExportMenu)
+  const standingsRef = useRef(null);
+  const bracketRef = useRef(null);
   const [editingMatch, setEditingMatch] = useState(null); // Match being edited
   const [liveMatches, setLiveMatches] = useState([]);
   const [matchStatistics, setMatchStatistics] = useState(null); // Match to show statistics for
@@ -2182,6 +2186,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     <div className="standings-view">
       <div className="standings-view-header">
         <h3>{t('management.groupStandings')}</h3>
+        <ExportMenu tournament={tournament} imageTarget={standingsRef} imageSuffix="standings" />
         {playoffsEnabled && (
           <div className="standings-legend">
             <span className="standings-legend-item">
@@ -2195,7 +2200,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           </div>
         )}
       </div>
-      <div className="standings-list">
+      <div className="standings-list" ref={standingsRef}>
         {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map(group => {
           const standings = group.standings || [];
           const hasData = standings.length > 0;
@@ -3266,6 +3271,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             <span>{qualifyingPlayers.length} {t('management.playersQualified')}</span>
             <span>{t('management.currentRound')}: {rounds[currentRound - 1]?.name || t('common.completed')}</span>
           </div>
+          <ExportMenu tournament={tournament} imageTarget={bracketRef} imageSuffix="bracket" items={['image', 'results']} />
           <div className="bracket-view-toggle">
             <button
               className={`view-toggle-btn ${bracketViewMode === 'detailed' ? 'active' : ''}`}
@@ -3297,6 +3303,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           </div>
         </div>
 
+        <div ref={bracketRef} className="bracket-export-target">
         {bracketViewMode === 'compact' ? (
           <BracketVisualization rounds={rounds} playoffMatches={playoffMatches} />
         ) : (
@@ -3542,6 +3549,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           ))}
         </div>
         )}
+        </div>
       </div>
     );
   };

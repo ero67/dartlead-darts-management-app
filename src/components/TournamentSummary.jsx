@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Trophy, Target, Zap, Award, Hash, Download, Loader } from 'lucide-react';
-import { toPng } from 'html-to-image';
+import { deliverFile, elementToPngBlob, exportFileName } from '../lib/exportShare';
 import { useLanguage } from '../contexts/LanguageContext';
 import { isValidLegDartCount } from '../utils/dartStats';
 import logo from '../assets/logo.png';
@@ -24,15 +24,14 @@ export function TournamentSummary({ tournament }) {
     if (!summaryRef.current) return;
     setExporting(true);
     try {
-      const dataUrl = await toPng(summaryRef.current, {
-        backgroundColor: '#1e293b',
-        pixelRatio: 2,
-        style: { padding: '1.5rem' }
+      // Share sheet on Android / mobile browsers, download elsewhere.
+      const blob = await elementToPngBlob(summaryRef.current, { backgroundColor: '#1e293b', padding: '1.5rem' });
+      await deliverFile({
+        blob,
+        filename: exportFileName(tournament.name, 'summary', 'png'),
+        title: tournament.name,
+        text: `${tournament.name} · dartlead.app`
       });
-      const link = document.createElement('a');
-      link.download = `${tournament.name || 'tournament'}-summary.png`;
-      link.href = dataUrl;
-      link.click();
     } catch (error) {
       console.error('Export failed:', error);
     } finally {

@@ -993,5 +993,22 @@
     "fullscreen": "Celá obrazovka (F)",
     "loadError": "Turnaj sa nepodarilo načítať",
     "pinned": "Pevné zobrazenie — odstráňte ?view= z adresy pre striedanie"
+  },
+  "export": {
+    "title": "Zdieľať / export",
+    "shareImage": "Zdieľať ako obrázok",
+    "standingsCsv": "Tabuľka (CSV)",
+    "resultsCsv": "Výsledky (CSV)",
+    "failed": "Export sa nepodaril. Skúste to znova.",
+    "colGroup": "Skupina",
+    "colLegsWon": "Vyhraté legy",
+    "colLegsLost": "Prehraté legy",
+    "colStage": "Fáza",
+    "colPlayer1": "Hráč 1",
+    "colPlayer2": "Hráč 2",
+    "colLegs1": "Legy 1",
+    "colLegs2": "Legy 2",
+    "colWinner": "Víťaz",
+    "thirdPlace": "Zápas o 3. miesto"
   }
 }
