@@ -12466,3 +12466,155 @@ a.tv-mode-btn { text-decoration: none; }
   background-color: #ecfdf5;
   border-color: transparent;
 }
+
+/* ============================================================
+   Modal system — one look for every dialog
+   Structure used throughout: .modal-overlay > .modal > (.modal-header,
+   .modal-content (body), .modal-actions). Device Settings and the account
+   deletion dialog follow the same recipe with their own classes. Appended
+   late in the sheet so it wins over the older per-dialog rules above.
+   ============================================================ */
+.modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  width: min(95vw, 760px);
+  max-width: 760px;
+  max-height: 92dvh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 45px -20px rgba(15, 23, 42, 0.35), 0 2px 8px var(--shadow-sm);
+}
+.modal.confirm-modal { max-width: 460px; }
+.modal > .modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.1rem 1.25rem;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--card-bg);
+}
+.modal-header h2,
+.modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-primary);
+}
+.modal-header .close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.modal-header .close-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.modal-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--card-bg);
+  position: static;
+}
+.modal-actions.confirm-modal-actions { justify-content: flex-end; }
+.modal-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: auto;
+  min-height: 40px;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.modal-actions .cancel-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color-dark);
+}
+.modal-actions .cancel-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.modal-actions .confirm-btn,
+.modal-actions .save-btn {
+  background: var(--accent-primary);
+  color: #fff;
+  border: 1px solid var(--accent-primary);
+}
+.modal-actions .confirm-btn:hover:not(:disabled),
+.modal-actions .save-btn:hover:not(:disabled) {
+  background: var(--accent-primary-strong);
+  border-color: var(--accent-primary-strong);
+}
+.modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.confirm-modal-content {
+  text-align: center;
+  padding: 1.5rem 1.25rem !important;
+}
+
+/* Phones: every dialog becomes a bottom sheet with full-width controls */
+@media (max-width: 640px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+    padding-bottom: var(--safe-area-inset-bottom, 0px);
+  }
+  .modal-header { padding: 0.9rem 1rem; }
+  .modal > .modal-content { padding: 1rem; }
+  .modal-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.6rem;
+    padding: 0.75rem 1rem;
+  }
+  .modal-actions button {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1rem;
+  }
+}
