@@ -1,7 +1,9 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import './BracketVisualization.css';
 
-export function BracketVisualization({ rounds, playoffMatches = [] }) {
+// `scale` enlarges the layout geometry (the TV display passes 1.6 and scales
+// the card styles to match); connectors are measured from the DOM so they follow.
+export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 }) {
   const matchRefs = useRef({});
   const containerRef = useRef(null);
   const [connections, setConnections] = useState([]);
@@ -44,9 +46,9 @@ export function BracketVisualization({ rounds, playoffMatches = [] }) {
 
   // Calculate bracket structure with positions
   const bracketStructure = useMemo(() => {
-    const matchHeight = 45; // Match card height
-    const spacing = 30; // Much more spacing to prevent overlap
-    const roundWidth = 200; // Wider to accommodate connections
+    const matchHeight = 45 * scale; // Match card height
+    const spacing = 30 * scale; // Much more spacing to prevent overlap
+    const roundWidth = 200 * scale; // Wider to accommodate connections
     
     const structure = [];
     
@@ -125,7 +127,7 @@ export function BracketVisualization({ rounds, playoffMatches = [] }) {
     });
     
     return structure;
-  }, [rounds, playoffMatches]);
+  }, [rounds, playoffMatches, scale]);
 
   // Calculate connection lines based on actual DOM positions
   useEffect(() => {
@@ -226,7 +228,7 @@ export function BracketVisualization({ rounds, playoffMatches = [] }) {
                     }}
                     className="bracket-match-viz"
                     style={{ 
-                      top: `${y - 22.5}px`
+                      top: `${y - 22.5 * scale}px`
                     }}
                     data-match-x={x}
                     data-match-y={y}

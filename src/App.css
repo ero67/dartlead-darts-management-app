@@ -8115,6 +8115,9 @@ body {
   }
 }
 
+/* TV mode link in the tournament header renders like the settings button */
+a.tv-mode-btn { text-decoration: none; }
+
 /* Admin panel: tabs + overview */
 .admin-tabs {
   margin: 0 0 1.25rem;

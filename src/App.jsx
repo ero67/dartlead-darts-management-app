@@ -31,6 +31,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { NotFound } from './components/NotFound';
 import { ResetPassword } from './components/ResetPassword';
 import { DeleteAccountInfo } from './components/DeleteAccountInfo';
+import { TvDisplay } from './components/TvDisplay';
 import { AccountDeletion } from './components/AccountDeletion';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
@@ -461,6 +462,15 @@ function AppContent() {
     navigate(`/create-tournament?leagueId=${league.id}`);
   };
 
+
+  // TV / wall display: no navigation, no app chrome, its own palette.
+  if (location.pathname.startsWith('/tv/')) {
+    return (
+      <Routes>
+        <Route path="/tv/:id" element={<TvDisplay />} />
+      </Routes>
+    );
+  }
 
   return (
     <div className="app">

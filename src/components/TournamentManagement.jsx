@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star, Lock, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star, Lock, ClipboardList, Tv } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -3575,6 +3575,17 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         </div>
         <div className="header-actions">
           <RefreshButton />
+          <a
+            className="edit-settings-btn tv-mode-btn"
+            href={`/tv/${tournament.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t('management.tvModeHint')}
+            aria-label={t('management.tvMode')}
+          >
+            <Tv size={18} />
+            <span className="btn-label">{t('management.tvMode')}</span>
+          </a>
           {canManage && user && (
             <button
               className="edit-settings-btn"

@@ -460,7 +460,9 @@
     "suggestedScorerHint": "Navrhnutý zapisovateľ tohto zápasu",
     "detailedView": "Podrobné zobrazenie",
     "tbd": "Neurčené",
-    "plusThirdPlace": "+ zápas o 3. miesto"
+    "plusThirdPlace": "+ zápas o 3. miesto",
+    "tvMode": "TV režim",
+    "tvModeHint": "Otvoriť zobrazenie na obrazovku pre tento turnaj v novej karte"
   },
   "summary": {
     "tab": "Súhrn",
@@ -973,5 +975,23 @@
     "timing": "Zmazanie je okamžité. Zálohy u nášho poskytovateľa databázy expirujú do 7 dní.",
     "noAccessTitle": "Nemôžete sa prihlásiť?",
     "noAccessText": "Ak už nemáte prístup k svojmu prihláseniu, pošlite žiadosť o zmazanie z e-mailovej adresy, ktorou ste sa registrovali; overíme ju a účet zmažeme."
+  },
+  "tv": {
+    "liveBoards": "Hrá sa",
+    "board": "Terč",
+    "leg": "Leg",
+    "upNext": "Nasleduje",
+    "nothingQueued": "Nič nečaká",
+    "noLiveMatches": "Momentálne sa nehrá žiadny zápas",
+    "completed": "Ukončený",
+    "inProgress": "Prebieha",
+    "views": "Zobrazenia",
+    "pause": "Pozastaviť striedanie",
+    "resume": "Obnoviť striedanie",
+    "paused": "Striedanie pozastavené — medzerník pokračuje",
+    "rotating": "Zobrazenie sa mení každých {{seconds}} s",
+    "fullscreen": "Celá obrazovka (F)",
+    "loadError": "Turnaj sa nepodarilo načítať",
+    "pinned": "Pevné zobrazenie — odstráňte ?view= z adresy pre striedanie"
   }
 }

@@ -460,7 +460,9 @@
     "suggestedScorerHint": "Suggested scorer for this match",
     "detailedView": "Detailed View",
     "tbd": "TBD",
-    "plusThirdPlace": "+ 3rd Place"
+    "plusThirdPlace": "+ 3rd Place",
+    "tvMode": "TV mode",
+    "tvModeHint": "Open the wall display for this tournament in a new tab"
   },
   "summary": {
     "tab": "Summary",
@@ -973,5 +975,23 @@
     "timing": "Deletion is immediate. Backups held by our database provider expire within 7 days.",
     "noAccessTitle": "Can't sign in?",
     "noAccessText": "If you no longer have access to your login, send a deletion request from the email address you registered with and we will verify and delete the account."
+  },
+  "tv": {
+    "liveBoards": "Live boards",
+    "board": "Board",
+    "leg": "Leg",
+    "upNext": "Up next",
+    "nothingQueued": "Nothing waiting",
+    "noLiveMatches": "No match is being played right now",
+    "completed": "Completed",
+    "inProgress": "In progress",
+    "views": "Views",
+    "pause": "Pause rotation",
+    "resume": "Resume rotation",
+    "paused": "Rotation paused — press space to resume",
+    "rotating": "Switching view every {{seconds}} s",
+    "fullscreen": "Fullscreen (F)",
+    "loadError": "Could not load the tournament",
+    "pinned": "Fixed view — remove ?view= from the address to rotate"
   }
 }
