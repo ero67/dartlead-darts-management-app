@@ -15,6 +15,7 @@ import { TournamentSummary } from './TournamentSummary';
 import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { ExportMenu } from './ExportMenu';
+import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { isValidLegDartCount } from '../utils/dartStats';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 
@@ -4500,118 +4501,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       )}
 
       {/* Match Statistics Modal */}
-      {matchStatistics && matchStatistics.result && (
-        <div className="modal-overlay">
-          <div className="modal match-statistics-modal">
-            <div className="modal-header">
-              <h3>{t('management.matchStatistics')}</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setMatchStatistics(null)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-content">
-              <div className="match-statistics-header">
-                <div className="match-players-header">
-                  <div className="player-header">
-                    <div className="player-name-stat">{matchStatistics.player1?.name || t('management.player1')}</div>
-                    <div className="player-legs-stat">{matchStatistics.result.player1Legs}</div>
-                  </div>
-                  <div className="vs-stat">{t('common.vs')}</div>
-                  <div className="player-header">
-                    <div className="player-legs-stat">{matchStatistics.result.player2Legs}</div>
-                    <div className="player-name-stat">{matchStatistics.player2?.name || t('management.player2')}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="statistics-sections">
-                {/* Match Averages */}
-                <div className="statistics-section">
-                  <h4>{t('management.matchAverage')}</h4>
-                  <div className="statistics-row">
-                    <div className="stat-value">
-                      {matchStatistics.result.player1Stats?.average ? matchStatistics.result.player1Stats.average.toFixed(2) : '0.00'}
-                    </div>
-                    <div className="stat-label">{t('management.avg')}</div>
-                    <div className="stat-value">
-                      {matchStatistics.result.player2Stats?.average ? matchStatistics.result.player2Stats.average.toFixed(2) : '0.00'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Legs Won */}
-                <div className="statistics-section">
-                  <h4>{t('management.legsWon')}</h4>
-                  <div className="statistics-row">
-                    <div className="stat-value">{matchStatistics.result.player1Legs || 0}</div>
-                    <div className="stat-label">{t('management.legs')}</div>
-                    <div className="stat-value">{matchStatistics.result.player2Legs || 0}</div>
-                  </div>
-                </div>
-
-                {/* Checkouts */}
-                <div className="statistics-section">
-                  <h4>{t('management.checkouts')}</h4>
-                  <div className="statistics-row checkouts-row">
-                    <div className="checkouts-list">
-                      {matchStatistics.result.player1Stats?.checkouts && matchStatistics.result.player1Stats.checkouts.length > 0 ? (
-                        matchStatistics.result.player1Stats.checkouts
-                          .map(c => typeof c === 'object' ? c.checkout : c)
-                          .filter(c => c && c > 0)
-                          .sort((a, b) => b - a)
-                          .join(', ') || '-'
-                      ) : '-'}
-                    </div>
-                    <div className="stat-label">{t('management.checkouts')}</div>
-                    <div className="checkouts-list">
-                      {matchStatistics.result.player2Stats?.checkouts && matchStatistics.result.player2Stats.checkouts.length > 0 ? (
-                        matchStatistics.result.player2Stats.checkouts
-                          .map(c => typeof c === 'object' ? c.checkout : c)
-                          .filter(c => c && c > 0)
-                          .sort((a, b) => b - a)
-                          .join(', ') || '-'
-                      ) : '-'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Darts per Leg */}
-                <div className="statistics-section">
-                  <h4>{t('management.dartsPerLeg')}</h4>
-                  <div className="legs-details">
-                    {Array.from({ length: Math.max(
-                      matchStatistics.result.player1Stats?.legs?.length || 0,
-                      matchStatistics.result.player2Stats?.legs?.length || 0
-                    ) }, (_, i) => i + 1).map(legNum => {
-                      const player1Leg = matchStatistics.result.player1Stats?.legs?.[legNum - 1];
-                      const player2Leg = matchStatistics.result.player2Stats?.legs?.[legNum - 1];
-                      const player1Darts = player1Leg?.darts || '-';
-                      const player2Darts = player2Leg?.darts || '-';
-                      const player1Won = player1Leg?.isWin;
-                      const player2Won = player2Leg?.isWin;
-
-                      return (
-                        <div key={legNum} className="leg-detail-row">
-                          <div className={`leg-darts ${player1Won ? 'winner' : ''}`}>
-                            {player1Darts}
-                          </div>
-                          <div className="leg-number">{t('management.leg')} {legNum}</div>
-                          <div className={`leg-darts ${player2Won ? 'winner' : ''}`}>
-                            {player2Darts}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <MatchStatisticsModal match={matchStatistics} onClose={() => setMatchStatistics(null)} />
     </div>
   );
 }

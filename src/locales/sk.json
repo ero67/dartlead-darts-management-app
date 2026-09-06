@@ -1010,5 +1010,25 @@
     "colLegs2": "Legy 2",
     "colWinner": "Víťaz",
     "thirdPlace": "Zápas o 3. miesto"
+  },
+  "matchStats": {
+    "title": "Štatistika zápasu",
+    "average": "Priemer na 3 šípky",
+    "legs": "Legy",
+    "oneEighties": "180",
+    "highestCheckout": "Najvyšší checkout",
+    "checkoutCount": "Checkouty",
+    "bestLeg": "Najlepší leg (šípky)",
+    "dartsThrown": "Hodené šípky",
+    "pointsScored": "Nahádzané body",
+    "legByLeg": "Leg po legu",
+    "leg": "Leg",
+    "darts": "Šípky",
+    "legAvg": "Priemer",
+    "checkoutsOf": "Checkouty",
+    "noCheckouts": "—",
+    "winner": "Víťaz",
+    "noDetails": "Pre tento zápas neboli zaznamenané podrobné štatistiky.",
+    "open": "Štatistika"
   }
 }

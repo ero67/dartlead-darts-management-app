@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Trophy, Target, Crown, Calendar, TrendingUp, Award, Medal,
-  Flame, Zap, Percent, Swords, ShieldCheck, ChevronRight, Activity, Pencil
+  Flame, Zap, Percent, Swords, ShieldCheck, ChevronRight, Activity, Pencil, BarChart3
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,6 +9,7 @@ import { tournamentService } from '../services/tournamentService';
 import { tournamentStatusLabel as statusLabel } from '../utils/tournamentStatus';
 import { DisplayNameEditor } from './DisplayNameEditor';
 import { AccountDeletion } from './AccountDeletion';
+import { MatchStatisticsModal } from './MatchStatisticsModal';
 
 const getInitials = (name) => {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
@@ -29,6 +30,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const { user } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [statsMatch, setStatsMatch] = useState(null);
   const [isEditingName, setIsEditingName] = useState(false);
 
   useEffect(() => {
@@ -296,6 +298,17 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
                     {match.average ? match.average.toFixed(2) : '—'}
                     <small>{t('playerProfile.avgShort')}</small>
                   </span>
+                  {match.result && (
+                    <button
+                      type="button"
+                      className="profile-match-stats-btn"
+                      onClick={() => setStatsMatch(match)}
+                      title={t('matchStats.open')}
+                      aria-label={t('matchStats.open')}
+                    >
+                      <BarChart3 size={16} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -370,6 +383,10 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
       )}
 
       {isOwnProfile && <AccountDeletion />}
+
+      {statsMatch && (
+        <MatchStatisticsModal match={statsMatch} onClose={() => setStatsMatch(null)} />
+      )}
     </div>
   );
 }

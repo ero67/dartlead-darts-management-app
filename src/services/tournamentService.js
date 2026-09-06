@@ -1999,7 +1999,7 @@ export const tournamentService = {
         .from('matches')
         .select(`
           id, tournament_id, winner_id, player1_id, player2_id,
-          player1_legs, player2_legs, is_playoff, created_at, updated_at,
+          player1_legs, player2_legs, is_playoff, playoff_round, created_at, updated_at, result,
           player1:players!matches_player1_id_fkey(id, name),
           player2:players!matches_player2_id_fkey(id, name)
         `)
@@ -2024,7 +2024,11 @@ export const tournamentService = {
           won: m.winner_id === playerId,
           isPlayoff: !!m.is_playoff,
           average: Number.isFinite(matchAverage) ? matchAverage : null,
-          playedAt: m.updated_at || m.created_at
+          playedAt: m.updated_at || m.created_at,
+          // For the statistics dialog on the profile page
+          player1: m.player1 || null,
+          player2: m.player2 || null,
+          result: m.result || null
         };
       });
 

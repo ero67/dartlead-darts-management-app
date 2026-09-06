@@ -1010,5 +1010,25 @@
     "colLegs2": "Legs 2",
     "colWinner": "Winner",
     "thirdPlace": "3rd place match"
+  },
+  "matchStats": {
+    "title": "Match statistics",
+    "average": "3-dart average",
+    "legs": "Legs",
+    "oneEighties": "180s",
+    "highestCheckout": "Highest checkout",
+    "checkoutCount": "Checkouts",
+    "bestLeg": "Best leg (darts)",
+    "dartsThrown": "Darts thrown",
+    "pointsScored": "Points scored",
+    "legByLeg": "Leg by leg",
+    "leg": "Leg",
+    "darts": "Darts",
+    "legAvg": "Avg",
+    "checkoutsOf": "Checkouts",
+    "noCheckouts": "—",
+    "winner": "Winner",
+    "noDetails": "No detailed statistics were recorded for this match.",
+    "open": "Statistics"
   }
 }
