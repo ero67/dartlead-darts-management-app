@@ -5,8 +5,17 @@ import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ManagerBilling } from './ManagerBilling';
+import { AdminOverview } from './AdminOverview';
+
+const ADMIN_TABS = [
+  { key: 'overview', label: 'Overview', icon: Trophy },
+  { key: 'users', label: 'Users & roles', icon: Users },
+  { key: 'billing', label: 'Billing', icon: Crown },
+  { key: 'data', label: 'Data fixes', icon: Settings }
+];
 
 export function AdminPanel() {
+  const [activeTab, setActiveTab] = useState('overview');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -585,7 +594,27 @@ export function AdminPanel() {
         <p className="admin-panel-subtitle">Manage users, tournaments, and matches</p>
       </div>
 
+      <div className="management-tabs admin-tabs" role="tablist">
+        {ADMIN_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            className={activeTab === tab.key ? 'active' : ''}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {React.createElement(tab.icon, { size: 16 })}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="admin-panel-content">
+        {activeTab === 'overview' && (
+          <AdminOverview onOpenBilling={() => setActiveTab('billing')} />
+        )}
+
+        {activeTab === 'users' && (<>
         {/* Set Manager Role Section */}
         <div className="admin-section">
           <div className="admin-section-header">
@@ -685,9 +714,6 @@ export function AdminPanel() {
           )}
         </div>
 
-        {/* Managers & Billing Section */}
-        <ManagerBilling />
-
         {/* View All Users Section */}
         <div className="admin-section">
           <div className="admin-section-header">
@@ -745,6 +771,11 @@ export function AdminPanel() {
           ) : null}
         </div>
 
+        </>)}
+
+        {activeTab === 'billing' && <ManagerBilling />}
+
+        {activeTab === 'data' && (<>
         {/* Force Tournament Status Section */}
         <div className="admin-section">
           <div className="admin-section-header">
@@ -1211,7 +1242,9 @@ export function AdminPanel() {
           </div>
         </div>
 
-        {/* ── Link Account to Player Stats ─────────────────────────── */}
+        </>)}
+
+        {activeTab === 'users' && (
         <div className="admin-section">
           <div className="admin-section-header">
             <LinkIcon size={20} />
@@ -1439,6 +1472,7 @@ export function AdminPanel() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );
