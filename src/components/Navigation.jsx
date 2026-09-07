@@ -33,6 +33,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
   
   const navItems = [
     { id: '/', label: t('navigation.home'), icon: Home },
+    { id: '/practice', label: t('navigation.practice'), icon: Target },
     { id: '/dashboard', label: (isAdmin || isManager) ? t('dashboard.myDashboard') : t('navigation.dashboard'), icon: Trophy, primary: isAdmin || isManager },
     { id: '/tournaments', label: t('navigation.tournaments'), icon: Users },
     { id: '/leagues', label: t('navigation.leagues'), icon: Crown },

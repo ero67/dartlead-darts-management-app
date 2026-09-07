@@ -1,10 +1,12 @@
 import React from 'react';
-import { ArrowRight, CheckCircle2, Mail, Shield, Trophy, Activity, BarChart3, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, CheckCircle2, Mail, Shield, Trophy, Activity, BarChart3, Users, Target } from 'lucide-react';
 import appScreenshot from '../assets/logo.png'; // placeholder; replace with real screenshot
 import { useLanguage } from '../contexts/LanguageContext';
 
 export function LandingPage() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const features = [
     {
@@ -26,6 +28,11 @@ export function LandingPage() {
       icon: Users,
       title: t('landing.features.playersTitle'),
       description: t('landing.features.playersDesc')
+    },
+    {
+      icon: Target,
+      title: t('landing.features.practiceTitle'),
+      description: t('landing.features.practiceDesc')
     }
   ];
 
@@ -52,6 +59,9 @@ export function LandingPage() {
           <div className="hero-actions">
             <button className="primary-btn" onClick={scrollToContact}>
               {t('landing.ctaPrimary')} <ArrowRight size={18} />
+            </button>
+            <button className="ghost-btn" onClick={() => navigate('/practice')}>
+              <Target size={18} /> {t('landing.ctaPractice')}
             </button>
             <span className="ghost-btn" style={{ cursor: 'default' }}>
               {t('landing.ctaMail')} info@dartlead.app

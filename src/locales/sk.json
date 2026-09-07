@@ -24,7 +24,8 @@
     "adminScorer": "Admin/Zapisovateľ",
     "darkMode": "Tmavý Režim",
     "lightMode": "Svetlý Režim",
-    "myProfile": "Môj Profil"
+    "myProfile": "Môj Profil",
+    "practice": "Tréning"
   },
   "dashboard": {
     "title": "Prehľad",
@@ -52,7 +53,13 @@
     "browsePublic": "Prehliadať Turnaje",
     "browseLeagues": "Prehliadať Ligy",
     "manage": "Spravovať",
-    "viewResults": "Zobraziť Výsledky"
+    "viewResults": "Zobraziť Výsledky",
+    "welcomePlayer": "Vitaj, {{name}}",
+    "playerIntro": "Trénuj sám, sleduj turnaje a ligy a udržuj svoj profil aktuálny.",
+    "practiceTitle": "Tréning zadarmo",
+    "practiceDesc": "Sólo X01 s priemermi, úspešnosťou checkoutov a históriou na tomto zariadení.",
+    "practiceCta": "Začať trénovať",
+    "continueSession": "Pokračovať v tréningu"
   },
   "tournaments": {
     "title": "Turnaje",
@@ -504,7 +511,9 @@
       "statsTitle": "Bohaté štatistiky",
       "statsDesc": "Priemery, checkouty, rozdiely legov, tabuľky a rebríčky.",
       "playersTitle": "Správa hráčov",
-      "playersDesc": "Rýchla registrácia, až 64 hráčov na turnaj, priraďovanie do skupín."
+      "playersDesc": "Rýchla registrácia, až 64 hráčov na turnaj, priraďovanie do skupín.",
+      "practiceTitle": "Tréning zadarmo",
+      "practiceDesc": "Sólo X01 s priemermi a štatistikou checkoutov, bez ligy. Ďalšie cvičenia pripravujeme."
     },
     "stepsEyebrow": "Ako to funguje",
     "stepsTitle": "Od nastavenia k live hre v troch krokoch.",
@@ -531,7 +540,8 @@
       "message": "Správa",
       "messagePlaceholder": "Opíšte svoje potreby",
       "submit": "Kontaktujte nás na"
-    }
+    },
+    "ctaPractice": "Vyskúšať tréning"
   },
   "auth": {
     "setNewPasswordTitle": "Nastavte si nové heslo",
@@ -1030,5 +1040,206 @@
     "winner": "Víťaz",
     "noDetails": "Pre tento zápas neboli zaznamenané podrobné štatistiky.",
     "open": "Štatistika"
+  },
+  "practice": {
+    "title": "Tréning",
+    "subtitle": "Trénuj sám. Výsledky sa ukladajú na tomto zariadení.",
+    "savedLocally": "Tréningy sa ukladajú na tomto zariadení.",
+    "resumeTitle": "Rozohraný tréning",
+    "resume": "Pokračovať",
+    "discard": "Zahodiť",
+    "comingSoon": "Pripravujeme",
+    "start": "Začať",
+    "games": {
+      "x01": {
+        "title": "X01",
+        "desc": "501, 301 alebo vlastný štart. Hraj legy proti terču a sleduj svoj priemer."
+      },
+      "checkout": {
+        "title": "Tréning checkoutov",
+        "desc": "Náhodné zakončenia od 2 do 170. Úspešnosť podľa čísla."
+      },
+      "oneTwentyOne": {
+        "title": "121",
+        "desc": "Zakonči 121 na deväť šípok a posuň sa vyššie."
+      },
+      "aroundTheClock": {
+        "title": "Okolo terča",
+        "desc": "1 až 20 a potom bull. Počet šípok a čas do konca."
+      }
+    },
+    "setup": {
+      "title": "Nový X01 tréning",
+      "startingScore": "Štartovacie skóre",
+      "custom": "Vlastné",
+      "legs": "Legy",
+      "unlimited": "Bez limitu",
+      "scoringMode": "Zapisovanie",
+      "scoringDart": "Šípka po šípke",
+      "scoringTurnTotal": "Súčet 3 šípok",
+      "scoringDartHint": "Každá šípka zvlášť. Kompletné štatistiky checkoutov.",
+      "scoringTurnTotalHint": "Zadaj súčet každého náhodu. Rýchlejšie."
+    },
+    "legOf": "Leg {{current}} / {{total}}",
+    "leg": "Leg {{current}}",
+    "legCountOne": "{{count}} leg",
+    "legCountMany": "{{count}} legov",
+    "remaining": "Zostáva",
+    "thisLeg": "Tento leg",
+    "stats": {
+      "average": "Priemer",
+      "firstNine": "Prvých 9",
+      "checkout": "Checkout %",
+      "oneEighties": "180",
+      "oneForties": "140+",
+      "tons": "100+",
+      "bestLeg": "Najlepší leg",
+      "highestCheckout": "Najvyšší checkout",
+      "highestVisit": "Najvyšší náhod",
+      "darts": "Šípky",
+      "legs": "Legy",
+      "busts": "Busty",
+      "sessions": "Tréningy",
+      "bestAverage": "Najlepší priemer",
+      "dartsOne": "{{count}} šípka",
+      "dartsFew": "{{count}} šípky",
+      "dartsMany": "{{count}} šípok"
+    },
+    "bust": "Bust",
+    "finishSession": "Ukončiť tréning",
+    "sessionComplete": "Tréning dokončený",
+    "playAgain": "Hrať znova",
+    "changeSettings": "Zmeniť nastavenia",
+    "backToPractice": "Späť na tréning",
+    "history": {
+      "title": "História tréningov",
+      "empty": "Zatiaľ žiadne tréningy",
+      "emptyHint": "Dokonči tréning a objaví sa tu.",
+      "viewAll": "Zobraziť všetky",
+      "recent": "Nedávne tréningy",
+      "clearAll": "Vymazať históriu",
+      "confirmClear": "Vymazať všetky tréningy z tohto zariadenia?",
+      "delete": "Vymazať",
+      "confirmClearCloud": "Vymazať všetky tréningy z tohto zariadenia aj z účtu?"
+    },
+    "noStats": "—",
+    "legWonOne": "Leg dokončený na {{count}} šípku",
+    "legWonFew": "Leg dokončený na {{count}} šípky",
+    "legWonMany": "Leg dokončený na {{count}} šípok",
+    "checkout": {
+      "setup": {
+        "title": "Nový tréning checkoutov",
+        "range": "Zakončenia",
+        "attempts": "Pokusy",
+        "note": "Len šípka po šípke: tréner musí vedieť, či bola posledná šípka double."
+      },
+      "ranges": {
+        "doubles": "Len doubly",
+        "low": "Nízke",
+        "mid": "Stredné",
+        "high": "Vysoké",
+        "all": "Všetky"
+      },
+      "target": "Cieľ",
+      "attempt": "Pokus {{current}}",
+      "attemptOf": "Pokus {{current}} / {{total}}",
+      "attemptCountOne": "{{count}} pokus",
+      "attemptCountFew": "{{count}} pokusy",
+      "attemptCountMany": "{{count}} pokusov",
+      "hitOne": "Zakončené na {{count}} šípku",
+      "hitFew": "Zakončené na {{count}} šípky",
+      "hitMany": "Zakončené na {{count}} šípok",
+      "miss": "Nezakončené",
+      "missCountOne": "{{count}} minutie",
+      "missCountFew": "{{count}} minutia",
+      "missCountMany": "{{count}} minutí",
+      "stats": {
+        "hits": "Zakončenia",
+        "hitRate": "Úspešnosť",
+        "doubleRate": "Trafené doubly",
+        "avgDartsPerHit": "Šípok na zakončenie",
+        "bestStreak": "Najdlhšia séria",
+        "hardest": "Najťažšie zakončenia"
+      }
+    },
+    "oneTwentyOne": {
+      "rules": "Zakonči cieľ do troch náhodov (deväť šípok). Ak sa podarí, cieľ sa zvýši o jeden; ak nie, klesne o jeden.",
+      "setup": {
+        "title": "Nový tréning 121",
+        "startTarget": "Štartovací cieľ",
+        "rounds": "Kolá",
+        "onFail": "Po neúspechu",
+        "onFail_down": "O jeden nižšie",
+        "onFail_stay": "Zostať"
+      },
+      "round": "Kolo {{current}}",
+      "roundOf": "Kolo {{current}} / {{total}}",
+      "roundCountOne": "{{count}} kolo",
+      "roundCountFew": "{{count}} kolá",
+      "roundCountMany": "{{count}} kôl",
+      "visitsLeftOne": "zostáva {{count}} náhod",
+      "visitsLeftFew": "zostávajú {{count}} náhody",
+      "visitsLeftMany": "zostáva {{count}} náhodov",
+      "success": "Podarilo sa! Ďalší: {{target}}",
+      "fail": "Nepodarilo sa. Ďalší: {{target}}",
+      "stats": {
+        "successes": "Zakončené",
+        "successRate": "Úspešnosť",
+        "highestTarget": "Najvyšší cieľ",
+        "highestSuccess": "Najvyššie zakončenie",
+        "finalTarget": "Konečný cieľ",
+        "rounds": "Kolá",
+        "bestStreak": "Najdlhšia séria",
+        "avgDartsPerSuccess": "Šípok na zakončenie"
+      }
+    },
+    "aroundTheClock": {
+      "rules": "Traf 1 až 20 v poradí a potom bull. Vyhráva najmenej šípok a najrýchlejší čas.",
+      "setup": {
+        "title": "Nové Okolo terča",
+        "mode": "Segmenty",
+        "includeBull": "Zakončiť na bull"
+      },
+      "modes": {
+        "singles": "Singly",
+        "doubles": "Doubly",
+        "trebles": "Triply"
+      },
+      "withBull": "s bullom",
+      "target": "Cieľ",
+      "time": "Čas",
+      "hit": "Trafené",
+      "miss": "Vedľa",
+      "dartsAtTarget": "Šípky na toto číslo",
+      "stats": {
+        "avgDartsPerTarget": "Šípok na číslo",
+        "firstDartHits": "Trafené prvou šípkou",
+        "hardest": "Najťažšie čísla"
+      }
+    },
+    "bests": {
+      "title": "Osobné rekordy",
+      "profileTitle": "Tréning",
+      "openPractice": "Otvoriť tréning",
+      "last30": "{{count}} za posledných 30 dní",
+      "bestAverage": "Najlepší priemer",
+      "bestFirstNine": "Najlepších prvých 9",
+      "bestLeg": "Najlepší leg",
+      "bestHitRate": "Najlepšia úspešnosť",
+      "fewestDarts": "Najmenej šípok",
+      "fastestTime": "Najrýchlejší čas"
+    },
+    "sync": {
+      "signInTitle": "Nestrať svoju históriu",
+      "signInText": "Prihlás sa a tréningy pôjdu s tebou na každé zariadenie. Čo je na tomto zariadení, sa nahrá pri prvom otvorení tréningu po prihlásení.",
+      "syncing": "Synchronizujem…",
+      "synced": "Synchronizované s tvojím účtom",
+      "failed": "Synchronizácia zlyhala. Tréningy zostanú na tomto zariadení, kým sa to nepodarí.",
+      "offline": "Offline · {{count}} čaká na nahratie",
+      "idle": "Uložené v tvojom účte",
+      "retry": "Synchronizovať",
+      "note": "Tréningy sa ukladajú do tvojho účtu aj na toto zariadenie.",
+      "deleteFailed": "Nepodarilo sa vymazať z účtu. Skús to znova, keď budeš online."
+    }
   }
 }

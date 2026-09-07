@@ -24,7 +24,8 @@
     "adminScorer": "Admin/Scorer",
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode",
-    "myProfile": "My Profile"
+    "myProfile": "My Profile",
+    "practice": "Practice"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -52,7 +53,13 @@
     "browsePublic": "Browse Tournaments",
     "browseLeagues": "Browse Leagues",
     "manage": "Manage",
-    "viewResults": "View Results"
+    "viewResults": "View Results",
+    "welcomePlayer": "Welcome, {{name}}",
+    "playerIntro": "Practice on your own, follow tournaments and leagues, and keep your profile up to date.",
+    "practiceTitle": "Free practice",
+    "practiceDesc": "Solo X01 with averages, checkout rate and history on this device.",
+    "practiceCta": "Start practicing",
+    "continueSession": "Continue session"
   },
   "tournaments": {
     "title": "Tournaments",
@@ -504,7 +511,9 @@
       "statsTitle": "Rich statistics",
       "statsDesc": "Averages, checkouts, leg differentials, standings, and leaderboards.",
       "playersTitle": "Player management",
-      "playersDesc": "Quick registration, up to 64 players per tournament, group assignment."
+      "playersDesc": "Quick registration, up to 64 players per tournament, group assignment.",
+      "practiceTitle": "Free practice mode",
+      "practiceDesc": "Solo X01 with averages and checkout stats, no league needed. More drills coming."
     },
     "stepsEyebrow": "How it works",
     "stepsTitle": "From setup to live play in three steps.",
@@ -531,7 +540,8 @@
       "message": "Message",
       "messagePlaceholder": "Tell us about your needs",
       "submit": "Contact us at"
-    }
+    },
+    "ctaPractice": "Try practice mode"
   },
   "auth": {
     "setNewPasswordTitle": "Set a new password",
@@ -1030,5 +1040,206 @@
     "winner": "Winner",
     "noDetails": "No detailed statistics were recorded for this match.",
     "open": "Statistics"
+  },
+  "practice": {
+    "title": "Practice",
+    "subtitle": "Train on your own. Results stay on this device.",
+    "savedLocally": "Sessions are saved on this device.",
+    "resumeTitle": "Session in progress",
+    "resume": "Resume",
+    "discard": "Discard",
+    "comingSoon": "Coming soon",
+    "start": "Start",
+    "games": {
+      "x01": {
+        "title": "X01",
+        "desc": "501, 301 or a custom start. Play legs against the board and track your average."
+      },
+      "checkout": {
+        "title": "Checkout trainer",
+        "desc": "Random finishes from 2 to 170. Hit rate per number."
+      },
+      "oneTwentyOne": {
+        "title": "121",
+        "desc": "Finish 121 in nine darts and move up when you do."
+      },
+      "aroundTheClock": {
+        "title": "Around the Clock",
+        "desc": "1 to 20, then bull. Darts and time to finish."
+      }
+    },
+    "setup": {
+      "title": "New X01 session",
+      "startingScore": "Starting score",
+      "custom": "Custom",
+      "legs": "Legs",
+      "unlimited": "Unlimited",
+      "scoringMode": "Scoring",
+      "scoringDart": "Dart by dart",
+      "scoringTurnTotal": "3-dart total",
+      "scoringDartHint": "Every dart counted. Full checkout stats.",
+      "scoringTurnTotalHint": "Type each visit total. Faster."
+    },
+    "legOf": "Leg {{current}} / {{total}}",
+    "leg": "Leg {{current}}",
+    "legCountOne": "{{count}} leg",
+    "legCountMany": "{{count}} legs",
+    "remaining": "Remaining",
+    "thisLeg": "This leg",
+    "stats": {
+      "average": "3-dart avg",
+      "firstNine": "First 9",
+      "checkout": "Checkout %",
+      "oneEighties": "180s",
+      "oneForties": "140+",
+      "tons": "100+",
+      "bestLeg": "Best leg",
+      "highestCheckout": "High checkout",
+      "highestVisit": "High visit",
+      "darts": "Darts",
+      "legs": "Legs",
+      "busts": "Busts",
+      "sessions": "Sessions",
+      "bestAverage": "Best avg",
+      "dartsOne": "{{count}} dart",
+      "dartsFew": "{{count}} darts",
+      "dartsMany": "{{count}} darts"
+    },
+    "bust": "Bust",
+    "finishSession": "Finish session",
+    "sessionComplete": "Session complete",
+    "playAgain": "Play again",
+    "changeSettings": "Change settings",
+    "backToPractice": "Back to practice",
+    "history": {
+      "title": "Practice history",
+      "empty": "No sessions yet",
+      "emptyHint": "Finish a session and it will show up here.",
+      "viewAll": "View all",
+      "recent": "Recent sessions",
+      "clearAll": "Clear history",
+      "confirmClear": "Delete all practice sessions from this device?",
+      "delete": "Delete",
+      "confirmClearCloud": "Delete all practice sessions from this device and your account?"
+    },
+    "noStats": "—",
+    "legWonOne": "Leg won in {{count}} dart",
+    "legWonFew": "Leg won in {{count}} darts",
+    "legWonMany": "Leg won in {{count}} darts",
+    "checkout": {
+      "setup": {
+        "title": "New checkout session",
+        "range": "Finishes",
+        "attempts": "Attempts",
+        "note": "Dart by dart only: the trainer needs to know whether the last dart was a double."
+      },
+      "ranges": {
+        "doubles": "Doubles only",
+        "low": "Low",
+        "mid": "Mid",
+        "high": "High",
+        "all": "All"
+      },
+      "target": "Target",
+      "attempt": "Attempt {{current}}",
+      "attemptOf": "Attempt {{current}} / {{total}}",
+      "attemptCountOne": "{{count}} attempt",
+      "attemptCountFew": "{{count}} attempts",
+      "attemptCountMany": "{{count}} attempts",
+      "hitOne": "Checked out with {{count}} dart",
+      "hitFew": "Checked out in {{count}} darts",
+      "hitMany": "Checked out in {{count}} darts",
+      "miss": "Missed",
+      "missCountOne": "{{count}} miss",
+      "missCountFew": "{{count}} misses",
+      "missCountMany": "{{count}} misses",
+      "stats": {
+        "hits": "Hits",
+        "hitRate": "Hit rate",
+        "doubleRate": "Doubles hit",
+        "avgDartsPerHit": "Darts per finish",
+        "bestStreak": "Best streak",
+        "hardest": "Hardest finishes"
+      }
+    },
+    "oneTwentyOne": {
+      "rules": "Check out the target within three visits (nine darts). Make it and the target goes up by one; miss and it drops by one.",
+      "setup": {
+        "title": "New 121 session",
+        "startTarget": "Starting target",
+        "rounds": "Rounds",
+        "onFail": "After a miss",
+        "onFail_down": "Drop one",
+        "onFail_stay": "Stay"
+      },
+      "round": "Round {{current}}",
+      "roundOf": "Round {{current}} / {{total}}",
+      "roundCountOne": "{{count}} round",
+      "roundCountFew": "{{count}} rounds",
+      "roundCountMany": "{{count}} rounds",
+      "visitsLeftOne": "{{count}} visit left",
+      "visitsLeftFew": "{{count}} visits left",
+      "visitsLeftMany": "{{count}} visits left",
+      "success": "Made it! Next: {{target}}",
+      "fail": "Missed. Next: {{target}}",
+      "stats": {
+        "successes": "Made",
+        "successRate": "Success rate",
+        "highestTarget": "Highest target",
+        "highestSuccess": "Highest made",
+        "finalTarget": "Final target",
+        "rounds": "Rounds",
+        "bestStreak": "Best streak",
+        "avgDartsPerSuccess": "Darts per finish"
+      }
+    },
+    "aroundTheClock": {
+      "rules": "Hit 1 to 20 in order, then the bull. Fewest darts and fastest time wins.",
+      "setup": {
+        "title": "New Around the Clock",
+        "mode": "Segments",
+        "includeBull": "Finish on the bull"
+      },
+      "modes": {
+        "singles": "Singles",
+        "doubles": "Doubles",
+        "trebles": "Trebles"
+      },
+      "withBull": "with bull",
+      "target": "Target",
+      "time": "Time",
+      "hit": "Hit",
+      "miss": "Miss",
+      "dartsAtTarget": "Darts at this number",
+      "stats": {
+        "avgDartsPerTarget": "Darts per number",
+        "firstDartHits": "First-dart hits",
+        "hardest": "Hardest numbers"
+      }
+    },
+    "bests": {
+      "title": "Personal bests",
+      "profileTitle": "Practice",
+      "openPractice": "Open practice",
+      "last30": "{{count}} in the last 30 days",
+      "bestAverage": "Best average",
+      "bestFirstNine": "Best first 9",
+      "bestLeg": "Best leg",
+      "bestHitRate": "Best hit rate",
+      "fewestDarts": "Fewest darts",
+      "fastestTime": "Fastest time"
+    },
+    "sync": {
+      "signInTitle": "Keep your history",
+      "signInText": "Sign in and your practice sessions follow you to every device. What is on this device is uploaded the first time you open practice while signed in.",
+      "syncing": "Syncing…",
+      "synced": "Synced with your account",
+      "failed": "Sync failed. Sessions stay on this device until it works.",
+      "offline": "Offline · {{count}} waiting to upload",
+      "idle": "Saved to your account",
+      "retry": "Sync now",
+      "note": "Sessions are saved to your account and this device.",
+      "deleteFailed": "Could not delete from your account. Try again when online."
+    }
   }
 }

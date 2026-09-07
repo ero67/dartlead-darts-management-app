@@ -12654,3 +12654,62 @@ a.tv-mode-btn { text-decoration: none; }
     font-size: 1rem;
   }
 }
+
+/* Dashboard for players (no manager role): practice card up top */
+.dashboard-player-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--accent-primary-border, var(--border-color));
+  background: var(--accent-primary-soft);
+}
+.dashboard-player-hero__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-primary);
+  color: white;
+  flex-shrink: 0;
+}
+.dashboard-player-hero__text {
+  flex: 1 1 240px;
+}
+.dashboard-player-hero__text h2 {
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  margin: 0 0 0.2rem;
+}
+.dashboard-player-hero__text p {
+  color: var(--text-secondary);
+  margin: 0;
+  font-size: 0.92rem;
+}
+.dashboard-player-hero__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.dashboard-welcome .quick-actions-bar {
+  justify-content: center;
+}
+
+.no-profile-practice {
+  margin: 1.5rem auto 0;
+  max-width: 720px;
+  text-align: left;
+}
+.no-profile-practice h3 {
+  color: var(--text-primary);
+  font-size: 1rem;
+  margin: 0 0 0.6rem;
+}
+.no-profile-practice .primary-btn {
+  margin-top: 0.75rem;
+}

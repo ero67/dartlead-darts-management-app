@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Target, RotateCcw, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { ArrowLeft, Target, CheckCircle, Eye } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -8,6 +8,11 @@ import { matchService } from '../services/tournamentService';
 import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import checkoutData from '../data/checkouts.json';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
+import { useOnScreenKeypad } from '../hooks/useOnScreenKeypad';
+import { DartKeypad } from './scoring/DartKeypad';
+import { TurnTotalKeypad } from './scoring/TurnTotalKeypad';
+import { parseTurnTotal } from '../lib/turnTotalInput';
+import { CheckoutDialog } from './scoring/CheckoutDialog';
 import { hapticTap, hapticBust, hapticLegWon, hapticMatchWon } from '../lib/haptics';
 
 // When both players have thrown this many visits in a single leg, the leg has run
@@ -178,39 +183,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const [turnTotalInput, setTurnTotalInput] = useState('');
   const [pendingCheckout, setPendingCheckout] = useState(null); // { total: number, dartsUsed: 1|2|3, finishedOnDouble: boolean } | null
   const [showBullup, setShowBullup] = useState(false); // bull-up decision modal for over-long legs
-  const [useOnScreenKeypad, setUseOnScreenKeypad] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const isCoarsePointer = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false;
-    const isTabletOrMobileWidth = window.innerWidth <= 1024;
-    return isCoarsePointer || isTabletOrMobileWidth;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const media = window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
-    const update = () => {
-      const isCoarsePointer = media ? media.matches : false;
-      const isTabletOrMobileWidth = window.innerWidth <= 1024;
-      setUseOnScreenKeypad(isCoarsePointer || isTabletOrMobileWidth);
-    };
-
-    update();
-    window.addEventListener('resize', update);
-    if (media) {
-      // Safari uses addListener/removeListener
-      if (typeof media.addEventListener === 'function') media.addEventListener('change', update);
-      else if (typeof media.addListener === 'function') media.addListener(update);
-    }
-
-    return () => {
-      window.removeEventListener('resize', update);
-      if (media) {
-        if (typeof media.removeEventListener === 'function') media.removeEventListener('change', update);
-        else if (typeof media.removeListener === 'function') media.removeListener(update);
-      }
-    };
-  }, []);
+  const isOnScreenKeypad = useOnScreenKeypad();
 
   // Only show match starter dialog if it's a new match and no match starter has been chosen
   // This effect is now mainly for cases where the state changes after initial load
@@ -668,50 +641,10 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   // Helper: ensure a score value is a finite number, falling back to a safe default
   const safeScore = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
 
-  const dartNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 0]; // Ascending order: 1-20, 25 (bull), 0 (miss)
-
-  const appendTurnTotalDigit = (digit) => {
-    hapticTap();
-    setTurnTotalInput(prev => {
-      const next = `${prev}${digit}`;
-      // keep it to max 3 digits (max is 180 anyway)
-      if (next.length > 3) return prev;
-      const normalized = next.replace(/^0+(?=\d)/, ''); // normalize leading zeros
-      const n = normalized === '' ? 0 : Number(normalized);
-      if (!Number.isFinite(n) || n > 180) return prev;
-      return normalized;
-    });
-  };
-
-  const backspaceTurnTotal = () => { hapticTap(); setTurnTotalInput(prev => prev.slice(0, -1)); }
   const clearTurnTotal = () => { hapticTap(); setTurnTotalInput(''); }
 
   // Empty input counts as 0: a bust or three misses is entered with a bare OK.
-  const getTurnTotalValue = () => {
-    if (!turnTotalInput) return 0;
-    const n = Number.parseInt(turnTotalInput, 10);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
-    if (n < 0 || n > 180) return null;
-    return n;
-  };
-
-  const isTurnTotalInvalid = turnTotalInput.length > 0 && getTurnTotalValue() === null;
-
-  const onTurnTotalInputChange = (value) => {
-    // digits only, max 3 chars, clamp to 180
-    const digitsOnly = String(value).replace(/\D/g, '').slice(0, 3);
-    if (digitsOnly === '') {
-      setTurnTotalInput('');
-      return;
-    }
-    const n = Number.parseInt(digitsOnly, 10);
-    if (!Number.isFinite(n)) {
-      setTurnTotalInput('');
-      return;
-    }
-    // Don't auto-correct (e.g. to 180). Keep user input and just block submit + show warning.
-    setTurnTotalInput(digitsOnly.replace(/^0+(?=\d)/, ''));
-  };
+  const getTurnTotalValue = () => parseTurnTotal(turnTotalInput);
 
   const undoLastVisit = () => {
     hapticTap();
@@ -858,9 +791,10 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     clearTurnTotal();
   };
 
-  const submitTurnTotal = () => {
+  // The keypad hands over the parsed total; the value in state is the fallback.
+  const submitTurnTotal = (submittedTotal) => {
     hapticTap();
-    const total = getTurnTotalValue();
+    const total = submittedTotal ?? getTurnTotalValue();
     if (total === null) return;
     if (!currentPlayerData) return;
     const remainingAfter = safeScore(currentPlayerData.currentScore, matchSettings.startingScore) - total;
@@ -2012,82 +1946,15 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
   return (
     <div className="match-interface mobile-optimized">
-      {pendingCheckout !== null && (
-        <div className="leg-starter-dialog checkout-modal">
-          <div className="dialog-content checkout-card">
-            <div className="checkout-card__header">
-              <span className="checkout-card__title">{t('match.checkout.title')}</span>
-              <span className="checkout-card__total">{pendingCheckout.total}</span>
-            </div>
-
-            <div className="checkout-card__section">
-              <span className="checkout-card__section-label">{t('match.checkout.dartsLabel')}</span>
-              <div className="checkout-darts-picker">
-                {[1, 2, 3].map(n => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`checkout-dart-option ${pendingCheckout.dartsUsed === n ? 'active' : ''}`}
-                    onClick={() => setPendingCheckout(prev => ({ ...prev, dartsUsed: n }))}
-                  >
-                    <span className="checkout-dart-option__num">{n}</span>
-                    <span className="checkout-dart-option__unit">
-                      {t(n === 1 ? 'match.checkout.dartUnitOne' : 'match.checkout.dartUnitMany')}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="checkout-card__section">
-              <span className="checkout-card__section-label">{t('match.checkout.outcomeLabel')}</span>
-              <div className="checkout-outcome-picker">
-                <button
-                  type="button"
-                  className={`checkout-outcome-card checkout-outcome-card--double ${pendingCheckout.finishedOnDouble ? 'active' : ''}`}
-                  onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: true }))}
-                >
-                  <CheckCircle size={22} />
-                  <span className="checkout-outcome-card__title">{t('match.checkout.doubleOut')}</span>
-                  <span className="checkout-outcome-card__hint">{t('match.checkout.doubleOutHint')}</span>
-                </button>
-                <button
-                  type="button"
-                  className={`checkout-outcome-card checkout-outcome-card--bust ${!pendingCheckout.finishedOnDouble ? 'active' : ''}`}
-                  onClick={() => setPendingCheckout(prev => ({ ...prev, finishedOnDouble: false }))}
-                >
-                  <XCircle size={22} />
-                  <span className="checkout-outcome-card__title">{t('match.checkout.bust')}</span>
-                  <span className="checkout-outcome-card__hint">{t('match.checkout.bustHint')}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="checkout-card__actions">
-              <button
-                type="button"
-                className="checkout-card__cancel"
-                onClick={() => setPendingCheckout(null)}
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                className={`checkout-card__confirm ${pendingCheckout.finishedOnDouble ? '' : 'checkout-card__confirm--bust'}`}
-                onClick={() => {
-                  applyTurnTotal(pendingCheckout.total, {
-                    finishedOnDouble: pendingCheckout.finishedOnDouble,
-                    dartsUsed: pendingCheckout.dartsUsed
-                  });
-                  setPendingCheckout(null);
-                }}
-              >
-                {t('match.checkout.confirm')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CheckoutDialog
+        pending={pendingCheckout}
+        onChange={setPendingCheckout}
+        onCancel={() => setPendingCheckout(null)}
+        onConfirm={(p) => {
+          applyTurnTotal(p.total, { finishedOnDouble: p.finishedOnDouble, dartsUsed: p.dartsUsed });
+          setPendingCheckout(null);
+        }}
+      />
       <div className="match-scoreboard match-scoreboard--compact">
         <div className={`player-score player1 ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
           <div className="player-header">
@@ -2246,133 +2113,23 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         ) : (
           <>
             {scoringMode === 'dart' ? (
-              <>
-                {/* Number buttons grid */}
-                <div className="dart-numbers">
-                  {dartNumbers.map((number, index) => (
-                    <button
-                      key={index}
-                      className={`dart-btn ${number === 25 ? 'bull' : inputMode === 'triple' ? 'triple' : inputMode === 'double' ? 'double' : 'single'}`}
-                      onClick={() => addScore(number)}
-                      disabled={currentTurn.darts >= 3 || (number === 25 && inputMode === 'triple')}
-                    >
-                      {number === 0 ? '0' : number === 25 ? '25' : number}
-                    </button>
-                  ))}
-                </div>
-                {/* Mode buttons */}
-                <div className="mode-buttons-row">
-                  <button 
-                    className={`mode-btn-inline ${inputMode === 'double' ? 'active' : ''}`}
-                    onClick={() => setInputMode(inputMode === 'double' ? 'single' : 'double')}
-                  >
-                    {t('match.double')}
-                  </button>
-                  <button 
-                    className={`mode-btn-inline ${inputMode === 'triple' ? 'active' : ''}`}
-                    onClick={() => setInputMode(inputMode === 'triple' ? 'single' : 'triple')}
-                  >
-                    {t('match.triple')}
-                  </button>
-                </div>
-                {/* Remove button - separate row */}
-                <div className="remove-last-row">
-                  <button 
-                    className="remove-last-btn dart-btn"
-                    onClick={removeLastDart}
-                    disabled={currentTurn.scores.length === 0 && turnHistory.length === 0 || isRemovingDart}
-                  >
-                    <ArrowLeft size={20} />
-                    <span>{t('match.undo')}</span>
-                  </button>
-                </div>
-              </>
+              <DartKeypad
+                inputMode={inputMode}
+                onInputModeChange={setInputMode}
+                onDart={addScore}
+                onUndo={removeLastDart}
+                dartsInVisit={currentTurn.darts}
+                canUndo={!((currentTurn.scores.length === 0 && turnHistory.length === 0) || isRemovingDart)}
+              />
             ) : (
-              <div className="turn-total-container">
-                <div className="turn-total-display">
-                  <div className="turn-total-display-row">
-                    <div className="turn-total-label">{t('match.turnTotalLabel')}</div>
-                    {/* Undo lives up here, away from OK: it used to sit right
-                        under the big green button and got hit by mistake. */}
-                    <button
-                      className="turn-total-undo"
-                      onClick={undoLastVisit}
-                      disabled={turnHistory.length === 0 || currentTurn.score > 0}
-                      type="button"
-                      title={t('match.undoLastVisit')}
-                    >
-                      <RotateCcw size={14} />
-                      {t('match.undoLastVisit')}
-                    </button>
-                  </div>
-                  <div className={`turn-total-value ${isTurnTotalInvalid ? 'invalid' : ''} ${turnTotalInput ? '' : 'empty'}`}>
-                    {turnTotalInput || '0'}
-                  </div>
-                  <div className="turn-total-hint">
-                    {isTurnTotalInvalid
-                      ? t('match.turnTotalInvalid')
-                      : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
-                  </div>
-                </div>
-
-                {useOnScreenKeypad ? (
-                  <div className="turn-total-keypad">
-                    {[1,2,3,4,5,6,7,8,9].map(n => (
-                      <button key={n} className="dart-btn" onClick={() => appendTurnTotalDigit(n)} type="button">
-                        {n}
-                      </button>
-                    ))}
-                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button" disabled={!turnTotalInput}>
-                      {t('match.clear')}
-                    </button>
-                    <button className="dart-btn" onClick={() => appendTurnTotalDigit(0)} type="button">0</button>
-                    <button className="dart-btn turn-total-backspace" onClick={backspaceTurnTotal} type="button" disabled={!turnTotalInput} aria-label={t('match.backspace')}>
-                      ⌫
-                    </button>
-                    <button
-                      className="dart-btn turn-total-ok"
-                      onClick={submitTurnTotal}
-                      disabled={isTurnTotalInvalid}
-                      type="button"
-                    >
-                      <span>{t('match.ok')}</span>
-                      {!turnTotalInput && <span className="turn-total-ok-sub">{t('match.okZero')}</span>}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="turn-total-desktop">
-                    <input
-                      className={`turn-total-input ${isTurnTotalInvalid ? 'invalid' : ''}`}
-                      value={turnTotalInput}
-                      onChange={(e) => onTurnTotalInputChange(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (!isTurnTotalInvalid) submitTurnTotal();
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          clearTurnTotal();
-                        }
-                      }}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="0–180"
-                    />
-                    <button
-                      className="dart-btn turn-total-ok"
-                      onClick={submitTurnTotal}
-                      disabled={isTurnTotalInvalid}
-                      type="button"
-                    >
-                      <span>{t('match.ok')}</span>
-                      {!turnTotalInput && <span className="turn-total-ok-sub">{t('match.okZero')}</span>}
-                    </button>
-                    <button className="dart-btn turn-total-clear" onClick={clearTurnTotal} type="button" disabled={!turnTotalInput}>
-                      {t('match.clear')}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <TurnTotalKeypad
+                value={turnTotalInput}
+                onChange={(next) => { hapticTap(); setTurnTotalInput(next); }}
+                onSubmit={submitTurnTotal}
+                onUndo={undoLastVisit}
+                canUndo={turnHistory.length > 0 && currentTurn.score === 0}
+                useOnScreenKeypad={isOnScreenKeypad}
+              />
             )}
           </>
         )}

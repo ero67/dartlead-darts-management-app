@@ -10,6 +10,8 @@ import { tournamentStatusLabel as statusLabel } from '../utils/tournamentStatus'
 import { DisplayNameEditor } from './DisplayNameEditor';
 import { AccountDeletion } from './AccountDeletion';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
+import { PracticeBests } from './practice/PracticeBests';
+import { loadHistory } from '../lib/practiceStorage';
 
 const getInitials = (name) => {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
@@ -25,7 +27,7 @@ const placementLabel = (placement, t) => {
   return null;
 };
 
-export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLeague, onSelectPlayer }) {
+export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLeague, onSelectPlayer, onSelectPractice }) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [profileData, setProfileData] = useState(null);
@@ -243,6 +245,16 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
       </section>
 
       {/* Recent form */}
+      {isOwnProfile && loadHistory().length > 0 && (
+        <section className="profile-section">
+          <h2><Target size={18} />{t('practice.bests.profileTitle')}</h2>
+          <PracticeBests entries={loadHistory()} compact />
+          <button type="button" className="profile-link-btn" onClick={() => onSelectPractice?.()}>
+            {t('practice.bests.openPractice')} <ChevronRight size={14} />
+          </button>
+        </section>
+      )}
+
       <section className="profile-section">
         <h2><Swords size={18} />{t('playerProfile.recentMatches')}</h2>
         {recentMatches.length > 0 ? (

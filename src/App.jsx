@@ -32,17 +32,25 @@ import { NotFound } from './components/NotFound';
 import { ResetPassword } from './components/ResetPassword';
 import { DeleteAccountInfo } from './components/DeleteAccountInfo';
 import { TvDisplay } from './components/TvDisplay';
+import { PracticeHome } from './components/practice/PracticeHome';
+import { PracticeX01 } from './components/practice/PracticeX01';
+import { PracticeHistory } from './components/practice/PracticeHistory';
+import { PracticeCheckout } from './components/practice/PracticeCheckout';
+import { PracticeOneTwentyOne } from './components/practice/PracticeOneTwentyOne';
+import { PracticeAroundTheClock } from './components/practice/PracticeAroundTheClock';
 import { AccountDeletion } from './components/AccountDeletion';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
 import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from './utils/postLoginRedirect';
 import { getUserDisplayName } from './utils/userDisplayName';
 import { DisplayNameEditor } from './components/DisplayNameEditor';
+import { PracticeBests } from './components/practice/PracticeBests';
+import { loadHistory } from './lib/practiceStorage';
 import './App.css';
 
 // Shown when a signed-in user has no player record yet (they have never been
 // approved into a tournament, so there are no stats to display).
-function NoPlayerProfile({ onBrowseTournaments }) {
+function NoPlayerProfile({ onBrowseTournaments, onOpenPractice }) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [isEditingName, setIsEditingName] = useState(false);
@@ -73,6 +81,13 @@ function NoPlayerProfile({ onBrowseTournaments }) {
       <button className="primary-btn" onClick={onBrowseTournaments}>
         {t('navigation.tournaments')}
       </button>
+      {loadHistory().length > 0 && (
+        <div className="no-profile-practice">
+          <h3>{t('practice.bests.profileTitle')}</h3>
+          <PracticeBests entries={loadHistory()} compact />
+          <button className="primary-btn" onClick={onOpenPractice}>{t('practice.bests.openPractice')}</button>
+        </div>
+      )}
       <AccountDeletion />
     </div>
   );
@@ -276,6 +291,7 @@ function PlayerProfileRoute() {
       onSelectTournament={(tourn) => navigate(`/tournament/${tourn.id}`)}
       onSelectLeague={(league) => navigate(`/league/${league.id}`)}
       onSelectPlayer={(player) => navigate(`/player/${player.id}`)}
+      onSelectPractice={() => navigate('/practice')}
     />
   );
 }
@@ -309,7 +325,7 @@ function MyProfileRedirect() {
       </div>
     );
   }
-  return <NoPlayerProfile onBrowseTournaments={() => navigate('/tournaments')} />;
+  return <NoPlayerProfile onBrowseTournaments={() => navigate('/tournaments')} onOpenPractice={() => navigate('/practice')} />;
 }
 
 function AppContent() {
@@ -538,6 +554,13 @@ function AppContent() {
               />
             </PullToRefresh>
           } />
+          {/* Practice mode: free for everyone, no account needed; sessions are device-local for now */}
+          <Route path="/practice" element={<PracticeHome />} />
+          <Route path="/practice/x01" element={<PracticeX01 />} />
+          <Route path="/practice/history" element={<PracticeHistory />} />
+          <Route path="/practice/checkout" element={<PracticeCheckout />} />
+          <Route path="/practice/121" element={<PracticeOneTwentyOne />} />
+          <Route path="/practice/around-the-clock" element={<PracticeAroundTheClock />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />

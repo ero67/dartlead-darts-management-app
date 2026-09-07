@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trophy, Users, Target, Calendar, TrendingUp, Crown, LogIn } from 'lucide-react';
+import { Plus, Trophy, Users, Target, Calendar, TrendingUp, Crown, LogIn, Play, User, Flame } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
@@ -7,6 +7,8 @@ import { useTournament } from '../contexts/TournamentContext';
 import { useLeague } from '../contexts/LeagueContext';
 import { tournamentStatusLabel, isTournamentRunning } from '../utils/tournamentStatus';
 import { getUserDisplayName } from '../utils/userDisplayName';
+import { loadActiveSession, loadHistory } from '../lib/practiceStorage';
+import { PRACTICE_GAMES } from '../lib/practiceGames';
 
 export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeague, onSelectLeague, onNavigate }) {
   const { t } = useLanguage();
@@ -38,18 +40,79 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
     return totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0;
   };
 
-  // Not logged in or regular user — show public welcome
+  // Not logged in or regular user — player view: practice first, then browsing
   if (!isManagerUser) {
+    const playerName = user ? (getUserDisplayName(user) || user?.email?.split('@')[0]) : null;
+    const activePractice = loadActiveSession();
+    const activeGame = activePractice ? PRACTICE_GAMES.find(g => g.id === activePractice.game) : null;
+    const practiceHistory = loadHistory();
+    const practiceTotals = practiceHistory.reduce((acc, entry) => {
+      const st = entry.stats || {};
+      acc.sessions += 1;
+      acc.oneEighties += st.oneEighties || 0;
+      if (entry.game === 'x01' && (st.totalDarts || 0) >= 9 && st.average > acc.bestAverage) acc.bestAverage = st.average;
+      return acc;
+    }, { sessions: 0, oneEighties: 0, bestAverage: 0 });
+
     return (
       <div className="dashboard">
         <div className="dashboard-header">
-          <h1>{t('dashboard.title')}</h1>
+          <h1>{playerName ? t('dashboard.welcomePlayer', { name: playerName }) : t('dashboard.title')}</h1>
         </div>
 
+        <div className="dashboard-player-hero">
+          <div className="dashboard-player-hero__icon"><Target size={28} /></div>
+          <div className="dashboard-player-hero__text">
+            <h2>{t('dashboard.practiceTitle')}</h2>
+            <p>{t('dashboard.practiceDesc')}</p>
+          </div>
+          <div className="dashboard-player-hero__actions">
+            {activeGame && (
+              <button className="create-tournament-btn" onClick={() => onNavigate(activeGame.path)}>
+                <Play size={20} />
+                {t('dashboard.continueSession')}
+              </button>
+            )}
+            <button
+              className="create-tournament-btn"
+              onClick={() => onNavigate('/practice')}
+              style={activeGame ? { background: 'var(--bg-tertiary)', color: 'var(--text-primary)' } : undefined}
+            >
+              <Target size={20} />
+              {t('dashboard.practiceCta')}
+            </button>
+          </div>
+        </div>
+
+        {practiceTotals.sessions > 0 && (
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon"><Target size={24} /></div>
+              <div className="stat-content">
+                <h3>{practiceTotals.sessions}</h3>
+                <p>{t('practice.stats.sessions')}</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon active"><TrendingUp size={24} /></div>
+              <div className="stat-content">
+                <h3>{practiceTotals.bestAverage ? practiceTotals.bestAverage.toFixed(1) : t('practice.noStats')}</h3>
+                <p>{t('practice.stats.bestAverage')}</p>
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon"><Flame size={24} /></div>
+              <div className="stat-content">
+                <h3>{practiceTotals.oneEighties}</h3>
+                <p>{t('practice.stats.oneEighties')}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="dashboard-welcome">
-          <Trophy size={48} />
-          <h2>{t('dashboard.welcome')}</h2>
-          <p>{t('dashboard.loginToManage')}</p>
+          <Trophy size={40} />
+          <p>{t('dashboard.playerIntro')}</p>
           <div className="quick-actions-bar">
             {!user && (
               <button className="create-tournament-btn" onClick={() => onNavigate('/login')}>
@@ -65,6 +128,12 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
               <Crown size={20} />
               {t('dashboard.browseLeagues')}
             </button>
+            {user && (
+              <button className="create-tournament-btn" onClick={() => onNavigate('/my-profile')} style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}>
+                <User size={20} />
+                {t('navigation.myProfile')}
+              </button>
+            )}
           </div>
         </div>
       </div>
