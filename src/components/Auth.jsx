@@ -30,7 +30,24 @@ export function Auth() {
     fullName: '',
   });
 
-  const { signIn, signUp, resetPassword, signInWithGoogle, nativeAuthError } = useAuth();
+  const { user, signIn, signUp, resetPassword, signInWithGoogle, nativeAuthError } = useAuth();
+
+  // A signed-in user has no business on the login page: send them on. This is
+  // the only place that navigates after a login, whichever way it happened:
+  // - email/password: signIn resolves and onAuthStateChange sets `user`;
+  // - Google in the browser: the OAuth round trip reloads the app elsewhere,
+  //   so this rarely fires (App.jsx restores the stored destination);
+  // - Google in the Android shell: the session arrives through the deep link
+  //   while the app is still sitting on /login — without this the form kept
+  //   showing to a user who was in fact logged in.
+  // Only when rendered as the /login route: protected routes also render
+  // <Auth /> inline and swap to their real page by themselves.
+  useEffect(() => {
+    if (!user || location.pathname !== '/login') return;
+    const stored = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
+    sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
+    navigate(from || (isSafeRedirectPath(stored) ? stored : '/dashboard'), { replace: true });
+  }, [user, from, location.pathname, navigate]);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -50,17 +67,8 @@ export function Auth() {
     try {
       if (isLogin) {
         const { error } = await signIn(formData.email, formData.password);
-        if (error) {
-          setError(error.message);
-        } else {
-          // Return to the page the user came from (e.g. a shared tournament
-          // registration link), or the dashboard by default. Consume the
-          // stored destination here so the OAuth-restore effect in App.jsx
-          // doesn't race us with a second navigation.
-          const stored = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY);
-          sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
-          navigate(from || (isSafeRedirectPath(stored) ? stored : '/dashboard'));
-        }
+        if (error) setError(error.message);
+        // Success: the effect above navigates once `user` is set.
       } else {
         if (formData.password !== formData.confirmPassword) {
           setError(t('auth.passwordsDoNotMatch'));
