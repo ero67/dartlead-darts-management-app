@@ -6,6 +6,8 @@
 //   icon-foreground.png  artwork only, sized for the adaptive safe zone
 //   icon-only.png        legacy (pre-Android 8) icon and Play listing
 //   splash[-dark].png    brand colour with a modest centred logo
+// Afterwards we add, per density, the Android 12+ splash icon:
+//   drawable-<density>/splash_icon.png
 // The generated PNGs are gitignored (binary build inputs); run
 // `npm run android:assets` after cloning or when the logo changes.
 import { mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -35,6 +37,15 @@ async function logoOn(size, box, opaque) {
     : sharp({ create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } });
   return base.composite([{ input: art, gravity: 'centre' }]).png().toBuffer();
 }
+
+// Android 12+ draws `windowSplashScreenAnimatedIcon` on a 288dp canvas and
+// masks it to a 192dp circle. With no icon supplied the platform falls back to
+// the launcher icon, whose largest layer is 192px — upscaled 4-6x on a modern
+// phone, which is why the logo looked blurry. Ship a purpose-built icon per
+// density instead; the same asset backs the pre-31 launch background.
+const SPLASH_ICON_DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
+const SPLASH_CANVAS_DP = 288;
+const SPLASH_ART_DP = 180;
 
 rmSync(dir, { recursive: true, force: true });
 mkdirSync(dir);
@@ -73,6 +84,20 @@ try {
     writeFileSync(
       join(RES, 'values', 'ic_launcher_background.xml'),
       `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">${BG}</color>\n</resources>\n`
+    );
+
+    // Splash icon per density (see SPLASH_* above) + the colour behind it.
+    for (const [density, scale] of Object.entries(SPLASH_ICON_DENSITIES)) {
+      const out = join(RES, `drawable-${density}`);
+      mkdirSync(out, { recursive: true });
+      writeFileSync(
+        join(out, 'splash_icon.png'),
+        await logoOn(Math.round(SPLASH_CANVAS_DP * scale), Math.round(SPLASH_ART_DP * scale), false)
+      );
+    }
+    writeFileSync(
+      join(RES, 'values', 'splash_background.xml'),
+      `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="splash_background">${BG}</color>\n</resources>\n`
     );
   }
 } finally {

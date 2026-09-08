@@ -32,8 +32,17 @@ Two kinds of binary build inputs are intentionally not in git (organisation
 policy); both are regenerated:
 
 ```bash
-npm run android:assets   # launcher icons + splash screens from public/pwa-maskable-512x512.png
+npm run android:assets   # launcher icons + splash screens from src/assets/logo-icon.png
 ```
+
+The script also writes `drawable-<density>/splash_icon.png`, the icon the
+Android 12+ system splash draws (288dp canvas, artwork inside the 192dp
+circle it masks to). Supplying it matters: with no
+`windowSplashScreenAnimatedIcon` the platform falls back to the launcher
+icon, whose largest layer is 192px, and upscales it to 288dp — a visibly
+blurry logo. `values-v31/styles.xml` points the splash theme at it, and
+`drawable/launch_screen.xml` reuses the same asset for the pre-31 launch
+background.
 
 `android/gradle/wrapper/gradle-wrapper.jar` is restored by Android Studio on
 first sync (it downloads the Gradle version pinned in

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launch window background. On Android 11 and older this IS the splash
+     screen; on 12+ it only covers the moment between the system splash and
+     the WebView's first paint. Drawing the logo as a centred bitmap keeps it
+     at its natural density instead of stretching one bitmap to the screen. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:src="@drawable/splash_icon"
+            android:gravity="center" />
+    </item>
+</layer-list>

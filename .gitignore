@@ -44,6 +44,7 @@ cypress.env.json
 android/gradle/wrapper/gradle-wrapper.jar
 android/app/src/main/res/mipmap-*/*.png
 android/app/src/main/res/drawable*/splash.png
+android/app/src/main/res/drawable*/splash_icon.png
 android/app/release/
 android/app/*.keystore
 android/app/*.jks
