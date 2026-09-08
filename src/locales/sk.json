@@ -463,6 +463,7 @@
     "confirmResetPlayoffs": "Naozaj chcete resetovať playoff? Tým sa vymažú všetky playoff zápasy a výsledky. Dáta skupinovej fázy zostanú zachované.",
     "playoffsResetSuccess": "Playoff bol resetovaný. Teraz ho môžete spustiť znova.",
     "failedToResetPlayoffs": "Nepodarilo sa resetovať playoff. Skúste to prosím znova.",
+    "resetPlayoffs": "Resetovať playoff",
     "scorerLabel": "Zapisuje",
     "suggestedScorerHint": "Navrhnutý zapisovateľ tohto zápasu",
     "detailedView": "Podrobné zobrazenie",

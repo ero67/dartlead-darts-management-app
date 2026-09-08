@@ -3290,17 +3290,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <Grid3x3 size={18} />
               {t('management.bracket')}
             </button>
-            {canManage && (
-              <button
-                className="view-toggle-btn reset-btn"
-                onClick={handleResetPlayoffs}
-                title={t('management.confirmResetPlayoffs')}
-                style={{ marginLeft: '1rem', background: 'var(--danger-color)', color: 'white' }}
-              >
-                <RotateCcw size={18} />
-                {t('common.reset')}
-              </button>
-            )}
           </div>
         </div>
 
@@ -3551,6 +3540,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         </div>
         )}
         </div>
+
+        {canManage && (
+          <div className="playoffs-footer">
+            <button
+              type="button"
+              className="danger-outline-btn"
+              onClick={handleResetPlayoffs}
+              title={t('management.confirmResetPlayoffs')}
+            >
+              <RotateCcw size={16} />
+              {t('management.resetPlayoffs')}
+            </button>
+          </div>
+        )}
       </div>
     );
   };

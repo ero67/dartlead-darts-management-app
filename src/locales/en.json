@@ -463,6 +463,7 @@
     "confirmResetPlayoffs": "Are you sure you want to reset the playoffs? This will clear all playoff matches and results. Group stage data will be preserved.",
     "playoffsResetSuccess": "Playoffs have been reset. You can now start them again.",
     "failedToResetPlayoffs": "Failed to reset playoffs. Please try again.",
+    "resetPlayoffs": "Reset playoffs",
     "scorerLabel": "Scorer",
     "suggestedScorerHint": "Suggested scorer for this match",
     "detailedView": "Detailed View",

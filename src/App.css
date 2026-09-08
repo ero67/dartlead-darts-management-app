@@ -8172,6 +8172,14 @@ body {
 }
 .standings-view-header .export-menu { margin-left: auto; margin-right: 0.75rem; }
 .playoffs-header .export-menu { margin-left: auto; margin-right: 0.75rem; }
+
+.playoffs-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
 @media (max-width: 640px) {
   .export-menu__btn .btn-label { display: none; }
   .export-menu__btn { padding: 0.5rem; }
