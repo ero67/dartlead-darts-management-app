@@ -1,5 +1,19 @@
 import { supabase, generateId } from '../lib/supabase.js'
 
+// Group matches in their intended play order. The DB rows carry match_order
+// (migration 20260910190000); rows from before it fall back to insert order.
+// Every consumer (match list, "next match", scorer rotation) must use this
+// same order or they disagree about what is played next.
+const sortByPlayOrder = (rows) => [...(rows || [])].sort((a, b) => {
+  const ao = a.match_order ?? Number.MAX_SAFE_INTEGER;
+  const bo = b.match_order ?? Number.MAX_SAFE_INTEGER;
+  if (ao !== bo) return ao - bo;
+  const at = a.created_at ? Date.parse(a.created_at) : 0;
+  const bt = b.created_at ? Date.parse(b.created_at) : 0;
+  if (at !== bt) return at - bt;
+  return String(a.id).localeCompare(String(b.id));
+});
+
 // Helper function to calculate group standings
 function calculateGroupStandings(group, criteriaOrder = null) {
   if (!group.players || !group.matches) {
@@ -305,7 +319,7 @@ export const tournamentService = {
 
       for (const group of groupsWithIds) {
         const groupMatches = []
-        for (const match of group.matches) {
+        for (const [matchIndex, match] of group.matches.entries()) {
           const player1Id = playerIdMap.get(match.player1?.id)
           const player2Id = playerIdMap.get(match.player2?.id)
           if (!player1Id || !player2Id) {
@@ -321,7 +335,8 @@ export const tournamentService = {
             player2_id: player2Id,
             legs_to_win: tournamentData.legsToWin || 3,
             starting_score: tournamentData.startingScore || 501,
-            status: 'pending'
+            status: 'pending',
+            match_order: matchIndex + 1
           })
           groupMatches.push(matchId)
         }
@@ -600,8 +615,7 @@ export const tournamentService = {
               .filter(Boolean)
 
             // Get matches for this group
-            const groupMatches = allMatches
-              .filter(match => match.group_id === group.id)
+            const groupMatches = sortByPlayOrder(allMatches.filter(match => match.group_id === group.id))
               .map(match => {
                 
                 // Get player stats for this match
@@ -610,6 +624,7 @@ export const tournamentService = {
                 
                 return {
                   id: match.id,
+                  matchOrder: match.match_order ?? null,
                   player1: playerMap.get(match.player1_id) || null,
                   player2: playerMap.get(match.player2_id) || null,
                   status: match.status,
@@ -920,7 +935,7 @@ export const tournamentService = {
             id: group.id,
             name: group.name,
             players: group.group_players.map(gp => gp.player),
-            matches: group.matches.map(match => {
+            matches: sortByPlayOrder(group.matches).map(match => {
               // Get player stats for this match
               const matchStats = matchPlayerStatsMap.get(match.id) || {};
               const player1StatsData = match.player1?.id ? matchStats[match.player1.id] : null;
@@ -932,6 +947,7 @@ export const tournamentService = {
                 // without it, a match restored after refresh saves to the DB
                 // but cannot update local standings ("Group not found").
                 groupId: group.id,
+                matchOrder: match.match_order ?? null,
                 player1: match.player1 || null,
                 player2: match.player2 || null,
                 status: match.status,
@@ -1095,7 +1111,7 @@ export const tournamentService = {
 
       // Batch insert all matches
       const allMatches = groups.flatMap(g =>
-        g.matches.map(m => ({
+        g.matches.map((m, matchIndex) => ({
           id: m.id,
           tournament_id: tournamentId,
           group_id: g.id,
@@ -1103,7 +1119,8 @@ export const tournamentService = {
           player2_id: m.player2.id,
           legs_to_win: tournament.legs_to_win,
           starting_score: tournament.starting_score,
-          status: 'pending'
+          status: 'pending',
+          match_order: matchIndex + 1
         }))
       );
       const { error: matchesError } = await supabase

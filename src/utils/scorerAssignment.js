@@ -4,28 +4,50 @@
 // stored, and every device derives the same names from the same tournament
 // state. Both functions return a Map of matchId -> player.
 
+// Play order of a group's matches: match_order from the DB, then insert
+// order, then id. Mirrors sortByPlayOrder in tournamentService so the hint
+// follows the order the matches are listed (and played) in.
+const byPlayOrder = (a, b) => {
+  const ao = a.matchOrder ?? Number.MAX_SAFE_INTEGER;
+  const bo = b.matchOrder ?? Number.MAX_SAFE_INTEGER;
+  if (ao !== bo) return ao - bo;
+  const at = a.createdAt ? Date.parse(a.createdAt) : 0;
+  const bt = b.createdAt ? Date.parse(b.createdAt) : 0;
+  if (at !== bt) return at - bt;
+  return String(a.id).localeCompare(String(b.id));
+};
+
+const playsIn = (match, playerId) =>
+  !!match && (match.player1?.id === playerId || match.player2?.id === playerId);
+
 // Group stage: each match gets a scorer from the same group who isn't playing
-// in it. Assignments are balanced so the duty rotates through the group.
+// in it. Matches are walked in play order; a player who is in the match just
+// before (still finishing) or just after (about to start) is avoided, then the
+// duty rotates to whoever has scored the least so far.
 export const assignGroupScorers = (groups) => {
   const byMatch = new Map();
   for (const group of groups || []) {
     const players = group.players || [];
-    // Iterate in a stable order so every client computes the same result
-    // regardless of how the match list happens to be sorted for display.
-    const matches = [...(group.matches || [])].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    const matches = [...(group.matches || [])].sort(byPlayOrder);
     const counts = new Map();
-    for (const match of matches) {
+    matches.forEach((match, index) => {
       const candidates = players.filter(
         (p) => p.id !== match.player1?.id && p.id !== match.player2?.id
       );
-      if (candidates.length === 0) continue; // 2-player group: nobody free
+      if (candidates.length === 0) return; // 2-player group: nobody free
+      const prev = matches[index - 1];
+      const next = matches[index + 1];
+      const busy = (p) => (playsIn(prev, p.id) ? 1 : 0) + (playsIn(next, p.id) ? 1 : 0);
       candidates.sort(
-        (a, b) => (counts.get(a.id) || 0) - (counts.get(b.id) || 0) || String(a.id).localeCompare(String(b.id))
+        (a, b) =>
+          busy(a) - busy(b) ||
+          (counts.get(a.id) || 0) - (counts.get(b.id) || 0) ||
+          String(a.id).localeCompare(String(b.id))
       );
       const scorer = candidates[0];
       counts.set(scorer.id, (counts.get(scorer.id) || 0) + 1);
       byMatch.set(match.id, scorer);
-    }
+    });
   }
   return byMatch;
 };
