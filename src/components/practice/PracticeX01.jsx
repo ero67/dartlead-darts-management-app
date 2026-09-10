@@ -11,9 +11,10 @@ import {
   liveRemaining, lastVisitLabels, computeStats, STARTING_SCORES
 } from '../../lib/x01Engine';
 import {
-  createX01Match, matchApplyDart, matchApplyVisitTotal, matchUndo, matchCanUndo,
-  currentPlayerState, computeMatchStats, isMatch, MATCH_LEG_OPTIONS
+  createX01Match, matchApplyDart, matchApplyVisitTotal, matchUndoHuman, matchCanUndo,
+  matchApplySequence, isBotTurn, currentPlayerState, computeMatchStats, isMatch, MATCH_LEG_OPTIONS
 } from '../../lib/x01Match';
+import { BOT_LEVELS, getBotLevel, botThrow, newSeed } from '../../lib/botPlayer';
 import {
   loadActiveSession, saveActiveSession, clearActiveSession, appendHistory,
   newSessionId, loadGameSettings, saveGameSettings
@@ -30,6 +31,7 @@ const GAME = 'x01';
 const LEG_OPTIONS = [1, 3, 5, 10, null];
 const DEFAULT_SETTINGS = { startingScore: 501, legsTarget: 3, scoringMode: 'dart', opponent: null, starter: 0 };
 const FLASH_MS = 900;
+const BOT_DART_MS = 700;
 const OPPONENT_NAME_MAX = 30;
 
 const sanitizeSettings = (saved) => {
@@ -37,10 +39,12 @@ const sanitizeSettings = (saved) => {
   const startingScore = Number.isInteger(saved.startingScore) && saved.startingScore >= 2 && saved.startingScore <= 1001
     ? saved.startingScore : DEFAULT_SETTINGS.startingScore;
   const scoringMode = saved.scoringMode === 'turnTotal' ? 'turnTotal' : 'dart';
-  // Opponent: null (solo) or a second person on this device. Bots come later.
+  // Opponent: null (solo), a second person on this device, or a bot level.
   const opponent = saved.opponent && saved.opponent.kind === 'human'
     ? { kind: 'human', name: String(saved.opponent.name || '').slice(0, OPPONENT_NAME_MAX) }
-    : null;
+    : saved.opponent && saved.opponent.kind === 'bot'
+      ? { kind: 'bot', level: BOT_LEVELS.some(l => l.level === saved.opponent.level) ? saved.opponent.level : 4 }
+      : null;
   let legsTarget = saved.legsTarget === null || (Number.isInteger(saved.legsTarget) && saved.legsTarget > 0)
     ? saved.legsTarget : DEFAULT_SETTINGS.legsTarget;
   // A match is always "first to N": no unlimited legs against an opponent.
@@ -69,6 +73,9 @@ export function PracticeX01() {
   const [pendingCheckout, setPendingCheckout] = useState(null);
   const [flash, setFlash] = useState(null); // { type: 'bust' } | { type: 'legWon', darts, by }
   const flashTimer = useRef(null);
+  // Bot visit in flight: timers animating the darts and the state to commit
+  const botTimers = useRef([]);
+  const pendingBot = useRef(null);
 
   const isPlaying = session !== null && summary === null;
   useKeepScreenAwake(isPlaying);
@@ -77,10 +84,19 @@ export function PracticeX01() {
     if (session) saveActiveSession(GAME, session);
   }, [session]);
 
-  useEffect(() => () => clearTimeout(flashTimer.current), []);
+  const clearBotTimers = () => {
+    botTimers.current.forEach(clearTimeout);
+    botTimers.current = [];
+    pendingBot.current = null;
+  };
+
+  useEffect(() => () => { clearTimeout(flashTimer.current); clearBotTimers(); }, []);
 
   const myName = (user && getUserDisplayName(user)) || t('practice.setup.you');
-  const opponentName = (settings.opponent?.name || '').trim() || t('practice.setup.opponentPlayer');
+  const botName = (level) => t('practice.bot.name', { level });
+  const opponentName = settings.opponent?.kind === 'bot'
+    ? botName(settings.opponent.level)
+    : (settings.opponent?.name || '').trim() || t('practice.setup.opponentPlayer');
 
   const showFlash = (value) => {
     clearTimeout(flashTimer.current);
@@ -161,16 +177,18 @@ export function PracticeX01() {
     setSummary(null);
     setInputMode('single');
     setTurnTotalInput('');
+    clearBotTimers();
     if (settings.opponent) {
+      const second = settings.opponent.kind === 'bot'
+        ? { id: 'bot', name: botName(settings.opponent.level), kind: 'bot', level: settings.opponent.level }
+        : { id: 'p2', name: opponentName, kind: 'human' };
       setSession(createX01Match({
         startingScore: settings.startingScore,
         legsTarget: settings.legsTarget,
         scoringMode: settings.scoringMode,
-        players: [
-          { id: 'me', name: myName, kind: 'human' },
-          { id: 'p2', name: opponentName, kind: 'human' }
-        ],
-        starter: settings.starter
+        players: [{ id: 'me', name: myName, kind: 'human' }, second],
+        starter: settings.starter,
+        seed: newSeed()
       }));
     } else {
       setSession(createSoloX01(settings));
@@ -179,9 +197,61 @@ export function PracticeX01() {
 
   const throwerState = session ? (isMatch(session) ? currentPlayerState(session) : session) : null;
   const throwerIndex = session && isMatch(session) ? session.turn : 0;
+  const botBusy = !!(session && isBotTurn(session));
+
+  // Commit the bot's visit (after the animation, or at once when skipped).
+  const commitBotVisit = () => {
+    const pending = pendingBot.current;
+    if (!pending) return;
+    clearBotTimers();
+    handleOutcome({ state: pending.final, outcome: pending.outcome }, pending.thrower);
+  };
+
+  // The bot's turn: throw the visit (engine decides when it ends), then show
+  // the darts one by one and commit the whole visit as one undo step.
+  useEffect(() => {
+    if (!session || !isBotTurn(session) || flash || summary) return undefined;
+    if (botTimers.current.length > 0) return undefined; // already animating
+
+    const level = getBotLevel(session.settings.players[session.turn].level);
+    const darts = [];
+    let seed = session.seed;
+    let probe = session;
+    let outcome = null;
+    for (let i = 0; i < 3; i++) {
+      const ps = currentPlayerState(probe);
+      const thrown = botThrow({
+        remaining: liveRemaining(ps),
+        dartsLeft: 3 - ps.current.visit.darts.length,
+        level,
+        checkouts: checkoutData,
+        seed
+      });
+      seed = thrown.seed;
+      const result = matchApplyDart(probe, thrown.dart);
+      if (result.outcome === null) break;
+      darts.push(thrown.dart);
+      outcome = result.outcome;
+      if (outcome !== 'dart') break;
+      probe = result.state;
+    }
+    if (darts.length === 0) return undefined;
+
+    const { states, final } = matchApplySequence(session, darts, seed);
+    pendingBot.current = { final, outcome, thrower: session.turn };
+    states.forEach((intermediate, i) => {
+      const isLast = i === states.length - 1;
+      botTimers.current.push(setTimeout(() => {
+        if (isLast) commitBotVisit();
+        else setSession(intermediate);
+      }, BOT_DART_MS * (i + 1)));
+    });
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, flash, summary]);
 
   const handleDart = (number) => {
-    if (!session || session.finishedAt || flash) return;
+    if (!session || session.finishedAt || flash || botBusy) return;
     const dart = dartFromInput(number, inputMode);
     if (!dart) return;
     hapticTap();
@@ -190,16 +260,16 @@ export function PracticeX01() {
   };
 
   const handleUndo = () => {
-    if (!session || flash) return;
+    if (!session || flash || botBusy) return;
     hapticTap();
-    setSession(isMatch(session) ? matchUndo(session) : undo(session));
+    setSession(isMatch(session) ? matchUndoHuman(session) : undo(session));
   };
 
   const applyTotal = (total, options) =>
     isMatch(session) ? matchApplyVisitTotal(session, total, options) : applyVisitTotal(session, total, options);
 
   const handleTurnTotal = (total) => {
-    if (!session || session.finishedAt || flash) return;
+    if (!session || session.finishedAt || flash || botBusy) return;
     hapticTap();
     if (throwerState.current.remaining - total === 0) {
       setPendingCheckout({ total, dartsUsed: 3, finishedOnDouble: true });
@@ -218,6 +288,7 @@ export function PracticeX01() {
   // Unlimited sessions (and abandoned ones) end by hand.
   const handleFinishEarly = () => {
     if (!session) return;
+    clearBotTimers();
     const states = isMatch(session) ? session.players : [session];
     const hasVisits = states.some(s => s.legs.length > 0 || s.current.visits.length > 0);
     if (!hasVisits) {
@@ -373,10 +444,33 @@ export function PracticeX01() {
               >
                 {t('practice.setup.opponentPlayer')}
               </button>
-              <button type="button" className="practice-chip" disabled title={t('practice.comingSoon')}>
-                {t('practice.setup.opponentBot')} · {t('practice.comingSoon')}
+              <button
+                type="button"
+                className={`practice-chip ${settings.opponent?.kind === 'bot' ? 'active' : ''}`}
+                onClick={() => setOpponent({ kind: 'bot', level: settings.opponent?.level || 4 })}
+              >
+                {t('practice.setup.opponentBot')}
               </button>
             </div>
+            {settings.opponent?.kind === 'bot' && (
+              <div className="practice-bot-levels">
+                <div className="practice-chips">
+                  {BOT_LEVELS.map(l => (
+                    <button
+                      key={l.level}
+                      type="button"
+                      className={`practice-chip practice-level-chip ${settings.opponent.level === l.level ? 'active' : ''}`}
+                      onClick={() => setSettings(s => ({ ...s, opponent: { kind: 'bot', level: l.level } }))}
+                    >
+                      {l.level}<small>~{l.average}</small>
+                    </button>
+                  ))}
+                </div>
+                <p className="practice-bot-hint">
+                  {t('practice.bot.levelHint', { level: settings.opponent.level, average: getBotLevel(settings.opponent.level).average })}
+                </p>
+              </div>
+            )}
             {settings.opponent?.kind === 'human' && (
               <input
                 className="practice-text-input"
@@ -494,7 +588,11 @@ export function PracticeX01() {
   };
 
   const renderMatchBoard = () => (
-    <div className={`practice-board practice-board--match ${flashClass}`}>
+    <div
+      className={`practice-board practice-board--match ${flashClass} ${botBusy ? 'bot-throwing' : ''}`}
+      onClick={botBusy ? commitBotVisit : undefined}
+      title={botBusy ? t('practice.bot.skip') : undefined}
+    >
       {flash?.type === 'bust' && <div className="practice-board-flash">{t('practice.bust')}</div>}
       {flash?.type === 'legWon' && <div className="practice-board-flash">{legWonText(flash)}</div>}
       <div className="practice-scoreboard">
@@ -517,7 +615,9 @@ export function PracticeX01() {
           );
         })}
       </div>
-      <div className="practice-checkout-hint">{suggestion ? suggestion.join(' → ') : ''}</div>
+      <div className="practice-checkout-hint">
+        {botBusy ? <span className="practice-bot-skip">{t('practice.bot.skip')}</span> : (suggestion ? suggestion.join(' → ') : '')}
+      </div>
     </div>
   );
 
@@ -558,8 +658,8 @@ export function PracticeX01() {
             onDart={handleDart}
             onUndo={handleUndo}
             dartsInVisit={throwerState.current.visit.darts.length}
-            canUndo={canUndoNow}
-            disabled={flash !== null}
+            canUndo={canUndoNow && !botBusy}
+            disabled={flash !== null || botBusy}
           />
         ) : (
           <TurnTotalKeypad
@@ -567,9 +667,9 @@ export function PracticeX01() {
             onChange={(next) => { hapticTap(); setTurnTotalInput(next); }}
             onSubmit={handleTurnTotal}
             onUndo={handleUndo}
-            canUndo={canUndoNow}
+            canUndo={canUndoNow && !botBusy}
             useOnScreenKeypad={isOnScreenKeypad}
-            disabled={flash !== null}
+            disabled={flash !== null || botBusy}
           />
         )}
       </div>

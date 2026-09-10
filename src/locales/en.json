@@ -1104,6 +1104,11 @@
       "starter": "Who starts",
       "you": "You"
     },
+    "bot": {
+      "name": "Bot level {{level}}",
+      "levelHint": "Level {{level}} throws around a {{average}} three-dart average.",
+      "skip": "Tap to skip"
+    },
     "match": {
       "vs": "vs",
       "result": "Result",

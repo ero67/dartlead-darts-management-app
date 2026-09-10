@@ -18,9 +18,12 @@ const UNDO_LIMIT = 300;
 const stripStack = (playerState) => ({ ...playerState, undoStack: [] });
 
 // players: [{ id, name, kind: 'human' | 'bot', level? }, { ... }]
-export const createX01Match = ({ startingScore = 501, legsTarget = 3, scoringMode = 'dart', players, starter = 0 }) => ({
+// `seed` drives a bot opponent's throws (see botPlayer.js). It is part of the
+// state, so undo snapshots restore it and a replayed bot visit is identical.
+export const createX01Match = ({ startingScore = 501, legsTarget = 3, scoringMode = 'dart', players, starter = 0, seed = 0 }) => ({
   kind: 'match',
   settings: { startingScore, legsTarget, scoringMode, players, starter },
+  seed,
   players: players.map(() => stripStack(createSoloX01({ startingScore, legsTarget: null, scoringMode }))),
   turn: starter,
   legStarter: starter,
@@ -101,12 +104,41 @@ export const matchApplyVisitTotal = (state, total, options) => {
   return { state: settle(state, result.state, result.outcome), outcome: result.outcome };
 };
 
+// Apply a bot's whole visit (darts already thrown by botPlayer) as ONE undo
+// step, so the human's undo never lands in the middle of the bot's turn.
+// Returns every intermediate state (for animating dart by dart) and the final
+// state carrying the advanced seed; only the final state should be committed.
+export const matchApplySequence = (state, darts, seed) => {
+  const states = [];
+  let current = state;
+  for (const dart of darts) {
+    const result = matchApplyDart(current, dart);
+    if (result.outcome === null) break;
+    current = result.state;
+    states.push(current);
+  }
+  const final = { ...current, seed, undoStack: pushUndo(state) };
+  return { states, final };
+};
+
+export const isBotTurn = (state) => isMatch(state) && !state.finishedAt && state.settings.players[state.turn]?.kind === 'bot';
+
 export const matchCanUndo = (state) => state.undoStack.length > 0;
 
 export const matchUndo = (state) => {
   if (!matchCanUndo(state)) return state;
   const previous = state.undoStack[state.undoStack.length - 1];
   return { ...previous, undoStack: state.undoStack.slice(0, -1) };
+};
+
+// Undo for the human: steps back over any bot visits as well, so one press
+// always removes the human's own last dart (a bot would otherwise just
+// replay the same visit at once).
+export const matchUndoHuman = (state) => {
+  let current = matchUndo(state);
+  let guard = 0;
+  while (isBotTurn(current) && matchCanUndo(current) && guard++ < 10) current = matchUndo(current);
+  return current;
 };
 
 export const currentPlayerState = (state) => state.players[state.turn];

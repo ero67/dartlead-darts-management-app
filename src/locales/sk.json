@@ -1104,6 +1104,11 @@
       "starter": "Kto začína",
       "you": "Vy"
     },
+    "bot": {
+      "name": "Bot úroveň {{level}}",
+      "levelHint": "Úroveň {{level}} hádže priemer okolo {{average}} na 3 šípky.",
+      "skip": "Ťuknutím preskočíte"
+    },
     "match": {
       "vs": "vs",
       "result": "Výsledok",

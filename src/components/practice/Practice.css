@@ -760,3 +760,31 @@
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+
+/* ---- Bot opponent -------------------------------------------------------- */
+.practice-bot-levels { margin-top: 0.6rem; }
+.practice-level-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+  padding-top: 0.35rem;
+  padding-bottom: 0.3rem;
+  min-width: 3.2rem;
+}
+.practice-level-chip small {
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.practice-bot-hint {
+  margin: 0.5rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.practice-board--match.bot-throwing { cursor: pointer; }
+.practice-bot-skip {
+  color: var(--text-tertiary);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
