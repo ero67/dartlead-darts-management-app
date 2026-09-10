@@ -1,6 +1,15 @@
-# Builds the Android app on every push to main and publishes the APK to a
-# rolling GitHub Release, so the latest build is always at
+# Builds the Android app when a version tag (v1.2.3) is pushed and publishes
+# the APK/AAB to a GitHub Release for that tag. The rolling `android-latest`
+# release is updated too, so the stable download link keeps working:
 #   https://github.com/<owner>/<repo>/releases/download/android-latest/DartLead.apk
+#
+# Pushes to main do NOT build the app (the web app ships via Vercel on every
+# push; the phone build is the deliberate release). Release flow:
+#   npm version minor          # bumps package.json and creates the v* tag
+#   git push && git push --tags
+#
+# `workflow_dispatch` still builds a test APK from any branch; those runs only
+# upload a workflow artifact and never touch a release.
 #
 # Repository settings needed (Settings → Secrets and variables → Actions):
 #   Secrets
@@ -21,7 +30,7 @@ name: Android APK
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 concurrency:
@@ -103,13 +112,42 @@ jobs:
             echo "signing=debug" >> "$GITHUB_OUTPUT"
           fi
 
+      # Tag build:   versionName = 1.2.3, versionCode = 1*10000 + 2*100 + 3
+      #              (tag must match package.json so the web and app agree)
+      # Manual build: versionName = <pkg>-dev+<run>.<sha>, versionCode = run
+      #              number offset by 900000000 so a dev build never competes
+      #              with a store version code
       - name: Compute version
         id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
           SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "name=${PKG_VERSION}+${{ github.run_number }}.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          if [ "$REF_TYPE" = "tag" ]; then
+            TAG_VERSION="${REF_NAME#v}"
+            if ! echo "$TAG_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Tag '$REF_NAME' is not a vMAJOR.MINOR.PATCH release tag."
+              exit 1
+            fi
+            if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+              echo "::error::Tag $REF_NAME does not match package.json version $PKG_VERSION. Bump package.json (npm version) before tagging."
+              exit 1
+            fi
+            IFS=. read -r MAJOR MINOR PATCH <<< "$TAG_VERSION"
+            if [ "$MINOR" -gt 99 ] || [ "$PATCH" -gt 99 ]; then
+              echo "::error::Minor and patch must be <= 99 for the versionCode scheme."
+              exit 1
+            fi
+            echo "name=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "code=$((MAJOR * 10000 + MINOR * 100 + PATCH))" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${PKG_VERSION}-dev+${{ github.run_number }}.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+            echo "code=$((900000000 + ${{ github.run_number }}))" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "pkg=${PKG_VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -146,24 +184,40 @@ jobs:
             out/DartLead-*.aab
           retention-days: 30
 
-      - name: Publish to rolling release
+      - name: Publish tagged release
+        if: steps.version.outputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: DartLead ${{ steps.version.outputs.name }}
+          make_latest: true
+          generate_release_notes: true
+          files: |
+            out/DartLead-${{ steps.version.outputs.name }}.apk
+            out/DartLead-${{ steps.version.outputs.name }}.aab
+          body: |
+            - Version: **${{ steps.version.outputs.name }}** (versionCode ${{ steps.version.outputs.code }}), commit ${{ github.sha }}
+            - Signing: **${{ steps.keystore.outputs.signing }}**${{ steps.keystore.outputs.signing == 'debug' && ' — uninstall the previous build before installing this one' || '' }}
+            - `.aab` is the Play Store upload bundle (same key, same version).
+
+            Install: download the `.apk` on the phone, open it, allow installing from this source when asked.
+
+      # Keeps the stable download link (docs, website) pointing at the newest
+      # tagged build.
+      - name: Update rolling android-latest release
+        if: steps.version.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
-          name: DartLead Android — latest main build
+          name: DartLead Android — latest release
           prerelease: true
           make_latest: false
           files: |
             out/DartLead.apk
-            out/DartLead-${{ steps.version.outputs.name }}.apk
             out/DartLead.aab
-            out/DartLead-${{ steps.version.outputs.name }}.aab
           body: |
-            Automatic build of `main` — commit ${{ github.sha }}.
+            Mirror of the newest tagged release, **${{ steps.version.outputs.name }}**
+            (see the `${{ github.ref_name }}` release for notes).
 
-            - Version: **${{ steps.version.outputs.name }}** (versionCode ${{ steps.version.outputs.code }})
-            - Signing: **${{ steps.keystore.outputs.signing }}**${{ steps.keystore.outputs.signing == 'debug' && ' — uninstall the previous build before installing this one' || '' }}
-            - Stable download link: `DartLead.apk` on this release always points at the newest build.
-            - `DartLead.aab` is the Play Store upload bundle (same key, same version).
-
-            Install: download `DartLead.apk` on the phone, open it, allow installing from this source when asked.
+            - Stable download link: `DartLead.apk` on this release always points at the newest release.
+            - Signing: **${{ steps.keystore.outputs.signing }}**

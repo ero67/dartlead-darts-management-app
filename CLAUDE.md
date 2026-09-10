@@ -22,7 +22,17 @@ npx cypress run --spec "cypress/e2e/<test-file>.cy.js"
 npm run android:sync     # build + copy dist into android/
 npm run android:open     # open in Android Studio
 npm run android:assets   # regenerate launcher icons/splash (gitignored binaries)
+
+# Release the Android app (CI builds only on v* tags, never on pushes to main)
+npm version patch        # or minor/major: bumps package.json, commits, tags vX.Y.Z
+git push && git push --tags
 ```
+
+The web app deploys to Vercel on every push to `main`. The Android APK/AAB is
+built by `.github/workflows/android.yml` only when a `v*` tag is pushed; the tag
+must equal the `package.json` version (versionCode = MAJOR*10000 + MINOR*100 + PATCH).
+Installed apps keep talking to the live database, so don't drop columns or RPCs
+the last tagged app still uses.
 
 ## Architecture
 

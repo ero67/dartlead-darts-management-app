@@ -92,17 +92,28 @@ Planned next:
 
 ## Continuous builds (GitHub Actions)
 
-`.github/workflows/android.yml` builds the app on every push to `main` and
-publishes the APK to a rolling GitHub Release:
+`.github/workflows/android.yml` builds the app when a version tag is pushed
+and publishes the APK and AAB to a GitHub Release for that tag. Pushes to
+`main` do not build the app — the website ships on every push via Vercel, the
+phone build is a deliberate release.
 
-- Stable link to the newest build:
+Release a new app version:
+
+```bash
+npm version minor        # or patch/major — bumps package.json, commits, tags vX.Y.Z
+git push && git push --tags
+```
+
+- Release page per version: `https://github.com/ero67/dartlead-darts-management-app/releases`
+- Stable link to the newest release (updated on every tag build):
   `https://github.com/ero67/dartlead-darts-management-app/releases/download/android-latest/DartLead.apk`
-- Release page (also shows version, commit and how it was signed):
-  `https://github.com/ero67/dartlead-darts-management-app/releases/tag/android-latest`
 - Each run also keeps a `DartLead-<version>.apk` artifact for 30 days.
+- "Run workflow" (workflow_dispatch) on any branch builds a test APK that is
+  only stored as a workflow artifact, versioned `<pkg>-dev+<run>.<sha>`.
 
-Version: `versionName` = `package.json` version + `+<run number>.<short sha>`,
-`versionCode` = the workflow run number (always increasing, so installs upgrade).
+Version: `versionName` = the tag without `v` (must equal the `package.json`
+version, the job fails otherwise), `versionCode` = `MAJOR*10000 + MINOR*100 +
+PATCH`, so `v1.2.3` → `10203`. Minor and patch are limited to 99.
 
 ### One-time setup — repository secrets
 
