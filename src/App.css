@@ -135,6 +135,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
@@ -149,6 +150,7 @@ body {
 
 .app {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   background: var(--bg-primary);
   width: 100vw;
@@ -3415,6 +3417,7 @@ body {
 /* Loading */
 .loading-container {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8747,6 +8750,7 @@ a.tv-mode-btn { text-decoration: none; }
   width: min(95vw, 760px);
   max-width: 760px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   overflow-x: hidden;
   box-shadow: 0 24px 60px -12px var(--shadow-lg);
@@ -9508,6 +9512,7 @@ a.tv-mode-btn { text-decoration: none; }
   .modal {
     margin: 1rem;
     max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
     width: calc(100vw - 2rem);
   }
 
@@ -9685,6 +9690,7 @@ a.tv-mode-btn { text-decoration: none; }
     border-radius: 16px 16px 0 0;
     margin: 0;
     max-height: 90vh;
+  max-height: 90dvh;
     width: 100vw;
   }
 
@@ -12720,4 +12726,124 @@ a.tv-mode-btn { text-decoration: none; }
 }
 .no-profile-practice .primary-btn {
   margin-top: 0.75rem;
+}
+
+/* ==========================================================================
+   Mobile match screen: fit the viewport instead of scrolling (#11, #12).
+   The scoring UI is used one-handed at the board; a keypad that scrolls out
+   of view is unusable. Below the fixed mobile header the screen becomes a
+   flex column and the keypad takes whatever height is left — shrinking on
+   short phones, growing on portrait tablets — so nothing overflows.
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .app-main:has(> .match-interface.mobile-optimized) {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+
+  .match-interface.mobile-optimized {
+    display: flex;
+    flex-direction: column;
+    /* 80px = fixed mobile header + main padding-top (see .app-main above) */
+    height: calc(100dvh - 80px - var(--safe-area-inset-top, 0px) - var(--safe-area-inset-bottom, 0px));
+    max-width: none;
+    overflow: hidden;
+  }
+
+  .match-interface.mobile-optimized > .match-scoreboard,
+  .match-interface.mobile-optimized > .match-stats-section,
+  .match-interface.mobile-optimized > .match-avg-section,
+  .match-interface.mobile-optimized > .bullup-offer {
+    flex: 0 0 auto;
+  }
+
+  .match-interface.mobile-optimized > .dart-board {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    /* keeps buttons from becoming absurd on very tall screens */
+    max-height: 860px;
+  }
+
+  /* dart-by-dart: rows share the remaining height */
+  .match-interface.mobile-optimized .dart-numbers {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* five rows of 1-20 + bull; ~100px buttons on a portrait tablet is plenty */
+    max-height: 520px;
+    grid-auto-rows: minmax(44px, 1fr);
+  }
+  .match-interface.mobile-optimized .dart-numbers .dart-btn {
+    min-height: 44px;
+    height: auto;
+    font-size: clamp(1.15rem, 5.5vmin, 2rem);
+  }
+  .match-interface.mobile-optimized .mode-buttons-row,
+  .match-interface.mobile-optimized .remove-last-row {
+    flex: 0 0 auto;
+    margin-top: 0;
+  }
+  .match-interface.mobile-optimized .mode-buttons-row .mode-btn-inline,
+  .match-interface.mobile-optimized .remove-last-row .remove-last-btn {
+    min-height: 48px;
+    height: clamp(48px, 7vmin, 64px);
+    font-size: clamp(1rem, 4vmin, 1.4rem);
+  }
+
+  /* sum of 3 darts: same idea, the number pad fills the space */
+  .match-interface.mobile-optimized .turn-total-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.35rem;
+  }
+  .match-interface.mobile-optimized .turn-total-display { flex: 0 0 auto; }
+  .match-interface.mobile-optimized .turn-total-keypad {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-auto-rows: minmax(44px, 1fr);
+  }
+  .match-interface.mobile-optimized .turn-total-keypad .dart-btn {
+    min-height: 44px;
+    font-size: clamp(1.2rem, 5vmin, 2.2rem);
+  }
+  .match-interface.mobile-optimized .turn-total-keypad .turn-total-ok {
+    min-height: 52px;
+    margin-top: 0;
+  }
+}
+
+/* Short phones: trim the scoreboard so the keypad keeps usable buttons */
+@media (max-width: 1024px) and (max-height: 700px) {
+  .match-interface.mobile-optimized .match-scoreboard--compact .current-score { font-size: 2.6rem; }
+  .match-interface.mobile-optimized .match-stats-section,
+  .match-interface.mobile-optimized .match-avg-section { padding: 0.15rem 0.25rem; }
+  .match-interface.mobile-optimized .turn-total-hint { display: none; }
+  .match-interface.mobile-optimized .turn-total-value { font-size: 1.6rem; }
+}
+
+/* League / tournament tab bar on narrow screens (#9): one scrollable row
+   instead of a wrapped block that overflowed its container. */
+@media (max-width: 640px) {
+  .management-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+  .management-tabs::-webkit-scrollbar { display: none; }
+  .management-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    scroll-snap-align: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
 }
