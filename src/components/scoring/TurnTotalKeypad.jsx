@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { normalizeTurnTotalInput, appendTurnTotalDigit, parseTurnTotal } from '../../lib/turnTotalInput';
@@ -16,6 +16,14 @@ export function TurnTotalKeypad({
 }) {
   const { t } = useLanguage();
   const isInvalid = value.length > 0 && parseTurnTotal(value) === null;
+  const inputRef = useRef(null);
+
+  // Keyboard entry: the field is disabled while the other side throws (a bot
+  // visit, a bust/leg flash) and a disabled input drops focus. Put the caret
+  // back the moment it is enabled again, so the next visit can just be typed.
+  useEffect(() => {
+    if (!useOnScreenKeypad && !disabled) inputRef.current?.focus();
+  }, [useOnScreenKeypad, disabled]);
 
   const append = (digit) => onChange(appendTurnTotalDigit(value, digit));
   const backspace = () => onChange(value.slice(0, -1));
@@ -83,6 +91,8 @@ export function TurnTotalKeypad({
       ) : (
         <div className="turn-total-desktop">
           <input
+            ref={inputRef}
+            autoFocus
             className={`turn-total-input ${isInvalid ? 'invalid' : ''}`}
             value={value}
             onChange={(e) => onChange(normalizeTurnTotalInput(e.target.value))}
