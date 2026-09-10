@@ -15,19 +15,20 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 })
     );
   }
 
-  // Helper to get match data (from playoffMatches if available, otherwise from rounds)
+  // Callers pass rounds through mergeBracketRounds (utils/bracketView.js),
+  // which already folded the match rows in and cleared next-round slots whose
+  // feeder is unfinished — so the bracket entry wins and the row only fills
+  // fields the entry does not define.
   const getMatchData = (match) => {
     const dbMatch = playoffMatches.find(pm => pm.id === match.id);
-    if (dbMatch) {
-      return {
-        ...match,
-        player1: dbMatch.player1 || match.player1,
-        player2: dbMatch.player2 || match.player2,
-        result: dbMatch.result || match.result,
-        status: dbMatch.status || match.status
-      };
-    }
-    return match;
+    if (!dbMatch) return match;
+    return {
+      ...match,
+      player1: match.player1 !== undefined ? match.player1 : dbMatch.player1,
+      player2: match.player2 !== undefined ? match.player2 : dbMatch.player2,
+      result: match.result ?? dbMatch.result,
+      status: match.status || dbMatch.status
+    };
   };
 
   // Helper to get winner of a match

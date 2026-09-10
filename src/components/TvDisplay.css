@@ -224,6 +224,16 @@
 .tv-upnext__players { font-size: clamp(1rem, 1.5vw, 1.25rem); font-weight: 700; }
 .tv-upnext__players em { color: var(--tv-muted); font-style: normal; font-weight: 500; margin: 0 0.3rem; }
 
+/* Each view stays mounted (rotation only toggles `hidden`) so scroll
+   positions survive; the wrapper must not add height of its own.
+   Inactive views are stacked in the same grid cell and hidden with
+   `visibility` rather than display:none — display:none would reset their
+   scroll offsets, which is exactly the bracket "jumping back" that this avoids. */
+.tv-main { display: grid; grid-template-rows: minmax(0, 1fr); }
+.tv-main > .tv-empty, .tv-main > .tv-error { grid-area: 1 / 1; align-self: start; }
+.tv-view { grid-area: 1 / 1; height: 100%; min-height: 0; }
+.tv-view[hidden] { display: block; visibility: hidden; pointer-events: none; }
+
 /* Standings */
 .tv-standings {
   display: grid;
@@ -272,7 +282,7 @@
   height: 100%;
   overflow: auto;
 }
-.tv-bracket .bracket-visualization { background: transparent; }
+.tv-bracket .bracket-visualization { background: transparent; scroll-behavior: auto; }
 .tv-bracket .bracket-round-viz { min-width: 320px; padding: 0 1.6rem; }
 .tv-bracket .bracket-round-matches-viz { width: 320px; }
 .tv-bracket .bracket-round-header-viz { margin-bottom: 1.6rem; padding-bottom: 0.6rem; }
@@ -293,9 +303,23 @@
   letter-spacing: 0.04em;
 }
 
+/* Phones / small tablets: one column and a normally scrolling page instead of
+   a fixed, clipped viewport (content taller than the screen was cut off). */
 @media (max-width: 900px) {
+  .tv-root {
+    position: static;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .tv-main { overflow: visible; }
+  .tv-main { display: block; }
+  .tv-view[hidden] { display: none; }
+  .tv-view, .tv-live, .tv-standings, .tv-bracket { height: auto; }
+  .tv-bracket { overflow-x: auto; }
   .tv-live { grid-template-columns: 1fr; }
   .tv-standings--2, .tv-standings--3, .tv-standings--4 { grid-template-columns: 1fr; }
   .tv-board-grid--2, .tv-board-grid--3, .tv-board-grid--4 { grid-template-columns: 1fr; }
-  .tv-views { display: none; }
+  .tv-header { flex-wrap: wrap; gap: 0.5rem; }
+  .tv-views { order: 3; width: 100%; justify-content: center; flex-wrap: wrap; }
+  .tv-views button { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
 }

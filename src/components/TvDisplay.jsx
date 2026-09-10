@@ -6,6 +6,7 @@ import { tournamentService, matchService } from '../services/tournamentService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
 import { BracketVisualization } from './BracketVisualization';
+import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
 import './TvDisplay.css';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
@@ -22,6 +23,21 @@ const DEFAULT_ROTATE_SECONDS = 12;
 const POLL_MS = 30000;
 
 const fmtClock = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+const sameData = (a, b) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
+};
+
+// Interleave per-group queues so every group is represented in "up next"
+// (A1, B1, C1, A2, B2, ...) instead of the first group filling the list.
+const roundRobin = (queues) => {
+  const out = [];
+  const max = Math.max(0, ...queues.map((q) => q.length));
+  for (let i = 0; i < max; i++) for (const q of queues) if (q[i]) out.push(q[i]);
+  return out;
+};
 
 export function TvDisplay() {
   const { id } = useParams();
@@ -46,8 +62,12 @@ export function TvDisplay() {
         tournamentService.getTournament(id),
         matchService.getLiveMatches().catch(() => [])
       ]);
-      setTournament(full);
-      setLiveMatches((live || []).filter((m) => m.tournament_id === id && m.status !== 'completed'));
+      const liveNow = (live || []).filter((m) => m.tournament_id === id && m.status !== 'completed');
+      // Realtime + polling refetch every few seconds during a match. Keep the
+      // previous object when nothing changed so memos, the bracket layout and
+      // its scroll position survive the refresh.
+      setTournament((prev) => (sameData(prev, full) ? prev : full));
+      setLiveMatches((prev) => (sameData(prev, liveNow) ? prev : liveNow));
       setError('');
     } catch (err) {
       console.error('TV display load failed:', err);
@@ -124,26 +144,31 @@ export function TvDisplay() {
   // ---- derived data -------------------------------------------------------
   const boards = useMemo(() => [...liveMatches].sort((a, b) => (a.live_board_number || 999) - (b.live_board_number || 999)), [liveMatches]);
 
+  const playoffRows = useMemo(() => (tournament?.playoffMatches || []), [tournament]);
+
+  // Bracket entries with the match rows merged in and next-round slots only
+  // filled once the feeding match completed (see utils/bracketView.js).
+  const bracketRounds = useMemo(
+    () => mergeBracketRounds(tournament?.playoffs?.rounds, playoffRows),
+    [tournament, playoffRows]
+  );
+
   const upNext = useMemo(() => {
     if (!tournament) return [];
     const liveIds = new Set(liveMatches.map((m) => m.id));
-    const items = [];
-    for (const g of tournament.groups || []) {
-      for (const m of g.matches || []) {
-        if (m.status === 'pending' && m.player1 && m.player2 && !liveIds.has(m.id)) items.push({ id: m.id, label: g.name, p1: m.player1.name, p2: m.player2.name });
-      }
-    }
-    for (const r of tournament.playoffs?.rounds || []) {
-      for (const m of r.matches || []) {
-        if (m.status === 'pending' && m.player1 && m.player2 && !liveIds.has(m.id)) items.push({ id: m.id, label: r.name, p1: m.player1.name, p2: m.player2.name });
-      }
-    }
-    return items.slice(0, 8);
-  }, [tournament, liveMatches]);
+    // Anything that is not pending is either live (with or without a paired
+    // device) or done — never "up next".
+    const ready = (m) => m.status === 'pending' && m.player1 && m.player2 && !liveIds.has(m.id);
+    const groupQueues = (tournament.groups || []).map((g) =>
+      (g.matches || []).filter(ready).map((m) => ({ id: m.id, label: g.name, p1: m.player1.name, p2: m.player2.name }))
+    );
+    const playoffItems = upcomingPlayoffMatches(bracketRounds)
+      .filter((m) => !liveIds.has(m.id))
+      .map((m) => ({ id: m.id, label: m.roundName, p1: m.player1.name, p2: m.player2.name }));
+    return [...roundRobin(groupQueues), ...playoffItems].slice(0, 8);
+  }, [tournament, liveMatches, bracketRounds]);
 
   const qualifiersPerGroup = tournament?.playoffSettings?.enabled ? Number(tournament.playoffSettings.qualifiersPerGroup || tournament.playoffSettings.playersPerGroup || 0) : 0;
-
-  const playoffRows = useMemo(() => (tournament?.playoffMatches || []), [tournament]);
 
   // ---- render -------------------------------------------------------------
   const renderLive = () => (
@@ -246,7 +271,7 @@ export function TvDisplay() {
   const renderBracket = () => (
     <div className="tv-bracket">
       <div className="tv-bracket-inner">
-        <BracketVisualization rounds={tournament.playoffs.rounds} playoffMatches={playoffRows} scale={1.6} />
+        <BracketVisualization rounds={bracketRounds} playoffMatches={playoffRows} scale={1.6} />
       </div>
     </div>
   );
@@ -290,9 +315,13 @@ export function TvDisplay() {
       <main className="tv-main">
         {error && <p className="tv-error">{error}</p>}
         {!tournament && !error && <p className="tv-empty">{t('common.loading')}</p>}
-        {tournament && activeView === 'live' && renderLive()}
-        {tournament && activeView === 'standings' && renderStandings()}
-        {tournament && activeView === 'bracket' && renderBracket()}
+        {tournament && views.map((v) => (
+          <div key={v} className="tv-view" hidden={v !== activeView}>
+            {v === 'live' && renderLive()}
+            {v === 'standings' && renderStandings()}
+            {v === 'bracket' && renderBracket()}
+          </div>
+        ))}
       </main>
 
       <footer className="tv-footer">

@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { BracketVisualization } from './BracketVisualization';
+import { mergeBracketRounds } from '../utils/bracketView';
 import { BracketSeedingEditor } from './BracketSeedingEditor';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { TournamentSummary } from './TournamentSummary';
@@ -3295,7 +3296,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
         <div ref={bracketRef} className="bracket-export-target">
         {bracketViewMode === 'compact' ? (
-          <BracketVisualization rounds={rounds} playoffMatches={playoffMatches} />
+          <BracketVisualization rounds={mergeBracketRounds(rounds, playoffMatches)} playoffMatches={playoffMatches} />
         ) : (
         <div className="bracket-container">
           {rounds.map((round, index) => (
