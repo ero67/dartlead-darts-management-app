@@ -13,11 +13,11 @@ import { PRACTICE_GAMES } from '../lib/practiceGames';
 export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeague, onSelectLeague, onNavigate }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { isAdmin, isManager, canCreateTournaments } = useAdmin();
+  const { isAdmin, canManage, canCreateTournaments } = useAdmin();
   const { tournaments } = useTournament();
   const { leagues } = useLeague();
 
-  const isManagerUser = user && (isAdmin || isManager);
+  const isManagerUser = user && canManage;
 
   // Filter to user's own data
   const myTournaments = isManagerUser

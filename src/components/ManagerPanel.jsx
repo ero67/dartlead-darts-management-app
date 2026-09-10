@@ -48,15 +48,18 @@ export function ManagerPanel() {
   ];
 
   // --- Tournaments / leagues this user manages (admins see everything) ---
-  const myTournaments = useMemo(() => (
-    isAdmin ? tournaments : tournaments.filter(tr => user && tr.userId === user.id)
-  ), [tournaments, isAdmin, user]);
-
   const myLeagues = useMemo(() => (
     isAdmin
       ? leagues
       : leagues.filter(l => user && (l.createdBy === user.id || (l.managerIds || []).includes(user.id)))
   ), [leagues, isAdmin, user]);
+
+  // Own tournaments plus every tournament of a league this user (co-)manages
+  const myTournaments = useMemo(() => {
+    if (isAdmin) return tournaments;
+    const leagueIds = new Set(myLeagues.map(l => l.id));
+    return tournaments.filter(tr => user && (tr.userId === user.id || (tr.leagueId && leagueIds.has(tr.leagueId))));
+  }, [tournaments, isAdmin, user, myLeagues]);
 
   // --- Overview stats (counts come from the lightweight tournament summary) ---
   const liveMatchesNow = myTournaments.reduce((sum, tr) => sum + (tr.inProgressMatches ?? 0), 0);

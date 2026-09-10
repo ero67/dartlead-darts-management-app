@@ -9,6 +9,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ScorersPanel } from './ScorersPanel';
+import { LeagueManagersPanel } from './LeagueManagersPanel';
 import { HeadToHead } from './HeadToHead';
 import { SeedingPresetLibrary } from './SeedingPresetLibrary';
 import { DisplayNameEditor } from './DisplayNameEditor';
@@ -1342,6 +1343,11 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         {activeTab === 'settings' && isManager && (
           <div>
             <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>{t('leagues.leagueSettings')}</h2>
+
+            <LeagueManagersPanel
+              leagueId={currentLeague.id}
+              canEdit={!!(isAdmin || currentLeague.createdBy === user?.id)}
+            />
 
             <ScorersPanel type="league" entityId={currentLeague.id} />
 

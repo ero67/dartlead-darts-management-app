@@ -949,6 +949,20 @@
     "message": "Stránka, ktorú hľadáte, neexistuje alebo bola presunutá.",
     "goHome": "Prejsť na prehľad"
   },
+  "leagueManagers": {
+    "title": "Manažéri ligy",
+    "owner": "Vlastník",
+    "description": "Spolumanažéri môžu túto ligu spravovať spolu s vami: členov, turnaje, bodovanie aj nastavenia. Zdieľajú vaše predplatné a nepotrebujú rolu manažéra. Vyhľadajte ich podľa mena alebo e-mailu.",
+    "descriptionReadOnly": "Ľudia, ktorí spravujú túto ligu. Zoznam môže meniť iba vlastník ligy.",
+    "remove": "Odstrániť",
+    "leave": "Odísť zo správy ligy",
+    "userNotFound": "Používateľ sa nenašiel",
+    "alreadyOwner": "Tento používateľ je už vlastníkom ligy",
+    "notAuthorized": "Spolumanažérov môže spravovať iba vlastník ligy",
+    "loadError": "Nepodarilo sa načítať manažérov ligy",
+    "addError": "Nepodarilo sa pridať manažéra",
+    "removeError": "Nepodarilo sa odstrániť manažéra"
+  },
   "scorers": {
     "title": "Zapisovatelia",
     "descriptionTournament": "Zapisovatelia môžu na svojom zariadení otvoriť zápasy tohto turnaja, počítať skóre a uložiť výsledky. Vyhľadajte ich podľa mena alebo e-mailu.",

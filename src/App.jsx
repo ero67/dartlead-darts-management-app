@@ -331,7 +331,7 @@ function MyProfileRedirect() {
 function AppContent() {
   const { t } = useLanguage();
   const { user, loading } = useAuth();
-  const { isAdmin, isManager, canCreateTournaments } = useAdmin();
+  const { isAdmin, canManage, isLeagueManager, canCreateTournaments } = useAdmin();
   const {
     tournaments,
     currentTournament,
@@ -566,7 +566,7 @@ function AppContent() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/delete-account" element={<DeleteAccountInfo />} />
           <Route path="/create-tournament" element={
-            user && canCreateTournaments ? (
+            user && (canCreateTournaments || (isLeagueManager && new URLSearchParams(location.search).has('leagueId'))) ? (
               <TournamentCreation 
                 onTournamentCreated={handleTournamentCreated}
                 onBack={() => navigate('/dashboard')}
@@ -592,7 +592,7 @@ function AppContent() {
             )
           } />
           <Route path="/manager" element={
-            isAdmin || isManager ? (
+            canManage ? (
               <ManagerPanel />
             ) : (
               <div className="unauthorized-container">

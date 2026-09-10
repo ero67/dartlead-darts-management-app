@@ -12,7 +12,7 @@ import { getUserDisplayName } from '../utils/userDisplayName';
 
 export function Navigation({ currentView, onViewChange, tournament, isMobileOpen, onMobileClose }) {
   const { user, signOut } = useAuth();
-  const { isAdmin, isManager } = useAdmin();
+  const { isAdmin, isManager, canManage } = useAdmin();
   const { deviceName, boardNumber } = useLiveMatch();
   const { t } = useLanguage();
   const { isDarkMode, toggleTheme } = useTheme();
@@ -34,7 +34,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
   const navItems = [
     { id: '/', label: t('navigation.home'), icon: Home },
     { id: '/practice', label: t('navigation.practice'), icon: Target },
-    { id: '/dashboard', label: (isAdmin || isManager) ? t('dashboard.myDashboard') : t('navigation.dashboard'), icon: Trophy, primary: isAdmin || isManager },
+    { id: '/dashboard', label: canManage ? t('dashboard.myDashboard') : t('navigation.dashboard'), icon: Trophy, primary: canManage },
     { id: '/tournaments', label: t('navigation.tournaments'), icon: Users },
     { id: '/leagues', label: t('navigation.leagues'), icon: Crown },
   ];
@@ -113,7 +113,7 @@ export function Navigation({ currentView, onViewChange, tournament, isMobileOpen
             </button>
           );
         })}
-        {(isAdmin || isManager) && (
+        {canManage && (
           <button
             className={`nav-item ${currentView === '/manager' ? 'active' : ''}`}
             onClick={() => handleNavItemClick('/manager')}

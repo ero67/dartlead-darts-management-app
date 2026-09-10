@@ -949,6 +949,20 @@
     "message": "The page you are looking for does not exist or has been moved.",
     "goHome": "Go to dashboard"
   },
+  "leagueManagers": {
+    "title": "League managers",
+    "owner": "Owner",
+    "description": "Co-managers can run this league with you: members, tournaments, scoring and settings. They share your subscription and do not need a manager role. Search for them by name or email.",
+    "descriptionReadOnly": "People who manage this league. Only the league owner can change this list.",
+    "remove": "Remove",
+    "leave": "Leave league management",
+    "userNotFound": "User not found",
+    "alreadyOwner": "This user already owns the league",
+    "notAuthorized": "Only the league owner can manage co-managers",
+    "loadError": "Failed to load league managers",
+    "addError": "Failed to add manager",
+    "removeError": "Failed to remove manager"
+  },
   "scorers": {
     "title": "Scorers",
     "descriptionTournament": "Scorers can open this tournament's matches on their own device, count the score and save results. Search for them by name or email.",

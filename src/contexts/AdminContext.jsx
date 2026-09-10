@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext.jsx';
+import { leagueService } from '../services/leagueService';
 
 const AdminContext = createContext();
 
@@ -13,8 +14,28 @@ export function AdminProvider({ children }) {
 
   const isManager = user?.app_metadata?.role === 'manager';
 
+  // Co-managers ride on another manager's league (league_managers table):
+  // they get the manager UI and full rights inside those leagues, but no role
+  // and no right to create standalone tournaments or new leagues.
+  const [isLeagueManager, setIsLeagueManager] = useState(false);
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId || isAdmin || isManager) {
+      setIsLeagueManager(false);
+      return;
+    }
+    let cancelled = false;
+    leagueService.managesAnyLeague().then(result => {
+      if (!cancelled) setIsLeagueManager(result);
+    });
+    return () => { cancelled = true; };
+  }, [userId, isAdmin, isManager]);
+
   // Check if user can create tournaments (admin or manager)
   const canCreateTournaments = isAdmin || isManager;
+
+  // Anyone who should see the manager panel / dashboard
+  const canManage = isAdmin || isManager || isLeagueManager;
 
   // Admin functions for correcting mistakes
   const adminFunctions = {
@@ -58,7 +79,10 @@ export function AdminProvider({ children }) {
   const value = {
     isAdmin,
     isManager,
+    isLeagueManager,
+    canManage,
     canCreateTournaments,
+    refreshLeagueManagerStatus: () => leagueService.managesAnyLeague().then(setIsLeagueManager),
     isAdminMode,
     setIsAdminMode,
     adminFunctions

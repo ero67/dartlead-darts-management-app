@@ -18,7 +18,6 @@ export const leagueService = {
           name: leagueData.name,
           description: leagueData.description || null,
           status: leagueData.status || 'active',
-          manager_ids: leagueData.managerIds || [user.id],
           created_by: user.id,
           default_tournament_settings: leagueData.defaultTournamentSettings || null,
           scoring_rules: leagueData.scoringRules || {
@@ -48,7 +47,7 @@ export const leagueService = {
     try {
       const { data: leagues, error } = await supabase
         .from('leagues')
-        .select('*')
+        .select('*, league_managers(user_id)')
         .eq('deleted', false)
         .order('created_at', { ascending: false });
 
@@ -94,7 +93,7 @@ export const leagueService = {
     try {
       const { data: league, error } = await supabase
         .from('leagues')
-        .select('*')
+        .select('*, league_managers(user_id)')
         .eq('id', leagueId)
         .eq('deleted', false)
         .single();
@@ -142,7 +141,7 @@ export const leagueService = {
           updated_at: new Date().toISOString()
         })
         .eq('id', leagueId)
-        .select()
+        .select('*, league_managers(user_id)')
         .single();
 
       if (error) throw error;
@@ -163,7 +162,7 @@ export const leagueService = {
           updated_at: new Date().toISOString()
         })
         .eq('id', leagueId)
-        .select()
+        .select('*, league_managers(user_id)')
         .single();
 
       if (error) throw error;
@@ -1763,7 +1762,8 @@ export const leagueService = {
       name: league.name,
       description: league.description,
       status: league.status,
-      managerIds: league.manager_ids || [],
+      // Co-managers (league_managers join); the creator is implicit via createdBy
+      managerIds: (league.league_managers || []).map(m => m.user_id),
       createdBy: league.created_by,
       defaultTournamentSettings: league.default_tournament_settings,
       scoringRules: league.scoring_rules || {
@@ -2097,6 +2097,64 @@ export const leagueService = {
     } catch (error) {
       console.error('Error removing league scorer:', error);
       throw error;
+    }
+  },
+
+  // --- Co-managers (league_managers) ---------------------------------------
+  // Only the league creator or an admin may add/remove; the RPCs enforce it.
+  async listManagers(leagueId) {
+    try {
+      const { data, error } = await supabase.rpc('list_league_managers', { l_id: leagueId });
+      if (error) throw error;
+      return (data || []).map(row => ({
+        userId: row.user_id,
+        email: row.email,
+        fullName: row.full_name,
+        isOwner: row.is_owner
+      }));
+    } catch (error) {
+      console.error('Error listing league managers:', error);
+      throw error;
+    }
+  },
+
+  async addManager(leagueId, email) {
+    try {
+      const { data, error } = await supabase.rpc('add_league_manager', {
+        l_id: leagueId,
+        user_email: email
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error adding league manager:', error);
+      throw error;
+    }
+  },
+
+  async removeManager(leagueId, userId) {
+    try {
+      const { data, error } = await supabase.rpc('remove_league_manager', {
+        l_id: leagueId,
+        target_user_id: userId
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'remove_failed');
+    } catch (error) {
+      console.error('Error removing league manager:', error);
+      throw error;
+    }
+  },
+
+  // Whether the signed-in user co-manages at least one league (no role needed).
+  async managesAnyLeague() {
+    try {
+      const { data, error } = await supabase.rpc('manages_any_league');
+      if (error) throw error;
+      return data === true;
+    } catch (error) {
+      console.error('Error checking league manager status:', error);
+      return false;
     }
   }
 };
