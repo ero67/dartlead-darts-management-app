@@ -258,14 +258,16 @@ function MatchRoute({ onMatchComplete }) {
         if (match) {
           startMatch(match);
         } else {
-          // Match not found, redirect to tournament
-          navigate(`/tournament/${currentTournament.id}`);
+          // Match not found, redirect to tournament. replace: a redirect must
+          // not leave the dead /match URL in history, or "back" bounces
+          // straight into it again.
+          navigate(`/tournament/${currentTournament.id}`, { replace: true });
         }
       } else if (tournaments.length > 0) {
         // Tournaments have loaded but currentTournament is null and wasn't restored
         // from sessionStorage – this means the user navigated here without a valid
         // tournament context. Redirect to tournaments list.
-        navigate('/tournaments');
+        navigate('/tournaments', { replace: true });
       }
       // If tournaments.length === 0, we're still loading – don't redirect yet,
       // the LOAD_TOURNAMENTS action will restore currentTournament from sessionStorage.
@@ -287,7 +289,9 @@ function PlayerProfileRoute() {
   return (
     <PlayerProfile
       playerId={id}
-      onBack={() => navigate(-1)}
+      // Opened from a shared link there is nothing to go back to; the
+      // browser would leave the site (or the Android app would close).
+      onBack={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/tournaments'))}
       onSelectTournament={(tourn) => navigate(`/tournament/${tourn.id}`)}
       onSelectLeague={(league) => navigate(`/league/${league.id}`)}
       onSelectPlayer={(player) => navigate(`/player/${player.id}`)}

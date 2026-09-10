@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, BarChart3 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useCloseOnBack } from '../hooks/useCloseOnBack';
 
 // Statistics of one completed match: score hero, side-by-side comparison with
 // the better side highlighted, leg-by-leg table, checkout chips. Used from the
@@ -25,6 +26,8 @@ const bestLegDarts = (stats) => {
 };
 
 export function MatchStatisticsModal({ match, onClose }) {
+  // Back button closes the dialog rather than leaving the page behind it
+  useCloseOnBack(!!match, onClose);
   const { t } = useLanguage();
   if (!match?.result) return null;
 
