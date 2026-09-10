@@ -41,7 +41,10 @@ export function PracticeHome() {
 
   useEffect(() => { runSync(); }, [runSync]);
 
-  const activeStats = active?.game === 'x01' ? computeStats(active.state) : null;
+  // A two-player session keeps one solo state per player; the owner is first.
+  const activeStats = active?.game === 'x01'
+    ? computeStats(active.state.kind === 'match' ? active.state.players[0] : active.state)
+    : null;
   const activeGame = active ? PRACTICE_GAMES.find(g => g.id === active.game) : null;
 
   const handleDiscard = () => {

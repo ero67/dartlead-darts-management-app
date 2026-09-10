@@ -188,6 +188,31 @@ export const applyVisitTotal = (state, total, { dartsUsed = 3, finishedOnDouble 
   };
 };
 
+// The opponent checked out: close this player's unfinished leg as lost so its
+// visits and darts still count towards averages, then start the next leg.
+export const abandonLeg = (state) => {
+  const { current } = state;
+  const visits = current.visit.darts.length > 0
+    ? [...current.visits, {
+        score: 0, darts: current.visit.darts.length, startRemaining: current.remaining,
+        isBust: false, isCheckout: false, isPartial: true, dartsList: current.visit.darts
+      }]
+    : current.visits;
+  const lostLeg = {
+    startRemaining: current.startRemaining,
+    visits,
+    darts: visits.reduce((sum, v) => sum + v.darts, 0),
+    checkout: 0,
+    lost: true
+  };
+  return {
+    ...state,
+    legs: [...state.legs, lostLeg],
+    current: newLeg(state.settings.startingScore),
+    undoStack: pushUndo(state)
+  };
+};
+
 export const canUndo = (state) => state.undoStack.length > 0;
 
 export const undo = (state) => {
@@ -213,8 +238,10 @@ export const lastVisitLabels = (state) => {
 const round1 = (n) => Math.round(n * 10) / 10;
 
 export const computeStats = (state) => {
-  const completedLegs = state.legs;
-  const legsForVisits = [...completedLegs, state.current];
+  // Legs lost to an opponent (abandonLeg) count for darts and averages but
+  // are not checkouts, best legs or won legs.
+  const completedLegs = state.legs.filter(leg => !leg.lost);
+  const legsForVisits = [...state.legs, state.current];
   const allVisits = legsForVisits.flatMap(l => l.visits);
 
   const totalDarts = allVisits.reduce((sum, v) => sum + v.darts, 0);

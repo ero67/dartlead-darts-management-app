@@ -1094,7 +1094,27 @@
       "scoringDart": "Šípka po šípke",
       "scoringTurnTotal": "Súčet 3 šípok",
       "scoringDartHint": "Každá šípka zvlášť. Kompletné štatistiky checkoutov.",
-      "scoringTurnTotalHint": "Zadaj súčet každého náhodu. Rýchlejšie."
+      "scoringTurnTotalHint": "Zadaj súčet každého náhodu. Rýchlejšie.",
+      "opponent": "Súper",
+      "opponentSolo": "Sám",
+      "opponentPlayer": "Druhý hráč",
+      "opponentBot": "Bot",
+      "opponentName": "Meno druhého hráča",
+      "firstTo": "Hrá sa na",
+      "starter": "Kto začína",
+      "you": "Vy"
+    },
+    "match": {
+      "vs": "vs",
+      "result": "Výsledok",
+      "toThrow": "Hádže {{name}}",
+      "legWonByOne": "{{name}} vyhráva leg na {{count}} šípku",
+      "legWonByFew": "{{name}} vyhráva leg na {{count}} šípky",
+      "legWonByMany": "{{name}} vyhráva leg na {{count}} šípok",
+      "youWon": "Vyhrali ste {{for}}:{{against}}",
+      "opponentWon": "{{name}} vyhráva {{for}}:{{against}}",
+      "abandoned": "Zápas nedohraný ({{for}}:{{against}})",
+      "opponentAverage": "{{name}}: priemer {{average}}"
     },
     "legOf": "Leg {{current}} / {{total}}",
     "leg": "Leg {{current}}",

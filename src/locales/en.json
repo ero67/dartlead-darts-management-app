@@ -1094,7 +1094,27 @@
       "scoringDart": "Dart by dart",
       "scoringTurnTotal": "3-dart total",
       "scoringDartHint": "Every dart counted. Full checkout stats.",
-      "scoringTurnTotalHint": "Type each visit total. Faster."
+      "scoringTurnTotalHint": "Type each visit total. Faster.",
+      "opponent": "Opponent",
+      "opponentSolo": "Solo",
+      "opponentPlayer": "Second player",
+      "opponentBot": "Bot",
+      "opponentName": "Second player's name",
+      "firstTo": "First to",
+      "starter": "Who starts",
+      "you": "You"
+    },
+    "match": {
+      "vs": "vs",
+      "result": "Result",
+      "toThrow": "{{name}} to throw",
+      "legWonByOne": "{{name}} wins the leg in {{count}} dart",
+      "legWonByFew": "{{name}} wins the leg in {{count}} darts",
+      "legWonByMany": "{{name}} wins the leg in {{count}} darts",
+      "youWon": "You won {{for}}:{{against}}",
+      "opponentWon": "{{name}} won {{for}}:{{against}}",
+      "abandoned": "Match not finished ({{for}}:{{against}})",
+      "opponentAverage": "{{name}}: {{average}} avg"
     },
     "legOf": "Leg {{current}} / {{total}}",
     "leg": "Leg {{current}}",

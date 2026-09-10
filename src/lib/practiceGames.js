@@ -18,7 +18,8 @@ export const describeSession = (entry, t) => {
       ? t('practice.setup.unlimited')
       : t(legsTarget === 1 ? 'practice.legCountOne' : 'practice.legCountMany', { count: legsTarget });
     const mode = scoringMode === 'turnTotal' ? t('practice.setup.scoringTurnTotal') : t('practice.setup.scoringDart');
-    return `${startingScore} · ${legs} · ${mode}`;
+    const opponent = entry.settings?.opponent?.name ? ` · ${t('practice.match.vs')} ${entry.settings.opponent.name}` : '';
+    return `${startingScore} · ${legs} · ${mode}${opponent}`;
   }
   if (entry.game === 'checkout') {
     const { range, min, max, attemptsTarget } = entry.settings || {};
@@ -75,7 +76,10 @@ export const sessionHighlights = (entry, t) => {
       return [
         [t('practice.stats.average'), (s.average ?? 0).toFixed(1)],
         [t('practice.stats.checkout'), pct(s.checkoutPercent, t)],
-        [t('practice.stats.legs'), s.legs ?? 0],
+        // A match shows its result where a solo session shows legs played
+        s.legsFor !== undefined
+          ? [t('practice.match.result'), `${s.legsFor}:${s.legsAgainst ?? 0}`]
+          : [t('practice.stats.legs'), s.legs ?? 0],
         [t('practice.stats.darts'), s.totalDarts ?? 0]
       ];
   }

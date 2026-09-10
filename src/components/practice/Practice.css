@@ -662,3 +662,101 @@
   animation: practice-spin 1s linear infinite;
 }
 @keyframes practice-spin { to { transform: rotate(360deg); } }
+
+/* ---- X01 two-player board (practice 1v1) -------------------------------- */
+.practice-text-input {
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--input-bg, var(--card-bg));
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+.practice-text-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+.practice-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.practice-board--match {
+  padding: 0.75rem 0.75rem 0.6rem;
+}
+.practice-scoreboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.practice-player {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  padding: 0.5rem 0.6rem;
+  text-align: center;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.practice-player.active {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.35);
+}
+.practice-player-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+.practice-player-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.practice-player-legs {
+  min-width: 1.6rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.12);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.practice-player.active .practice-player-legs { background: rgba(255, 255, 255, 0.25); }
+.practice-player-remaining {
+  font-size: clamp(2.4rem, 11vw, 4.2rem);
+  line-height: 1.05;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  margin: 0.1rem 0;
+}
+.practice-player .practice-last-throws {
+  min-height: 1.8rem;
+  margin: 0.25rem 0;
+  gap: 0.25rem;
+}
+.practice-player .practice-last-throws span {
+  padding: 0.15rem 0.45rem;
+  min-width: 2.2rem;
+  font-size: 0.85rem;
+}
+.practice-player.active .practice-last-throws span {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+.practice-player-avg {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.practice-player.active .practice-player-avg { color: rgba(255, 255, 255, 0.9); }
+.practice-board--match .practice-checkout-hint { margin-top: 0.4rem; }
+.practice-summary-opponent {
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
