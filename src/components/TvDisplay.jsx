@@ -149,7 +149,7 @@ export function TvDisplay() {
   // Bracket entries with the match rows merged in and next-round slots only
   // filled once the feeding match completed (see utils/bracketView.js).
   const bracketRounds = useMemo(
-    () => mergeBracketRounds(tournament?.playoffs?.rounds, playoffRows),
+    () => mergeBracketRounds(tournament?.playoffs?.rounds, playoffRows, tournament?.players),
     [tournament, playoffRows]
   );
 

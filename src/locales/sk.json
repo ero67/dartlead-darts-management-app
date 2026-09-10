@@ -901,6 +901,7 @@
     "yourName": "Vaše meno",
     "nameHint": "Toto meno sa zobrazuje v turnajoch, ligách a štatistikách.",
     "nameInvalid": "Meno musí mať 2 až 60 znakov.",
+    "nameTaken": "Toto meno už používa iný hráč. Zvoľte si prosím iné.",
     "nameSaveFailed": "Meno sa nepodarilo uložiť. Skúste to znova.",
     "dartsThrown": "Hodené šípky",
     "recentMatches": "Posledné zápasy",

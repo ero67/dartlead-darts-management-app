@@ -901,6 +901,7 @@
     "yourName": "Your name",
     "nameHint": "This name is shown in tournaments, leagues and statistics.",
     "nameInvalid": "The name must be 2 to 60 characters long.",
+    "nameTaken": "This name is already used by another player. Please pick a different one.",
     "nameSaveFailed": "Failed to save the name. Please try again.",
     "dartsThrown": "Darts Thrown",
     "recentMatches": "Recent Matches",

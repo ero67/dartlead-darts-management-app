@@ -13,22 +13,29 @@ const isThird = (m) => !!m?.isThirdPlaceMatch;
 // Merge DB rows into the bracket entries and clear next-round slots whose
 // feeder match is not completed. Returns new round/match objects; the input
 // is not mutated.
-export function mergeBracketRounds(rounds, playoffMatches = []) {
+// `players` (the tournament's player list) is optional: when given, slot
+// names are taken from it, so a player renamed after the bracket was built
+// shows the current name rather than the one frozen in the JSONB.
+export function mergeBracketRounds(rounds, playoffMatches = [], players = []) {
   if (!Array.isArray(rounds) || rounds.length === 0) return [];
   const rowById = new Map((playoffMatches || []).map((m) => [m.id, m]));
+  const nameById = new Map((players || []).filter((p) => p?.id && p.name).map((p) => [p.id, p.name]));
+  const fresh = (p) => (p && nameById.has(p.id) && nameById.get(p.id) !== p.name ? { ...p, name: nameById.get(p.id) } : p);
 
   const merged = rounds.map((round) => ({
     ...round,
     matches: (round.matches || []).map((m) => {
       const row = rowById.get(m.id);
-      if (!row) return { ...m };
-      return {
-        ...m,
-        player1: row.player1 || m.player1 || null,
-        player2: row.player2 || m.player2 || null,
-        status: row.status || m.status || 'pending',
-        result: row.result || m.result || null
-      };
+      const base = row
+        ? {
+            ...m,
+            player1: row.player1 || m.player1 || null,
+            player2: row.player2 || m.player2 || null,
+            status: row.status || m.status || 'pending',
+            result: row.result || m.result || null
+          }
+        : { ...m };
+      return { ...base, player1: fresh(base.player1) || null, player2: fresh(base.player2) || null };
     })
   }));
 

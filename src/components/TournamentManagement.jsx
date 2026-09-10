@@ -3296,7 +3296,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
         <div ref={bracketRef} className="bracket-export-target">
         {bracketViewMode === 'compact' ? (
-          <BracketVisualization rounds={mergeBracketRounds(rounds, playoffMatches)} playoffMatches={playoffMatches} />
+          <BracketVisualization rounds={mergeBracketRounds(rounds, playoffMatches, tournament.players)} playoffMatches={playoffMatches} />
         ) : (
         <div className="bracket-container">
           {rounds.map((round, index) => (

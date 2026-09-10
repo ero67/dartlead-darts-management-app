@@ -31,13 +31,16 @@ export function DisplayNameEditor({ currentName, onSaved, onCancel }) {
     setIsSaving(true);
     setError('');
     try {
+      // Player row first: it is the step that can be refused (name already in
+      // the roster). Changing the account name afterwards keeps both in sync
+      // instead of leaving the account renamed and the player not.
+      const player = await tournamentService.renameMyPlayer(cleaned);
       const { error: authError } = await updateDisplayName(cleaned);
       if (authError) throw authError;
-      const player = await tournamentService.renameMyPlayer(cleaned);
       onSaved(cleaned, player);
     } catch (err) {
       console.error('Error saving display name:', err);
-      setError(t('playerProfile.nameSaveFailed'));
+      setError(t(err?.message?.includes('name_taken') ? 'playerProfile.nameTaken' : 'playerProfile.nameSaveFailed'));
     } finally {
       setIsSaving(false);
     }
