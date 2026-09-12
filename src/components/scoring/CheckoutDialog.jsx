@@ -4,8 +4,10 @@ import { useLanguage } from '../../contexts/LanguageContext';
 
 // Asked when a 3-dart total lands exactly on zero: how many darts did the
 // finish take, and did it end on a double? `pending` is
-// { total, dartsUsed: 1|2|3, finishedOnDouble: boolean }.
-export function CheckoutDialog({ pending, onChange, onConfirm, onCancel }) {
+// { total, dartsUsed: 1|2|3, finishedOnDouble: boolean }. The two hints under
+// the outcome cards can be overridden where "leg won" is the wrong words (the
+// checkout trainer scores attempts, not legs).
+export function CheckoutDialog({ pending, onChange, onConfirm, onCancel, doubleOutHint, bustHint }) {
   const { t } = useLanguage();
   if (!pending) return null;
 
@@ -46,7 +48,7 @@ export function CheckoutDialog({ pending, onChange, onConfirm, onCancel }) {
             >
               <CheckCircle size={22} />
               <span className="checkout-outcome-card__title">{t('match.checkout.doubleOut')}</span>
-              <span className="checkout-outcome-card__hint">{t('match.checkout.doubleOutHint')}</span>
+              <span className="checkout-outcome-card__hint">{doubleOutHint || t('match.checkout.doubleOutHint')}</span>
             </button>
             <button
               type="button"
@@ -55,7 +57,7 @@ export function CheckoutDialog({ pending, onChange, onConfirm, onCancel }) {
             >
               <XCircle size={22} />
               <span className="checkout-outcome-card__title">{t('match.checkout.bust')}</span>
-              <span className="checkout-outcome-card__hint">{t('match.checkout.bustHint')}</span>
+              <span className="checkout-outcome-card__hint">{bustHint || t('match.checkout.bustHint')}</span>
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, BarChart3 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCloseOnBack } from '../hooks/useCloseOnBack';
+import { HIGH_SCORE_BANDS, countHighScores, checkoutRate } from '../utils/dartStats';
 
 // Statistics of one completed match: score hero, side-by-side comparison with
 // the better side highlighted, leg-by-leg table, checkout chips. Used from the
@@ -13,7 +14,11 @@ import { useCloseOnBack } from '../hooks/useCloseOnBack';
 // result comes from saveMatchResult: winner, player1Legs, player2Legs,
 // player{1,2}Stats: { average, oneEighties, totalScore, totalDarts,
 //   checkouts: [{leg, checkout, darts, totalDarts} | number],
-//   legs: [{leg, darts, checkout, average, isWin}] }
+//   legs: [{leg, darts, checkout, average, isWin}],
+//   visitScores: [number], doubleAttempts, checkoutBasis }
+// Matches played before visitScores/doubleAttempts existed show "—" for the
+// high-score bands (except 180, which was always counted) and the checkout
+// percentage.
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const checkoutValues = (stats) => (stats?.checkouts || [])
@@ -23,6 +28,13 @@ const checkoutValues = (stats) => (stats?.checkouts || [])
 const bestLegDarts = (stats) => {
   const wins = (stats?.legs || []).filter((l) => l?.isWin && num(l.darts) > 0).map((l) => num(l.darts));
   return wins.length ? Math.min(...wins) : null;
+};
+const hasVisitScores = (stats) => Array.isArray(stats?.visitScores) && stats.visitScores.length > 0;
+// 180s were counted before per-visit scores were stored, so that one band can
+// still be filled in for older matches; the rest are unknown.
+const bandCount = (stats, bands, band) => {
+  if (hasVisitScores(stats)) return bands[band];
+  return band === 180 ? num(stats?.oneEighties) : null;
 };
 
 export function MatchStatisticsModal({ match, onClose }) {
@@ -42,9 +54,28 @@ export function MatchStatisticsModal({ match, onClose }) {
 
   const co1 = checkoutValues(s1);
   const co2 = checkoutValues(s2);
+  const cr1 = checkoutRate(s1);
+  const cr2 = checkoutRate(s2);
+  const bands1 = countHighScores(s1.visitScores);
+  const bands2 = countHighScores(s2.visitScores);
+  const bandRows = HIGH_SCORE_BANDS.map((band) => ({
+    key: `band-${band}`,
+    label: band === 180 ? '180' : `${band}+`,
+    a: bandCount(s1, bands1, band),
+    b: bandCount(s2, bands2, band),
+    higherBetter: true
+  }));
   const rows = [
     { key: 'average', label: t('matchStats.average'), a: num(s1.average), b: num(s2.average), fmt: (v) => v.toFixed(2), higherBetter: true },
-    { key: 'oneEighties', label: t('matchStats.oneEighties'), a: num(s1.oneEighties), b: num(s2.oneEighties), higherBetter: true },
+    {
+      key: 'checkoutPercent',
+      label: t('matchStats.checkoutPercent'),
+      a: cr1.percent, b: cr2.percent,
+      fmt: (v) => `${v.toFixed(0)}%`,
+      subA: cr1.attempts > 0 ? `${cr1.hits}/${cr1.attempts}` : null,
+      subB: cr2.attempts > 0 ? `${cr2.hits}/${cr2.attempts}` : null,
+      higherBetter: true
+    },
     { key: 'highestCheckout', label: t('matchStats.highestCheckout'), a: co1[0] || 0, b: co2[0] || 0, higherBetter: true },
     { key: 'checkoutCount', label: t('matchStats.checkoutCount'), a: co1.length, b: co2.length, higherBetter: true },
     { key: 'bestLeg', label: t('matchStats.bestLeg'), a: bestLegDarts(s1), b: bestLegDarts(s2), higherBetter: false },
@@ -65,9 +96,10 @@ export function MatchStatisticsModal({ match, onClose }) {
     }
     const total = num(row.a) + num(row.b);
     const pct = total > 0 ? Math.round((num(v) / total) * 100) : 0;
+    const sub = side === 'a' ? row.subA : row.subB;
     return (
       <div className={`mstats-row__value ${side === 'b' ? 'right' : ''} ${better ? 'better' : ''}`}>
-        <span>{shown}</span>
+        <span>{shown}{sub ? <small className="mstats-row__sub">{sub}</small> : null}</span>
         {!row.neutral && total > 0 && <div className="mstats-bar"><span style={{ width: `${pct}%` }} /></div>}
       </div>
     );
@@ -119,6 +151,19 @@ export function MatchStatisticsModal({ match, onClose }) {
                     {renderValue(row, 'b')}
                   </div>
                 ))}
+              </div>
+
+              <div className="mstats-section">
+                <h4>{t('matchStats.highScores')}</h4>
+                <div className="mstats-compare">
+                  {bandRows.map((row) => (
+                    <div key={row.key} className="mstats-row">
+                      {renderValue(row, 'a')}
+                      <div className="mstats-row__label">{row.label}</div>
+                      {renderValue(row, 'b')}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {legs.length > 0 && (

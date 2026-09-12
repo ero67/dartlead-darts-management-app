@@ -408,8 +408,6 @@
     "playoffMatchUpdated": "Playoff match updated successfully",
     "failedToUpdatePlayoffMatch": "Failed to update playoff match",
     "statistics": "Statistics",
-    "most180s": "Most 180s",
-    "hit180s": "180s",
     "bestAverages": "Best Match Averages",
     "bestCheckouts": "Best Checkouts",
     "fewestDarts": "Legs with Fewest Darts",
@@ -470,7 +468,9 @@
     "tbd": "TBD",
     "plusThirdPlace": "+ 3rd Place",
     "tvMode": "TV mode",
-    "tvModeHint": "Open the wall display for this tournament in a new tab"
+    "tvModeHint": "Open the wall display for this tournament in a new tab",
+    "highScores": "High scores",
+    "highScoresLegacyNote": "Matches played before high scores were recorded only count their 180s."
   },
   "summary": {
     "tab": "Summary",
@@ -1041,7 +1041,6 @@
     "title": "Match statistics",
     "average": "3-dart average",
     "legs": "Legs",
-    "oneEighties": "180s",
     "highestCheckout": "Highest checkout",
     "checkoutCount": "Checkouts",
     "bestLeg": "Best leg (darts)",
@@ -1055,7 +1054,9 @@
     "noCheckouts": "—",
     "winner": "Winner",
     "noDetails": "No detailed statistics were recorded for this match.",
-    "open": "Statistics"
+    "open": "Statistics",
+    "checkoutPercent": "Checkout %",
+    "highScores": "High scores"
   },
   "practice": {
     "title": "Practice",
@@ -1102,7 +1103,9 @@
       "opponentName": "Second player's name",
       "firstTo": "First to",
       "starter": "Who starts",
-      "you": "You"
+      "you": "You",
+      "subtitle": "Legs against the board, or against a second player or a bot.",
+      "opponentHint": "Solo, someone else on this device, or a bot."
     },
     "bot": {
       "name": "Bot level {{level}}",
@@ -1172,7 +1175,10 @@
         "title": "New checkout session",
         "range": "Finishes",
         "attempts": "Attempts",
-        "note": "Dart by dart only: the trainer needs to know whether the last dart was a double."
+        "note": "Type your three-dart total. Land exactly on the target and you pick how many darts it took — and whether it was a double or a bust.",
+        "subtitle": "Random finishes, one three-dart visit each.",
+        "rangeHint": "Which finishes the trainer draws from.",
+        "attemptsHint": "How many finishes before the summary."
       },
       "ranges": {
         "doubles": "Doubles only",
@@ -1197,21 +1203,27 @@
       "stats": {
         "hits": "Hits",
         "hitRate": "Hit rate",
-        "doubleRate": "Doubles hit",
         "avgDartsPerHit": "Darts per finish",
         "bestStreak": "Best streak",
         "hardest": "Hardest finishes"
-      }
+      },
+      "lastAttempt": "Last: {{target}}",
+      "dialogHit": "Counts as a finish",
+      "dialogBust": "No double — attempt missed"
     },
     "oneTwentyOne": {
-      "rules": "Check out the target within three visits (nine darts). Make it and the target goes up by one; miss and it drops by one.",
+      "rules": "Check out the target within three visits (nine darts). Make it and the target goes up by one; miss and it drops by one — never below the target you started on.",
       "setup": {
         "title": "New 121 session",
         "startTarget": "Starting target",
         "rounds": "Rounds",
         "onFail": "After a miss",
         "onFail_down": "Drop one",
-        "onFail_stay": "Stay"
+        "onFail_stay": "Stay",
+        "subtitle": "Nine darts at the target, then it moves.",
+        "startTargetHint": "Also the floor: the target never drops below it.",
+        "roundsHint": "How many rounds before the summary.",
+        "onFailHint": "Dropping one never goes below {{target}}."
       },
       "round": "Round {{current}}",
       "roundOf": "Round {{current}} / {{total}}",
@@ -1239,7 +1251,9 @@
       "setup": {
         "title": "New Around the Clock",
         "mode": "Segments",
-        "includeBull": "Finish on the bull"
+        "includeBull": "Finish on the bull",
+        "subtitle": "1 to 20 in order, against the clock.",
+        "modeHint": "Which segment counts as a hit."
       },
       "modes": {
         "singles": "Singles",

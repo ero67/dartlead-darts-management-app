@@ -1,7 +1,9 @@
-// Checkout trainer: random finishes, three darts per attempt. Pure state
-// machine, dart-by-dart only (a turn total cannot tell a double from a bust).
+// Checkout trainer: random finishes, one visit (three darts) per attempt.
+// Pure state machine. Scoring is by 3-dart total: a total that lands exactly
+// on the target is confirmed through the checkout dialog, which is where the
+// darts used and the double/bust answer come from.
 
-import { isFinishable, isBustScore } from './x01Engine.js';
+import { isFinishable, isBustScore, isOneDartOut } from './x01Engine.js';
 
 const UNDO_LIMIT = 300;
 
@@ -14,7 +16,7 @@ export const CHECKOUT_RANGES = {
 };
 export const ATTEMPT_OPTIONS = [10, 20, 50, null];
 
-export const isOneDartOut = (n) => n === 50 || (n % 2 === 0 && n >= 2 && n <= 40);
+export { isOneDartOut };
 
 export const finishableTargets = ({ min, max, oneDartOnly = false }) => {
   const out = [];
@@ -59,23 +61,9 @@ const pushUndo = (state) => {
 const remainingOf = (current) => current.target - current.darts.reduce((sum, d) => sum + d.value, 0);
 export const liveRemaining = (state) => remainingOf(state.current);
 
-// Returns { state, outcome } with outcome 'dart' | 'hit' | 'miss' | 'bust' | null.
-export const applyDart = (state, dart, rng) => {
-  if (!dart || state.finishedAt || state.current.darts.length >= 3) return { state, outcome: null };
-  const before = remainingOf(state.current);
-  const darts = [...state.current.darts, { ...dart, atDouble: isOneDartOut(before) }];
-  const after = before - dart.value;
-
-  let outcome = 'dart';
-  if (isBustScore(after) || (after === 0 && dart.multiplier !== 2)) outcome = 'bust';
-  else if (after === 0) outcome = 'hit';
-  else if (darts.length === 3) outcome = 'miss';
-
-  if (outcome === 'dart') {
-    return { state: { ...state, current: { ...state.current, darts }, undoStack: pushUndo(state) }, outcome };
-  }
-
-  const attempt = { target: state.current.target, darts, hit: outcome === 'hit', bust: outcome === 'bust', dartsUsed: darts.length };
+// Close the attempt on the given outcome and draw the next target.
+const settleAttempt = (state, { darts, dartsUsed, outcome }, rng) => {
+  const attempt = { target: state.current.target, darts, hit: outcome === 'hit', bust: outcome === 'bust', dartsUsed };
   const attempts = [...state.attempts, attempt];
   const complete = state.settings.attemptsTarget !== null && attempts.length >= state.settings.attemptsTarget;
   return {
@@ -88,6 +76,32 @@ export const applyDart = (state, dart, rng) => {
     },
     outcome
   };
+};
+
+// 3-dart total input, one attempt per total. `dartsUsed` and `finishedOnDouble`
+// come from the checkout dialog and only matter when the total lands exactly on
+// the target. Returns { state, outcome } with outcome 'hit' | 'miss' | 'bust'
+// | null.
+export const applyVisitTotal = (state, total, { dartsUsed = 3, finishedOnDouble = false } = {}, rng) => {
+  if (state.finishedAt) return { state, outcome: null };
+  if (!Number.isInteger(total) || total < 0 || total > 180) return { state, outcome: null };
+  if (![1, 2, 3].includes(dartsUsed)) return { state, outcome: null };
+
+  const before = remainingOf(state.current);
+  const after = before - total;
+  const entry = { value: total, label: String(total), number: null, multiplier: finishedOnDouble ? 2 : 1, isTurnTotal: true };
+
+  let outcome = 'miss';
+  if (isBustScore(after) || (after === 0 && !finishedOnDouble)) outcome = 'bust';
+  else if (after === 0) outcome = 'hit';
+
+  return settleAttempt(state, {
+    darts: [...state.current.darts, entry],
+    // Landing on the target opens the checkout dialog, so the darts are known;
+    // any other total is a full three-dart visit.
+    dartsUsed: state.current.darts.length + (after === 0 ? dartsUsed : 3),
+    outcome
+  }, rng);
 };
 
 export const canUndo = (state) => state.undoStack.length > 0;
@@ -105,10 +119,7 @@ const round1 = (n) => Math.round(n * 10) / 10;
 export const computeStats = (state) => {
   const { attempts } = state;
   const hits = attempts.filter(a => a.hit).length;
-  const allDarts = attempts.flatMap(a => a.darts);
-  const dartsAtDouble = allDarts.filter(d => d.atDouble).length;
-  const doublesHit = attempts.filter(a => a.hit).length; // every hit is a dart at a double that landed
-  const totalDarts = allDarts.length + state.current.darts.length;
+  const totalDarts = attempts.reduce((sum, a) => sum + a.dartsUsed, 0) + state.current.darts.length;
   let streak = 0, bestStreak = 0;
   for (const a of attempts) { streak = a.hit ? streak + 1 : 0; if (streak > bestStreak) bestStreak = streak; }
   const missesByTarget = {};
@@ -119,9 +130,6 @@ export const computeStats = (state) => {
     attempts: attempts.length,
     hits,
     hitPercent: attempts.length ? round1((hits / attempts.length) * 100) : null,
-    dartsAtDouble,
-    doublesHit,
-    doublePercent: dartsAtDouble ? round1((doublesHit / dartsAtDouble) * 100) : null,
     avgDartsPerHit: hits ? round1(dartsOnHits / hits) : null,
     bestStreak,
     totalDarts,

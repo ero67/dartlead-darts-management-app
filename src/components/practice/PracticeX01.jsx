@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Flag, RotateCcw, Settings2, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Flag, Keyboard, RotateCcw, Settings2, Target, Trophy, Users } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { DartKeypad } from '../scoring/DartKeypad';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
+import { PracticeSetup, PracticeField, PracticeOptionCards } from './PracticeShared';
 import {
   createSoloX01, applyDart, applyVisitTotal, undo, canUndo, dartFromInput,
   liveRemaining, lastVisitLabels, computeStats, STARTING_SCORES
@@ -19,7 +20,7 @@ import {
   loadActiveSession, saveActiveSession, clearActiveSession, appendHistory,
   newSessionId, loadGameSettings, saveGameSettings
 } from '../../lib/practiceStorage';
-import { formatDuration, pluralSuffix } from '../../lib/practiceGames';
+import { describeSession, formatDuration, pluralSuffix } from '../../lib/practiceGames';
 import { getUserDisplayName } from '../../utils/userDisplayName';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
@@ -28,7 +29,7 @@ import checkoutData from '../../data/checkouts.json';
 import './Practice.css';
 
 const GAME = 'x01';
-const LEG_OPTIONS = [1, 3, 5, 10, null];
+const LEG_OPTIONS = [1, 2, 3, 4, 5, 10, null];
 const DEFAULT_SETTINGS = { startingScore: 501, legsTarget: 3, scoringMode: 'dart', opponent: null, starter: 0 };
 const FLASH_MS = 900;
 const BOT_DART_MS = 700;
@@ -395,11 +396,18 @@ export function PracticeX01() {
             <p>{t('practice.games.x01.desc')}</p>
           </div>
         </div>
-        <div className="practice-setup">
-          <h2>{t('practice.setup.title')}</h2>
-
-          <div className="practice-field">
-            <label>{t('practice.setup.startingScore')}</label>
+        <PracticeSetup
+          title={t('practice.setup.title')}
+          subtitle={t('practice.setup.subtitle')}
+          recap={describeSession({ game: GAME, settings }, t)}
+          onStart={handleStart}
+        >
+          <PracticeField
+            icon={Target}
+            tone="green"
+            label={t('practice.setup.startingScore')}
+            value={settings.startingScore}
+          >
             <div className="practice-chips">
               {STARTING_SCORES.map(score => (
                 <button
@@ -425,10 +433,21 @@ export function PracticeX01() {
                 }}
               />
             </div>
-          </div>
+          </PracticeField>
 
-          <div className="practice-field">
-            <label>{t('practice.setup.opponent')}</label>
+          <PracticeField
+            icon={Users}
+            tone="violet"
+            label={t('practice.setup.opponent')}
+            hint={t('practice.setup.opponentHint')}
+            value={
+              settings.opponent?.kind === 'bot'
+                ? `${t('practice.setup.opponentBot')} ${settings.opponent.level}`
+                : settings.opponent?.kind === 'human'
+                  ? (settings.opponent.name || t('practice.setup.opponentPlayer'))
+                  : t('practice.setup.opponentSolo')
+            }
+          >
             <div className="practice-chips">
               <button
                 type="button"
@@ -481,10 +500,14 @@ export function PracticeX01() {
                 onChange={(e) => setSettings(s => ({ ...s, opponent: { kind: 'human', name: e.target.value } }))}
               />
             )}
-          </div>
+          </PracticeField>
 
-          <div className="practice-field">
-            <label>{hasOpponent ? t('practice.setup.firstTo') : t('practice.setup.legs')}</label>
+          <PracticeField
+            icon={Trophy}
+            tone="blue"
+            label={hasOpponent ? t('practice.setup.firstTo') : t('practice.setup.legs')}
+            value={settings.legsTarget === null ? t('practice.setup.unlimited') : settings.legsTarget}
+          >
             <div className="practice-chips">
               {legOptions.map(legs => (
                 <button
@@ -497,11 +520,15 @@ export function PracticeX01() {
                 </button>
               ))}
             </div>
-          </div>
+          </PracticeField>
 
           {hasOpponent && (
-            <div className="practice-field">
-              <label>{t('practice.setup.starter')}</label>
+            <PracticeField
+              icon={Flag}
+              tone="rose"
+              label={t('practice.setup.starter')}
+              value={settings.starter === 0 ? myName : opponentName}
+            >
               <div className="practice-chips">
                 <button
                   type="button"
@@ -518,37 +545,25 @@ export function PracticeX01() {
                   {opponentName}
                 </button>
               </div>
-            </div>
+            </PracticeField>
           )}
 
-          <div className="practice-field">
-            <label>{t('practice.setup.scoringMode')}</label>
-            <div className="practice-mode-cards">
-              <button
-                type="button"
-                className={`practice-mode-card ${settings.scoringMode === 'dart' ? 'active' : ''}`}
-                onClick={() => setSettings(s => ({ ...s, scoringMode: 'dart' }))}
-              >
-                <strong>{t('practice.setup.scoringDart')}</strong>
-                <span>{t('practice.setup.scoringDartHint')}</span>
-              </button>
-              <button
-                type="button"
-                className={`practice-mode-card ${settings.scoringMode === 'turnTotal' ? 'active' : ''}`}
-                onClick={() => setSettings(s => ({ ...s, scoringMode: 'turnTotal' }))}
-              >
-                <strong>{t('practice.setup.scoringTurnTotal')}</strong>
-                <span>{t('practice.setup.scoringTurnTotalHint')}</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="practice-setup-actions">
-            <button type="button" className="create-tournament-btn" onClick={handleStart}>
-              {t('practice.start')}
-            </button>
-          </div>
-        </div>
+          <PracticeField
+            icon={Keyboard}
+            tone="amber"
+            label={t('practice.setup.scoringMode')}
+            value={t(settings.scoringMode === 'turnTotal' ? 'practice.setup.scoringTurnTotal' : 'practice.setup.scoringDart')}
+          >
+            <PracticeOptionCards
+              options={[
+                { value: 'dart', label: t('practice.setup.scoringDart'), hint: t('practice.setup.scoringDartHint') },
+                { value: 'turnTotal', label: t('practice.setup.scoringTurnTotal'), hint: t('practice.setup.scoringTurnTotalHint') }
+              ]}
+              value={settings.scoringMode}
+              onChange={(scoringMode) => setSettings(s => ({ ...s, scoringMode }))}
+            />
+          </PracticeField>
+        </PracticeSetup>
       </div>
     );
   }

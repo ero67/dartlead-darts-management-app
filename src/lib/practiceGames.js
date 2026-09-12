@@ -55,7 +55,7 @@ export const sessionHighlights = (entry, t) => {
       return [
         [t('practice.checkout.stats.hitRate'), pct(s.hitPercent, t)],
         [t('practice.checkout.stats.hits'), `${s.hits ?? 0}/${s.attempts ?? 0}`],
-        [t('practice.checkout.stats.doubleRate'), pct(s.doublePercent, t)],
+        [t('practice.checkout.stats.avgDartsPerHit'), s.avgDartsPerHit ?? t('practice.noStats')],
         [t('practice.stats.darts'), s.totalDarts ?? 0]
       ];
     case 'oneTwentyOne':

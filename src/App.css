@@ -3670,6 +3670,14 @@ body {
   max-width: 100%;
 }
 
+/* Scoreboard + last throws + averages as one block, so the layout can put
+   them above the keypad (portrait) or beside it (landscape). */
+.match-info-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .player-header {
   margin-bottom: 0.25rem;
 }
@@ -5588,6 +5596,35 @@ body {
   transition: color 0.3s ease;
 }
 
+/* High-score leaderboard: a column per band (80+, 95+, 133+, 170+, 180).
+   Narrower than the other boards, and it scrolls sideways on a phone. */
+.leaderboard-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.leaderboard--bands {
+  min-width: 26rem;
+}
+.leaderboard--bands .leaderboard-header,
+.leaderboard--bands .leaderboard-row {
+  grid-template-columns: 44px minmax(90px, 1fr) repeat(5, minmax(2.4rem, 3rem));
+  gap: 0.4rem;
+}
+.leaderboard--bands .band {
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.leaderboard-header .band {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.stats-note {
+  margin: 0.6rem 0 0;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+}
+
 .no-stats {
   text-align: center;
   color: var(--text-tertiary);
@@ -5651,6 +5688,13 @@ body {
     height: 28px;
     font-size: 0.8rem;
   }
+
+  /* The band board keeps every column and scrolls sideways instead. */
+  .leaderboard--bands .leaderboard-header,
+  .leaderboard--bands .leaderboard-row {
+    grid-template-columns: 30px minmax(80px, 1fr) repeat(5, minmax(2rem, 2.6rem)) !important;
+    gap: 0.35rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -5667,6 +5711,21 @@ body {
 
   .leaderboard-row {
     padding: 0.5rem;
+  }
+
+  /* Fit all five bands on a phone rather than hiding 180 behind a scroll. */
+  .leaderboard--bands {
+    min-width: 0;
+  }
+
+  .leaderboard--bands .leaderboard-header,
+  .leaderboard--bands .leaderboard-row {
+    grid-template-columns: 24px minmax(48px, 1fr) repeat(5, 1.9rem) !important;
+    gap: 0.3rem;
+  }
+
+  .leaderboard--bands .band {
+    font-size: 0.78rem;
   }
 
   .leaderboard-row .position {
@@ -10620,6 +10679,13 @@ a.tv-mode-btn { text-decoration: none; }
   color: var(--text-primary);
 }
 .mstats-row__value.right { align-items: flex-end; text-align: right; }
+.mstats-row__sub {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
 .mstats-row__value.better { color: var(--accent-primary-strong); }
 .mstats-bar {
   height: 4px;
@@ -12752,64 +12818,76 @@ a.tv-mode-btn { text-decoration: none; }
     overflow: hidden;
   }
 
-  .match-interface.mobile-optimized > .match-scoreboard,
-  .match-interface.mobile-optimized > .match-stats-section,
-  .match-interface.mobile-optimized > .match-avg-section,
-  .match-interface.mobile-optimized > .bullup-offer {
+  .match-interface.mobile-optimized > .match-info-panel {
     flex: 0 0 auto;
+    min-height: 0;
   }
 
   .match-interface.mobile-optimized > .dart-board {
     flex: 1 1 auto;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
     /* keeps buttons from becoming absurd on very tall screens */
     max-height: 860px;
   }
 
-  /* dart-by-dart: rows share the remaining height */
-  .match-interface.mobile-optimized .dart-numbers {
-    flex: 1 1 auto;
+  /* Keypad sizing below is shared with the practice games: both screens give
+     the keypad a .dart-board with a fixed slice of the viewport to fill.
+     dart-by-dart: the three rows share that height in proportion (5 rows of
+     numbers : mode : undo), so Double/Triple stay about as tall as one row of
+     numbers instead of the thin strip they were, and undo - the one button
+     nobody wants to hit by accident - stays the shortest. */
+  .dart-board {
+    display: flex;
+    flex-direction: column;
+  }
+  .dart-board .dart-numbers {
+    flex: 5 1 0;
     min-height: 0;
     /* five rows of 1-20 + bull; ~100px buttons on a portrait tablet is plenty */
     max-height: 520px;
     grid-auto-rows: minmax(44px, 1fr);
   }
-  .match-interface.mobile-optimized .dart-numbers .dart-btn {
+  .dart-board .dart-numbers .dart-btn {
     min-height: 44px;
     height: auto;
-    font-size: clamp(1.15rem, 5.5vmin, 2rem);
+    font-size: clamp(1.1rem, 5vmin, 1.9rem);
   }
-  .match-interface.mobile-optimized .mode-buttons-row,
-  .match-interface.mobile-optimized .remove-last-row {
-    flex: 0 0 auto;
+  .dart-board .mode-buttons-row {
+    flex: 1.2 1 0;
+    min-height: 52px;
+    max-height: 124px;
     margin-top: 0;
   }
-  .match-interface.mobile-optimized .mode-buttons-row .mode-btn-inline,
-  .match-interface.mobile-optimized .remove-last-row .remove-last-btn {
-    min-height: 48px;
-    height: clamp(48px, 7vmin, 64px);
+  .dart-board .remove-last-row {
+    flex: 0.5 1 0;
+    min-height: 40px;
+    max-height: 64px;
+    margin-top: 0;
+  }
+  .dart-board .mode-buttons-row .mode-btn-inline,
+  .dart-board .remove-last-row .remove-last-btn {
+    min-height: 0;
+    height: auto;
     font-size: clamp(1rem, 4vmin, 1.4rem);
   }
 
   /* sum of 3 darts: same idea, the number pad fills the space */
-  .match-interface.mobile-optimized .turn-total-container {
+  .dart-board .turn-total-container {
     flex: 1 1 auto;
     min-height: 0;
     padding: 0.35rem;
   }
-  .match-interface.mobile-optimized .turn-total-display { flex: 0 0 auto; }
-  .match-interface.mobile-optimized .turn-total-keypad {
+  .dart-board .turn-total-display { flex: 0 0 auto; }
+  .dart-board .turn-total-keypad {
     flex: 1 1 auto;
     min-height: 0;
     grid-auto-rows: minmax(44px, 1fr);
   }
-  .match-interface.mobile-optimized .turn-total-keypad .dart-btn {
+  .dart-board .turn-total-keypad .dart-btn {
     min-height: 44px;
     font-size: clamp(1.2rem, 5vmin, 2.2rem);
   }
-  .match-interface.mobile-optimized .turn-total-keypad .turn-total-ok {
+  .dart-board .turn-total-keypad .turn-total-ok {
     min-height: 52px;
     margin-top: 0;
   }
@@ -12820,8 +12898,181 @@ a.tv-mode-btn { text-decoration: none; }
   .match-interface.mobile-optimized .match-scoreboard--compact .current-score { font-size: 2.6rem; }
   .match-interface.mobile-optimized .match-stats-section,
   .match-interface.mobile-optimized .match-avg-section { padding: 0.15rem 0.25rem; }
-  .match-interface.mobile-optimized .turn-total-hint { display: none; }
-  .match-interface.mobile-optimized .turn-total-value { font-size: 1.6rem; }
+  .dart-board .turn-total-hint { display: none; }
+  .dart-board .turn-total-value { font-size: 1.6rem; }
+}
+
+/* ==========================================================================
+   Phone held sideways: scores on the left, numbers on the right.
+   Stacked the way portrait does it, the keypad falls below the fold of a
+   ~350px tall viewport and has to be scrolled to. Side by side nothing
+   scrolls: the two player cards fill the left column, the keypad the right.
+   Height-capped so a tablet in landscape keeps the roomier stacked layout.
+   ========================================================================== */
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 600px) {
+  .match-interface.mobile-optimized {
+    flex-direction: row;
+    gap: 0.3rem;
+    /* Sit flush under the fixed 60px header: the 20px gap .app-main leaves
+       below it is dead space on a screen this short. Done with a negative
+       margin rather than by changing that padding, so the height below still
+       adds up where :has() is not supported. */
+    margin-top: -20px;
+    height: calc(100dvh - 60px - var(--safe-area-inset-top, 0px) - var(--safe-area-inset-bottom, 0px));
+  }
+
+  .match-interface.mobile-optimized > .match-info-panel {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* One card per player, stacked, each filling half the column */
+  .match-interface.mobile-optimized .match-scoreboard--compact {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(0, 1fr);
+    /* the base grid pins cards to the top of their row; here they share the
+       column height evenly instead */
+    align-items: stretch;
+    gap: 0.3rem;
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .match-interface.mobile-optimized .match-scoreboard--compact .player-score {
+    /* .match-scoreboard .player-score pins cards to the top as blocks; a
+       stretched flex column is what fills half the sidebar here */
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    /* a later generic .player-score rule centres (and so shrink-wraps) the
+       rows inside the card, which truncates the name */
+    align-items: stretch;
+    justify-content: center;
+    padding: 0.3rem 0.6rem;
+    border-radius: 10px;
+  }
+  .match-interface.mobile-optimized .match-scoreboard--compact .player-header {
+    margin-bottom: 0;
+  }
+  .match-interface.mobile-optimized .match-scoreboard--compact .current-score {
+    font-size: clamp(2rem, 9vh, 3.2rem);
+    margin: 0;
+  }
+  .match-interface.mobile-optimized .match-scoreboard--compact .legs-won {
+    font-size: 1.5rem;
+    padding: 0.1rem 0.4rem;
+  }
+
+  /* Each card carries its own throws and average here, which is what the two
+     separate rows under the scoreboard show in portrait - so those go. */
+  .match-interface.mobile-optimized .match-scoreboard--compact .last-throws,
+  .match-interface.mobile-optimized .match-scoreboard--compact .player-stats-row {
+    display: flex;
+    margin: 0.15rem 0 0;
+  }
+  .match-interface.mobile-optimized .match-scoreboard--compact .player-stats-row {
+    font-size: 0.7rem;
+    gap: 0.5rem;
+    /* the card turns orange (throwing) or red (bust); the muted grey this
+       row inherits is unreadable on both */
+    color: inherit;
+    opacity: 0.85;
+  }
+  .match-interface.mobile-optimized .match-stats-section,
+  .match-interface.mobile-optimized .match-avg-section {
+    display: none;
+  }
+  .match-interface.mobile-optimized .bullup-offer {
+    margin: 0.3rem 0 0;
+    padding: 0.3rem 0.5rem;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .match-interface.mobile-optimized > .dart-board {
+    flex: 1.8 1 0;
+    min-width: 0;
+    max-height: none;
+  }
+
+  /* Three rows of eight: the column is wider than it is tall, so the buttons
+     come out square-ish rather than the tall thin strips 5 columns would give. */
+  .dart-board .dart-numbers {
+    flex: 3 1 0;
+    grid-template-columns: repeat(8, 1fr);
+    grid-auto-rows: minmax(34px, 1fr);
+    max-height: none;
+  }
+  .dart-board .dart-numbers .dart-btn {
+    min-height: 34px;
+    font-size: clamp(0.95rem, 4.5vh, 1.6rem);
+  }
+  .dart-board .mode-buttons-row {
+    flex: 1 1 0;
+    min-height: 40px;
+    max-height: none;
+  }
+  .dart-board .remove-last-row {
+    flex: 0.45 1 0;
+    min-height: 32px;
+  }
+  .dart-board .mode-buttons-row .mode-btn-inline,
+  .dart-board .remove-last-row .remove-last-btn {
+    font-size: clamp(0.85rem, 3.5vh, 1.25rem);
+  }
+
+  /* 3-dart total: the pad is only three columns, so cap it instead of
+     stretching each key across half the screen. */
+  .dart-board .turn-total-container {
+    padding: 0.2rem;
+    gap: 0.3rem;
+  }
+  /* The readout is chunky for a screen this short and the keys need every
+     pixel it gives up. */
+  .dart-board .turn-total-display {
+    padding: 0.3rem 0.5rem;
+  }
+  .dart-board .turn-total-label {
+    font-size: 0.72rem;
+  }
+  .dart-board .turn-total-undo {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.72rem;
+  }
+  .dart-board .turn-total-value {
+    font-size: clamp(1.1rem, 5.5vh, 1.6rem);
+  }
+  .dart-board .turn-total-keypad {
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+    gap: 0.25rem;
+    grid-auto-rows: minmax(32px, 1fr);
+  }
+  .dart-board .turn-total-keypad .dart-btn {
+    min-height: 32px;
+    font-size: clamp(1rem, 4.5vh, 1.8rem);
+  }
+  .dart-board .turn-total-keypad .turn-total-ok {
+    min-height: 40px;
+  }
+}
+
+/* Very small phones in landscape (~320px tall): the 3-dart pad is four rows
+   plus OK, which does not fit at the minimums above. */
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 380px) {
+  .dart-board .turn-total-keypad {
+    grid-auto-rows: minmax(26px, 1fr);
+  }
+  .dart-board .turn-total-keypad .dart-btn {
+    min-height: 26px;
+  }
+  .dart-board .turn-total-keypad .turn-total-ok {
+    min-height: 34px;
+  }
+  .dart-board .turn-total-undo {
+    padding: 0.2rem 0.4rem;
+  }
 }
 
 /* League / tournament tab bar on narrow screens (#9): one scrollable row

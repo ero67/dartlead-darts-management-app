@@ -12,7 +12,7 @@
 
 import { createSoloX01, applyDart, applyVisitTotal, abandonLeg, computeStats } from './x01Engine.js';
 
-export const MATCH_LEG_OPTIONS = [1, 3, 5, 7];
+export const MATCH_LEG_OPTIONS = [1, 2, 3, 4, 5, 7, 10];
 const UNDO_LIMIT = 300;
 
 const stripStack = (playerState) => ({ ...playerState, undoStack: [] });

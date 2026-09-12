@@ -2212,10 +2212,23 @@ export const tournamentService = {
   // boards finishing at the same time can no longer overwrite each other's
   // next-round slot. Returns { success, playoffs, status } on success.
   async completePlayoffMatch(tournamentId, matchId, matchResult) {
+    // The RPC copies this result into the bracket (tournaments.playoffs), which
+    // the app loads on every tournament view. The bracket only shows the
+    // outcome, so leave the per-visit scores out of it — they belong to the
+    // match row (matches.result), which is where the statistics read them.
+    const p_result = { ...matchResult };
+    for (const key of ['player1Stats', 'player2Stats']) {
+      const stats = p_result[key];
+      if (stats && Array.isArray(stats.visitScores)) {
+        // eslint-disable-next-line no-unused-vars
+        const { visitScores, ...rest } = stats;
+        p_result[key] = rest;
+      }
+    }
     const { data, error } = await supabase.rpc('complete_playoff_match', {
       t_id: tournamentId,
       m_id: matchId,
-      p_result: matchResult
+      p_result
     });
     if (error) throw error;
     if (!data?.success) {
@@ -2936,6 +2949,11 @@ export const matchService = {
             totalDarts: matchResult.player1Stats?.totalDarts || 0,
             average: matchResult.player1Stats?.average || 0,
             oneEighties: matchResult.player1Stats?.oneEighties || 0,
+            // Per-visit scores feed the high-score bands; doubleAttempts is the
+            // checkout-percentage denominator (see utils/dartStats).
+            visitScores: matchResult.player1Stats?.visitScores || [],
+            doubleAttempts: matchResult.player1Stats?.doubleAttempts || 0,
+            checkoutBasis: matchResult.player1Stats?.checkoutBasis || null,
             legAverages: matchResult.player1Stats?.legAverages || [],
             checkouts: matchResult.player1Stats?.checkouts || [],
             legs: matchResult.player1Stats?.legs || []
@@ -2945,6 +2963,11 @@ export const matchService = {
             totalDarts: matchResult.player2Stats?.totalDarts || 0,
             average: matchResult.player2Stats?.average || 0,
             oneEighties: matchResult.player2Stats?.oneEighties || 0,
+            // Per-visit scores feed the high-score bands; doubleAttempts is the
+            // checkout-percentage denominator (see utils/dartStats).
+            visitScores: matchResult.player2Stats?.visitScores || [],
+            doubleAttempts: matchResult.player2Stats?.doubleAttempts || 0,
+            checkoutBasis: matchResult.player2Stats?.checkoutBasis || null,
             legAverages: matchResult.player2Stats?.legAverages || [],
             checkouts: matchResult.player2Stats?.checkouts || [],
             legs: matchResult.player2Stats?.legs || []

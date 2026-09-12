@@ -408,8 +408,6 @@
     "playoffMatchUpdated": "Playoff zápas bol úspešne aktualizovaný",
     "failedToUpdatePlayoffMatch": "Nepodarilo sa aktualizovať playoff zápas",
     "statistics": "Štatistiky",
-    "most180s": "Najviac 180",
-    "hit180s": "180",
     "bestAverages": "Najlepšie Priemery v Zápasoch",
     "bestCheckouts": "Najlepšie Checkouty",
     "fewestDarts": "Legy s Najmenším počtom Šípok",
@@ -470,7 +468,9 @@
     "tbd": "Neurčené",
     "plusThirdPlace": "+ zápas o 3. miesto",
     "tvMode": "TV režim",
-    "tvModeHint": "Otvoriť zobrazenie na obrazovku pre tento turnaj v novej karte"
+    "tvModeHint": "Otvoriť zobrazenie na obrazovku pre tento turnaj v novej karte",
+    "highScores": "Vysoké nahádzania",
+    "highScoresLegacyNote": "Zápasy odohrané pred zavedením tejto štatistiky majú započítané len 180."
   },
   "summary": {
     "tab": "Súhrn",
@@ -1041,7 +1041,6 @@
     "title": "Štatistika zápasu",
     "average": "Priemer na 3 šípky",
     "legs": "Legy",
-    "oneEighties": "180",
     "highestCheckout": "Najvyšší checkout",
     "checkoutCount": "Checkouty",
     "bestLeg": "Najlepší leg (šípky)",
@@ -1055,7 +1054,9 @@
     "noCheckouts": "—",
     "winner": "Víťaz",
     "noDetails": "Pre tento zápas neboli zaznamenané podrobné štatistiky.",
-    "open": "Štatistika"
+    "open": "Štatistika",
+    "checkoutPercent": "Úspešnosť zakončenia",
+    "highScores": "Vysoké nahádzania"
   },
   "practice": {
     "title": "Tréning",
@@ -1102,7 +1103,9 @@
       "opponentName": "Meno druhého hráča",
       "firstTo": "Hrá sa na",
       "starter": "Kto začína",
-      "you": "Vy"
+      "you": "Vy",
+      "subtitle": "Legy proti terču, proti druhému hráčovi alebo proti botovi.",
+      "opponentHint": "Sám, druhý hráč na tomto zariadení, alebo bot."
     },
     "bot": {
       "name": "Bot úroveň {{level}}",
@@ -1172,7 +1175,10 @@
         "title": "Nový tréning checkoutov",
         "range": "Zakončenia",
         "attempts": "Pokusy",
-        "note": "Len šípka po šípke: tréner musí vedieť, či bola posledná šípka double."
+        "note": "Zadaj súčet troch šípok. Ak trafíš presne cieľ, vyberieš koľko šípok to trvalo — a či to bol double alebo prehodenie.",
+        "subtitle": "Náhodné zakončenia, jeden náhod (tri šípky) na pokus.",
+        "rangeHint": "Z akých zakončení tréner vyberá.",
+        "attemptsHint": "Koľko zakončení do súhrnu."
       },
       "ranges": {
         "doubles": "Len doubly",
@@ -1197,21 +1203,27 @@
       "stats": {
         "hits": "Zakončenia",
         "hitRate": "Úspešnosť",
-        "doubleRate": "Trafené doubly",
         "avgDartsPerHit": "Šípok na zakončenie",
         "bestStreak": "Najdlhšia séria",
         "hardest": "Najťažšie zakončenia"
-      }
+      },
+      "lastAttempt": "Naposledy: {{target}}",
+      "dialogHit": "Počíta sa ako zakončenie",
+      "dialogBust": "Bez double — pokus neúspešný"
     },
     "oneTwentyOne": {
-      "rules": "Zakonči cieľ do troch náhodov (deväť šípok). Ak sa podarí, cieľ sa zvýši o jeden; ak nie, klesne o jeden.",
+      "rules": "Zakonči cieľ do troch náhodov (deväť šípok). Ak sa podarí, cieľ sa zvýši o jeden; ak nie, klesne o jeden — nikdy nie pod štartovací cieľ.",
       "setup": {
         "title": "Nový tréning 121",
         "startTarget": "Štartovací cieľ",
         "rounds": "Kolá",
         "onFail": "Po neúspechu",
         "onFail_down": "O jeden nižšie",
-        "onFail_stay": "Zostať"
+        "onFail_stay": "Zostať",
+        "subtitle": "Deväť šípok na cieľ, potom sa cieľ posunie.",
+        "startTargetHint": "Zároveň spodná hranica: cieľ nikdy neklesne nižšie.",
+        "roundsHint": "Koľko kôl do súhrnu.",
+        "onFailHint": "Zníženie o jeden nikdy neklesne pod {{target}}."
       },
       "round": "Kolo {{current}}",
       "roundOf": "Kolo {{current}} / {{total}}",
@@ -1239,7 +1251,9 @@
       "setup": {
         "title": "Nové Okolo terča",
         "mode": "Segmenty",
-        "includeBull": "Zakončiť na bull"
+        "includeBull": "Zakončiť na bull",
+        "subtitle": "1 až 20 po poradí, na čas.",
+        "modeHint": "Ktorý segment sa počíta ako zásah."
       },
       "modes": {
         "singles": "Singly",

@@ -17,7 +17,7 @@ import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { ExportMenu } from './ExportMenu';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
-import { isValidLegDartCount } from '../utils/dartStats';
+import { isValidLegDartCount, HIGH_SCORE_BANDS, countHighScores, addHighScores } from '../utils/dartStats';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 
   // Generate unique ID for playoff matches (using crypto.randomUUID for proper UUIDs)
@@ -2311,7 +2311,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const allAverages = [];
     const allCheckouts = [];
     const allLegs = [];
-    const player180s = new Map(); // playerId -> { player, count }
+    // playerId -> { player, bands: { 80: n, 95: n, 133: n, 170: n, 180: n } }
+    const playerHighScores = new Map();
+    let hasLegacyMatches = false;
     const collectLegs = (playerStats, player, opponent, matchId, startingScore) => {
       if (!playerStats?.legs?.length) {
         return false;
@@ -2385,21 +2387,27 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         });
       }
 
-      // 180s (count per player across all matches)
-      const add180s = (player, playerStats) => {
+      // High scores per player across all matches. Matches played before the
+      // per-visit scores were stored only know their 180s — those still count
+      // towards the 180 column, and the note under the table explains the rest.
+      const addHighScoreBands = (player, playerStats) => {
         const playerId = player?.id;
-        if (!playerId) return;
-        const count = Number(playerStats?.oneEighties || 0);
-        if (!Number.isFinite(count) || count <= 0) return;
-        const existing = player180s.get(playerId);
-        if (!existing) {
-          player180s.set(playerId, { player, count });
-        } else {
-          existing.count += count;
+        if (!playerId || !playerStats) return;
+        let entry = playerHighScores.get(playerId);
+        if (!entry) {
+          entry = { player, bands: countHighScores([]) };
+          playerHighScores.set(playerId, entry);
         }
+        if (Array.isArray(playerStats.visitScores) && playerStats.visitScores.length > 0) {
+          addHighScores(entry.bands, countHighScores(playerStats.visitScores));
+          return;
+        }
+        const oneEighties = Number(playerStats.oneEighties) || 0;
+        if (Number(playerStats.totalDarts) > 0) hasLegacyMatches = true;
+        entry.bands[180] += oneEighties;
       };
-      add180s(match.player1, match.result.player1Stats);
-      add180s(match.player2, match.result.player2Stats);
+      addHighScoreBands(match.player1, match.result.player1Stats);
+      addHighScoreBands(match.player2, match.result.player2Stats);
 
       // Best checkouts
       const addCheckoutEntries = (playerStats, player, opponent) => {
@@ -2544,8 +2552,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       .sort((a, b) => a.darts - b.darts)
       .slice(0, 10);
 
-    const most180s = Array.from(player180s.values())
-      .sort((a, b) => b.count - a.count)
+    // Rank on the rarest band first, then downwards.
+    const rankedBands = [...HIGH_SCORE_BANDS].reverse();
+    const highScores = Array.from(playerHighScores.values())
+      .filter(entry => rankedBands.some(band => entry.bands[band] > 0))
+      .sort((a, b) => {
+        for (const band of rankedBands) {
+          if (b.bands[band] !== a.bands[band]) return b.bands[band] - a.bands[band];
+        }
+        return 0;
+      })
       .slice(0, 10);
 
     return (
@@ -2625,24 +2641,33 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           )}
         </div>
 
-        {/* 180s Leaderboard */}
+        {/* High scores (visits of 80+, 95+, 133+, 170+ and 180) */}
         <div className="statistics-section">
-          <h4>{t('management.most180s')}</h4>
-          {most180s.length > 0 ? (
-            <div className="leaderboard">
-              <div className="leaderboard-header">
-                <span>#</span>
-                <span>{t('management.player')}</span>
-                <span>{t('management.hit180s')}</span>
-              </div>
-              {most180s.map((entry, index) => (
-                <div key={`180-${entry.player?.id || index}`} className="leaderboard-row">
-                  <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
-                  <span className="value">{entry.count}</span>
+          <h4>{t('management.highScores')}</h4>
+          {highScores.length > 0 ? (
+            <>
+              <div className="leaderboard-scroll">
+                <div className="leaderboard leaderboard--bands">
+                  <div className="leaderboard-header">
+                    <span>#</span>
+                    <span>{t('management.player')}</span>
+                    {HIGH_SCORE_BANDS.map(band => (
+                      <span key={band} className="band">{band === 180 ? '180' : `${band}+`}</span>
+                    ))}
+                  </div>
+                  {highScores.map((entry, index) => (
+                    <div key={`hs-${entry.player?.id || index}`} className="leaderboard-row">
+                      <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
+                      <span className="player-name">{renderPlayerLink(entry.player)}</span>
+                      {HIGH_SCORE_BANDS.map(band => (
+                        <span key={band} className={`band ${band === 180 ? 'value' : ''}`}>{entry.bands[band]}</span>
+                      ))}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+              {hasLegacyMatches && <p className="stats-note">{t('management.highScoresLegacyNote')}</p>}
+            </>
           ) : (
             <p className="no-stats">{t('management.noStatisticsYet')}</p>
           )}

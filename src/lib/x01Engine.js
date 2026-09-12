@@ -21,6 +21,11 @@ const BOGEY_NUMBERS = new Set([169, 168, 166, 165, 163, 162, 159]);
 export const isFinishable = (remaining) =>
   Number.isInteger(remaining) && remaining >= 2 && remaining <= 170 && !BOGEY_NUMBERS.has(remaining);
 
+// Scores that can be finished with a single dart: any even number up to 40,
+// or the bull. A dart thrown on one of these is a dart at a double.
+export const isOneDartOut = (remaining) =>
+  remaining === 50 || (Number.isInteger(remaining) && remaining % 2 === 0 && remaining >= 2 && remaining <= 40);
+
 // Build a dart entry from a keypad press. Returns null for an impossible dart
 // (there is no triple bull).
 export const dartFromInput = (number, inputMode = 'single') => {

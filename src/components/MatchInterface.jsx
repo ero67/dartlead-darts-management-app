@@ -9,6 +9,7 @@ import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import checkoutData from '../data/checkouts.json';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../hooks/useOnScreenKeypad';
+import { visitCheckoutAttempts } from '../utils/dartStats';
 import { DartKeypad } from './scoring/DartKeypad';
 import { TurnTotalKeypad } from './scoring/TurnTotalKeypad';
 import { parseTurnTotal } from '../lib/turnTotalInput';
@@ -114,6 +115,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
                 p.legDarts = Number.isFinite(p.legDarts) ? p.legDarts : 0;
                 p.legs = Number.isFinite(p.legs) ? p.legs : 0;
                 p.oneEighties = Number.isFinite(p.oneEighties) ? p.oneEighties : 0;
+                p.visitScores = Array.isArray(p.visitScores) ? p.visitScores : [];
+                p.doubleAttempts = Number.isFinite(p.doubleAttempts) ? p.doubleAttempts : 0;
               }
             });
           }
@@ -137,8 +140,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       currentPlayer: null, // null means match hasn't started yet
       matchStarter: null,
       legScores: {
-        player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
-        player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
+        player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] },
+        player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] }
       },
       currentTurn: {
         score: 0,
@@ -162,8 +165,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const [currentPlayer, setCurrentPlayer] = useState(initialState?.currentPlayer !== undefined ? initialState.currentPlayer : null);
   const [matchStarter, setMatchStarter] = useState(initialState?.matchStarter || null);
   const [legScores, setLegScores] = useState(initialState?.legScores || {
-    player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
-    player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
+    player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] },
+    player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] }
   });
   const [currentTurn, setCurrentTurn] = useState(initialState?.currentTurn || {
     score: 0,
@@ -442,8 +445,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         setCurrentPlayer(null);
         setMatchStarter(null);
         setLegScores({
-          player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
-          player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
+          player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] },
+          player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] }
         });
         setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
         setTurnHistory([]);
@@ -723,6 +726,14 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           oneEighties: Math.max(
             0,
             (prev[playerKey].oneEighties || 0) - (turnScore === 180 ? 1 : 0)
+          ),
+          // A bust visit was never added to visitScores, so only drop a scoring one.
+          visitScores: last.turn?.isBust
+            ? (prev[playerKey].visitScores || [])
+            : (prev[playerKey].visitScores || []).slice(0, -1),
+          doubleAttempts: Math.max(
+            0,
+            (prev[playerKey].doubleAttempts || 0) - visitCheckoutAttempts(last.turn?.turnStartScore, last.turn?.scores)
           )
         }
       };
@@ -1003,7 +1014,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             ...prev[`player${currentPlayer + 1}`],
             currentScore: turnStartScore,
             totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + newDarts,
-            legDarts: prev[`player${currentPlayer + 1}`].legDarts + newDarts
+            legDarts: prev[`player${currentPlayer + 1}`].legDarts + newDarts,
+            // A bust scores nothing, but the darts thrown at a double still count.
+            doubleAttempts: (prev[`player${currentPlayer + 1}`].doubleAttempts || 0) + visitCheckoutAttempts(turnStartScore, newScores)
           }
         }));
         // Remove bust visual feedback
@@ -1068,7 +1081,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
               ...prev[`player${currentPlayer + 1}`],
               currentScore: turnStartScore,
               totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + newDarts,
-              legDarts: prev[`player${currentPlayer + 1}`].legDarts + newDarts
+              legDarts: prev[`player${currentPlayer + 1}`].legDarts + newDarts,
+              // A bust scores nothing, but the darts thrown at a double still count.
+              doubleAttempts: (prev[`player${currentPlayer + 1}`].doubleAttempts || 0) + visitCheckoutAttempts(turnStartScore, newScores)
             }
           }));
           // Remove bust visual feedback
@@ -1258,6 +1273,15 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             oneEighties: Math.max(
               0,
               (prev[playerKey].oneEighties || 0) - (visitScore === 180 && !wasBustTurn ? 1 : 0)
+            ),
+            // The whole visit goes back into currentTurn; finishTurn adds the
+            // corrected one again, so take the old one off in full.
+            visitScores: wasBustTurn
+              ? (prev[playerKey].visitScores || [])
+              : (prev[playerKey].visitScores || []).slice(0, -1),
+            doubleAttempts: Math.max(
+              0,
+              (prev[playerKey].doubleAttempts || 0) - visitCheckoutAttempts(lastTurn.turn?.turnStartScore, lastTurn.turn?.scores)
             )
           }
         };
@@ -1304,7 +1328,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           ...prev[`player${currentPlayer + 1}`],
           currentScore: turnStartScore,
           totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + turnData.darts,
-          legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts
+          legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts,
+          // A bust scores nothing, but the darts thrown at a double still count.
+          doubleAttempts: (prev[`player${currentPlayer + 1}`].doubleAttempts || 0) + visitCheckoutAttempts(turnStartScore, turnData.scores)
         }
       }));
       // Record the bust in turn history (score 0, darts counted) so undo can
@@ -1334,7 +1360,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             ...prev[`player${currentPlayer + 1}`],
             currentScore: turnStartScore,
             totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + turnData.darts,
-            legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts
+            legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts,
+            // A bust scores nothing, but the darts thrown at a double still count.
+            doubleAttempts: (prev[`player${currentPlayer + 1}`].doubleAttempts || 0) + visitCheckoutAttempts(turnStartScore, turnData.scores)
           }
         }));
         // Record the bust in turn history so undo targets THIS visit — without
@@ -1406,6 +1434,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             totalScore: prev[winnerKey].totalScore + turnData.score,
             totalDarts: prev[winnerKey].totalDarts + turnData.darts,
             legDarts: 0, // Reset leg darts for new leg
+            visitScores: [...(prev[winnerKey].visitScores || []), turnData.score],
+            doubleAttempts: (prev[winnerKey].doubleAttempts || 0) + visitCheckoutAttempts(turnStartScore, turnData.scores),
             legAverages: newLegAverages,
             legDetails: winnerLegDetails,
             checkouts: [...prev[`player${currentPlayer + 1}`].checkouts, { leg: currentLeg, checkout, darts: turnData.darts, totalDarts: dartsUsed }]
@@ -1474,6 +1504,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             totalScore: legScores[winnerKey].totalScore + turnData.score,
             totalDarts: legScores[winnerKey].totalDarts + turnData.darts,
             legDarts: 0, // Reset leg darts
+            visitScores: [...(legScores[winnerKey].visitScores || []), turnData.score],
+            doubleAttempts: (legScores[winnerKey].doubleAttempts || 0) + visitCheckoutAttempts(turnStartScore, turnData.scores),
             legAverages: newLegAverages,
             legDetails: finalWinnerLegDetails,
             checkouts: [...legScores[winnerKey].checkouts, { leg: currentLeg, checkout, darts: turnData.darts, totalDarts: dartsUsed }]
@@ -1562,7 +1594,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             totalScore: prev[`player${currentPlayer + 1}`].totalScore + turnData.score,
             totalDarts: prev[`player${currentPlayer + 1}`].totalDarts + turnData.darts,
             legDarts: prev[`player${currentPlayer + 1}`].legDarts + turnData.darts,
-            oneEighties: (prev[`player${currentPlayer + 1}`].oneEighties || 0) + (turnData.score === 180 ? 1 : 0)
+            oneEighties: (prev[`player${currentPlayer + 1}`].oneEighties || 0) + (turnData.score === 180 ? 1 : 0),
+            visitScores: [...(prev[`player${currentPlayer + 1}`].visitScores || []), turnData.score],
+            doubleAttempts: (prev[`player${currentPlayer + 1}`].doubleAttempts || 0) + visitCheckoutAttempts(turnStartScore, turnData.scores)
           }
         };
         
@@ -1666,6 +1700,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         totalDarts: finalLegScores.player1.totalDarts,
         average: player1MatchAverage,
         oneEighties: finalLegScores.player1.oneEighties || 0,
+        // Score of every non-bust visit: the high-score bands (80+, 95+, …) are
+        // counted from this, so the bands can change without a data migration.
+        visitScores: finalLegScores.player1.visitScores || [],
+        doubleAttempts: finalLegScores.player1.doubleAttempts || 0,
+        checkoutBasis: scoringMode === 'turnTotal' ? 'visits' : 'darts',
         legAverages: player1LegAverages,
         checkouts: finalLegScores.player1.checkouts,
         legs: finalLegScores.player1.legDetails || []
@@ -1675,6 +1714,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         totalDarts: finalLegScores.player2.totalDarts,
         average: player2MatchAverage,
         oneEighties: finalLegScores.player2.oneEighties || 0,
+        // Score of every non-bust visit: the high-score bands (80+, 95+, …) are
+        // counted from this, so the bands can change without a data migration.
+        visitScores: finalLegScores.player2.visitScores || [],
+        doubleAttempts: finalLegScores.player2.doubleAttempts || 0,
+        checkoutBasis: scoringMode === 'turnTotal' ? 'visits' : 'darts',
         legAverages: player2LegAverages,
         checkouts: finalLegScores.player2.checkouts,
         legs: finalLegScores.player2.legDetails || []
@@ -1819,8 +1863,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         updateMatchToDatabase(match.id, {
           currentLeg: 1,
           legScores: {
-            player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] },
-            player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, legAverages: [], checkouts: [], legDetails: [] }
+            player1: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] },
+            player2: { legs: 0, currentScore: matchSettings.startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] }
           },
           currentPlayer: playerIndex
         });
@@ -1955,74 +1999,6 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           setPendingCheckout(null);
         }}
       />
-      <div className="match-scoreboard match-scoreboard--compact">
-        <div className={`player-score player1 ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
-          <div className="player-header">
-            <div className="player-name">{match.player1?.name || t('match.player1')}</div>
-            <div className="legs-won">{legScores.player1.legs}</div>
-          </div>
-          <div className="current-score">{safeScore(legScores.player1.currentScore, matchSettings.startingScore)}</div>
-          {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))] && (
-            <div className="checkout-suggestion">
-              {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))].join(' → ')}
-            </div>
-          )}
-          {player1LastThrows.length > 0 && (
-            <div className="last-throws">
-              {player1LastThrows.map((throwLabel, idx) => (
-                <span key={idx} className="throw-label">{throwLabel}</span>
-              ))}
-            </div>
-          )}
-          <div className="player-stats-row">
-            <span>{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
-            <span>{t('match.darts')}: {legScores.player1.legDarts}</span>
-          </div>
-        </div>
-
-        <div className="vs-divider mobile-hidden">
-          <span>{t('match.leg')} {currentLeg}</span>
-          <span className="match-settings-text">{t(matchSettings.legsToWin === 1 ? 'tournaments.firstToLeg' : 'tournaments.firstToLegs', { count: matchSettings.legsToWin })}</span>
-        </div>
-
-        <div className={`player-score player2 ${currentPlayer === 1 ? 'active-player' : ''} ${bustingPlayer === 1 ? 'bust' : ''}`}>
-          <div className="player-header">
-            <div className="player-name">{match.player2?.name || t('match.player2')}</div>
-            <div className="legs-won">{legScores.player2.legs}</div>
-          </div>
-          <div className="current-score">{safeScore(legScores.player2.currentScore, matchSettings.startingScore)}</div>
-          {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))] && (
-            <div className="checkout-suggestion">
-              {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))].join(' → ')}
-            </div>
-          )}
-          {player2LastThrows.length > 0 && (
-            <div className="last-throws">
-              {player2LastThrows.map((throwLabel, idx) => (
-                <span key={idx} className="throw-label">{throwLabel}</span>
-              ))}
-            </div>
-          )}
-          <div className="player-stats-row">
-            <span>{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
-            <span>{t('match.darts')}: {legScores.player2.legDarts}</span>
-          </div>
-        </div>
-      </div>
-
-      {!isViewOnly && bothReachedBullupThreshold && !matchComplete && (
-        <div className="bullup-offer">
-          <span className="bullup-offer-text">{t('match.bullup.offer')}</span>
-          <button
-            type="button"
-            className="bullup-offer-btn"
-            onClick={() => setShowBullup(true)}
-          >
-            <Target size={18} />
-            {t('match.bullup.decideButton')}
-          </button>
-        </div>
-      )}
 
       {showBullup && (
         <div className="leg-starter-dialog checkout-modal">
@@ -2058,50 +2034,122 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         </div>
       )}
 
-      {/* Stats Section - Individual darts */}
-      <div className="match-stats-section">
-        <div className={`player-stats-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
-          {player1LastThrows.length > 0 && (
-            <div className="last-throws">
-              {player1LastThrows.map((throwLabel, idx) => (
-                <span key={idx} className="throw-label">{throwLabel}</span>
-              ))}
+      {/* Scores, last throws and averages. Grouped so the landscape
+          layout can put them beside the keypad instead of above it. */}
+      <div className="match-info-panel">
+        <div className="match-scoreboard match-scoreboard--compact">
+          <div className={`player-score player1 ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
+            <div className="player-header">
+              <div className="player-name">{match.player1?.name || t('match.player1')}</div>
+              <div className="legs-won">{legScores.player1.legs}</div>
             </div>
-          )}
+            <div className="current-score">{safeScore(legScores.player1.currentScore, matchSettings.startingScore)}</div>
+            {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))] && (
+              <div className="checkout-suggestion">
+                {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))].join(' → ')}
+              </div>
+            )}
+            {player1LastThrows.length > 0 && (
+              <div className="last-throws">
+                {player1LastThrows.map((throwLabel, idx) => (
+                  <span key={idx} className="throw-label">{throwLabel}</span>
+                ))}
+              </div>
+            )}
+            <div className="player-stats-row">
+              <span>{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
+              <span>{t('match.darts')}: {legScores.player1.legDarts}</span>
+            </div>
+          </div>
+
+          <div className="vs-divider mobile-hidden">
+            <span>{t('match.leg')} {currentLeg}</span>
+            <span className="match-settings-text">{t(matchSettings.legsToWin === 1 ? 'tournaments.firstToLeg' : 'tournaments.firstToLegs', { count: matchSettings.legsToWin })}</span>
+          </div>
+
+          <div className={`player-score player2 ${currentPlayer === 1 ? 'active-player' : ''} ${bustingPlayer === 1 ? 'bust' : ''}`}>
+            <div className="player-header">
+              <div className="player-name">{match.player2?.name || t('match.player2')}</div>
+              <div className="legs-won">{legScores.player2.legs}</div>
+            </div>
+            <div className="current-score">{safeScore(legScores.player2.currentScore, matchSettings.startingScore)}</div>
+            {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))] && (
+              <div className="checkout-suggestion">
+                {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))].join(' → ')}
+              </div>
+            )}
+            {player2LastThrows.length > 0 && (
+              <div className="last-throws">
+                {player2LastThrows.map((throwLabel, idx) => (
+                  <span key={idx} className="throw-label">{throwLabel}</span>
+                ))}
+              </div>
+            )}
+            <div className="player-stats-row">
+              <span>{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
+              <span>{t('match.darts')}: {legScores.player2.legDarts}</span>
+            </div>
+          </div>
         </div>
 
-        <div className="vs-divider mobile-hidden">
-          <span>{t('common.vs')}</span>
+        {!isViewOnly && bothReachedBullupThreshold && !matchComplete && (
+          <div className="bullup-offer">
+            <span className="bullup-offer-text">{t('match.bullup.offer')}</span>
+            <button
+              type="button"
+              className="bullup-offer-btn"
+              onClick={() => setShowBullup(true)}
+            >
+              <Target size={18} />
+              {t('match.bullup.decideButton')}
+            </button>
+          </div>
+        )}
+
+        {/* Stats Section - Individual darts */}
+        <div className="match-stats-section">
+          <div className={`player-stats-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
+            {player1LastThrows.length > 0 && (
+              <div className="last-throws">
+                {player1LastThrows.map((throwLabel, idx) => (
+                  <span key={idx} className="throw-label">{throwLabel}</span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="vs-divider mobile-hidden">
+            <span>{t('common.vs')}</span>
+          </div>
+
+          <div className={`player-stats-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
+            {player2LastThrows.length > 0 && (
+              <div className="last-throws">
+                {player2LastThrows.map((throwLabel, idx) => (
+                  <span key={idx} className="throw-label">{throwLabel}</span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className={`player-stats-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
-          {player2LastThrows.length > 0 && (
-            <div className="last-throws">
-              {player2LastThrows.map((throwLabel, idx) => (
-                <span key={idx} className="throw-label">{throwLabel}</span>
-              ))}
-            </div>
-          )}
+        {/* Average and Darts Section */}
+        <div className="match-avg-section">
+          <div className={`player-avg-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
+            <span className="avg-text">{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
+            <span className="darts-text">{t('match.dartsCount', { count: legScores.player1.legDarts })}</span>
+          </div>
+
+          <div className="vs-divider mobile-hidden">
+            <span>{t('common.vs')}</span>
+          </div>
+
+          <div className={`player-avg-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
+            <span className="avg-text">{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
+            <span className="darts-text">{t('match.dartsCount', { count: legScores.player2.legDarts })}</span>
+          </div>
         </div>
       </div>
-
-      {/* Average and Darts Section */}
-      <div className="match-avg-section">
-        <div className={`player-avg-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
-          <span className="avg-text">{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
-          <span className="darts-text">{t('match.dartsCount', { count: legScores.player1.legDarts })}</span>
-        </div>
-
-        <div className="vs-divider mobile-hidden">
-          <span>{t('common.vs')}</span>
-        </div>
-
-        <div className={`player-avg-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
-          <span className="avg-text">{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
-          <span className="darts-text">{t('match.dartsCount', { count: legScores.player2.legDarts })}</span>
-        </div>
-      </div>
-
 
       <div className="dart-board">
         {isViewOnly ? (

@@ -228,91 +228,216 @@
   gap: 0.4rem;
 }
 
-/* Setup form */
+/* ---- Setup form ---------------------------------------------------------
+   Every game's settings screen is one card of sections. Each section carries
+   its own colour (--tone, set by the .practice-field--* modifier) which the
+   icon, the value pill and the selected chips inside it pick up, so the
+   sections read apart without dividers between them.
+   ------------------------------------------------------------------------ */
 .practice-setup {
-  max-width: 560px;
+  max-width: 620px;
   margin: 0 auto;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 1.25rem 1.25rem 1.5rem;
+  padding: 1.1rem 1.1rem 1.2rem;
+  box-shadow: 0 8px 28px var(--shadow-sm);
 }
-.practice-setup h2 {
-  margin: 0 0 1rem;
+.practice-setup-head {
+  padding-bottom: 0.9rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.practice-setup-head h2 {
+  margin: 0;
   color: var(--text-primary);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  font-weight: 700;
 }
-.practice-field {
-  margin-bottom: 1.1rem;
-}
-.practice-field > label {
-  display: block;
+.practice-setup-head p {
+  margin: 0.25rem 0 0;
   color: var(--text-secondary);
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.88rem;
+}
+.practice-setup-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* Section tones */
+.practice-field {
+  --tone: var(--accent-primary);
+  --tone-rgb: var(--accent-primary-rgb);
+  --tone-ink: #ffffff;
+  border: 1px solid rgba(var(--tone-rgb), 0.2);
+  border-radius: var(--radius-md);
+  background: rgba(var(--tone-rgb), 0.05);
+  padding: 0.7rem 0.8rem 0.8rem;
+}
+.practice-field--blue { --tone: #2563eb; --tone-rgb: 37, 99, 235; }
+.practice-field--violet { --tone: #7c3aed; --tone-rgb: 124, 58, 237; }
+.practice-field--amber { --tone: #b45309; --tone-rgb: 180, 83, 9; }
+.practice-field--cyan { --tone: #0e7490; --tone-rgb: 14, 116, 144; }
+.practice-field--rose { --tone: #be123c; --tone-rgb: 190, 18, 60; }
+
+.dark-mode .practice-field { --tone-ink: #06140c; }
+.dark-mode .practice-field--blue { --tone: #60a5fa; --tone-rgb: 96, 165, 250; }
+.dark-mode .practice-field--violet { --tone: #a78bfa; --tone-rgb: 167, 139, 250; }
+.dark-mode .practice-field--amber { --tone: #fbbf24; --tone-rgb: 251, 191, 36; }
+.dark-mode .practice-field--cyan { --tone: #22d3ee; --tone-rgb: 34, 211, 238; }
+.dark-mode .practice-field--rose { --tone: #fb7185; --tone-rgb: 251, 113, 133; }
+
+.practice-field-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.6rem;
+}
+.practice-field-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: none;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--tone-rgb), 0.16);
+  color: var(--tone);
+}
+.practice-field-labels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.practice-field-label {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
-  margin-bottom: 0.5rem;
 }
+.practice-field-hint {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+.practice-field-value {
+  flex: none;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: rgba(var(--tone-rgb), 0.14);
+  color: var(--tone);
+  font-weight: 700;
+  font-size: 0.8rem;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .practice-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: 0.4rem;
 }
 .practice-chip {
-  padding: 0.5rem 0.95rem;
+  padding: 0.45rem 0.9rem;
   border-radius: var(--radius-pill, 999px);
   border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
+  background: var(--card-bg);
   color: var(--text-primary);
   font-weight: 600;
   cursor: pointer;
   font: inherit;
   font-variant-numeric: tabular-nums;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.practice-chip:hover:not(:disabled):not(.active) {
+  border-color: rgba(var(--tone-rgb, var(--accent-primary-rgb)), 0.5);
 }
 .practice-chip.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: white;
+  background: var(--tone, var(--accent-primary));
+  border-color: var(--tone, var(--accent-primary));
+  color: var(--tone-ink, #ffffff);
+  box-shadow: 0 2px 8px rgba(var(--tone-rgb, var(--accent-primary-rgb)), 0.3);
 }
 .practice-chip-input {
-  width: 5.5rem;
+  width: 6.5rem;
   padding: 0.45rem 0.7rem;
   border-radius: var(--radius-pill, 999px);
-  border: 1px solid var(--border-color);
+  border: 1px dashed var(--border-strong);
   background: var(--input-bg, var(--card-bg));
   color: var(--text-primary);
   font: inherit;
   font-weight: 600;
 }
+.practice-chip-input:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--tone, var(--accent-primary));
+}
 .practice-mode-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 .practice-mode-card {
   text-align: left;
-  padding: 0.8rem 0.9rem;
+  padding: 0.7rem 0.8rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
+  background: var(--card-bg);
   color: var(--text-primary);
   cursor: pointer;
   font: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 .practice-mode-card.active {
-  border-color: var(--accent-primary);
-  background: var(--accent-primary-soft);
+  border-color: var(--tone, var(--accent-primary));
+  background: rgba(var(--tone-rgb, var(--accent-primary-rgb)), 0.12);
+  box-shadow: inset 0 0 0 1px var(--tone, var(--accent-primary));
 }
 .practice-mode-card strong { display: block; margin-bottom: 0.15rem; }
 .practice-mode-card span { color: var(--text-secondary); font-size: 0.82rem; }
+
 .practice-setup-actions {
   display: flex;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.75rem;
   justify-content: flex-end;
-  margin-top: 1.25rem;
+  margin-top: 1.1rem;
   flex-wrap: wrap;
 }
+.practice-setup-recap {
+  flex: 1;
+  min-width: 10rem;
+  color: var(--text-secondary);
+  font-size: 0.83rem;
+}
+.practice-start-btn {
+  padding: 0.75rem 1.6rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-strong));
+  color: #06140c;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 14px rgba(var(--accent-primary-rgb), 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.practice-start-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(var(--accent-primary-rgb), 0.4);
+}
+.practice-start-btn:active { transform: none; }
 
 /* Play screen */
 .practice-play {
@@ -482,6 +607,10 @@
 
 @media (max-width: 640px) {
   .practice-mode-cards { grid-template-columns: 1fr; }
+  .practice-setup { padding: 0.9rem 0.85rem 1rem; }
+  .practice-setup-actions { flex-direction: column-reverse; align-items: stretch; }
+  .practice-start-btn { width: 100%; }
+  .practice-setup-recap { text-align: center; }
   .practice-session-row { grid-template-columns: 1fr; }
   .practice-session-stats { justify-content: flex-start; }
   .practice-session-stats div { text-align: left; }
@@ -493,7 +622,7 @@
 .practice-setup-note {
   color: var(--text-tertiary);
   font-size: 0.82rem;
-  margin: -0.25rem 0 0;
+  margin: 0.7rem 0 0;
 }
 .practice-last-throws span.faded {
   opacity: 0.45;
@@ -787,4 +916,206 @@
   color: var(--text-tertiary);
   font-weight: 600;
   font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   Play screen on a phone: fit the viewport instead of scrolling.
+   Same treatment as the match screen. The keypad is what the screen is for,
+   so it takes whatever height is left once the top bar, the board and the
+   footer are laid out, and nothing ends up below the fold. The keypad's own
+   proportions come from the shared .dart-board rules in App.css.
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .app-main:has(> .practice-play) {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+
+  .practice-play {
+    display: flex;
+    flex-direction: column;
+    /* 80px = fixed mobile header + main padding-top */
+    height: calc(100dvh - 80px - var(--safe-area-inset-top, 0px) - var(--safe-area-inset-bottom, 0px));
+    max-width: none;
+    overflow: hidden;
+  }
+  .practice-play > .practice-play-top,
+  .practice-play > .practice-board,
+  .practice-play > .practice-play-footer {
+    flex: 0 0 auto;
+  }
+  .practice-play > .dart-board {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 860px;
+    padding: 0.4rem;
+  }
+  .practice-play-top {
+    padding: 0.35rem 0.5rem 0.4rem;
+  }
+  .practice-play-footer {
+    margin-top: 0.4rem;
+  }
+
+  /* Around the Clock brings its own pad (two big targets + undo) rather than
+     the number grid, so it needs its own share of the column. Capped and
+     centred: filling a tall phone would give it two half-screen buttons. */
+  .practice-atc-pad {
+    justify-content: center;
+  }
+  .practice-atc-pad .practice-atc-buttons {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 300px;
+    margin-bottom: 0.4rem;
+  }
+  .practice-atc-pad .practice-atc-btn {
+    min-height: 0;
+  }
+  .practice-atc-pad .remove-last-row {
+    flex: 0 0 auto;
+  }
+}
+
+/* Short phones: trim the board so the keypad keeps usable buttons */
+@media (max-width: 1024px) and (max-height: 740px) {
+  .practice-play .practice-board {
+    padding: 0.5rem 0.75rem;
+  }
+  .practice-play .practice-remaining {
+    font-size: clamp(2.4rem, 12vw, 3.6rem);
+    margin: 0.1rem 0 0.2rem;
+  }
+  .practice-play .practice-checkout-hint {
+    min-height: 1.2em;
+    font-size: 0.9rem;
+  }
+  .practice-play .practice-last-throws {
+    min-height: 1.7rem;
+    margin: 0.3rem 0;
+  }
+  .practice-play-top {
+    padding: 0.2rem 0.4rem;
+  }
+  .practice-play-footer {
+    margin-top: 0.3rem;
+  }
+  .practice-play-footer .practice-ghost-btn {
+    padding: 0.35rem 0.9rem;
+  }
+}
+
+/* ==========================================================================
+   Phone held sideways: board on the left, keypad on the right - the same
+   two columns the match screen uses, for the same reason. Height-capped so a
+   tablet in landscape keeps the roomier stacked layout.
+   ========================================================================== */
+@media (max-width: 1024px) and (orientation: landscape) and (max-height: 600px) {
+  .practice-play {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: 0.4rem;
+    /* flush under the fixed 60px header, as on the match screen */
+    margin-top: -20px;
+    height: calc(100dvh - 60px - var(--safe-area-inset-top, 0px) - var(--safe-area-inset-bottom, 0px));
+  }
+  .practice-play > * {
+    grid-column: 1;
+    min-width: 0;
+  }
+  .practice-play > .dart-board {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    max-height: none;
+    border-radius: var(--radius-lg);
+  }
+  .practice-play > .practice-board {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+    border-radius: var(--radius-lg);
+    padding: 0.4rem 0.6rem;
+  }
+
+  .practice-play-top {
+    flex-wrap: wrap;
+    padding: 0.15rem 0.35rem;
+  }
+  .practice-play-meta {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    font-size: 0.75rem;
+  }
+  .practice-play-footer {
+    margin-top: 0.3rem;
+  }
+  .practice-play .practice-remaining-label {
+    font-size: 0.68rem;
+  }
+  .practice-play .practice-remaining {
+    font-size: clamp(1.9rem, 11vh, 3.2rem);
+    margin: 0;
+  }
+  .practice-play .practice-checkout-hint {
+    min-height: 1.1em;
+    font-size: 0.8rem;
+  }
+  .practice-play .practice-last-throws {
+    min-height: 1.5rem;
+    margin: 0.2rem 0;
+  }
+  .practice-play .practice-board-stats {
+    gap: 0.6rem;
+    font-size: 0.72rem;
+    flex-wrap: wrap;
+  }
+  .practice-play .practice-visits {
+    font-size: 0.75rem;
+  }
+
+  /* 1v1 and bot matches: the two player cards stack down the column */
+  .practice-board--match .practice-scoreboard {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(0, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 0.25rem;
+  }
+  .practice-player {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.25rem 0.5rem;
+  }
+  .practice-player-remaining {
+    font-size: clamp(1.2rem, 7vh, 2rem);
+  }
+  .practice-player-name {
+    font-size: 0.78rem;
+  }
+  .practice-player-legs {
+    font-size: 1rem;
+    padding: 0 0.3rem;
+  }
+  .practice-player .practice-last-throws {
+    min-height: 1.1rem;
+    margin: 0;
+  }
+  .practice-player .practice-last-throws span {
+    padding: 0.05rem 0.35rem;
+    min-width: 1.8rem;
+    font-size: 0.72rem;
+  }
+  .practice-player-avg {
+    font-size: 0.65rem;
+  }
+
+  .practice-atc-pad .practice-atc-btn {
+    font-size: 1.1rem;
+  }
 }

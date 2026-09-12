@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, X, RotateCcw, Flag } from 'lucide-react';
+import { ArrowLeft, Check, CircleDot, X, RotateCcw, Flag, Target } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeHardestList } from './PracticeShared';
+import {
+  PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeHardestList, PracticeSetup, PracticeField
+} from './PracticeShared';
 import { createAroundTheClock, applyThrow, undo, canUndo, currentTarget, computeStats, ATC_MODES } from '../../lib/aroundTheClock';
-import { pluralSuffix } from '../../lib/practiceGames';
+import { describeSession, pluralSuffix } from '../../lib/practiceGames';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { hapticTap, hapticBust, hapticLegWon } from '../../lib/haptics';
@@ -95,22 +97,32 @@ export function PracticeAroundTheClock() {
     return (
       <div className="practice-page">
         <PracticeScreenHeader title={t('practice.games.aroundTheClock.title')} description={t('practice.aroundTheClock.rules')} />
-        <div className="practice-setup">
-          <h2>{t('practice.aroundTheClock.setup.title')}</h2>
-          <div className="practice-field">
-            <label>{t('practice.aroundTheClock.setup.mode')}</label>
+        <PracticeSetup
+          title={t('practice.aroundTheClock.setup.title')}
+          subtitle={t('practice.aroundTheClock.setup.subtitle')}
+          recap={describeSession({ game: GAME, settings }, t)}
+          onStart={handleStart}
+        >
+          <PracticeField
+            icon={CircleDot}
+            tone="green"
+            label={t('practice.aroundTheClock.setup.mode')}
+            hint={t('practice.aroundTheClock.setup.modeHint')}
+            value={t(`practice.aroundTheClock.modes.${settings.mode}`)}
+          >
             <PracticeChips options={ATC_MODES} value={settings.mode} onChange={(mode) => setSettings(s => ({ ...s, mode, includeBull: mode === 'trebles' ? false : s.includeBull }))} render={(m) => t(`practice.aroundTheClock.modes.${m}`)} />
-          </div>
+          </PracticeField>
           {settings.mode !== 'trebles' && (
-            <div className="practice-field">
-              <label>{t('practice.aroundTheClock.setup.includeBull')}</label>
+            <PracticeField
+              icon={Target}
+              tone="blue"
+              label={t('practice.aroundTheClock.setup.includeBull')}
+              value={settings.includeBull ? t('common.yes') : t('common.no')}
+            >
               <PracticeChips options={[true, false]} value={settings.includeBull} onChange={(includeBull) => setSettings(s => ({ ...s, includeBull }))} render={(v) => (v ? t('common.yes') : t('common.no'))} />
-            </div>
+            </PracticeField>
           )}
-          <div className="practice-setup-actions">
-            <button type="button" className="create-tournament-btn" onClick={handleStart}>{t('practice.start')}</button>
-          </div>
-        </div>
+        </PracticeSetup>
       </div>
     );
   }

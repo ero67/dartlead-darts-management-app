@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Flag } from 'lucide-react';
+import { ArrowLeft, Flag, Keyboard, Repeat, Target, TrendingDown } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DartKeypad } from '../scoring/DartKeypad';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
-import { PracticeScreenHeader, PracticeChips, PracticeSummary } from './PracticeShared';
+import {
+  PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeSetup, PracticeField, PracticeOptionCards
+} from './PracticeShared';
 import { dartFromInput, liveRemaining, lastVisitLabels, canUndo as x01CanUndo } from '../../lib/x01Engine';
 import {
   createOneTwentyOne, applyDart, applyVisitTotal, undo, canUndo, computeStats, visitsLeft,
   ROUND_OPTIONS, MIN_TARGET, MAX_TARGET
 } from '../../lib/oneTwentyOne';
-import { pluralSuffix } from '../../lib/practiceGames';
+import { describeSession, pluralSuffix } from '../../lib/practiceGames';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
@@ -128,13 +130,25 @@ export function PracticeOneTwentyOne() {
   }
 
   if (!session) {
+    const roundsLabel = settings.roundsTarget === null
+      ? t('practice.setup.unlimited')
+      : t(`practice.oneTwentyOne.roundCount${pluralSuffix(settings.roundsTarget)}`, { count: settings.roundsTarget });
     return (
       <div className="practice-page">
         <PracticeScreenHeader title={t('practice.games.oneTwentyOne.title')} description={t('practice.oneTwentyOne.rules')} />
-        <div className="practice-setup">
-          <h2>{t('practice.oneTwentyOne.setup.title')}</h2>
-          <div className="practice-field">
-            <label>{t('practice.oneTwentyOne.setup.startTarget')}</label>
+        <PracticeSetup
+          title={t('practice.oneTwentyOne.setup.title')}
+          subtitle={t('practice.oneTwentyOne.setup.subtitle')}
+          recap={describeSession({ game: GAME, settings }, t)}
+          onStart={handleStart}
+        >
+          <PracticeField
+            icon={Target}
+            tone="green"
+            label={t('practice.oneTwentyOne.setup.startTarget')}
+            hint={t('practice.oneTwentyOne.setup.startTargetHint')}
+            value={settings.startTarget}
+          >
             <div className="practice-chips">
               {START_OPTIONS.map(n => (
                 <button key={n} type="button" className={`practice-chip ${settings.startTarget === n ? 'active' : ''}`} onClick={() => setSettings(s => ({ ...s, startTarget: n }))}>{n}</button>
@@ -153,32 +167,44 @@ export function PracticeOneTwentyOne() {
                 }}
               />
             </div>
-          </div>
-          <div className="practice-field">
-            <label>{t('practice.oneTwentyOne.setup.rounds')}</label>
+          </PracticeField>
+
+          <PracticeField
+            icon={Repeat}
+            tone="blue"
+            label={t('practice.oneTwentyOne.setup.rounds')}
+            hint={t('practice.oneTwentyOne.setup.roundsHint')}
+            value={roundsLabel}
+          >
             <PracticeChips options={ROUND_OPTIONS} value={settings.roundsTarget} onChange={(roundsTarget) => setSettings(s => ({ ...s, roundsTarget }))} render={(n) => (n === null ? t('practice.setup.unlimited') : n)} />
-          </div>
-          <div className="practice-field">
-            <label>{t('practice.oneTwentyOne.setup.onFail')}</label>
+          </PracticeField>
+
+          <PracticeField
+            icon={TrendingDown}
+            tone="amber"
+            label={t('practice.oneTwentyOne.setup.onFail')}
+            hint={t('practice.oneTwentyOne.setup.onFailHint', { target: settings.startTarget })}
+            value={t(`practice.oneTwentyOne.setup.onFail_${settings.onFail}`)}
+          >
             <PracticeChips options={['down', 'stay']} value={settings.onFail} onChange={(onFail) => setSettings(s => ({ ...s, onFail }))} render={(v) => t(`practice.oneTwentyOne.setup.onFail_${v}`)} />
-          </div>
-          <div className="practice-field">
-            <label>{t('practice.setup.scoringMode')}</label>
-            <div className="practice-mode-cards">
-              <button type="button" className={`practice-mode-card ${settings.scoringMode === 'dart' ? 'active' : ''}`} onClick={() => setSettings(s => ({ ...s, scoringMode: 'dart' }))}>
-                <strong>{t('practice.setup.scoringDart')}</strong>
-                <span>{t('practice.setup.scoringDartHint')}</span>
-              </button>
-              <button type="button" className={`practice-mode-card ${settings.scoringMode === 'turnTotal' ? 'active' : ''}`} onClick={() => setSettings(s => ({ ...s, scoringMode: 'turnTotal' }))}>
-                <strong>{t('practice.setup.scoringTurnTotal')}</strong>
-                <span>{t('practice.setup.scoringTurnTotalHint')}</span>
-              </button>
-            </div>
-          </div>
-          <div className="practice-setup-actions">
-            <button type="button" className="create-tournament-btn" onClick={handleStart}>{t('practice.start')}</button>
-          </div>
-        </div>
+          </PracticeField>
+
+          <PracticeField
+            icon={Keyboard}
+            tone="violet"
+            label={t('practice.setup.scoringMode')}
+            value={t(settings.scoringMode === 'turnTotal' ? 'practice.setup.scoringTurnTotal' : 'practice.setup.scoringDart')}
+          >
+            <PracticeOptionCards
+              options={[
+                { value: 'dart', label: t('practice.setup.scoringDart'), hint: t('practice.setup.scoringDartHint') },
+                { value: 'turnTotal', label: t('practice.setup.scoringTurnTotal'), hint: t('practice.setup.scoringTurnTotalHint') }
+              ]}
+              value={settings.scoringMode}
+              onChange={(scoringMode) => setSettings(s => ({ ...s, scoringMode }))}
+            />
+          </PracticeField>
+        </PracticeSetup>
       </div>
     );
   }

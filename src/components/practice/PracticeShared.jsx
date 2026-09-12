@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, RotateCcw, Settings2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Play, RotateCcw, Settings2 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 // Page header used by every game's setup screen.
@@ -17,6 +17,68 @@ export function PracticeScreenHeader({ title, description, children }) {
         {description && <p>{description}</p>}
       </div>
       {children}
+    </div>
+  );
+}
+
+// Setup screen shell: the settings card every game shows before the first
+// dart. `children` are PracticeField sections; `recap` is the one-line
+// read-back of the current settings shown next to the start button.
+export function PracticeSetup({ title, subtitle, recap, children, note, onStart }) {
+  const { t } = useLanguage();
+  return (
+    <div className="practice-setup">
+      <div className="practice-setup-head">
+        <h2>{title}</h2>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      <div className="practice-setup-sections">{children}</div>
+      {note && <p className="practice-setup-note">{note}</p>}
+      <div className="practice-setup-actions">
+        {recap && <div className="practice-setup-recap">{recap}</div>}
+        <button type="button" className="practice-start-btn" onClick={onStart}>
+          <Play size={18} /> {t('practice.start')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// One settings section inside PracticeSetup. Each gets its own colour (`tone`)
+// so the sections read apart at a glance; the chips inside inherit it.
+export function PracticeField({ icon: Icon, label, hint, value, tone = 'green', children }) {
+  return (
+    <section className={`practice-field practice-field--${tone}`}>
+      <div className="practice-field-head">
+        {Icon && <span className="practice-field-icon"><Icon size={16} /></span>}
+        <div className="practice-field-labels">
+          <span className="practice-field-label">{label}</span>
+          {hint && <span className="practice-field-hint">{hint}</span>}
+        </div>
+        {value !== null && value !== undefined && value !== '' && (
+          <span className="practice-field-value">{value}</span>
+        )}
+      </div>
+      <div className="practice-field-body">{children}</div>
+    </section>
+  );
+}
+
+// Two-up (or more) cards for a setting that needs a line of explanation each.
+export function PracticeOptionCards({ options, value, onChange }) {
+  return (
+    <div className="practice-mode-cards">
+      {options.map((option) => (
+        <button
+          key={String(option.value)}
+          type="button"
+          className={`practice-mode-card ${value === option.value ? 'active' : ''}`}
+          onClick={() => onChange(option.value)}
+        >
+          <strong>{option.label}</strong>
+          {option.hint && <span>{option.hint}</span>}
+        </button>
+      ))}
     </div>
   );
 }

@@ -1,7 +1,8 @@
 // The 121 game: check out the target within three visits (nine darts). Make
 // it and the target goes up by one; miss and it drops by one (or stays, per
-// settings). Each round is one X01 leg run by x01Engine; this module tracks
-// the rounds and owns undo.
+// settings). The starting target is also the floor: a miss there leaves the
+// target where it is, so a 121 session never drops to 120. Each round is one
+// X01 leg run by x01Engine; this module tracks the rounds and owns undo.
 
 import { createSoloX01, applyDart as x01ApplyDart, applyVisitTotal as x01ApplyVisitTotal } from './x01Engine.js';
 
@@ -17,7 +18,8 @@ const clampTarget = (n) => {
   while (BOGEY.has(t)) t += 1;
   return Math.min(MAX_TARGET, t);
 };
-const stepDown = (n) => { let t = n - 1; while (BOGEY.has(t)) t -= 1; return Math.max(MIN_TARGET, t); };
+// Never below the floor (the target the session started on).
+const stepDown = (n, floor) => { let t = n - 1; while (BOGEY.has(t)) t -= 1; return Math.max(floor, t); };
 const stepUp = (n) => { let t = n + 1; while (BOGEY.has(t)) t += 1; return Math.min(MAX_TARGET, t); };
 
 const newRound = (target, scoringMode) => ({ ...createSoloX01({ startingScore: target, legsTarget: 1, scoringMode }), undoStack: [] });
@@ -58,7 +60,9 @@ const settle = (state, roundState, outcome) => {
     : roundState.current.visits.reduce((sum, v) => sum + v.darts, 0);
   const roundRecord = { target: state.target, success: legWon, darts, visits: legWon ? roundState.legs[0].visits.length : visitsUsed };
   const rounds = [...state.rounds, roundRecord];
-  const nextTarget = legWon ? stepUp(state.target) : (state.settings.onFail === 'down' ? stepDown(state.target) : state.target);
+  const nextTarget = legWon
+    ? stepUp(state.target)
+    : (state.settings.onFail === 'down' ? stepDown(state.target, state.settings.startTarget) : state.target);
   const complete = state.settings.roundsTarget !== null && rounds.length >= state.settings.roundsTarget;
   return {
     state: {
