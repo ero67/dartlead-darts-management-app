@@ -107,7 +107,10 @@
     "statusOpenForRegistration": "Registration",
     "statusStarted": "In progress",
     "statusCompleted": "Completed",
-    "continueTournament": "Continue Tournament"
+    "continueTournament": "Continue Tournament",
+    "scorersTitle": "Scorers",
+    "scorersHint": "Who may count matches on their own device? Search registered users by name or email. You can always count as the manager, and you can change the list later on the Scorers tab.",
+    "scorersEmpty": "No scorers added yet — only you will be able to count matches."
   },
   "liveMatches": {
     "title": "Live Matches",
@@ -171,7 +174,8 @@
     "undoLastVisit": "Undo last visit",
     "dartsCount": "{{count}} darts",
     "okZero": "no score (0)",
-    "backspace": "Delete last digit"
+    "backspace": "Delete last digit",
+    "notScorerDescription": "You are signed in but not assigned as a scorer for this tournament, so your score would not be saved. Ask the tournament manager to add you under Scorers."
   },
   "tournamentCreation": {
     "title": "Create Tournament",
@@ -470,7 +474,12 @@
     "tvMode": "TV mode",
     "tvModeHint": "Open the wall display for this tournament in a new tab",
     "highScores": "High scores",
-    "highScoresLegacyNote": "Matches played before high scores were recorded only count their 180s."
+    "highScoresLegacyNote": "Matches played before high scores were recorded only count their 180s.",
+    "notScorer": "Not a scorer",
+    "notScorerHint": "You are not assigned as a scorer for this tournament. Ask the tournament manager to add you under Scorers, then you can count matches on this device.",
+    "noScorersTitle": "Only you can count matches right now",
+    "noScorersText": "Add scorers so players can count matches on their own devices. Anyone else who opens a match can only watch.",
+    "addScorers": "Add scorers"
   },
   "summary": {
     "tab": "Summary",
@@ -974,7 +983,8 @@
     "notAuthorized": "You are not allowed to manage scorers",
     "loadError": "Failed to load scorers",
     "addError": "Failed to add scorer",
-    "removeError": "Failed to remove scorer"
+    "removeError": "Failed to remove scorer",
+    "managerNote": "As the manager you can always count matches yourself."
   },
   "account": {
     "title": "Account",

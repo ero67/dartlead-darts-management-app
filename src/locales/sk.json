@@ -107,7 +107,10 @@
     "statusOpenForRegistration": "Registrácia",
     "statusStarted": "Prebieha",
     "statusCompleted": "Ukončený",
-    "continueTournament": "Pokračovať v turnaji"
+    "continueTournament": "Pokračovať v turnaji",
+    "scorersTitle": "Zapisovatelia",
+    "scorersHint": "Kto môže počítať zápasy na vlastnom zariadení? Vyhľadajte registrovaných používateľov podľa mena alebo e-mailu. Ako organizátor môžete počítať vždy a zoznam môžete neskôr upraviť v záložke Zapisovatelia.",
+    "scorersEmpty": "Zatiaľ žiadni zapisovatelia — zápasy budete môcť počítať len vy."
   },
   "liveMatches": {
     "title": "Live Zápasy",
@@ -171,7 +174,8 @@
     "undoLastVisit": "Vrátiť posledný náhod",
     "dartsCount": "{{count}} šípok",
     "okZero": "bez bodov (0)",
-    "backspace": "Zmazať poslednú číslicu"
+    "backspace": "Zmazať poslednú číslicu",
+    "notScorerDescription": "Ste prihlásený, ale nie ste priradený ako zapisovateľ tohto turnaja, takže vaše skóre by sa neuložilo. Požiadajte organizátora turnaja, aby vás pridal v záložke Zapisovatelia."
   },
   "tournamentCreation": {
     "title": "Vytvoriť Turnaj",
@@ -470,7 +474,12 @@
     "tvMode": "TV režim",
     "tvModeHint": "Otvoriť zobrazenie na obrazovku pre tento turnaj v novej karte",
     "highScores": "Vysoké nahádzania",
-    "highScoresLegacyNote": "Zápasy odohrané pred zavedením tejto štatistiky majú započítané len 180."
+    "highScoresLegacyNote": "Zápasy odohrané pred zavedením tejto štatistiky majú započítané len 180.",
+    "notScorer": "Nie ste zapisovateľ",
+    "notScorerHint": "Nie ste priradený ako zapisovateľ tohto turnaja. Požiadajte organizátora turnaja, aby vás pridal v záložke Zapisovatelia, potom môžete počítať zápasy na tomto zariadení.",
+    "noScorersTitle": "Zápasy môžete zatiaľ počítať len vy",
+    "noScorersText": "Pridajte zapisovateľov, aby hráči mohli počítať zápasy na vlastných zariadeniach. Ostatní si zápas môžu iba prezerať.",
+    "addScorers": "Pridať zapisovateľov"
   },
   "summary": {
     "tab": "Súhrn",
@@ -974,7 +983,8 @@
     "notAuthorized": "Nemáte oprávnenie spravovať zapisovateľov",
     "loadError": "Nepodarilo sa načítať zapisovateľov",
     "addError": "Nepodarilo sa pridať zapisovateľa",
-    "removeError": "Nepodarilo sa odstrániť zapisovateľa"
+    "removeError": "Nepodarilo sa odstrániť zapisovateľa",
+    "managerNote": "Ako organizátor môžete zápasy vždy počítať aj sami."
   },
   "account": {
     "title": "Účet",

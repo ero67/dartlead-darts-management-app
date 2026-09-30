@@ -13098,3 +13098,143 @@ a.tv-mode-btn { text-decoration: none; }
     gap: 0.35rem;
   }
 }
+
+/* Scorers picked on the tournament creation form */
+.creation-scorer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.creation-scorer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+}
+
+.creation-scorer-name {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creation-scorer-remove {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.creation-scorer-remove:hover {
+  color: var(--text-primary);
+}
+
+.creation-scorer-empty {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* Manager nudge: nobody but the manager can count matches yet */
+.scorer-nudge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  background: rgba(var(--accent-primary-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.35);
+  color: var(--text-primary);
+}
+
+.scorer-nudge-icon {
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.scorer-nudge-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+}
+
+.scorer-nudge-text span {
+  color: var(--text-secondary);
+}
+
+.scorer-nudge-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.scorer-nudge-btn {
+  padding: 0.45rem 0.85rem;
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scorer-nudge-btn:hover {
+  filter: brightness(1.08);
+}
+
+.scorer-nudge-dismiss {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0.3rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.scorer-nudge-dismiss:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 600px) {
+  .scorer-nudge {
+    flex-wrap: wrap;
+  }
+
+  .scorer-nudge-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* Signed-in user who is not a scorer: shown instead of "Start match" */
+.not-scorer-hint {
+  cursor: help;
+}
+
+.start-match-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

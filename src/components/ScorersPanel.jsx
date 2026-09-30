@@ -8,7 +8,7 @@ import { leagueService } from '../services/leagueService';
 // Manage the scorer allowlist of a tournament (type="tournament") or a league
 // (type="league"). Scorers are registered users the manager authorizes to run
 // the match scoring UI; enforcement happens in the database (RLS).
-export function ScorersPanel({ type, entityId }) {
+export function ScorersPanel({ type, entityId, onScorersChange }) {
   const { t } = useLanguage();
   const [scorers, setScorers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,6 +39,12 @@ export function ScorersPanel({ type, entityId }) {
   useEffect(() => {
     loadScorers();
   }, [loadScorers]);
+
+  // Let the parent react to the list (e.g. hide its "no scorers yet" nudge).
+  useEffect(() => {
+    if (!isLoading && hasAccess) onScorersChange?.(scorers);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scorers, isLoading, hasAccess]);
 
   // Called when the manager picks a user from the search dropdown. The RPC
   // still resolves the account by email; the picker only saves typing it.
@@ -85,6 +91,8 @@ export function ScorersPanel({ type, entityId }) {
       <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{t('scorers.title')}</h3>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.875rem' }}>
         {type === 'league' ? t('scorers.descriptionLeague') : t('scorers.descriptionTournament')}
+        {' '}
+        {t('scorers.managerNote')}
       </p>
 
       <div style={{ marginBottom: '1rem' }}>

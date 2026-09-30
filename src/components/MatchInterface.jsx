@@ -3,8 +3,9 @@ import { ArrowLeft, Target, CheckCircle, Eye } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTournament } from '../contexts/TournamentContext';
 import { supabase } from '../lib/supabase';
-import { matchService } from '../services/tournamentService';
+import { matchService, tournamentService } from '../services/tournamentService';
 import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import checkoutData from '../data/checkouts.json';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
@@ -217,9 +218,30 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const { startLiveMatch, endLiveMatch, updateLiveMatch, isMatchLiveOnThisDevice, deviceId, deviceName, boardNumber } = useLiveMatch();
   const { user } = useAuth();
   const { t } = useLanguage();
-  
-  // Check if user is logged in - non-logged-in users can only view
-  const isViewOnly = !user;
+  const { currentTournament } = useTournament();
+
+  // Scoring permission (manager or assigned scorer — can_score_tournament in
+  // the DB). null until resolved; false turns the page view-only so nobody
+  // scores a match the database will refuse to save. Bracket matches
+  // restored after a refresh carry no tournamentId, hence the fallback.
+  const tournamentId = match?.tournamentId || match?.tournament_id || currentTournament?.id || null;
+  const [canScore, setCanScore] = useState(null);
+  useEffect(() => {
+    if (!user?.id || !tournamentId) {
+      setCanScore(false);
+      return;
+    }
+    let cancelled = false;
+    tournamentService.canScore(tournamentId).then(allowed => {
+      // An unresolvable check (offline) must not lock out a scorer mid-match.
+      if (!cancelled) setCanScore(allowed === null ? true : allowed);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id, tournamentId]);
+
+  // Logged-out visitors and signed-in users who are not scorers can only view
+  const isViewOnly = !user || canScore === false;
+  const isNotScorer = !!user && canScore === false;
 
   // Function to load match state from database
   const loadMatchStateFromDatabase = async (matchId, startingScore) => {
@@ -832,6 +854,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       console.log('User not logged in, skipping live match start');
       return;
     }
+    // ...and allowed to score (wait for the check; the DB would reject the
+    // writes below anyway, but marking the match live locally would strand it)
+    if (canScore !== true) {
+      return;
+    }
     
     const matchData = {
       player1: match.player1,
@@ -869,8 +896,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     };
     // Keyed on the ids only: AuthContext hands out a new user object on every
     // token refresh, and re-running this mid-match rewrote who started it.
+    // canScore flips once (null -> boolean) when the permission check lands.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, match?.id]);
+  }, [user?.id, match?.id, canScore]);
 
   // Update live match data whenever match state changes (only if match is not completed and user is logged in)
   useEffect(() => {
@@ -1935,7 +1963,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         <div className="leg-starter-dialog">
           <div className="dialog-content">
             <h2>{t('match.viewOnlyMode')}</h2>
-            <p>{t('match.viewOnlyStartDescription')}</p>
+            <p>{isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyStartDescription')}</p>
             <button className="back-btn" onClick={onBack}>
               <ArrowLeft size={20} />
               {t('match.backToTournament')}
@@ -2156,7 +2184,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           <div className="view-only-message">
             <Eye size={48} />
             <h3>{t('match.viewOnlyMode')}</h3>
-            <p>{t('match.viewOnlyScoreDescription')}</p>
+            <p>{isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyScoreDescription')}</p>
           </div>
         ) : (
           <>

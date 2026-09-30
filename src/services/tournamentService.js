@@ -360,6 +360,23 @@ export const tournamentService = {
         }
       })
 
+      // Scorers picked on the creation form. The tournament row exists now,
+      // so the manager-only RPC accepts them; a failure here must not undo
+      // the tournament — the manager can still add the person on the
+      // Scorers tab.
+      const scorerEmails = [...new Set(
+        (tournamentData.scorers || []).map(s => (typeof s === 'string' ? s : s?.email) || '').filter(Boolean)
+      )]
+      if (scorerEmails.length > 0) {
+        const results = await Promise.allSettled(
+          scorerEmails.map(email => supabase.rpc('add_tournament_scorer', { t_id: tournamentId, user_email: email }))
+        )
+        results.forEach((r, i) => {
+          const failed = r.status === 'rejected' || r.value?.error || (r.value?.data && r.value.data.success === false)
+          if (failed) console.error('Could not add scorer during tournament creation:', scorerEmails[i], r.reason || r.value?.error || r.value?.data)
+        })
+      }
+
       // Parse group_settings if it's a string (JSONB from Supabase might be string)
       let groupSettings = tournament.group_settings;
       if (typeof groupSettings === 'string') {
@@ -1672,6 +1689,25 @@ export const tournamentService = {
     } catch (error) {
       console.error('Error searching users:', error);
       return [];
+    }
+  },
+
+  // Whether the signed-in user may write scoring data for this tournament
+  // (manager, tournament scorer or league scorer) — the same predicate the
+  // RLS policies use, so the UI can hide "Start match" from users whose
+  // saves the database would silently discard. Resolves to null when the
+  // check itself fails (offline, no session) so callers can treat it as
+  // "unknown" rather than "denied".
+  async canScore(tournamentId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return false;
+      const { data, error } = await supabase.rpc('can_score_tournament', { t_id: tournamentId });
+      if (error) throw error;
+      return data === true;
+    } catch (error) {
+      console.error('Error checking scoring permission:', error);
+      return null;
     }
   },
 

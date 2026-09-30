@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, ArrowLeft, ChevronUp, ChevronDown, Check, Plus, Users } from 'lucide-react';
+import { Trophy, ArrowLeft, ChevronUp, ChevronDown, Check, Plus, Users, ClipboardList, X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLeague } from '../contexts/LeagueContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
+import { UserSearchPicker } from './UserSearchPicker';
 
 // Generate unique ID for tournaments
 const generateId = () => {
@@ -11,6 +13,7 @@ const generateId = () => {
 
 export function TournamentCreation({ onTournamentCreated, onBack }) {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const { currentLeague, selectLeague } = useLeague();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -57,6 +60,19 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
   });
   const [defaultScoringMode, setDefaultScoringMode] = useState(leagueDefaults.defaultScoringMode || 'dart');
   const [selectedPlayers, setSelectedPlayers] = useState([]);
+  // Registered users who may count matches on their own devices. Saved right
+  // after the tournament row is created (tournamentService.createTournament);
+  // the manager never needs to be listed — they can always count.
+  const [scorers, setScorers] = useState([]);
+
+  const handleAddScorer = (picked) => {
+    if (!picked?.email) return;
+    setScorers(prev => (prev.some(s => s.id === picked.id) ? prev : [...prev, picked]));
+  };
+
+  const handleRemoveScorer = (userId) => {
+    setScorers(prev => prev.filter(s => s.id !== userId));
+  };
 
   // Load league if leagueId is provided
   useEffect(() => {
@@ -140,6 +156,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
       standingsCriteriaOrder: standingsCriteriaOrder,
       playoffs: null, // Playoffs will be created only when user clicks "Start Playoffs"
       leagueId: leagueId || null, // Link to league if created from league
+      scorers: scorers.map(s => ({ id: s.id, email: s.email })),
       createdAt: new Date().toISOString(),
       status: 'open_for_registration' // Tournament is open for player registration
     };
@@ -261,6 +278,44 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
             </div>
           </div>
         )}
+
+        <div className="form-section">
+          <h3>
+            <ClipboardList size={18} />
+            {t('tournaments.scorersTitle')}
+          </h3>
+          <p className="settings-description">
+            {t('tournaments.scorersHint')}
+          </p>
+          <UserSearchPicker
+            onSelect={handleAddScorer}
+            excludeIds={[...scorers.map(s => s.id), ...(user?.id ? [user.id] : [])]}
+          />
+          {scorers.length > 0 ? (
+            <ul className="creation-scorer-list">
+              {scorers.map(scorer => (
+                <li key={scorer.id} className="creation-scorer-item">
+                  <span className="creation-scorer-name">
+                    {scorer.fullName && scorer.fullName !== scorer.email
+                      ? `${scorer.fullName} (${scorer.email})`
+                      : scorer.email}
+                  </span>
+                  <button
+                    type="button"
+                    className="creation-scorer-remove"
+                    onClick={() => handleRemoveScorer(scorer.id)}
+                    aria-label={t('scorers.remove')}
+                    title={t('scorers.remove')}
+                  >
+                    <X size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="creation-scorer-empty">{t('tournaments.scorersEmpty')}</p>
+          )}
+        </div>
 
         <div className="form-section">
           <h3>{t('registration.matchSettings')}</h3>

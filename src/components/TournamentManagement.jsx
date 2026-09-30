@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
+import { leagueService } from '../services/leagueService';
 import { BracketVisualization } from './BracketVisualization';
 import { mergeBracketRounds } from '../utils/bracketView';
 import { BracketSeedingEditor } from './BracketSeedingEditor';
@@ -220,6 +221,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
   // Handler for starting a match - shows confirmation dialog first
   const handleStartMatchRequest = (matchData) => {
+    // Belt and braces: the buttons below are hidden for non-scorers, but
+    // the database would discard everything such a user scored.
+    if (canScore !== true) {
+      alert(t('management.notScorerHint'));
+      return;
+    }
     setMatchToConfirm(matchData);
   };
 
@@ -285,6 +292,107 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const { isAdmin, isAdminMode } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   const canManage = isAdmin || isOwner;
+
+  // Whether this user may count matches: managers always, everyone else only
+  // when listed as a tournament/league scorer (can_score_tournament in the
+  // DB). null = not resolved yet. The RLS policies enforce the same rule, so
+  // showing "Start match" to anyone else let them score a match whose result
+  // the database then silently refused to save.
+  const [canScore, setCanScore] = useState(canManage ? true : null);
+  useEffect(() => {
+    if (!user || !tournament?.id) {
+      setCanScore(false);
+      return;
+    }
+    if (canManage) {
+      setCanScore(true);
+      return;
+    }
+    let cancelled = false;
+    const check = async () => {
+      const allowed = await tournamentService.canScore(tournament.id);
+      if (!cancelled) setCanScore(allowed);
+    };
+    check();
+    // Re-check when the tab comes back into view — the manager may have
+    // added this user as a scorer in the meantime.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') check();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user?.id, tournament?.id, canManage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Manager nudge: how many people besides the manager can count. Tournament
+  // and league scorers are tracked separately because the Scorers tab only
+  // edits the former. null = unknown (loading or lookup failed) — no nudge.
+  const [tournamentScorerCount, setTournamentScorerCount] = useState(null);
+  const [leagueScorerCount, setLeagueScorerCount] = useState(null);
+  const scorerCount = tournamentScorerCount === null || leagueScorerCount === null
+    ? null
+    : tournamentScorerCount + leagueScorerCount;
+  const nudgeDismissKey = tournament?.id ? `dartlead-scorer-nudge-dismissed:${tournament.id}` : null;
+  const [isScorerNudgeDismissed, setIsScorerNudgeDismissed] = useState(() => {
+    try {
+      return nudgeDismissKey ? localStorage.getItem(nudgeDismissKey) === '1' : false;
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    if (!canManage || !tournament?.id || tournament.status === 'completed') {
+      setTournamentScorerCount(null);
+      setLeagueScorerCount(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const tournamentScorers = await tournamentService.listScorers(tournament.id);
+        const leagueScorers = tournament.leagueId
+          ? await leagueService.listScorers(tournament.leagueId)
+          : [];
+        if (cancelled) return;
+        setTournamentScorerCount(tournamentScorers.length);
+        setLeagueScorerCount(leagueScorers.length);
+      } catch {
+        if (cancelled) return;
+        setTournamentScorerCount(null);
+        setLeagueScorerCount(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [canManage, tournament?.id, tournament?.leagueId, tournament?.status]);
+
+  const dismissScorerNudge = () => {
+    setIsScorerNudgeDismissed(true);
+    try {
+      if (nudgeDismissKey) localStorage.setItem(nudgeDismissKey, '1');
+    } catch {
+      // localStorage unavailable — the nudge just comes back next visit
+    }
+  };
+
+  const showScorerNudge = canManage && scorerCount === 0 && !isScorerNudgeDismissed
+    && tournament?.status !== 'completed' && activeTab !== 'scorers';
+
+  // Shown in place of "Start match" to a signed-in user who is not a scorer.
+  const renderNotScorerHint = () => (
+    <span
+      className="login-hint not-scorer-hint"
+      title={t('management.notScorerHint')}
+      onClick={() => alert(t('management.notScorerHint'))}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') alert(t('management.notScorerHint')); }}
+    >
+      <Lock size={11} />
+      {t('management.notScorer')}
+    </span>
+  );
   const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament, applyRemoteMatchResult } = useTournament();
 
   // Keep the apply-remote fn in a ref for the realtime channel handlers.
@@ -2080,9 +2188,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                     </div>
                   )}
                   {match.status === 'pending' && !isMatchActuallyLive(match.id) && (
-                    user ? (
+                    !user ? null : canScore === false ? renderNotScorerHint() : (
                       <button 
                         className="start-match-btn"
+                        disabled={canScore !== true}
                         onClick={() => handleStartMatchRequest({ 
                           ...match,
                           tournamentId: tournament.id,
@@ -2095,7 +2204,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         <Play size={16} />
                         {t('management.startMatch')}
                       </button>
-                    ) : null
+                    )
                   )}
                   {/* Same device, match in progress here (scorer backed out of the
                       match view) — resume from the locally saved state. This state
@@ -3459,9 +3568,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                         </button>
                       )}
                       {match.status === 'pending' && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
-                        user ? (
+                        !user ? null : canScore === false ? renderNotScorerHint() : (
                           <button 
                             className="start-match-btn"
+                            disabled={canScore !== true}
                             onClick={() => {
                               // Calculate round size from number of matches (each match has 2 players)
                               const roundSize = getRoundSize(round);
@@ -3479,7 +3589,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                             <Play size={16} />
                             {t('management.startMatch')}
                           </button>
-                        ) : null
+                        )
                       )}
                       {/* Same device resume — see the group-match card note */}
                       {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && user && (
@@ -3714,6 +3824,29 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       </div>
 
       <div className="management-content">
+        {showScorerNudge && (
+          <div className="scorer-nudge" role="status">
+            <ClipboardList size={18} className="scorer-nudge-icon" />
+            <div className="scorer-nudge-text">
+              <strong>{t('management.noScorersTitle')}</strong>
+              <span>{t('management.noScorersText')}</span>
+            </div>
+            <div className="scorer-nudge-actions">
+              <button type="button" className="scorer-nudge-btn" onClick={() => handleTabChange('scorers')}>
+                {t('management.addScorers')}
+              </button>
+              <button
+                type="button"
+                className="scorer-nudge-dismiss"
+                onClick={dismissScorerNudge}
+                aria-label={t('common.close')}
+                title={t('common.close')}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        )}
         {tournament.tournamentType !== 'playoff_only' && activeTab === 'groups' && renderGroups()}
         {tournament.tournamentType !== 'playoff_only' && activeTab === 'matches' && renderMatches()}
         {tournament.tournamentType !== 'playoff_only' && activeTab === 'standings' && renderStandings()}
@@ -3721,7 +3854,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         {activeTab === 'statistics' && renderStatistics()}
         {activeTab === 'liveMatches' && renderLiveMatches()}
         {activeTab === 'scorers' && canManage && (
-          <ScorersPanel type="tournament" entityId={tournament.id} />
+          <ScorersPanel
+            type="tournament"
+            entityId={tournament.id}
+            onScorersChange={(list) => setTournamentScorerCount(list.length)}
+          />
         )}
         {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}
       </div>
