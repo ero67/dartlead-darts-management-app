@@ -77,6 +77,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [unlinkedTournaments, setUnlinkedTournaments] = useState([]);
   const [loadingUnlinked, setLoadingUnlinked] = useState(false);
   const [selectedTournamentToLink, setSelectedTournamentToLink] = useState('');
+  const [linkPlayers, setLinkPlayers] = useState([]);       // players of the picked tournament
+  const [linkPlayerMap, setLinkPlayerMap] = useState({});    // tournament player id -> member player id | 'new' | ''
 
   // League statistics state
   const [leagueStats, setLeagueStats] = useState(null);
@@ -552,16 +554,48 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     setLeagueStats(null);
   };
 
+  const closeLinkTournament = () => {
+    setIsLinkingTournament(false);
+    setSelectedTournamentToLink('');
+    setLinkPlayers([]);
+    setLinkPlayerMap({});
+  };
+
+  // Picking a tournament loads its players and prefills the member mapping:
+  // same player row first, then a case-insensitive name match, else unmapped.
+  const handleSelectTournamentToLink = async (tournamentId) => {
+    setSelectedTournamentToLink(tournamentId);
+    setLinkPlayers([]);
+    setLinkPlayerMap({});
+    if (!tournamentId) return;
+    try {
+      const players = await leagueService.getTournamentPlayersForLink(tournamentId);
+      const members = (currentLeague?.members || []).map(m => m.player).filter(Boolean);
+      const norm = (n) => (n || '').trim().toLowerCase();
+      const map = {};
+      players.forEach(p => {
+        const hit = members.find(m => m.id === p.id) || members.find(m => norm(m.name) === norm(p.name));
+        map[p.id] = hit ? hit.id : '';
+      });
+      setLinkPlayers(players);
+      setLinkPlayerMap(map);
+    } catch (error) {
+      console.error('Error loading tournament players:', error);
+    }
+  };
+
+  const isLinkMapComplete = linkPlayers.length > 0 && linkPlayers.every(p => linkPlayerMap[p.id]);
+
   const handleLinkTournament = async () => {
-    if (!selectedTournamentToLink || !currentLeague || isLinking) return;
+    if (!selectedTournamentToLink || !currentLeague || isLinking || !isLinkMapComplete) return;
     setIsLinking(true);
     try {
-      await linkTournamentToLeague(currentLeague.id, selectedTournamentToLink);
+      const playerMap = linkPlayers.map(p => ({ from: p.id, to: linkPlayerMap[p.id] }));
+      await linkTournamentToLeague(currentLeague.id, selectedTournamentToLink, playerMap);
       // Refresh the league to get updated tournament list
       await selectLeague(currentLeague.id);
       invalidateStats();
-      setIsLinkingTournament(false);
-      setSelectedTournamentToLink('');
+      closeLinkTournament();
       setUnlinkedTournaments([]);
     } catch (error) {
       console.error('Error linking tournament:', error);
@@ -963,7 +997,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                   </h3>
                   <button
                     className="action-btn delete"
-                    onClick={() => { setIsLinkingTournament(false); setSelectedTournamentToLink(''); }}
+                    onClick={closeLinkTournament}
                   >
                     <X size={16} />
                   </button>
@@ -978,7 +1012,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <select
                       value={selectedTournamentToLink}
-                      onChange={(e) => setSelectedTournamentToLink(e.target.value)}
+                      onChange={(e) => handleSelectTournamentToLink(e.target.value)}
                       style={{
                         flex: 1,
                         minWidth: '200px',
@@ -991,20 +1025,52 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
                       }}
                     >
                       <option value="">{t('leagues.chooseTournament') || '-- Choose tournament --'}</option>
-                      {unlinkedTournaments.map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} ({t.status}) — {new Date(t.created_at).toLocaleDateString()}
+                      {unlinkedTournaments.map(tour => (
+                        <option key={tour.id} value={tour.id}>
+                          {tour.name} ({tour.status}) — {new Date(tour.created_at).toLocaleDateString()}
                         </option>
                       ))}
                     </select>
                     <button
                       className="action-btn play"
                       onClick={handleLinkTournament}
-                      disabled={!selectedTournamentToLink || isLinking}
-                      style={{ opacity: selectedTournamentToLink && !isLinking ? 1 : 0.5 }}
+                      disabled={!isLinkMapComplete || isLinking}
+                      style={{ opacity: isLinkMapComplete && !isLinking ? 1 : 0.5 }}
                     >
                       <Check size={16} />
                     </button>
+                  </div>
+                )}
+                {linkPlayers.length > 0 && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
+                      {t('leagues.mapPlayersHint')}
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 0.75rem', alignItems: 'center' }}>
+                      {linkPlayers.map(p => (
+                        <React.Fragment key={p.id}>
+                          <span style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{p.name}</span>
+                          <select
+                            value={linkPlayerMap[p.id] || ''}
+                            onChange={(e) => setLinkPlayerMap(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            style={{
+                              padding: '0.4rem',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              background: 'var(--input-bg)',
+                              color: linkPlayerMap[p.id] ? 'var(--text-primary)' : 'var(--accent-secondary)',
+                              fontSize: '0.9rem'
+                            }}
+                          >
+                            <option value="">{t('leagues.chooseMember')}</option>
+                            <option value="new">{t('leagues.newMember')}</option>
+                            {(currentLeague.members || []).map(m => m.player).filter(Boolean).map(m => (
+                              <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                          </select>
+                        </React.Fragment>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

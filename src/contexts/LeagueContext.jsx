@@ -277,9 +277,9 @@ export function LeagueProvider({ children }) {
     }
   };
 
-  const linkTournamentToLeague = async (leagueId, tournamentId) => {
+  const linkTournamentToLeague = async (leagueId, tournamentId, playerMap) => {
     try {
-      const tournament = await leagueService.linkTournamentToLeague(leagueId, tournamentId);
+      const tournament = await leagueService.linkTournamentToLeague(leagueId, tournamentId, playerMap);
       if (tournament && state.currentLeague?.id === leagueId) {
         dispatch({ type: ACTIONS.LINK_TOURNAMENT, payload: tournament });
         // Refresh leaderboard since points may have been calculated

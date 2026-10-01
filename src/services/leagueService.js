@@ -1129,23 +1129,29 @@ export const leagueService = {
   },
 
   // Link an existing tournament to a league (set league_id) and recalculate points
-  async linkTournamentToLeague(leagueId, tournamentId) {
+  // Players of an unlinked tournament, for the member-mapping step of linking.
+  async getTournamentPlayersForLink(tournamentId) {
+    const { data, error } = await supabase
+      .from('tournament_players')
+      .select('players(id, name)')
+      .eq('tournament_id', tournamentId);
+    if (error) throw error;
+    return (data || []).map(r => r.players).filter(Boolean);
+  },
+
+  // playerMap: [{ from: <tournament player id>, to: <member player id> | 'new' }]
+  // covering every tournament player. The RPC rewrites the tournament's player
+  // ids onto league members (rosters are per manager, so a tournament run by
+  // someone else references their player rows) and links it in one transaction.
+  async linkTournamentToLeague(leagueId, tournamentId, playerMap) {
     try {
-      // Set the league_id on the tournament
-      const { data: linkedRows, error: updateError } = await supabase
-        .from('tournaments')
-        .update({ league_id: leagueId, league_points_calculated: false })
-        .eq('id', tournamentId)
-        .is('league_id', null) // safety: only link if not already linked
-        .select('id');
-
-      if (updateError) throw updateError;
-
-      // 0 rows means the tournament is already linked to another league —
-      // awarding points here would credit this league for a foreign tournament.
-      if (!linkedRows || linkedRows.length === 0) {
-        throw new Error('TOURNAMENT_ALREADY_LINKED');
-      }
+      const { data: adopted, error: adoptError } = await supabase.rpc('adopt_tournament_into_league', {
+        t_id: tournamentId,
+        l_id: leagueId,
+        player_map: playerMap
+      });
+      if (adoptError) throw adoptError;
+      if (!adopted?.success) throw new Error(`adopt_tournament_into_league failed: ${adopted?.error || 'unknown'}`);
 
       // If the tournament is completed, calculate points right away
       const { data: tournament } = await supabase
