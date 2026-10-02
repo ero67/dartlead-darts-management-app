@@ -48,7 +48,7 @@ describe('Tournament Registration Flow', () => {
     // Find and click remove button (X button)
     // Player names are profile links, so walk up to the card and target the
     // remove button explicitly rather than "the last button next to the name".
-    cy.contains('Player to Remove').closest('.player-card').find('.remove-player-btn').click()
+    cy.contains('Player to Remove').closest('[data-testid="player-card"]').find('[data-testid="remove-player-btn"]').click()
     
     // Confirm removal if confirmation dialog appears
     cy.get('body').then(($body) => {
