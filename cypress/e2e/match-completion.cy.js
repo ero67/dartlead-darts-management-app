@@ -16,8 +16,7 @@ describe('Match Completion Flow', () => {
     })
     
     // Start tournament
-    cy.contains('button', /start tournament/i).click()
-    cy.url().should('include', '/tournament/')
+    cy.startTournament()
   })
 
   it('should display matches in groups', () => {

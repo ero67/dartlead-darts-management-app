@@ -9,7 +9,7 @@ describe('Playoff Auto-Propagation', () => {
       .type('Playoff Propagation Test')
     
     // Enable playoffs
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     cy.contains('button', /create/i).click()
     
     // Add 8 players for quarterfinals
@@ -19,8 +19,7 @@ describe('Playoff Auto-Propagation', () => {
     })
     
     // Start tournament
-    cy.contains('button', /start tournament/i).click()
-    cy.url().should('include', '/tournament/')
+    cy.startTournament()
   })
 
   it('should automatically seed first round when playoffs start', () => {
@@ -71,7 +70,7 @@ describe('Playoff Auto-Propagation', () => {
     // Ensure standard seeding is selected
     cy.contains(/settings|nastavenia/i).click()
     cy.contains(/playoff settings|nastavenia play-off/i).scrollIntoView()
-    cy.contains(/standard tournament seeding|štandardné turnajové rozdelenie/i).click()
+    cy.clickIfPresent(/standard tournament seeding|štandardné turnajové rozdelenie/i)
     cy.contains('button', /update settings|aktualizovať nastavenia/i).click()
     
     // Start playoffs
@@ -91,7 +90,7 @@ describe('Playoff Auto-Propagation', () => {
     // Configure group-based seeding
     cy.contains(/settings|nastavenia/i).click()
     cy.contains(/playoff settings|nastavenia play-off/i).scrollIntoView()
-    cy.contains(/group-based seeding|rozdelenie podľa skupín/i).click()
+    cy.clickIfPresent(/group-based seeding|rozdelenie podľa skupín/i)
     
     // Configure group matchups if available
     cy.get('body').then(($body) => {

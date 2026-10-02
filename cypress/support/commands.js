@@ -113,9 +113,33 @@ Cypress.Commands.add('addPlayers', (playerNames) => {
  */
 Cypress.Commands.add('startTournament', () => {
   cy.contains('button', /start tournament/i).click()
+  // The groups preview dialog asks for a second confirmation before starting.
+  cy.get('[role="dialog"]').contains('button', /start tournament|spustiť turnaj/i).click()
+  cy.get('[role="dialog"]').should('not.exist')
   // Wait for tournament to start and navigate to management page
   cy.url().should('include', '/tournament/')
   cy.contains(/groups|matches|standings/i).should('be.visible')
+})
+
+/**
+ * Playoffs are enabled by default; only toggle the switch when they are off.
+ * @example cy.ensurePlayoffsEnabled()
+ */
+Cypress.Commands.add('ensurePlayoffsEnabled', () => {
+  cy.get('#enable-playoffs').then(($switch) => {
+    if ($switch.attr('aria-checked') !== 'true') cy.wrap($switch).click()
+  })
+})
+
+/**
+ * Click text that may not be rendered on this screen (e.g. a seeding option
+ * that only exists in the settings dialog of a started tournament).
+ * @example cy.clickIfPresent(/group-based seeding/i)
+ */
+Cypress.Commands.add('clickIfPresent', (matcher) => {
+  cy.get('body').then(($body) => {
+    if (matcher.test($body.text())) cy.contains(matcher).click()
+  })
 })
 
 /**

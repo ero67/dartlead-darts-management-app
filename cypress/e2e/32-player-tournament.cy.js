@@ -14,7 +14,7 @@ describe('32 Player Tournament Flow', () => {
       .type(tournamentName)
     
     // Enable playoffs
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     
     // Configure groups: 8 groups with all players advancing
     // With 32 players and 8 groups = 4 players per group
@@ -29,7 +29,7 @@ describe('32 Player Tournament Flow', () => {
     
     // Set players advancing per group to "All" (value 9999)
     cy.get('body').then(($body) => {
-      if ($body.text().includes('Players Advancing Per Group') || $body.text().includes('Hráči Postupujúci')) {
+      if (/players advancing per group|hráči postupujúci/i.test($body.text())) {
         // Find the select dropdown for players per group
         cy.contains(/players advancing|hráči postupujúci/i).parent().find('[data-slot="select-trigger"]').then(($trigger) => {
           // Select "All" option (value 9999)
@@ -62,10 +62,7 @@ describe('32 Player Tournament Flow', () => {
     cy.log('✅ All 32 players added successfully')
     
     // Step 3: Start tournament
-    cy.contains('button', /start tournament/i).click()
-    
-    // Wait for tournament to start - check URL first
-    cy.url().should('include', '/tournament/')
+    cy.startTournament()
     
     // Wait for page to load and look for tab buttons or tournament management content
     cy.get('body').should('be.visible')
@@ -200,7 +197,7 @@ describe('32 Player Tournament Flow', () => {
     cy.contains('button', /create tournament/i).click()
     cy.get('input[placeholder*="tournament name" i], input[name*="tournament" i]').first()
       .type(tournamentName)
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     
     // Configure groups: 8 groups with all players advancing
     cy.get('[role="radio"][value="groups"]').click()
@@ -220,8 +217,7 @@ describe('32 Player Tournament Flow', () => {
     cy.contains(/players.*32|hráči.*32/i).should('be.visible')
     
     // Start tournament
-    cy.contains('button', /start tournament/i).click()
-    cy.url().should('include', '/tournament/')
+    cy.startTournament()
     
     // Verify groups were created - wait for page to load
     cy.wait(2000)
