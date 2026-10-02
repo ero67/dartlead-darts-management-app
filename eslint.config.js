@@ -26,4 +26,9 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // shadcn/ui files export cva variants next to their components
+    files: ['src/components/ui/**/*.jsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])

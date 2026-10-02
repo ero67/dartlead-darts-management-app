@@ -46,7 +46,6 @@ import { getUserDisplayName } from './utils/userDisplayName';
 import { DisplayNameEditor } from './components/DisplayNameEditor';
 import { PracticeBests } from './components/practice/PracticeBests';
 import { loadHistory } from './lib/practiceStorage';
-import './App.css';
 
 // Shown when a signed-in user has no player record yet (they have never been
 // approved into a tournament, so there are no stats to display).
