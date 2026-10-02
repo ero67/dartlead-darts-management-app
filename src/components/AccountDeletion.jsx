@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, AlertTriangle, X } from 'lucide-react';
+import { Trash2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
+} from '@/components/ui/dialog';
 
 // "Delete my account" — required by Google Play for any app with sign-up, and
 // the GDPR right to erasure. The database function delete_my_account() removes
@@ -45,49 +51,62 @@ export function AccountDeletion() {
   };
 
   return (
-    <section className="profile-section account-section">
-      <h2><Trash2 size={18} />{t('account.title')}</h2>
-      <p className="account-section__text">{t('account.deleteIntro')}</p>
-      <button type="button" className="danger-outline-btn" onClick={() => setIsOpen(true)}>
-        <Trash2 size={16} />
-        {t('account.deleteButton')}
-      </button>
+    <Card className="tw text-card-foreground">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Trash2 className="size-4 text-muted-foreground" />
+          {t('account.title')}
+        </CardTitle>
+        <CardDescription>{t('account.deleteIntro')}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button
+          type="button"
+          variant="outline"
+          className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => setIsOpen(true)}
+        >
+          <Trash2 />
+          {t('account.deleteButton')}
+        </Button>
+      </CardContent>
 
-      {isOpen && createPortal(
-        <div className="modal-overlay account-delete-overlay" onClick={close}>
-          <div className="modal-content account-delete-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="account-delete-modal__header">
-              <h2><AlertTriangle size={20} />{t('account.confirmTitle')}</h2>
-              <button type="button" className="close-btn" onClick={close} aria-label={t('common.cancel')} disabled={isDeleting}>
-                <X size={18} />
-              </button>
-            </div>
-            <div className="account-delete-modal__body">
-              <p>{t('account.confirmIntro')}</p>
-              <ul>
-                <li>{t('account.confirmRemoved')}</li>
-                <li>{t('account.confirmKept')}</li>
-                <li>{t('account.confirmIrreversible')}</li>
-              </ul>
-              <label className="account-delete-modal__check">
-                <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} disabled={isDeleting} />
-                <span>{t('account.confirmCheckbox')}</span>
-              </label>
-              {error && <p className="error-message">{error}</p>}
-            </div>
-            <div className="account-delete-modal__footer">
-              <button type="button" className="cancel-btn" onClick={close} disabled={isDeleting}>
-                {t('common.cancel')}
-              </button>
-              <button type="button" className="danger-btn" onClick={handleDelete} disabled={!confirmed || isDeleting}>
-                <Trash2 size={16} />
-                {isDeleting ? t('account.deleting') : t('account.confirmButton')}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </section>
+      <Dialog open={isOpen} onOpenChange={(open) => { if (!open) close(); }}>
+        <DialogContent className="tw text-foreground">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-destructive" />
+              {t('account.confirmTitle')}
+            </DialogTitle>
+            <DialogDescription>{t('account.confirmIntro')}</DialogDescription>
+          </DialogHeader>
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+            <li>{t('account.confirmRemoved')}</li>
+            <li>{t('account.confirmKept')}</li>
+            <li>{t('account.confirmIrreversible')}</li>
+          </ul>
+          <Label htmlFor="account-delete-confirm" className="items-start gap-3 leading-snug font-normal">
+            <Checkbox
+              id="account-delete-confirm"
+              checked={confirmed}
+              onCheckedChange={(checked) => setConfirmed(checked === true)}
+              disabled={isDeleting}
+              className="mt-0.5"
+            />
+            <span>{t('account.confirmCheckbox')}</span>
+          </Label>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={close} disabled={isDeleting}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={!confirmed || isDeleting}>
+              <Trash2 />
+              {isDeleting ? t('account.deleting') : t('account.confirmButton')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

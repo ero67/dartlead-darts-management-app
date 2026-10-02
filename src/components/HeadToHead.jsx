@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Users, Loader } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+// shadcn Select items need a non-empty value; '' (nobody picked) maps to this.
+const NONE = '__none';
 
 export function HeadToHead({ leagueId, players }) {
   const { t } = useLanguage();
@@ -85,63 +91,73 @@ export function HeadToHead({ leagueId, players }) {
   const p1Name = players.find(p => p.id === player1Id)?.name || '';
   const p2Name = players.find(p => p.id === player2Id)?.name || '';
 
+  const renderPlayerSelect = (value, onChange) => (
+    <Select value={value || NONE} onValueChange={(v) => onChange(v === NONE ? '' : v)}>
+      <SelectTrigger className="w-full min-w-0 flex-1" aria-label={t('leagues.selectPlayer')}>
+        <SelectValue placeholder={t('leagues.selectPlayer')} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NONE}>{t('leagues.selectPlayer')}</SelectItem>
+        {players.map(p => (
+          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
   return (
-    <div className="h2h-section">
-      <h3 className="h2h-title">
-        <Users size={18} />
-        {t('leagues.headToHead')}
-      </h3>
-      <div className="h2h-selectors">
-        <select value={player1Id} onChange={(e) => setPlayer1Id(e.target.value)}>
-          <option value="">{t('leagues.selectPlayer')}</option>
-          {players.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-        <span className="h2h-vs">{t('leagues.statVs')}</span>
-        <select value={player2Id} onChange={(e) => setPlayer2Id(e.target.value)}>
-          <option value="">{t('leagues.selectPlayer')}</option>
-          {players.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {loading && (
-        <div className="h2h-loading"><Loader size={16} className="spinning" /></div>
-      )}
-
-      {stats && !loading && stats.matches === 0 && (
-        <p className="h2h-no-matches">{t('leagues.noH2HMatches')}</p>
-      )}
-
-      {stats && !loading && stats.matches > 0 && (
-        <div className="h2h-results">
-          <div className="h2h-record">
-            <div className={`h2h-player ${stats.p1Wins > stats.p2Wins ? 'h2h-player--leading' : ''}`}>
-              <span className="h2h-player-name">{p1Name}</span>
-              <span className="h2h-player-wins">{stats.p1Wins}</span>
-            </div>
-            <div className="h2h-center">
-              <span className="h2h-matches-count">{t(stats.matches === 1 ? 'common.matchCountOne' : stats.matches < 5 ? 'common.matchCountFew' : 'common.matchCountMany', { count: stats.matches })}</span>
-            </div>
-            <div className={`h2h-player ${stats.p2Wins > stats.p1Wins ? 'h2h-player--leading' : ''}`}>
-              <span className="h2h-player-wins">{stats.p2Wins}</span>
-              <span className="h2h-player-name">{p2Name}</span>
-            </div>
-          </div>
-          <div className="h2h-details">
-            <div className="h2h-stat">
-              <span>{t('leagues.legsRecord')}</span>
-              <strong>{stats.p1Legs} : {stats.p2Legs}</strong>
-            </div>
-            <div className="h2h-stat">
-              <span>{t('leagues.avgAgainst')}</span>
-              <strong>{stats.p1Avg.toFixed(1)} : {stats.p2Avg.toFixed(1)}</strong>
-            </div>
-          </div>
+    <Card className="tw text-card-foreground">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="size-4 text-muted-foreground" />
+          {t('leagues.headToHead')}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {renderPlayerSelect(player1Id, setPlayer1Id)}
+          <span className="px-1 text-xs font-medium uppercase text-muted-foreground">{t('leagues.statVs')}</span>
+          {renderPlayerSelect(player2Id, setPlayer2Id)}
         </div>
-      )}
-    </div>
+
+        {loading && (
+          <div className="flex justify-center py-4 text-muted-foreground">
+            <Loader className="size-4 animate-spin" />
+          </div>
+        )}
+
+        {stats && !loading && stats.matches === 0 && (
+          <p className="py-2 text-center text-sm text-muted-foreground">{t('leagues.noH2HMatches')}</p>
+        )}
+
+        {stats && !loading && stats.matches > 0 && (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <div className={cn('flex flex-col gap-1', stats.p1Wins <= stats.p2Wins && 'text-muted-foreground')}>
+                <span className="truncate text-sm font-medium">{p1Name}</span>
+                <span className="text-4xl font-semibold tracking-tight tabular-nums">{stats.p1Wins}</span>
+              </div>
+              <span className="text-center text-xs text-muted-foreground">
+                {t(stats.matches === 1 ? 'common.matchCountOne' : stats.matches < 5 ? 'common.matchCountFew' : 'common.matchCountMany', { count: stats.matches })}
+              </span>
+              <div className={cn('flex flex-col items-end gap-1 text-right', stats.p2Wins <= stats.p1Wins && 'text-muted-foreground')}>
+                <span className="truncate text-sm font-medium">{p2Name}</span>
+                <span className="text-4xl font-semibold tracking-tight tabular-nums">{stats.p2Wins}</span>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3 text-sm">
+                <span className="text-muted-foreground">{t('leagues.legsRecord')}</span>
+                <strong className="tabular-nums">{stats.p1Legs} : {stats.p2Legs}</strong>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3 text-sm">
+                <span className="text-muted-foreground">{t('leagues.avgAgainst')}</span>
+                <strong className="tabular-nums">{stats.p1Avg.toFixed(1)} : {stats.p2Avg.toFixed(1)}</strong>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

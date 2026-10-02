@@ -5,12 +5,21 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { tournamentService } from '../services/tournamentService';
-import { tournamentStatusLabel as statusLabel } from '../utils/tournamentStatus';
+import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { StatusBadge } from './shared/StatusBadge';
+import { EmptyState } from './shared/EmptyState';
+import { StatTile } from './shared/StatTile';
 import { DisplayNameEditor } from './DisplayNameEditor';
 import { AccountDeletion } from './AccountDeletion';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { PracticeBests } from './practice/PracticeBests';
+import { tournamentService } from '../services/tournamentService';
 import { loadHistory } from '../lib/practiceStorage';
 
 const getInitials = (name) => {
@@ -26,6 +35,34 @@ const placementLabel = (placement, t) => {
   if (placement === 3) return t('playerProfile.placementThird');
   return null;
 };
+
+const WIN_BADGE = 'border-transparent bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200';
+const LOSS_BADGE = 'border-transparent bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200';
+const TITLE_BADGE = 'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200';
+const MEDAL_CLASS = { 1: 'text-amber-500', 2: 'text-zinc-400', 3: 'text-amber-700' };
+
+const ROW_BUTTON = 'flex w-full items-center gap-3 px-6 py-3 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none';
+
+function Section({ icon: Icon, title, children }) {
+  return (
+    <section className="flex flex-col gap-4">
+      <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        {Icon && <Icon className="size-4 text-muted-foreground" />}
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function BackButton({ onBack, t }) {
+  return (
+    <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
+      <ArrowLeft />
+      {t('common.back')}
+    </Button>
+  );
+}
 
 export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLeague, onSelectPlayer, onSelectPractice }) {
   const { t } = useLanguage();
@@ -55,26 +92,22 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t('common.loading')}</p>
+      <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8" aria-busy="true" aria-label={t('common.loading')}>
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+          {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
       </div>
     );
   }
 
   if (!profileData) {
     return (
-      <div className="player-profile">
-        <div className="profile-topbar">
-          <button className="back-btn" onClick={onBack}>
-            <ArrowLeft size={20} />
-            {t('common.back')}
-          </button>
-        </div>
-        <div className="profile-empty-state">
-          <Target size={40} />
-          <h2>{t('playerProfile.playerNotFound')}</h2>
-        </div>
+      <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+        <BackButton onBack={onBack} t={t} />
+        <EmptyState icon={Target} title={t('playerProfile.playerNotFound')} />
       </div>
     );
   }
@@ -111,7 +144,10 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
       key: 'winRate',
       icon: Percent,
       label: t('playerProfile.winRate'),
-      value: `${winRate.toFixed(careerStats.matchesPlayed > 0 ? 1 : 0)}%`
+      value: `${winRate.toFixed(careerStats.matchesPlayed > 0 ? 1 : 0)}%`,
+      hint: careerStats.matchesPlayed > 0
+        ? `${plural('winsCount', careerStats.wins)} · ${plural('lossesCount', careerStats.losses)}`
+        : undefined
     },
     {
       key: 'average',
@@ -122,30 +158,29 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   ];
 
   const statTiles = [
-    { key: 'wins', icon: Trophy, accent: 'success', label: t('playerProfile.wins'), value: careerStats.wins },
-    { key: 'losses', icon: Target, accent: 'danger', label: t('playerProfile.losses'), value: careerStats.losses },
-    { key: 'bestAverage', icon: Award, accent: 'primary', label: t('playerProfile.bestAverage'), value: careerStats.bestAverage.toFixed(2) },
-    { key: 'highestCheckout', icon: Zap, accent: 'warning', label: t('playerProfile.highestCheckout'), value: careerStats.highestCheckout || '—' },
-    { key: 'total180s', icon: Flame, accent: 'danger', label: t('playerProfile.total180s'), value: careerStats.total180s || 0 },
-    { key: 'legs', icon: Activity, accent: 'primary', label: t('playerProfile.legsRecord'), value: `${careerStats.totalLegsWon || 0}:${careerStats.totalLegsLost || 0}` },
-    { key: 'titles', icon: Crown, accent: 'warning', label: t('playerProfile.tournamentWins'), value: careerStats.tournamentWins || 0 },
-    { key: 'darts', icon: Target, accent: 'neutral', label: t('playerProfile.dartsThrown'), value: (careerStats.totalDarts || 0).toLocaleString() }
+    { key: 'wins', icon: Trophy, label: t('playerProfile.wins'), value: careerStats.wins },
+    { key: 'losses', icon: Target, label: t('playerProfile.losses'), value: careerStats.losses },
+    { key: 'bestAverage', icon: Award, label: t('playerProfile.bestAverage'), value: careerStats.bestAverage.toFixed(2) },
+    { key: 'highestCheckout', icon: Zap, label: t('playerProfile.highestCheckout'), value: careerStats.highestCheckout || '—' },
+    { key: 'total180s', icon: Flame, label: t('playerProfile.total180s'), value: careerStats.total180s || 0 },
+    { key: 'legs', icon: Activity, label: t('playerProfile.legsRecord'), value: `${careerStats.totalLegsWon || 0}:${careerStats.totalLegsLost || 0}` },
+    { key: 'titles', icon: Crown, label: t('playerProfile.tournamentWins'), value: careerStats.tournamentWins || 0 },
+    { key: 'darts', icon: Target, label: t('playerProfile.dartsThrown'), value: (careerStats.totalDarts || 0).toLocaleString() }
   ];
 
+  const practiceHistory = isOwnProfile ? loadHistory() : [];
+
   return (
-    <div className="player-profile">
-      <div className="profile-topbar">
-        <button className="back-btn" onClick={onBack}>
-          <ArrowLeft size={20} />
-          {t('common.back')}
-        </button>
-      </div>
+    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 text-foreground md:p-8">
+      <BackButton onBack={onBack} t={t} />
 
       {/* Hero */}
-      <header className="profile-hero">
-        <div className="profile-hero-main">
-          <div className="profile-avatar">{getInitials(player.name)}</div>
-          <div className="profile-identity">
+      <Card className="flex-col gap-6 p-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+          <Avatar className="size-20 shrink-0">
+            <AvatarFallback className="text-2xl font-semibold text-foreground">{getInitials(player.name)}</AvatarFallback>
+          </Avatar>
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
             {isOwnProfile && isEditingName ? (
               <DisplayNameEditor
                 currentName={player.name}
@@ -156,242 +191,240 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
                 onCancel={() => setIsEditingName(false)}
               />
             ) : (
-              <h1>
-                {player.name}
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-2xl font-semibold tracking-tight">{player.name}</h1>
                 {isOwnProfile && (
-                  <button
+                  <Button
                     type="button"
-                    className="profile-edit-name-btn"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground"
                     onClick={() => setIsEditingName(true)}
                     title={t('playerProfile.editName')}
                     aria-label={t('playerProfile.editName')}
                   >
-                    <Pencil size={16} />
-                  </button>
+                    <Pencil />
+                  </Button>
                 )}
-              </h1>
+              </div>
             )}
-            <div className="profile-meta">
+            <div className="flex flex-wrap gap-1.5">
               {isOwnProfile && (
-                <span className="profile-chip profile-chip--you">{t('playerProfile.yourProfile')}</span>
+                <Badge>{t('playerProfile.yourProfile')}</Badge>
               )}
               {player.user_id && (
-                <span className="profile-chip profile-chip--linked">
-                  <ShieldCheck size={13} />
+                <Badge variant="secondary">
+                  <ShieldCheck />
                   {t('playerProfile.linkedAccount')}
-                </span>
+                </Badge>
               )}
-              <span className="profile-chip">
-                <Trophy size={13} />
+              <Badge variant="outline">
+                <Trophy />
                 {plural('tournamentsCount', careerStats.tournamentsPlayed ?? tournaments.length)}
-              </span>
+              </Badge>
               {careerStats.tournamentWins > 0 && (
-                <span className="profile-chip profile-chip--title">
-                  <Crown size={13} />
+                <Badge variant="outline" className={TITLE_BADGE}>
+                  <Crown />
                   {plural('titlesCount', careerStats.tournamentWins)}
-                </span>
+                </Badge>
               )}
               {streak.count > 1 && (
-                <span className={`profile-chip ${streak.won ? 'profile-chip--win' : 'profile-chip--loss'}`}>
-                  <Flame size={13} />
+                <Badge variant="outline" className={streak.won ? WIN_BADGE : LOSS_BADGE}>
+                  <Flame />
                   {plural(streak.won ? 'winStreakCount' : 'lossStreakCount', streak.count)}
-                </span>
+                </Badge>
               )}
             </div>
           </div>
         </div>
 
-        <div className="profile-hero-stats">
-          {heroStats.map(stat => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.key} className="profile-hero-stat">
-                <Icon size={16} />
-                <strong>{stat.value}</strong>
-                <span>{stat.label}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {careerStats.matchesPlayed > 0 && (
-          <div className="profile-winrate">
-            <div className="profile-winrate-labels">
-              <span className="win">{plural('winsCount', careerStats.wins)}</span>
-              <span className="loss">{plural('lossesCount', careerStats.losses)}</span>
-            </div>
-            <div className="profile-winrate-bar">
-              <span className="profile-winrate-fill" style={{ width: `${winRate}%` }} />
-            </div>
+        <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[28rem]">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {heroStats.map(stat => (
+              <StatTile key={stat.key} label={stat.label} value={stat.value} icon={stat.icon} hint={stat.hint} />
+            ))}
           </div>
-        )}
-      </header>
+          {careerStats.matchesPlayed > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{plural('winsCount', careerStats.wins)}</span>
+                <span>{plural('lossesCount', careerStats.losses)}</span>
+              </div>
+              <Progress value={winRate} aria-label={t('playerProfile.winRate')} />
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Career Statistics */}
-      <section className="profile-section">
-        <h2><Activity size={18} />{t('playerProfile.careerStats')}</h2>
-        <div className="profile-stats-grid">
-          {statTiles.map(tile => {
-            const Icon = tile.icon;
-            return (
-              <div key={tile.key} className={`profile-stat-tile accent-${tile.accent}`}>
-                <span className="profile-stat-icon"><Icon size={16} /></span>
-                <strong className="profile-stat-value">{tile.value}</strong>
-                <span className="profile-stat-label">{tile.label}</span>
-              </div>
-            );
-          })}
+      <Section icon={Activity} title={t('playerProfile.careerStats')}>
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+          {statTiles.map(tile => (
+            <StatTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} />
+          ))}
         </div>
-      </section>
+      </Section>
 
-      {/* Recent form */}
-      {isOwnProfile && loadHistory().length > 0 && (
-        <section className="profile-section">
-          <h2><Target size={18} />{t('practice.bests.profileTitle')}</h2>
-          <PracticeBests entries={loadHistory()} compact />
-          <button type="button" className="profile-link-btn" onClick={() => onSelectPractice?.()}>
-            {t('practice.bests.openPractice')} <ChevronRight size={14} />
-          </button>
-        </section>
+      {/* Practice bests */}
+      {isOwnProfile && practiceHistory.length > 0 && (
+        <Section icon={Target} title={t('practice.bests.profileTitle')}>
+          <Card>
+            <CardContent>
+              <PracticeBests entries={practiceHistory} compact />
+            </CardContent>
+            <CardFooter>
+              <Button type="button" variant="link" className="h-auto p-0" onClick={() => onSelectPractice?.()}>
+                {t('practice.bests.openPractice')} <ChevronRight />
+              </Button>
+            </CardFooter>
+          </Card>
+        </Section>
       )}
 
-      <section className="profile-section">
-        <h2><Swords size={18} />{t('playerProfile.recentMatches')}</h2>
+      {/* Recent matches */}
+      <Section icon={Swords} title={t('playerProfile.recentMatches')}>
         {recentMatches.length > 0 ? (
-          <>
-            <div className="profile-form-pills">
-              {[...recentMatches].reverse().map(match => (
-                <span
-                  key={match.id}
-                  className={`profile-form-pill ${match.won ? 'win' : 'loss'}`}
-                  title={`${match.opponentName || t('common.unknown')} ${match.legsFor}:${match.legsAgainst}`}
-                >
-                  {match.won ? t('playerProfile.formWin') : t('playerProfile.formLoss')}
-                </span>
-              ))}
-            </div>
-            <div className="profile-match-list">
-              {recentMatches.map(match => (
-                <div key={match.id} className={`profile-match-row ${match.won ? 'win' : 'loss'}`}>
-                  <span className={`profile-match-result ${match.won ? 'win' : 'loss'}`}>
+          <Card className="gap-4 pb-0">
+            <CardHeader>
+              <div className="flex flex-wrap gap-1">
+                {[...recentMatches].reverse().map(match => (
+                  <Badge
+                    key={match.id}
+                    variant="outline"
+                    className={cn('size-6 justify-center p-0', match.won ? WIN_BADGE : LOSS_BADGE)}
+                    title={`${match.opponentName || t('common.unknown')} ${match.legsFor}:${match.legsAgainst}`}
+                  >
                     {match.won ? t('playerProfile.formWin') : t('playerProfile.formLoss')}
-                  </span>
-                  <div className="profile-match-main">
-                    <span className="profile-match-opponent">
-                      {t('playerProfile.versus')}{' '}
-                      {match.opponentId && onSelectPlayer ? (
-                        <button
-                          type="button"
-                          className="profile-link-btn"
-                          onClick={() => onSelectPlayer({ id: match.opponentId })}
-                        >
-                          {match.opponentName || t('common.unknown')}
-                        </button>
-                      ) : (
-                        match.opponentName || t('common.unknown')
+                  </Badge>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent className="divide-y px-0">
+              {recentMatches.map(match => (
+                <div key={match.id} className="flex items-center gap-3 px-6 py-3 text-sm">
+                  <Badge variant="outline" className={cn('size-6 shrink-0 justify-center p-0', match.won ? WIN_BADGE : LOSS_BADGE)}>
+                    {match.won ? t('playerProfile.formWin') : t('playerProfile.formLoss')}
+                  </Badge>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex flex-wrap items-center gap-1.5 font-medium">
+                      <span>
+                        {t('playerProfile.versus')}{' '}
+                        {match.opponentId && onSelectPlayer ? (
+                          <button
+                            type="button"
+                            className="font-medium underline-offset-4 hover:underline"
+                            onClick={() => onSelectPlayer({ id: match.opponentId })}
+                          >
+                            {match.opponentName || t('common.unknown')}
+                          </button>
+                        ) : (
+                          match.opponentName || t('common.unknown')
+                        )}
+                      </span>
+                      {match.isPlayoff && (
+                        <Badge variant="outline">{t('playerProfile.playoffTag')}</Badge>
                       )}
                     </span>
-                    <span className="profile-match-context">
-                      {match.isPlayoff && (
-                        <span className="profile-match-tag">{t('playerProfile.playoffTag')}</span>
-                      )}
-                      {match.tournamentName && (
-                        <span className="profile-match-tournament">{match.tournamentName}</span>
-                      )}
-                      {match.playedAt && (
-                        <span className="profile-match-date">
-                          {new Date(match.playedAt).toLocaleDateString()}
-                        </span>
-                      )}
+                    {(match.tournamentName || match.playedAt) && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {[
+                          match.tournamentName,
+                          match.playedAt ? new Date(match.playedAt).toLocaleDateString() : null
+                        ].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end">
+                    <span className="text-lg font-semibold tabular-nums">{match.legsFor}:{match.legsAgainst}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {match.average ? match.average.toFixed(2) : '—'} {t('playerProfile.avgShort')}
                     </span>
                   </div>
-                  <span className="profile-match-score">{match.legsFor}:{match.legsAgainst}</span>
-                  <span className="profile-match-avg">
-                    {match.average ? match.average.toFixed(2) : '—'}
-                    <small>{t('playerProfile.avgShort')}</small>
-                  </span>
                   {match.result && (
-                    <button
+                    <Button
                       type="button"
-                      className="profile-match-stats-btn"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground"
                       onClick={() => setStatsMatch(match)}
                       title={t('matchStats.open')}
                       aria-label={t('matchStats.open')}
                     >
-                      <BarChart3 size={16} />
-                    </button>
+                      <BarChart3 />
+                    </Button>
                   )}
                 </div>
               ))}
-            </div>
-          </>
+            </CardContent>
+          </Card>
         ) : (
-          <p className="profile-empty-text">{t('playerProfile.noMatches')}</p>
+          <EmptyState icon={Swords} title={t('playerProfile.noMatches')} />
         )}
-      </section>
+      </Section>
 
       {/* Tournament History */}
-      <section className="profile-section">
-        <h2><Trophy size={18} />{t('playerProfile.tournamentHistory')}</h2>
+      <Section icon={Trophy} title={t('playerProfile.tournamentHistory')}>
         {tournaments.length > 0 ? (
-          <div className="profile-tournament-list">
-            {tournaments.map(tourn => (
-              <button
-                type="button"
-                key={tourn.id}
-                className="tournament-history-item"
-                onClick={() => onSelectTournament && onSelectTournament(tourn)}
-              >
-                <span className={`profile-placement place-${tourn.placement || 'none'}`}>
-                  {tourn.placement ? (
-                    <>
-                      <Medal size={14} />
-                      {tourn.placement}
-                    </>
-                  ) : (
-                    <Trophy size={14} />
-                  )}
-                </span>
-                <span className="tournament-name">{tourn.name}</span>
-                {tourn.placement && (
-                  <span className={`profile-placement-label place-${tourn.placement}`}>
-                    {placementLabel(tourn.placement, t)}
+          <Card className="py-0">
+            <CardContent className="divide-y px-0">
+              {tournaments.map((tourn, index) => (
+                <button
+                  type="button"
+                  key={tourn.id}
+                  className={ROW_BUTTON}
+                  onClick={() => onSelectTournament && onSelectTournament(tourn)}
+                >
+                  <span className="flex w-8 shrink-0 items-center justify-center">
+                    {tourn.placement && tourn.placement <= 3 ? (
+                      <Medal className={cn('size-5', MEDAL_CLASS[tourn.placement])} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground tabular-nums">{tourn.placement || index + 1}</span>
+                    )}
                   </span>
-                )}
-                <span className={`status-badge ${tourn.status}`}>{statusLabel(tourn.status, t)}</span>
-                <span className="tournament-date">
-                  <Calendar size={14} />
-                  {new Date(tourn.created_at).toLocaleDateString()}
-                </span>
-                <ChevronRight size={16} className="profile-row-chevron" />
-              </button>
-            ))}
-          </div>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate font-medium">{tourn.name}</span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Calendar className="size-3.5" />
+                      {new Date(tourn.created_at).toLocaleDateString()}
+                    </span>
+                  </span>
+                  {tourn.placement && placementLabel(tourn.placement, t) && (
+                    <Badge variant="outline" className={cn(tourn.placement === 1 && TITLE_BADGE)}>
+                      {placementLabel(tourn.placement, t)}
+                    </Badge>
+                  )}
+                  <StatusBadge status={tourn.status} t={t} />
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </CardContent>
+          </Card>
         ) : (
-          <p className="profile-empty-text">{t('playerProfile.noTournaments')}</p>
+          <EmptyState icon={Trophy} title={t('playerProfile.noTournaments')} />
         )}
-      </section>
+      </Section>
 
       {/* League Memberships */}
       {leagues.length > 0 && (
-        <section className="profile-section">
-          <h2><Crown size={18} />{t('playerProfile.leagues')}</h2>
-          <div className="profile-tournament-list">
-            {leagues.map(lm => (
-              <button
-                type="button"
-                key={lm.league_id}
-                className="league-membership-item"
-                onClick={() => onSelectLeague && onSelectLeague({ id: lm.league_id })}
-              >
-                <Crown size={16} />
-                <span className="league-membership-name">{lm.leagues?.name || lm.league_id}</span>
-                {lm.is_active && <span className="active-badge">{t('common.active')}</span>}
-                <ChevronRight size={16} className="profile-row-chevron" />
-              </button>
-            ))}
-          </div>
-        </section>
+        <Section icon={Crown} title={t('playerProfile.leagues')}>
+          <Card className="py-0">
+            <CardContent className="divide-y px-0">
+              {leagues.map(lm => (
+                <button
+                  type="button"
+                  key={lm.league_id}
+                  className={ROW_BUTTON}
+                  onClick={() => onSelectLeague && onSelectLeague({ id: lm.league_id })}
+                >
+                  <Crown className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate font-medium">{lm.leagues?.name || lm.league_id}</span>
+                  {lm.is_active && <Badge variant="outline" className={WIN_BADGE}>{t('common.active')}</Badge>}
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        </Section>
       )}
 
       {isOwnProfile && <AccountDeletion />}
