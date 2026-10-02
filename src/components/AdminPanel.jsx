@@ -6,6 +6,22 @@ import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ManagerBilling } from './ManagerBilling';
 import { AdminOverview } from './AdminOverview';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EmptyState } from './shared/EmptyState';
+import { tournamentStatusClass } from '../utils/tournamentStatus';
+import { cn } from '@/lib/utils';
+
+// shadcn Select items need a non-empty value; '' sentinels map to this.
+const NONE = '__none';
+const fromSelect = (v) => (v === NONE ? '' : v);
 
 const ADMIN_TABS = [
   { key: 'overview', label: 'Overview', icon: Trophy },
@@ -74,7 +90,7 @@ export function AdminPanel() {
 
     try {
       // Call Supabase RPC function to set manager role (secure version checks admin)
-      const { data, error } = await supabase.rpc('set_user_role_secure', {
+      const { error } = await supabase.rpc('set_user_role_secure', {
         user_email: email.trim().toLowerCase(),
         user_role: 'manager'
       });
@@ -114,7 +130,7 @@ export function AdminPanel() {
     setMessage({ type: '', text: '' });
 
     try {
-      const { data, error } = await supabase.rpc('set_user_role_secure', {
+      const { error } = await supabase.rpc('set_user_role_secure', {
         user_email: userEmail,
         user_role: null
       });
@@ -584,896 +600,699 @@ export function AdminPanel() {
     loadAllPlayers();
   }, []);
 
+  const filteredPlayers = (search) => allPlayers.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
+  const playerName = (id) => allPlayers.find(p => p.id === id)?.name || id;
+
+  const messageBox = message.text && (
+    <Alert
+      variant={message.type === 'success' ? 'default' : 'destructive'}
+      className={message.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200' : ''}
+    >
+      {message.type === 'success' ? <Check /> : <AlertCircle />}
+      <AlertDescription className={message.type === 'success' ? 'text-current' : ''}>{message.text}</AlertDescription>
+    </Alert>
+  );
+
+  const logBox = (title, lines) => lines.length > 0 && (
+    <div className="rounded-lg bg-muted p-4 font-mono text-xs">
+      <strong className="mb-2 block">{title}</strong>
+      {lines.map((line, i) => (
+        <div key={i} className="py-0.5 text-muted-foreground">{line}</div>
+      ))}
+    </div>
+  );
+
+  const removableChip = (id, onRemove) => (
+    <Badge key={id} variant="outline" className="gap-1 bg-red-100 text-red-800 line-through dark:bg-red-950 dark:text-red-200">
+      {playerName(id)}
+      <button type="button" className="inline-flex no-underline" onClick={() => onRemove(id)} title="Remove" aria-label="Remove">
+        <X className="size-3" />
+      </button>
+    </Badge>
+  );
+
   return (
-    <div className="admin-panel-page">
-      <div className="admin-panel-header">
-        <div className="admin-panel-title">
-          <Crown size={24} />
-          <h1>Admin Panel</h1>
+    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Admin Panel</h1>
+          <p className="text-sm text-muted-foreground">Manage users, tournaments, and matches</p>
         </div>
-        <p className="admin-panel-subtitle">Manage users, tournaments, and matches</p>
       </div>
 
-      <div className="management-tabs admin-tabs" role="tablist">
-        {ADMIN_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            role="tab"
-            aria-selected={activeTab === tab.key}
-            className={activeTab === tab.key ? 'active' : ''}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {React.createElement(tab.icon, { size: 16 })}
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
+        <TabsList className="h-auto flex-wrap">
+          {ADMIN_TABS.map((tab) => (
+            <TabsTrigger key={tab.key} value={tab.key}>
+              <tab.icon />
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <div className="admin-panel-content">
-        {activeTab === 'overview' && (
+        <TabsContent value="overview">
           <AdminOverview onOpenBilling={() => setActiveTab('billing')} />
-        )}
+        </TabsContent>
 
-        {activeTab === 'users' && (<>
-        {/* Set Manager Role Section */}
-        <div className="admin-section">
-          <div className="admin-section-header">
-            <UserPlus size={20} />
-            <h2>Assign Manager Role</h2>
-          </div>
-          <p className="admin-section-description">
-            Managers can create tournaments. Enter a user's email address to grant manager permissions.
-          </p>
+        <TabsContent value="users" className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assign Manager Role</CardTitle>
+              <CardDescription>
+                Managers can create tournaments. Enter a user's email address to grant manager permissions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="email">
+                  <Mail className="size-4" />
+                  Email Address
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  onKeyPress={(e) => e.key === 'Enter' && !loading && setManagerRole()}
+                  disabled={loading}
+                  className="max-w-md"
+                />
+              </div>
+              <Button className="w-fit" onClick={setManagerRole} disabled={loading || !email.trim()}>
+                {loading ? (
+                  <>
+                    <Loader className="animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus />
+                    Assign Manager Role
+                  </>
+                )}
+              </Button>
+              {messageBox}
+            </CardContent>
+          </Card>
 
-          <div className="admin-form">
-            <div className="form-group">
-              <label htmlFor="email">
-                <Mail size={16} />
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
-                onKeyPress={(e) => e.key === 'Enter' && !loading && setManagerRole()}
-                disabled={loading}
-              />
-            </div>
-
-        <button 
-              className="admin-button primary"
-              onClick={setManagerRole}
-              disabled={loading || !email.trim()}
-        >
-              {loading ? (
-                <>
-                  <Loader size={16} className="spinning" />
-                  Assigning...
-                </>
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Managers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingManagers ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader className="size-5 animate-spin" />
+                  <span>Loading managers...</span>
+                </div>
+              ) : managers.length === 0 ? (
+                <EmptyState icon={Crown} title="No managers assigned yet." />
               ) : (
-                <>
-                  <UserPlus size={16} />
-                  Assign Manager Role
-                </>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="w-0" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {managers.map((manager) => (
+                      <TableRow key={manager.id}>
+                        <TableCell className="font-medium">{manager.email}</TableCell>
+                        <TableCell className="text-muted-foreground">{manager.full_name}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => removeManagerRole(manager.email)}
+                            disabled={loading}
+                            title="Remove manager role"
+                          >
+                            <X />
+                            Remove
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
-        </button>
-      </div>
+            </CardContent>
+          </Card>
 
-          {message.text && (
-            <div className={`admin-message ${message.type}`}>
-              {message.type === 'success' ? (
-                <Check size={16} />
-              ) : (
-                <AlertCircle size={16} />
-              )}
-              <span>{message.text}</span>
-            </div>
-          )}
-        </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>View All Users</CardTitle>
+              <CardDescription>View all registered users and their roles.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <Button className="w-fit" onClick={loadAllUsers} disabled={loadingUsers}>
+                {loadingUsers ? (
+                  <>
+                    <Loader className="animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Users />
+                    Load All Users
+                  </>
+                )}
+              </Button>
 
-        {/* Managers List Section */}
-          <div className="admin-section">
-          <div className="admin-section-header">
-            <Crown size={20} />
-            <h2>Current Managers</h2>
-          </div>
+              {loadingUsers && allUsers.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader className="size-5 animate-spin" />
+                  <span>Loading users...</span>
+                </div>
+              ) : allUsers.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell className="text-muted-foreground">{user.full_name || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={user.role === 'admin' ? 'default' : user.role === 'manager' ? 'secondary' : 'outline'}>{user.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
+                          {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : null}
+            </CardContent>
+          </Card>
 
-          {loadingManagers ? (
-            <div className="admin-loading">
-              <Loader size={20} className="spinning" />
-              <span>Loading managers...</span>
-            </div>
-          ) : managers.length === 0 ? (
-            <div className="admin-empty">
-              <p>No managers assigned yet.</p>
-            </div>
-          ) : (
-            <div className="managers-list">
-              {managers.map((manager) => (
-                <div key={manager.id} className="manager-item">
-                  <div className="manager-info">
-                    <div className="manager-email">{manager.email}</div>
-                    {manager.full_name && (
-                      <div className="manager-name">{manager.full_name}</div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Link Account to Player Stats</CardTitle>
+              <CardDescription>
+                Attach the results a player already has — from tournaments they played under their name, before they had a login — to their account.
+                Everything recorded against that player record (matches, averages, 180s, checkouts, tournament history, league memberships) then shows on their profile.
+                If they used more than one spelling of their name, merge those records in at the same time.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label>
+                  <UserPlus className="size-4" />
+                  Account
+                </Label>
+                <UserSearchPicker onSelect={handleSelectLinkUser} />
+                {linkUser && (
+                  <div className="flex flex-col gap-1.5 rounded-lg bg-muted p-3 text-sm">
+                    <div>
+                      <strong>{linkUser.fullName}</strong>
+                      <span className="text-muted-foreground"> — {linkUser.email}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {linkUserPlayer
+                        ? <>Currently linked to player <strong>&quot;{linkUserPlayer.name}&quot;</strong></>
+                        : 'No player record linked yet'}
+                    </div>
+                    {linkUserPlayer && (
+                      <Button variant="outline" size="sm" className="w-fit" onClick={handleUnlinkPlayer} disabled={linking}>
+                        <Unlink />
+                        Unlink
+                      </Button>
                     )}
                   </div>
-              <button 
-                    className="admin-button danger small"
-                    onClick={() => removeManagerRole(manager.email)}
-                    disabled={loading}
-                    title="Remove manager role"
-              >
-                    <X size={14} />
-                    Remove
-              </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* View All Users Section */}
-        <div className="admin-section">
-          <div className="admin-section-header">
-            <Users size={20} />
-            <h2>View All Users</h2>
-          </div>
-          <p className="admin-section-description">
-            View all registered users and their roles.
-          </p>
-              
-              <button 
-            className="admin-button primary"
-            onClick={loadAllUsers}
-            disabled={loadingUsers}
-          >
-            {loadingUsers ? (
-              <>
-                <Loader size={16} className="spinning" />
-                Loading...
-              </>
-            ) : (
-              <>
-                <Users size={16} />
-                Load All Users
-              </>
-            )}
-              </button>
-              
-          {loadingUsers && allUsers.length === 0 ? (
-            <div className="admin-loading">
-              <Loader size={20} className="spinning" />
-              <span>Loading users...</span>
-            </div>
-          ) : allUsers.length > 0 ? (
-            <div className="users-list" style={{ marginTop: '1.5rem' }}>
-              <div className="users-table-header">
-                <div>Email</div>
-                <div>Name</div>
-                <div>Role</div>
-                <div>Created</div>
+                )}
               </div>
-              {allUsers.map((user) => (
-                <div key={user.id} className="user-item">
-                  <div className="user-email">{user.email}</div>
-                  <div className="user-name">{user.full_name || '-'}</div>
-                  <div className="user-role-badge">
-                    <span className={`role-badge ${user.role}`}>{user.role}</span>
+
+              {linkUser && (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="linkPlayerSearch">
+                      <Search className="size-4" />
+                      Filter Player Records
+                    </Label>
+                    <Input
+                      id="linkPlayerSearch"
+                      type="text"
+                      value={linkPlayerSearch}
+                      onChange={(e) => setLinkPlayerSearch(e.target.value)}
+                      placeholder="Type to filter player names..."
+                      className="max-w-md"
+                    />
                   </div>
-                  <div className="user-created">
-                    {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+
+                  <div className="flex flex-col gap-2">
+                    <Label>
+                      <Users className="size-4" />
+                      Player record to attach
+                    </Label>
+                    <Select value={linkPlayerId || NONE} onValueChange={(v) => setLinkPlayerId(fromSelect(v))} disabled={!!linkUserPlayer}>
+                      <SelectTrigger className="w-full max-w-md">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>-- Select a player --</SelectItem>
+                        {filteredPlayers(linkPlayerSearch)
+                          .filter(p => !p.user_id || p.id === linkUserPlayer?.id)
+                          .map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Only records that no account has claimed are listed.
+                      {linkUserPlayer && ' This account is already linked, so the profile is fixed — use the merge list below to fold other spellings into it.'}
+                    </p>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
 
-        </>)}
+                  {/* Stats preview so the admin can confirm it's the right person */}
+                  {loadingLinkPreview && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader className="size-4 animate-spin" />
+                      <span>Loading statistics...</span>
+                    </div>
+                  )}
+                  {!loadingLinkPreview && linkPreview && (
+                    <div className="flex flex-col gap-2 rounded-lg bg-muted p-4 text-sm">
+                      <strong>{linkPreview.player.name}</strong>
+                      <div className="flex flex-wrap gap-x-5 gap-y-1 text-muted-foreground tabular-nums">
+                        <span>{linkPreview.tournaments.length} tournaments</span>
+                        <span>{linkPreview.careerStats.matchesPlayed} matches</span>
+                        <span>{linkPreview.careerStats.wins}W / {linkPreview.careerStats.losses}L</span>
+                        <span>avg {linkPreview.careerStats.overallAverage.toFixed(2)}</span>
+                        <span>{linkPreview.careerStats.total180s} × 180</span>
+                        <span>{linkPreview.careerStats.tournamentWins} titles</span>
+                      </div>
+                      {linkPreview.tournaments.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          {linkPreview.tournaments.slice(0, 5).map(t => t.name).join(', ')}
+                          {linkPreview.tournaments.length > 5 && ` +${linkPreview.tournaments.length - 5} more`}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-        {activeTab === 'billing' && <ManagerBilling />}
+                  {/* Optional: other spellings to fold in */}
+                  <div className="flex flex-col gap-2">
+                    <Label>
+                      <GitMerge className="size-4" />
+                      Also merge these records (optional)
+                    </Label>
+                    <Select value={NONE} onValueChange={(v) => addLinkExtraPlayer(fromSelect(v))}>
+                      <SelectTrigger className="w-full max-w-md">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>-- Add another spelling of the name --</SelectItem>
+                        {filteredPlayers(linkPlayerSearch)
+                          .filter(p => !p.user_id && p.id !== linkPlayerId && !linkExtraPlayerIds.includes(p.id))
+                          .map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    {linkExtraPlayerIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {linkExtraPlayerIds.map(id => removableChip(id, removeLinkExtraPlayer))}
+                      </div>
+                    )}
+                    {linkExtraPlayerIds.length > 0 && (
+                      <p className="text-xs text-destructive">
+                        These {linkExtraPlayerIds.length} record(s) will be merged into the profile above and permanently deleted. This cannot be undone.
+                      </p>
+                    )}
+                  </div>
 
-        {activeTab === 'data' && (<>
-        {/* Force Tournament Status Section */}
-        <div className="admin-section">
-          <div className="admin-section-header">
-            <Settings size={20} />
-            <h2>Force Tournament Status</h2>
-          </div>
-          <p className="admin-section-description">
-            Select a tournament from the list and manually change its status.
-          </p>
-
-          <div className="admin-form">
-            <div className="form-group">
-              <label htmlFor="tournamentForStatus">
-                <Search size={16} />
-                Select Tournament
-              </label>
-              <select
-                id="tournamentForStatus"
-                value={selectedTournamentForStatus}
-                onChange={(e) => handleTournamentSelectForStatus(e.target.value)}
-                disabled={loadingTournaments || loadingTournament}
-              >
-                <option value="">-- Select a tournament --</option>
-                {tournamentsForStatus.map((tournament) => (
-                  <option key={tournament.id} value={tournament.id}>
-                    {tournament.name} ({tournament.status})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {loadingTournament && (
-              <div className="admin-loading">
-                <Loader size={16} className="spinning" />
-                <span>Loading tournament...</span>
-        </div>
-      )}
-
-            {tournamentInfo && (
-              <div style={{ marginTop: '1.5rem' }}>
-                <div className="form-group">
-                  <label htmlFor="newStatus">
-                    Current Status: <span className={`status-badge ${tournamentInfo.status}`}>{tournamentInfo.status}</span>
-                  </label>
-                  <label htmlFor="newStatus" style={{ marginTop: '1rem', display: 'block' }}>
-                    New Status:
-                  </label>
-                  <select
-                    id="newStatus"
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
+                  <Button
+                    className="w-full"
+                    onClick={handleLinkStatsToUser}
+                    disabled={!linkPlayerId || linking || (!!linkUserPlayer && linkExtraPlayerIds.length === 0)}
                   >
-                    <option value="open_for_registration">Open for Registration</option>
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </div>
+                    {linking ? (
+                      <>
+                        <Loader className="animate-spin" />
+                        Linking...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon />
+                        {linkExtraPlayerIds.length > 0
+                          ? `Merge ${linkExtraPlayerIds.length} record(s) and link to account`
+                          : 'Link stats to account'}
+                      </>
+                    )}
+                  </Button>
 
-                <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <strong>Tournament:</strong> {tournamentInfo.name}
-                  </div>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <strong>Players:</strong> {tournamentInfo.players?.length || 0}
-                  </div>
-                  <div style={{ marginBottom: '0.5rem' }}>
-                    <strong>Groups:</strong> {tournamentInfo.groups?.length || 0}
-                  </div>
-                </div>
+                  {logBox('Log:', linkLog)}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                <button
-                  className="admin-button primary"
-                  onClick={forceTournamentStatus}
-                  disabled={loadingTournament || newStatus === tournamentInfo.status}
-                  style={{ marginTop: '1rem', width: '100%' }}
+        <TabsContent value="billing">
+          <ManagerBilling />
+        </TabsContent>
+
+        <TabsContent value="data" className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Force Tournament Status</CardTitle>
+              <CardDescription>Select a tournament from the list and manually change its status.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="tournamentForStatus">
+                  <Search className="size-4" />
+                  Select Tournament
+                </Label>
+                <Select
+                  value={selectedTournamentForStatus || NONE}
+                  onValueChange={(v) => handleTournamentSelectForStatus(fromSelect(v))}
+                  disabled={loadingTournaments || loadingTournament}
                 >
-                  {loadingTournament ? (
-                    <>
-                      <Loader size={16} className="spinning" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <Settings size={16} />
-                      Update Status
-                    </>
-                  )}
-              </button>
-            </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── League Points Management ─────────────────────────────── */}
-        <div className="admin-section">
-          <div className="admin-section-header">
-            <Trophy size={20} />
-            <h2>League Points Management</h2>
-          </div>
-          <p className="admin-section-description">
-            Add bonus points for tournaments played outside the app. These bonus points are preserved when the leaderboard is recalculated. The total is always: Tournament Points + Bonus Points.
-          </p>
-
-          <div className="admin-form">
-            <div className="form-group">
-              <label>Select League</label>
-              <select
-                value={selectedLeagueForPoints}
-                onChange={(e) => handleLeagueSelectForPoints(e.target.value)}
-                disabled={loadingLeagues}
-              >
-                <option value="">-- Choose a league --</option>
-                {leaguesForPoints.map(league => (
-                  <option key={league.id} value={league.id}>
-                    {league.name} ({league.status})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {loadingLeaderboard && (
-              <div className="admin-loading">
-                <Loader size={16} className="spinning" />
-                <span>Loading leaderboard...</span>
+                  <SelectTrigger id="tournamentForStatus" className="w-full max-w-md">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- Select a tournament --</SelectItem>
+                    {tournamentsForStatus.map((tournament) => (
+                      <SelectItem key={tournament.id} value={tournament.id}>
+                        {tournament.name} ({tournament.status})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            {selectedLeagueForPoints && !loadingLeaderboard && leaderboardEntries.length === 0 && (
-              <p style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
-                No leaderboard entries found. Recalculate the leaderboard from the league settings first.
-              </p>
-            )}
-
-            {leaderboardEntries.length > 0 && (
-              <div style={{ marginTop: '1rem' }}>
-                <div style={{ 
-                  overflowX: 'auto',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px'
-                }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'var(--bg-tertiary)' }}>
-                        <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>#</th>
-                        <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}>Player</th>
-                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.8rem' }}>From Tournaments</th>
-                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.8rem' }}>Bonus Pts</th>
-                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.8rem' }}>Total</th>
-                        <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem' }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leaderboardEntries.map((entry, index) => {
-                        const isChanged = editedPoints[entry.playerId] !== undefined && editedPoints[entry.playerId] !== entry.manualPoints;
-                        const previewTotal = entry.tournamentPoints + (editedPoints[entry.playerId] ?? entry.manualPoints);
-                        return (
-                          <tr 
-                            key={entry.playerId}
-                            style={{ 
-                              borderTop: '1px solid var(--border-color)',
-                              background: isChanged ? 'var(--accent-primary-light, rgba(59, 130, 246, 0.08))' : 'transparent'
-                            }}
-                          >
-                            <td style={{ padding: '0.6rem 0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                              {index + 1}
-                            </td>
-                            <td style={{ padding: '0.6rem 0.75rem', color: 'var(--text-primary)', fontWeight: '500' }}>
-                              {entry.playerName}
-                            </td>
-                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                              {entry.tournamentPoints}
-                            </td>
-                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
-                              <input
-                                type="number"
-                                min="0"
-                                value={editedPoints[entry.playerId] ?? entry.manualPoints}
-                                onChange={(e) => handlePointChange(entry.playerId, e.target.value)}
-                                style={{
-                                  width: '70px',
-                                  padding: '0.35rem 0.5rem',
-                                  border: `1px solid ${isChanged ? 'var(--accent-primary, #3b82f6)' : 'var(--border-color)'}`,
-                                  borderRadius: '6px',
-                                  background: 'var(--input-bg)',
-                                  color: 'var(--text-primary)',
-                                  textAlign: 'center',
-                                  fontSize: '0.9rem',
-                                  fontWeight: isChanged ? '700' : '400'
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: '600' }}>
-                              {isChanged ? previewTotal : entry.totalPoints}
-                            </td>
-                            <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
-                              <button
-                                onClick={() => saveSinglePlayerPoints(entry.playerId, entry.playerName)}
-                                disabled={!isChanged || savingPoints}
-                                style={{
-                                  padding: '0.3rem 0.5rem',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  background: isChanged ? 'var(--accent-primary, #3b82f6)' : 'var(--bg-tertiary)',
-                                  color: isChanged ? '#fff' : 'var(--text-muted)',
-                                  cursor: isChanged ? 'pointer' : 'default',
-                                  opacity: isChanged ? 1 : 0.4,
-                                  transition: 'all 0.2s'
-                                }}
-                                title={isChanged ? `Save ${entry.playerName}` : 'No changes'}
-                              >
-                                <Check size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              {loadingTournament && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader className="size-4 animate-spin" />
+                  <span>Loading tournament...</span>
                 </div>
+              )}
 
-                {/* Save All button */}
-                <button
-                  className="admin-button primary"
-                  onClick={saveAllPoints}
-                  disabled={savingPoints || !Object.entries(editedPoints).some(([pid, pts]) => {
-                    const entry = leaderboardEntries.find(e => e.playerId === pid);
-                    return entry && pts !== entry.manualPoints;
-                  })}
-                  style={{ marginTop: '1rem', width: '100%' }}
+              {tournamentInfo && (
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    Current Status: <Badge variant="outline" className={tournamentStatusClass(tournamentInfo.status)}>{tournamentInfo.status}</Badge>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="newStatus">New Status:</Label>
+                    <Select value={newStatus} onValueChange={setNewStatus}>
+                      <SelectTrigger id="newStatus" className="w-full max-w-md">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="open_for_registration">Open for Registration</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1 rounded-lg bg-muted p-4 text-sm">
+                    <div><strong>Tournament:</strong> {tournamentInfo.name}</div>
+                    <div><strong>Players:</strong> {tournamentInfo.players?.length || 0}</div>
+                    <div><strong>Groups:</strong> {tournamentInfo.groups?.length || 0}</div>
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    onClick={forceTournamentStatus}
+                    disabled={loadingTournament || newStatus === tournamentInfo.status}
+                  >
+                    {loadingTournament ? (
+                      <>
+                        <Loader className="animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Settings />
+                        Update Status
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>League Points Management</CardTitle>
+              <CardDescription>
+                Add bonus points for tournaments played outside the app. These bonus points are preserved when the leaderboard is recalculated. The total is always: Tournament Points + Bonus Points.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="leagueForPoints">Select League</Label>
+                <Select
+                  value={selectedLeagueForPoints || NONE}
+                  onValueChange={(v) => handleLeagueSelectForPoints(fromSelect(v))}
+                  disabled={loadingLeagues}
                 >
-                  {savingPoints ? (
-                    <>
-                      <Loader size={16} className="spinning" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      Save All Changes
-                    </>
-                  )}
-                </button>
+                  <SelectTrigger id="leagueForPoints" className="w-full max-w-md">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- Choose a league --</SelectItem>
+                    {leaguesForPoints.map(league => (
+                      <SelectItem key={league.id} value={league.id}>
+                        {league.name} ({league.status})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* ── Player Merge ─────────────────────────────────────────── */}
-        <div className="admin-section">
-          <div className="admin-section-header">
-            <GitMerge size={20} />
-            <h2>Merge Players</h2>
-          </div>
-          <p className="admin-section-description">
-            Merge duplicate player records. All tournament data, matches, statistics and league results from the <strong>source</strong> player will be transferred to the <strong>target</strong> player. The source player will be deleted. <span style={{ color: 'var(--accent-danger, #ef4444)', fontWeight: 600 }}>This cannot be undone!</span>
-          </p>
-
-          <div className="admin-form">
-            {loadingPlayers ? (
-              <div className="admin-loading">
-                <Loader size={16} className="spinning" />
-                <span>Loading players...</span>
-              </div>
-            ) : (
-              <>
-                {/* Search filter */}
-                <div className="form-group">
-                  <label>
-                    <Search size={16} />
-                    Filter Players
-                  </label>
-                  <input
-                    type="text"
-                    value={playerSearch}
-                    onChange={(e) => setPlayerSearch(e.target.value)}
-                    placeholder="Type to filter player names..."
-                  />
+              {loadingLeaderboard && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader className="size-4 animate-spin" />
+                  <span>Loading leaderboard...</span>
                 </div>
+              )}
 
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                  {/* Source players (will be deleted) */}
-                  <div className="form-group" style={{ flex: '1 1 250px' }}>
-                    <label style={{ color: 'var(--accent-danger, #ef4444)' }}>
-                      Source(s) — will be deleted
-                    </label>
-                    <select
-                      value=""
-                      onChange={(e) => { addSourcePlayer(e.target.value); e.target.value = ''; }}
-                    >
-                      <option value="">-- Add source player --</option>
-                      {allPlayers
-                        .filter(p => {
-                          if (!playerSearch) return true;
-                          return p.name.toLowerCase().includes(playerSearch.toLowerCase());
-                        })
-                        .filter(p => p.id !== targetPlayerId && !sourcePlayerIds.includes(p.id))
-                        .map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))
-                      }
-                    </select>
-                    {/* Selected source chips */}
-                    {sourcePlayerIds.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
-                        {sourcePlayerIds.map(id => {
-                          const player = allPlayers.find(p => p.id === id);
+              {selectedLeagueForPoints && !loadingLeaderboard && leaderboardEntries.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No leaderboard entries found. Recalculate the leaderboard from the league settings first.
+                </p>
+              )}
+
+              {leaderboardEntries.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10">#</TableHead>
+                          <TableHead>Player</TableHead>
+                          <TableHead className="text-right">From Tournaments</TableHead>
+                          <TableHead className="text-right">Bonus Pts</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="w-0" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {leaderboardEntries.map((entry, index) => {
+                          const isChanged = editedPoints[entry.playerId] !== undefined && editedPoints[entry.playerId] !== entry.manualPoints;
+                          const previewTotal = entry.tournamentPoints + (editedPoints[entry.playerId] ?? entry.manualPoints);
                           return (
-                            <span
-                              key={id}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                padding: '0.25rem 0.6rem',
-                                background: 'rgba(239, 68, 68, 0.12)',
-                                color: 'var(--accent-danger, #ef4444)',
-                                borderRadius: '20px',
-                                fontSize: '0.85rem',
-                                fontWeight: 500,
-                                textDecoration: 'line-through'
-                              }}
-                            >
-                              {player?.name || id}
-                              <button
-                                onClick={() => removeSourcePlayer(id)}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  background: 'none',
-                                  border: 'none',
-                                  color: 'var(--accent-danger, #ef4444)',
-                                  cursor: 'pointer',
-                                  padding: '0',
-                                  marginLeft: '2px',
-                                  lineHeight: 1
-                                }}
-                                title="Remove"
-                              >
-                                <X size={14} />
-                              </button>
-                            </span>
+                            <TableRow key={entry.playerId} className={isChanged ? 'bg-primary/5' : ''}>
+                              <TableCell className="text-muted-foreground tabular-nums">{index + 1}</TableCell>
+                              <TableCell className="font-medium">{entry.playerName}</TableCell>
+                              <TableCell className="text-right text-muted-foreground tabular-nums">{entry.tournamentPoints}</TableCell>
+                              <TableCell className="text-right">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={editedPoints[entry.playerId] ?? entry.manualPoints}
+                                  onChange={(e) => handlePointChange(entry.playerId, e.target.value)}
+                                  className={cn('ml-auto h-8 w-20 text-right tabular-nums', isChanged && 'border-primary font-bold')}
+                                />
+                              </TableCell>
+                              <TableCell className="text-right font-semibold tabular-nums">
+                                {isChanged ? previewTotal : entry.totalPoints}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant={isChanged ? 'default' : 'ghost'}
+                                  size="icon-sm"
+                                  onClick={() => saveSinglePlayerPoints(entry.playerId, entry.playerName)}
+                                  disabled={!isChanged || savingPoints}
+                                  title={isChanged ? `Save ${entry.playerName}` : 'No changes'}
+                                  aria-label={isChanged ? `Save ${entry.playerName}` : 'No changes'}
+                                >
+                                  <Check />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
                           );
                         })}
-                      </div>
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    onClick={saveAllPoints}
+                    disabled={savingPoints || !Object.entries(editedPoints).some(([pid, pts]) => {
+                      const entry = leaderboardEntries.find(e => e.playerId === pid);
+                      return entry && pts !== entry.manualPoints;
+                    })}
+                  >
+                    {savingPoints ? (
+                      <>
+                        <Loader className="animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save />
+                        Save All Changes
+                      </>
                     )}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', padding: '2rem 0.5rem 0' }}>
-                    <ArrowRight size={24} style={{ color: 'var(--text-secondary)' }} />
-                  </div>
-
-                  {/* Target player (will be kept) */}
-                  <div className="form-group" style={{ flex: '1 1 250px' }}>
-                    <label style={{ color: 'var(--accent-success, #22c55e)' }}>
-                      Target — will be kept
-                    </label>
-                    <select
-                      value={targetPlayerId}
-                      onChange={(e) => setTargetPlayerId(e.target.value)}
-                    >
-                      <option value="">-- Select target player --</option>
-                      {allPlayers
-                        .filter(p => {
-                          if (!playerSearch) return true;
-                          return p.name.toLowerCase().includes(playerSearch.toLowerCase());
-                        })
-                        .filter(p => !sourcePlayerIds.includes(p.id))
-                        .map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))
-                      }
-                    </select>
-                  </div>
-                </div>
-
-                {/* Preview */}
-                {sourcePlayerIds.length > 0 && targetPlayerId && (
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
-                    background: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-end' }}>
-                        {sourcePlayerIds.map(id => (
-                          <span key={id} style={{
-                            padding: '0.3rem 0.7rem',
-                            background: 'rgba(239, 68, 68, 0.12)',
-                            color: 'var(--accent-danger, #ef4444)',
-                            borderRadius: '8px',
-                            fontWeight: 600,
-                            fontSize: '0.85rem',
-                            textDecoration: 'line-through'
-                          }}>
-                            {allPlayers.find(p => p.id === id)?.name}
-                          </span>
-                        ))}
-                      </div>
-                      <ArrowRight size={18} style={{ color: 'var(--text-secondary)' }} />
-                      <span style={{
-                        padding: '0.4rem 0.8rem',
-                        background: 'rgba(34, 197, 94, 0.12)',
-                        color: 'var(--accent-success, #22c55e)',
-                        borderRadius: '8px',
-                        fontWeight: 600,
-                        fontSize: '0.9rem'
-                      }}>
-                        {allPlayers.find(p => p.id === targetPlayerId)?.name}
-                      </span>
-                    </div>
-                    <p style={{ textAlign: 'center', marginTop: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                      All matches, stats, tournament entries, and league data from {sourcePlayerIds.length} player(s) will be transferred.
-                    </p>
-                  </div>
-                )}
-
-                {/* Merge button */}
-                <button
-                  className="admin-button primary"
-                  onClick={handleMergePlayers}
-                  disabled={sourcePlayerIds.length === 0 || !targetPlayerId || merging}
-                  style={{
-                    marginTop: '1rem',
-                    width: '100%',
-                    background: sourcePlayerIds.length > 0 && targetPlayerId ? 'var(--accent-danger, #ef4444)' : undefined
-                  }}
-                >
-                  {merging ? (
-                    <>
-                      <Loader size={16} className="spinning" />
-                      Merging {sourcePlayerIds.length} player(s)...
-                    </>
-                  ) : (
-                    <>
-                      <GitMerge size={16} />
-                      Merge {sourcePlayerIds.length > 0 ? `${sourcePlayerIds.length} Player(s)` : 'Players'}
-                    </>
-                  )}
-                </button>
-
-                {/* Merge Log */}
-                {mergeLog.length > 0 && (
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
-                    background: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontFamily: 'monospace'
-                  }}>
-                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Merge Log:</strong>
-                    {mergeLog.map((line, i) => (
-                      <div key={i} style={{ color: 'var(--text-secondary)', padding: '0.15rem 0' }}>
-                        {line}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        </>)}
-
-        {activeTab === 'users' && (
-        <div className="admin-section">
-          <div className="admin-section-header">
-            <LinkIcon size={20} />
-            <h2>Link Account to Player Stats</h2>
-          </div>
-          <p className="admin-section-description">
-            Attach the results a player already has — from tournaments they played under their name, before they had a login — to their account.
-            Everything recorded against that player record (matches, averages, 180s, checkouts, tournament history, league memberships) then shows on their profile.
-            If they used more than one spelling of their name, merge those records in at the same time.
-          </p>
-
-          <div className="admin-form">
-            <div className="form-group">
-              <label>
-                <UserPlus size={16} />
-                Account
-              </label>
-              <UserSearchPicker onSelect={handleSelectLinkUser} />
-              {linkUser && (
-                <div style={{
-                  marginTop: '0.6rem',
-                  padding: '0.6rem 0.8rem',
-                  background: 'var(--bg-tertiary)',
-                  borderRadius: '8px',
-                  fontSize: '0.88rem',
-                  color: 'var(--text-primary)'
-                }}>
-                  <strong>{linkUser.fullName}</strong>
-                  <span style={{ color: 'var(--text-secondary)' }}> — {linkUser.email}</span>
-                  <div style={{ marginTop: '0.35rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    {linkUserPlayer
-                      ? <>Currently linked to player <strong>&quot;{linkUserPlayer.name}&quot;</strong></>
-                      : 'No player record linked yet'}
-                  </div>
-                  {linkUserPlayer && (
-                    <button
-                      className="admin-button"
-                      onClick={handleUnlinkPlayer}
-                      disabled={linking}
-                      style={{ marginTop: '0.6rem' }}
-                    >
-                      <Unlink size={14} />
-                      Unlink
-                    </button>
-                  )}
+                  </Button>
                 </div>
               )}
-            </div>
+            </CardContent>
+          </Card>
 
-            {linkUser && (
-              <>
-                <div className="form-group">
-                  <label>
-                    <Search size={16} />
-                    Filter Player Records
-                  </label>
-                  <input
-                    type="text"
-                    value={linkPlayerSearch}
-                    onChange={(e) => setLinkPlayerSearch(e.target.value)}
-                    placeholder="Type to filter player names..."
-                  />
+          <Card>
+            <CardHeader>
+              <CardTitle>Merge Players</CardTitle>
+              <CardDescription>
+                Merge duplicate player records. All tournament data, matches, statistics and league results from the <strong>source</strong> player will be transferred to the <strong>target</strong> player. The source player will be deleted. <span className="font-semibold text-destructive">This cannot be undone!</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {loadingPlayers ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader className="size-4 animate-spin" />
+                  <span>Loading players...</span>
                 </div>
-
-                <div className="form-group">
-                  <label>
-                    <Users size={16} />
-                    Player record to attach
-                  </label>
-                  <select
-                    value={linkPlayerId}
-                    onChange={(e) => setLinkPlayerId(e.target.value)}
-                    disabled={!!linkUserPlayer}
-                  >
-                    <option value="">-- Select a player --</option>
-                    {allPlayers
-                      .filter(p => !p.user_id || p.id === linkUserPlayer?.id)
-                      .filter(p => !linkPlayerSearch || p.name.toLowerCase().includes(linkPlayerSearch.toLowerCase()))
-                      .map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                  </select>
-                  <p style={{ marginTop: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                    Only records that no account has claimed are listed.
-                    {linkUserPlayer && ' This account is already linked, so the profile is fixed — use the merge list below to fold other spellings into it.'}
-                  </p>
-                </div>
-
-                {/* Stats preview so the admin can confirm it's the right person */}
-                {loadingLinkPreview && (
-                  <div className="admin-loading">
-                    <Loader size={16} className="spinning" />
-                    <span>Loading statistics...</span>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="playerSearch">
+                      <Search className="size-4" />
+                      Filter Players
+                    </Label>
+                    <Input
+                      id="playerSearch"
+                      type="text"
+                      value={playerSearch}
+                      onChange={(e) => setPlayerSearch(e.target.value)}
+                      placeholder="Type to filter player names..."
+                      className="max-w-md"
+                    />
                   </div>
-                )}
-                {!loadingLinkPreview && linkPreview && (
-                  <div style={{
-                    padding: '0.9rem 1rem',
-                    background: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                    fontSize: '0.88rem'
-                  }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>{linkPreview.player.name}</strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
-                      <span>{linkPreview.tournaments.length} tournaments</span>
-                      <span>{linkPreview.careerStats.matchesPlayed} matches</span>
-                      <span>{linkPreview.careerStats.wins}W / {linkPreview.careerStats.losses}L</span>
-                      <span>avg {linkPreview.careerStats.overallAverage.toFixed(2)}</span>
-                      <span>{linkPreview.careerStats.total180s} × 180</span>
-                      <span>{linkPreview.careerStats.tournamentWins} titles</span>
+
+                  <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-start">
+                    {/* Source players (will be deleted) */}
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-destructive">Source(s) — will be deleted</Label>
+                      <Select value={NONE} onValueChange={(v) => addSourcePlayer(fromSelect(v))}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE}>-- Add source player --</SelectItem>
+                          {filteredPlayers(playerSearch)
+                            .filter(p => p.id !== targetPlayerId && !sourcePlayerIds.includes(p.id))
+                            .map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {sourcePlayerIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {sourcePlayerIds.map(id => removableChip(id, removeSourcePlayer))}
+                        </div>
+                      )}
                     </div>
-                    {linkPreview.tournaments.length > 0 && (
-                      <div style={{ marginTop: '0.5rem', color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>
-                        {linkPreview.tournaments.slice(0, 5).map(t => t.name).join(', ')}
-                        {linkPreview.tournaments.length > 5 && ` +${linkPreview.tournaments.length - 5} more`}
+
+                    <ArrowRight className="hidden size-6 self-center text-muted-foreground md:mt-8 md:block" />
+
+                    {/* Target player (will be kept) */}
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-green-700 dark:text-green-400">Target — will be kept</Label>
+                      <Select value={targetPlayerId || NONE} onValueChange={(v) => setTargetPlayerId(fromSelect(v))}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE}>-- Select target player --</SelectItem>
+                          {filteredPlayers(playerSearch)
+                            .filter(p => !sourcePlayerIds.includes(p.id))
+                            .map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  {sourcePlayerIds.length > 0 && targetPlayerId && (
+                    <div className="flex flex-col gap-3 rounded-lg border bg-muted p-4">
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        <div className="flex flex-col items-end gap-1.5">
+                          {sourcePlayerIds.map(id => (
+                            <Badge key={id} variant="outline" className="bg-red-100 text-red-800 line-through dark:bg-red-950 dark:text-red-200">
+                              {allPlayers.find(p => p.id === id)?.name}
+                            </Badge>
+                          ))}
+                        </div>
+                        <ArrowRight className="size-4 text-muted-foreground" />
+                        <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200">
+                          {allPlayers.find(p => p.id === targetPlayerId)?.name}
+                        </Badge>
                       </div>
+                      <p className="text-center text-xs text-muted-foreground">
+                        All matches, stats, tournament entries, and league data from {sourcePlayerIds.length} player(s) will be transferred.
+                      </p>
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    variant={sourcePlayerIds.length > 0 && targetPlayerId ? 'destructive' : 'default'}
+                    onClick={handleMergePlayers}
+                    disabled={sourcePlayerIds.length === 0 || !targetPlayerId || merging}
+                  >
+                    {merging ? (
+                      <>
+                        <Loader className="animate-spin" />
+                        Merging {sourcePlayerIds.length} player(s)...
+                      </>
+                    ) : (
+                      <>
+                        <GitMerge />
+                        Merge {sourcePlayerIds.length > 0 ? `${sourcePlayerIds.length} Player(s)` : 'Players'}
+                      </>
                     )}
-                  </div>
-                )}
+                  </Button>
 
-                {/* Optional: other spellings to fold in */}
-                <div className="form-group" style={{ marginTop: '1rem' }}>
-                  <label>
-                    <GitMerge size={16} />
-                    Also merge these records (optional)
-                  </label>
-                  <select
-                    value=""
-                    onChange={(e) => { addLinkExtraPlayer(e.target.value); e.target.value = ''; }}
-                  >
-                    <option value="">-- Add another spelling of the name --</option>
-                    {allPlayers
-                      .filter(p => !p.user_id && p.id !== linkPlayerId && !linkExtraPlayerIds.includes(p.id))
-                      .filter(p => !linkPlayerSearch || p.name.toLowerCase().includes(linkPlayerSearch.toLowerCase()))
-                      .map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                  </select>
-                  {linkExtraPlayerIds.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
-                      {linkExtraPlayerIds.map(id => (
-                        <span
-                          key={id}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            padding: '0.25rem 0.6rem',
-                            background: 'rgba(239, 68, 68, 0.12)',
-                            color: 'var(--accent-danger, #ef4444)',
-                            borderRadius: '20px',
-                            fontSize: '0.85rem',
-                            fontWeight: 500,
-                            textDecoration: 'line-through'
-                          }}
-                        >
-                          {allPlayers.find(p => p.id === id)?.name || id}
-                          <button
-                            onClick={() => removeLinkExtraPlayer(id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--accent-danger, #ef4444)',
-                              cursor: 'pointer',
-                              padding: 0,
-                              marginLeft: '2px',
-                              lineHeight: 1
-                            }}
-                            title="Remove"
-                          >
-                            <X size={14} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {linkExtraPlayerIds.length > 0 && (
-                    <p style={{ marginTop: '0.5rem', color: 'var(--accent-danger, #ef4444)', fontSize: '0.82rem' }}>
-                      These {linkExtraPlayerIds.length} record(s) will be merged into the profile above and permanently deleted. This cannot be undone.
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  className="admin-button primary"
-                  onClick={handleLinkStatsToUser}
-                  disabled={!linkPlayerId || linking || (!!linkUserPlayer && linkExtraPlayerIds.length === 0)}
-                  style={{ marginTop: '0.5rem', width: '100%' }}
-                >
-                  {linking ? (
-                    <>
-                      <Loader size={16} className="spinning" />
-                      Linking...
-                    </>
-                  ) : (
-                    <>
-                      <LinkIcon size={16} />
-                      {linkExtraPlayerIds.length > 0
-                        ? `Merge ${linkExtraPlayerIds.length} record(s) and link to account`
-                        : 'Link stats to account'}
-                    </>
-                  )}
-                </button>
-
-                {linkLog.length > 0 && (
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
-                    background: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontFamily: 'monospace'
-                  }}>
-                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Log:</strong>
-                    {linkLog.map((line, i) => (
-                      <div key={i} style={{ color: 'var(--text-secondary)', padding: '0.15rem 0' }}>
-                        {line}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-        )}
-      </div>
+                  {logBox('Merge Log:', mergeLog)}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
