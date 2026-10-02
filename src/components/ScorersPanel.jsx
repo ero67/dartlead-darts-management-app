@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, ClipboardList } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { UserSearchPicker } from './UserSearchPicker';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from './shared/EmptyState';
 
 // Manage the scorer allowlist of a tournament (type="tournament") or a league
 // (type="league"). Scorers are registered users the manager authorizes to run
@@ -87,70 +91,65 @@ export function ScorersPanel({ type, entityId, onScorersChange }) {
   if (!hasAccess) return null;
 
   return (
-    <div className="group-card" style={{ marginBottom: '1.5rem' }}>
-      <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{t('scorers.title')}</h3>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.875rem' }}>
-        {type === 'league' ? t('scorers.descriptionLeague') : t('scorers.descriptionTournament')}
-        {' '}
-        {t('scorers.managerNote')}
-      </p>
+    <Card className="tw text-foreground">
+      <CardHeader>
+        <CardTitle>{t('scorers.title')}</CardTitle>
+        <CardDescription>
+          {type === 'league' ? t('scorers.descriptionLeague') : t('scorers.descriptionTournament')}
+          {' '}
+          {t('scorers.managerNote')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <UserSearchPicker
+            onSelect={handleAddScorer}
+            excludeIds={scorers.map(s => s.userId)}
+          />
+          {isAdding && (
+            <p className="text-sm text-muted-foreground">{t('common.saving')}</p>
+          )}
+        </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <UserSearchPicker
-          onSelect={handleAddScorer}
-          excludeIds={scorers.map(s => s.userId)}
-        />
-        {isAdding && (
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{t('common.saving')}</p>
+        {error && (
+          <p className="text-sm text-destructive">{error}</p>
         )}
-      </div>
 
-      {error && (
-        <p style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.875rem', marginBottom: '1rem' }}>{error}</p>
-      )}
-
-      {isLoading ? (
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('common.loading')}</p>
-      ) : scorers.length === 0 ? (
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('scorers.empty')}</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {scorers.map((scorer) => (
-            <li
-              key={scorer.userId}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '6px',
-                background: 'var(--bg-secondary)'
-              }}
-            >
-              <span style={{ color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {scorer.fullName ? `${scorer.fullName} (${scorer.email})` : scorer.email}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleRemoveScorer(scorer.userId)}
-                aria-label={t('scorers.remove')}
-                title={t('scorers.remove')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+        ) : scorers.length === 0 ? (
+          <EmptyState icon={ClipboardList} title={t('scorers.empty')} />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {scorers.map((scorer) => (
+              <li
+                key={scorer.userId}
+                className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2"
               >
-                <X size={16} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback>{(scorer.fullName || scorer.email || '?').charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{scorer.fullName || scorer.email}</div>
+                    {scorer.fullName && <div className="truncate text-xs text-muted-foreground">{scorer.email}</div>}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRemoveScorer(scorer.userId)}
+                  aria-label={t('scorers.remove')}
+                  title={t('scorers.remove')}
+                >
+                  <X />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
