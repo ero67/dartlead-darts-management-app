@@ -193,3 +193,17 @@ Cypress.Commands.add('waitForTournament', () => {
   cy.get('[class*="tournament"], [class*="management"]').should('be.visible')
 })
 
+
+/**
+ * Pick an option in a shadcn/Radix Select (no native <select>).
+ * `trigger` is a zero-based index among the comboboxes inside `scope`, or a jQuery/element.
+ * @example cy.selectOption(0, /701/)            // first select on the page
+ * @example cy.selectOption(1, /5/, '[role="dialog"]')
+ */
+Cypress.Commands.add('selectOption', (trigger, optionText, scope = 'body') => {
+  const open = typeof trigger === 'number'
+    ? cy.get(scope).find('[data-slot="select-trigger"]').eq(trigger)
+    : cy.wrap(trigger)
+  open.click()
+  cy.get('[role="option"]').contains(optionText).click()
+})

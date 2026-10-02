@@ -84,10 +84,10 @@ describe('Tournament Registration Flow', () => {
     cy.contains('button', /edit settings|upraviť nastavenia/i).click()
     
     // Change legs to win
-    cy.get('select').first().select('5')
+    cy.selectOption(0, /\b5\b/, '[role="dialog"]')
     
     // Change starting score
-    cy.get('select').eq(1).select('701')
+    cy.selectOption(1, /701/, '[role="dialog"]')
     
     // Update settings
     cy.contains('button', /update settings|aktualizovať nastavenia/i).click()

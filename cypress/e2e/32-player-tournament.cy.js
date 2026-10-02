@@ -21,7 +21,7 @@ describe('32 Player Tournament Flow', () => {
     // If all players advance = 4 × 8 = 32 qualifiers (perfect for Round of 32)
     
     // First ensure "Number of Groups" radio is selected
-    cy.get('input[type="radio"][value="groups"]').check()
+    cy.get('[role="radio"][value="groups"]').click()
     
     // Set number of groups to 8
     cy.get('input[type="number"]').first().clear().type('8')
@@ -31,14 +31,15 @@ describe('32 Player Tournament Flow', () => {
     cy.get('body').then(($body) => {
       if ($body.text().includes('Players Advancing Per Group') || $body.text().includes('Hráči Postupujúci')) {
         // Find the select dropdown for players per group
-        cy.contains(/players advancing|hráči postupujúci/i).parent().find('select').then(($select) => {
+        cy.contains(/players advancing|hráči postupujúci/i).parent().find('[data-slot="select-trigger"]').then(($trigger) => {
           // Select "All" option (value 9999)
-          cy.wrap($select).select('9999')
+          cy.selectOption($trigger, /^all$|^všetci$/i)
           cy.log('✅ Set players advancing per group to "All" (all 4 players from each group)')
         })
       } else {
         // Fallback: try to find select by looking for "All" option
-        cy.get('select').contains('option', /all/i).parent().select('9999')
+        cy.get('[data-slot="select-trigger"]').contains(/all|všetci/i).click()
+        cy.get('[role="option"]').contains(/^all$|^všetci$/i).click()
       }
     })
     
@@ -202,9 +203,11 @@ describe('32 Player Tournament Flow', () => {
     cy.contains(/enable playoffs|povoliť play-off/i).click()
     
     // Configure groups: 8 groups with all players advancing
-    cy.get('input[type="radio"][value="groups"]').check()
+    cy.get('[role="radio"][value="groups"]').click()
     cy.get('input[type="number"]').first().clear().type('8')
-    cy.contains(/players advancing|hráči postupujúci/i).parent().find('select').select('9999')
+    cy.contains(/players advancing|hráči postupujúci/i).parent().find('[data-slot="select-trigger"]').then(($trigger) => {
+      cy.selectOption($trigger, /^all$|^všetci$/i)
+    })
     
     cy.contains('button', /create/i).click()
     

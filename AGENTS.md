@@ -40,10 +40,10 @@ Group imports in this order, separated by blank lines:
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useTournament } from './contexts/TournamentContext';
 import { Navigation } from './components/Navigation';
 import { tournamentService } from './services/tournamentService';
-import './App.css';
 ```
 
 ### File Naming
@@ -153,9 +153,10 @@ Required in `.env.local`:
 
 ### CSS/Styling
 
-- Use CSS files, not CSS-in-JS
-- Follow BEM-like naming: `.component-name`, `.component-name__element`, `.component-name--modifier`
-- Use CSS custom properties for theming (defined in `index.css`)
+- Tailwind utilities + shadcn/ui primitives from `@/components/ui`; no per-component CSS files
+- Reuse `src/components/shared/` (StatusBadge, EmptyState, StatTile, LoadingState) before writing new patterns
+- Colors only through tokens (`bg-card`, `text-muted-foreground`, …); soft status tints via `tournamentStatusClass`
+- Numbers get `tabular-nums`; touch targets on board screens are at least 44px
 
 ### Code Comments
 
