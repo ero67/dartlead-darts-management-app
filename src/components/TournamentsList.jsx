@@ -10,25 +10,9 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { tournamentStatusLabel, isTournamentRunning } from '../utils/tournamentStatus';
-
-const STATUS_BADGE_CLASS = {
-  open_for_registration: 'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  completed: 'border-transparent bg-secondary text-secondary-foreground',
-  running: 'border-transparent bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-};
-
-function TournamentStatusBadge({ status, t }) {
-  const cls = isTournamentRunning(status)
-    ? STATUS_BADGE_CLASS.running
-    : (STATUS_BADGE_CLASS[status] ?? STATUS_BADGE_CLASS.completed);
-  return (
-    <Badge variant="outline" className={cls}>
-      {isTournamentRunning(status) && <span className="size-1.5 rounded-full bg-current" />}
-      {tournamentStatusLabel(status, t)}
-    </Badge>
-  );
-}
+import { StatusBadge } from './shared/StatusBadge';
+import { EmptyState } from './shared/EmptyState';
+import { isTournamentRunning, tournamentStatusClass } from '../utils/tournamentStatus';
 
 export function TournamentsList({ tournaments, onCreateTournament, onSelectTournament, onDeleteTournament }) {
   const { t } = useLanguage();
@@ -142,7 +126,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                     <div className="flex min-w-0 flex-col gap-2">
                       <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <TournamentStatusBadge status={tournament.status} t={t} />
+                        <StatusBadge status={tournament.status} t={t} />
                         {isOwner && <Badge variant="outline">{t('tournaments.yours')}</Badge>}
                       </div>
                     </div>
@@ -209,7 +193,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                     {running ? t('tournaments.continue') : t('tournaments.view')} {t('tournaments.tournament')}
                   </Button>
                   {tournament.status === 'open_for_registration' && user && !isOwner && (
-                    <Badge variant="outline" className={STATUS_BADGE_CLASS.open_for_registration}>
+                    <Badge variant="outline" className={tournamentStatusClass('open_for_registration')}>
                       {t('registration.openForRegistration')}
                     </Badge>
                   )}
@@ -221,23 +205,20 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
       )}
 
       {sortedTournaments.length === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed p-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <Trophy className="size-6" />
-          </div>
-          <h3 className="text-base font-semibold">{t('tournaments.noTournamentsFound')}</h3>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            {filter === 'all'
-              ? t('tournaments.createFirstToGetStarted')
-              : t('tournaments.noFilteredTournaments', { filter: filterLabels[filter].toLowerCase() })}
-          </p>
+        <EmptyState
+          icon={Trophy}
+          title={t('tournaments.noTournamentsFound')}
+          description={filter === 'all'
+            ? t('tournaments.createFirstToGetStarted')
+            : t('tournaments.noFilteredTournaments', { filter: filterLabels[filter].toLowerCase() })}
+        >
           {filter === 'all' && canCreate && (
             <Button onClick={onCreateTournament}>
               <Plus />
               {t('tournaments.create')}
             </Button>
           )}
-        </div>
+        </EmptyState>
       )}
     </div>
   );
