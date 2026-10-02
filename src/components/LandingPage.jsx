@@ -51,7 +51,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-16 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-16 p-4 text-foreground md:p-8">
       <header className="grid items-center gap-10 md:grid-cols-2">
         <div className="flex flex-col gap-6">
           <Badge variant="secondary" className="w-fit">{t('landing.heroBadge')}</Badge>

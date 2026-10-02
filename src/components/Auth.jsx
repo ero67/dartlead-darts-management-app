@@ -152,7 +152,7 @@ export function Auth() {
   };
 
   return (
-    <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <img src={logo} alt="DartLead" className="mx-auto size-14" />

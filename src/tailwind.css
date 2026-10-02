@@ -1,12 +1,7 @@
-/* Tailwind v4 + shadcn/ui tokens.
- * Preflight is deliberately NOT imported so the legacy App.css keeps working
- * while screens are migrated one by one. Delete App.css rules as screens move over. */
-@layer legacy, theme, base, components, utilities;
-/* Legacy stylesheets live in the lowest layer so Tailwind utilities on migrated
- * screens always win; unlayered CSS would otherwise beat every utility. */
-@import "./index.css" layer(legacy);
-@import "./App.css" layer(legacy);
+/* Tailwind v4 + shadcn/ui tokens. The only stylesheet: every screen is on Tailwind. */
+@layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "tw-animate-css";
 
@@ -120,14 +115,20 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* Scoped stand-in for the preflight rules shadcn components rely on.
- * Wrap a migrated screen in <div className="tw"> until the whole app is on Tailwind. */
 @layer base {
-  .tw, .tw *, .tw ::before, .tw ::after { box-sizing: border-box; border: 0 solid var(--color-border); }
-  .tw button, .tw input, .tw select, .tw textarea { font: inherit; color: inherit; background: transparent; margin: 0; padding: 0; }
-  .tw button { cursor: pointer; }
-  .tw h1, .tw h2, .tw h3, .tw h4, .tw p, .tw ul, .tw ol { margin: 0; }
-  .tw ul, .tw ol { padding: 0; list-style: none; }
-  .tw img, .tw svg { display: block; }
-  .tw a { font-weight: inherit; }
+  * { @apply border-border outline-ring/50; }
+  :root {
+    color-scheme: light;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    /* Tabular figures everywhere by default: this is a scoreboard app */
+    font-variant-numeric: tabular-nums;
+  }
+  .dark-mode { color-scheme: dark; }
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-width: 320px;
+    overflow-x: hidden;
+  }
 }

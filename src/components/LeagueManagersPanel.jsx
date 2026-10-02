@@ -82,7 +82,7 @@ export function LeagueManagersPanel({ leagueId, canEdit }) {
   if (!hasAccess) return null;
 
   return (
-    <Card className="tw text-foreground">
+    <Card className="text-foreground">
       <CardHeader>
         <CardTitle>{t('leagueManagers.title')}</CardTitle>
         <CardDescription>

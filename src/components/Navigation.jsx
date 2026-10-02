@@ -72,7 +72,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
   const roleLabel = isAdmin ? t('common.roleAdmin') : (isManager ? t('common.roleManager') : null);
 
   return (
-    <Sidebar collapsible="icon" className="tw">
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <img src={logoIcon} alt="DartLead" className="size-8 shrink-0 rounded-lg object-cover" />
@@ -127,7 +127,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
                   <span>{LANGUAGES.find(l => l.code === language)?.name}</span>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="tw min-w-40">
+              <DropdownMenuContent side="top" align="start" className="min-w-40">
                 {LANGUAGES.map((lang) => (
                   <DropdownMenuItem key={lang.code} onClick={() => changeLanguage(lang.code)}>
                     <span className="flex-1">{lang.name}</span>
@@ -167,7 +167,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
                     <ChevronsUpDown className="ml-auto size-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="start" className="tw min-w-56">
+                <DropdownMenuContent side="top" align="start" className="min-w-56">
                   <DropdownMenuLabel className="flex items-center gap-2 font-normal">
                     <span className="truncate">{displayName}</span>
                     {roleLabel && <Badge variant="secondary">{roleLabel}</Badge>}

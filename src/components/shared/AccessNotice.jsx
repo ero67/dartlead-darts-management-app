@@ -4,7 +4,7 @@ import { ShieldAlert } from 'lucide-react';
 // "You can't be here" notice for role-guarded routes.
 export function AccessNotice({ title, lines = [] }) {
   return (
-    <div className="tw flex min-h-[50vh] flex-col items-center justify-center gap-3 p-8 text-center">
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 p-8 text-center">
       <div className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <ShieldAlert className="size-6" />
       </div>

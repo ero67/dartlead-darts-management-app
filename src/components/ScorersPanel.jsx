@@ -91,7 +91,7 @@ export function ScorersPanel({ type, entityId, onScorersChange }) {
   if (!hasAccess) return null;
 
   return (
-    <Card className="tw text-foreground">
+    <Card className="text-foreground">
       <CardHeader>
         <CardTitle>{t('scorers.title')}</CardTitle>
         <CardDescription>

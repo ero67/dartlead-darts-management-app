@@ -394,7 +394,7 @@ export function TournamentSummary({ tournament }) {
   );
 
   return (
-    <div className="tw flex flex-col gap-4 text-foreground">
+    <div className="flex flex-col gap-4 text-foreground">
       <div className="flex flex-wrap items-center justify-end gap-4">
         <Button variant="outline" onClick={handleExportImage} disabled={exporting}>
           {exporting ? <Loader className="animate-spin" /> : <Download />}

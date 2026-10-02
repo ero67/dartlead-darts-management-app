@@ -2214,7 +2214,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   ].filter(Boolean);
 
   return (
-    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-4">
         <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
           <ArrowLeft />

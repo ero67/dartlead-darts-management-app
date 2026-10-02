@@ -92,7 +92,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
 
   if (loading) {
     return (
-      <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8" aria-busy="true" aria-label={t('common.loading')}>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8" aria-busy="true" aria-label={t('common.loading')}>
         <Skeleton className="h-8 w-24" />
         <Skeleton className="h-40 w-full rounded-xl" />
         <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -105,7 +105,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
 
   if (!profileData) {
     return (
-      <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
         <BackButton onBack={onBack} t={t} />
         <EmptyState icon={Target} title={t('playerProfile.playerNotFound')} />
       </div>
@@ -171,7 +171,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const practiceHistory = isOwnProfile ? loadHistory() : [];
 
   return (
-    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 text-foreground md:p-8">
       <BackButton onBack={onBack} t={t} />
 
       {/* Hero */}

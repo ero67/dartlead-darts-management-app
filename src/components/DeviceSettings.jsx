@@ -51,7 +51,7 @@ export function DeviceSettings({ isOpen, onClose }) {
   // drawer on phones still gives a real full-screen sheet.
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="tw sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('deviceSettings.title', 'Nastavenia zariadenia')}</DialogTitle>
           <DialogDescription className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export function DeviceBadge({ boardNumber, deviceName, compact = false }) {
   if (!boardNumber && !deviceName) return null;
 
   return (
-    <span className="tw inline-flex flex-wrap items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1">
       {boardNumber && (
         <Badge variant="secondary" className={compact ? 'px-1.5 text-[11px]' : ''}>
           <Target className={compact ? 'size-3' : 'size-3.5'} />

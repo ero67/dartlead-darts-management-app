@@ -23,7 +23,7 @@ class ErrorBoundaryInner extends React.Component {
     if (this.state.hasError) {
       const { t } = this.props;
       return (
-        <div className="tw flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
           <div className="flex size-12 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
             <AlertTriangle className="size-6" />
           </div>

@@ -21,7 +21,7 @@ export function OfflineBanner() {
 
   return (
     <div
-      className="tw fixed inset-x-0 z-50 flex flex-col gap-px text-sm font-medium"
+      className="fixed inset-x-0 z-50 flex flex-col gap-px text-sm font-medium"
       style={{ top: 'var(--safe-area-inset-top, 0px)' }}
       role="status"
     >

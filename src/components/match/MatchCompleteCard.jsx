@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 export function MatchCompleteCard({ winnerName, player1Legs, player2Legs, onBack }) {
   const { t } = useLanguage();
   return (
-    <div className="tw dark-mode flex flex-1 flex-col items-center justify-center bg-background p-4 text-foreground">
+    <div className="dark-mode flex flex-1 flex-col items-center justify-center bg-background p-4 text-foreground">
       <Card className="w-full max-w-sm items-center gap-4 px-6 text-center">
         <div className="flex size-14 items-center justify-center rounded-full bg-green-950 text-green-200">
           <CheckCircle className="size-7" />

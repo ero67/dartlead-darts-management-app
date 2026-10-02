@@ -57,7 +57,7 @@ export function TurnTotalKeypad({
   );
 
   return (
-    <div className="tw flex min-h-0 flex-1 flex-col gap-2 p-2 text-foreground">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 text-foreground">
       <div className="flex flex-col gap-1 rounded-lg border bg-card px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('match.turnTotalLabel')}</span>

@@ -49,7 +49,7 @@ export function LeagueCreation({ onLeagueCreated, onBack }) {
   };
 
   return (
-    <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-3">
         <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
           <ArrowLeft />

@@ -319,7 +319,7 @@ export function TvDisplay() {
   const viewLabel = { live: t('tv.liveBoards'), standings: t('management.standings'), bracket: t('management.playoffs') };
 
   return (
-    <div className="tw dark-mode flex min-h-screen flex-col bg-background text-foreground lg:fixed lg:inset-0 lg:overflow-hidden [&:fullscreen]:cursor-none" ref={rootRef}>
+    <div className="dark-mode flex min-h-screen flex-col bg-background text-foreground lg:fixed lg:inset-0 lg:overflow-hidden [&:fullscreen]:cursor-none" ref={rootRef}>
       <header className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-3 lg:h-20 lg:flex-nowrap lg:py-0">
         <div className="flex min-w-0 items-center gap-3">
           <Trophy className="size-7 shrink-0 text-primary" />

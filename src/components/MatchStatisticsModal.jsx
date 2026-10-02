@@ -172,7 +172,7 @@ export function MatchStatisticsModal({ match, onClose }) {
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         showCloseButton={false}
-        className="tw flex max-h-[90vh] flex-col gap-4 overflow-y-auto text-foreground sm:max-w-2xl"
+        className="flex max-h-[90vh] flex-col gap-4 overflow-y-auto text-foreground sm:max-w-2xl"
       >
         <DialogHeader className="flex-row items-center justify-between gap-4 space-y-0">
           <DialogTitle className="flex items-center gap-2">

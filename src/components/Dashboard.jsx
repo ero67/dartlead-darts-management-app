@@ -48,7 +48,7 @@ function PlayerDashboard({ onNavigate }) {
   }, { sessions: 0, oneEighties: 0, bestAverage: 0 });
 
   return (
-    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
       <h1 className="text-2xl font-semibold tracking-tight">
         {playerName ? t('dashboard.welcomePlayer', { name: playerName }) : t('dashboard.title')}
       </h1>
@@ -137,7 +137,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
   const displayName = getUserDisplayName(user) || user?.email?.split('@')[0] || t('common.roleManager');
 
   return (
-    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 text-foreground md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{t('dashboard.welcomeManager', { name: displayName })}</h1>

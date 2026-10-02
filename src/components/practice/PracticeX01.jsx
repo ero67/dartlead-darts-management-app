@@ -341,7 +341,7 @@ export function PracticeX01() {
           ? t('practice.match.opponentWon', { name: opponent.name, for: s.legsFor, against: s.legsAgainst })
           : t('practice.match.abandoned', { for: s.legsFor, against: s.legsAgainst });
     return (
-      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeSummaryHeader icon={opponent ? Trophy : CheckCircle} title={resultText}>
           <p className="text-sm text-muted-foreground">
             {summary.settings.startingScore}
@@ -373,7 +373,7 @@ export function PracticeX01() {
       legsTarget: opponent && !MATCH_LEG_OPTIONS.includes(s.legsTarget) ? DEFAULT_SETTINGS.legsTarget : s.legsTarget
     }));
     return (
-      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.x01.title')} description={t('practice.games.x01.desc')} />
         <PracticeSetup
           title={t('practice.setup.title')}

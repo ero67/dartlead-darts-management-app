@@ -131,7 +131,7 @@ export function PracticeCheckout() {
       ? t('practice.setup.unlimited')
       : t(`practice.checkout.attemptCount${pluralSuffix(settings.attemptsTarget)}`, { count: settings.attemptsTarget });
     return (
-      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.checkout.title')} description={t('practice.games.checkout.desc')} />
         <PracticeSetup
           title={t('practice.checkout.setup.title')}

@@ -69,7 +69,7 @@ export function SeedingPresetLibrary({ presets, onChange }) {
   const bracketLabel = (size) => t('registration.presetBracketTop', { count: size });
 
   return (
-    <div className="tw flex flex-col gap-4 text-foreground">
+    <div className="flex flex-col gap-4 text-foreground">
       <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-muted/40 p-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="preset-groups" className="text-xs text-muted-foreground">{t('registration.presetGroups')}</Label>

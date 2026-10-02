@@ -28,7 +28,7 @@ export function RefreshButton() {
       type="button"
       variant="outline"
       size="sm"
-      className="tw"
+     
       onClick={handleRefresh}
       disabled={isRefreshing}
       title={t('common.refresh')}

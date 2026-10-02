@@ -51,7 +51,7 @@ export function AccountDeletion() {
   };
 
   return (
-    <Card className="tw text-card-foreground">
+    <Card className="text-card-foreground">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Trash2 className="size-4 text-muted-foreground" />
@@ -72,7 +72,7 @@ export function AccountDeletion() {
       </CardContent>
 
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) close(); }}>
-        <DialogContent className="tw text-foreground">
+        <DialogContent className="text-foreground">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="size-5 text-destructive" />

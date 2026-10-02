@@ -134,7 +134,7 @@ export function PracticeOneTwentyOne() {
       ? t('practice.setup.unlimited')
       : t(`practice.oneTwentyOne.roundCount${pluralSuffix(settings.roundsTarget)}`, { count: settings.roundsTarget });
     return (
-      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.oneTwentyOne.title')} description={t('practice.oneTwentyOne.rules')} />
         <PracticeSetup
           title={t('practice.oneTwentyOne.setup.title')}

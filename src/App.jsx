@@ -61,7 +61,7 @@ function NoPlayerProfile({ onBrowseTournaments, onOpenPractice }) {
   const displayName = getUserDisplayName(user);
   const practiceEntries = loadHistory();
   return (
-    <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
       <Card>
         <CardHeader>
           <CardTitle>{t('playerProfile.noLinkedProfile')}</CardTitle>
@@ -487,7 +487,7 @@ function AppContent() {
 
   return (
     <SidebarProvider
-      className="tw bg-background text-foreground"
+      className="bg-background text-foreground"
       // Capacitor (Android 15+ edge-to-edge) injects --safe-area-inset-*; on the web these resolve to 0.
       style={{ paddingTop: 'var(--safe-area-inset-top, 0px)', paddingBottom: 'var(--safe-area-inset-bottom, 0px)' }}
     >

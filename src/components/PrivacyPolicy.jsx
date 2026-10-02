@@ -5,7 +5,7 @@ import { getSupportEmail } from '../utils/publicUrl';
 export function PrivacyPolicy() {
   const supportEmail = getSupportEmail();
   return (
-    <div className="tw mx-auto flex max-w-3xl flex-col gap-8 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-8 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
         <p className="text-sm text-muted-foreground">Last updated: September 5, 2026</p>

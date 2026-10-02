@@ -26,7 +26,7 @@ export function DartKeypad({
   const modeClass = inputMode === 'single' ? '' : 'border-primary/40 bg-primary/10';
 
   return (
-    <div className="tw flex min-h-0 flex-1 flex-col gap-1 p-1 text-foreground">
+    <div className="flex min-h-0 flex-1 flex-col gap-1 p-1 text-foreground">
       <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-5 gap-1 max-lg:landscape:grid-cols-8">
         {DART_NUMBERS.map((number) => (
           <button

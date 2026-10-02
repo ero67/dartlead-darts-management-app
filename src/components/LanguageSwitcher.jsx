@@ -13,12 +13,12 @@ export function LanguageSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="tw">
+        <Button variant="outline" size="sm">
           <Globe />
           {current?.name}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="tw min-w-40">
+      <DropdownMenuContent align="end" className="min-w-40">
         {LANGUAGES.map(lang => (
           <DropdownMenuItem key={lang.code} onClick={() => changeLanguage(lang.code)}>
             <span className="flex-1">{lang.name}</span>

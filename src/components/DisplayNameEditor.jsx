@@ -50,7 +50,7 @@ export function DisplayNameEditor({ currentName, onSaved, onCancel }) {
   };
 
   return (
-    <form className="tw flex w-full max-w-sm flex-col gap-2 text-foreground" onSubmit={handleSubmit}>
+    <form className="flex w-full max-w-sm flex-col gap-2 text-foreground" onSubmit={handleSubmit}>
       <Label htmlFor="display-name-input">{t('playerProfile.yourName')}</Label>
       <div className="flex items-center gap-2">
         <Input

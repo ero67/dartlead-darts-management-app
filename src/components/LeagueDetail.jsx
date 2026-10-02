@@ -220,7 +220,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   if (!currentLeague) {
     if (loadError) {
       return (
-        <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
           <EmptyState icon={Trophy} title={t('leagues.notFound')}>
             <Button onClick={onBack}>
               <ArrowLeft />
@@ -231,7 +231,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       );
     }
     return (
-      <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8" aria-busy="true">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8" aria-busy="true">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-10 w-80 max-w-full" />
         <p className="text-sm text-muted-foreground">{t('leagues.loading')}</p>
@@ -629,7 +629,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   };
 
   return (
-    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-3">
         <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
           <ArrowLeft />

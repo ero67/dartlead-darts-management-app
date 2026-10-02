@@ -50,7 +50,7 @@ export function ResetPassword() {
 
   if (loading) {
     return (
-      <div className="tw min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center gap-3 p-6 bg-muted/40 text-foreground">
+      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center gap-3 p-6 bg-muted/40 text-foreground">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       </div>
@@ -60,7 +60,7 @@ export function ResetPassword() {
   // No recovery session: the link is expired, already used, or opened cold
   if (!user) {
     return (
-      <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-semibold tracking-tight">{t('auth.resetLinkInvalidTitle')}</CardTitle>
@@ -78,7 +78,7 @@ export function ResetPassword() {
 
   if (isDone) {
     return (
-      <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-semibold tracking-tight">{t('auth.passwordUpdatedTitle')}</CardTitle>
@@ -90,7 +90,7 @@ export function ResetPassword() {
   }
 
   return (
-    <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-semibold tracking-tight">{t('auth.setNewPasswordTitle')}</CardTitle>

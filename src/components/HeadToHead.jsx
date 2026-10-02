@@ -106,7 +106,7 @@ export function HeadToHead({ leagueId, players }) {
   );
 
   return (
-    <Card className="tw text-card-foreground">
+    <Card className="text-card-foreground">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="size-4 text-muted-foreground" />

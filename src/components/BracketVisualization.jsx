@@ -203,7 +203,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 })
   // Hooks above run unconditionally; the empty state returns after them.
   if (!rounds || rounds.length === 0) {
     return (
-      <div className="tw p-12 text-center text-sm text-muted-foreground">
+      <div className="p-12 text-center text-sm text-muted-foreground">
         <p>No bracket data available</p>
       </div>
     );
@@ -238,7 +238,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 })
   };
 
   return (
-    <div className="tw relative w-full overflow-x-auto py-6" ref={containerRef} style={{ fontSize: `${scale}rem` }}>
+    <div className="relative w-full overflow-x-auto py-6" ref={containerRef} style={{ fontSize: `${scale}rem` }}>
       <div className="relative z-[2] flex w-fit min-w-fit">
         {bracketStructure.map(({ round, matches, roundIndex }) => (
           <div key={round.id || roundIndex} className="flex min-w-[16.25em] shrink-0 flex-col items-start px-[1em]">

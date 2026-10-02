@@ -31,7 +31,7 @@ export function ExportMenu({ tournament, imageTarget, imageSuffix = 'standings',
     const el = imageTarget?.current;
     if (!el) throw new Error('no target');
     const isDark = document.documentElement.classList.contains('dark-mode');
-    const blob = await elementToPngBlob(el, { backgroundColor: isDark ? '#0f141c' : '#ffffff' });
+    const blob = await elementToPngBlob(el, { backgroundColor: isDark ? '#09090b' : '#ffffff' });
     await deliverFile({ blob, filename: exportFileName(tournament.name, imageSuffix, 'png'), title: tournament.name, text: `${tournament.name} · dartlead.app` });
   });
 
@@ -56,12 +56,12 @@ export function ExportMenu({ tournament, imageTarget, imageSuffix = 'standings',
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="tw" title={t('export.title')}>
+        <Button type="button" variant="outline" size="sm" title={t('export.title')}>
           {busy ? <Loader className="animate-spin" /> : <Share2 />}
           <span className="hidden sm:inline">{t('export.title')}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="tw min-w-48">
+      <DropdownMenuContent align="end" className="min-w-48">
         {items.includes('image') && (
           <DropdownMenuItem onSelect={(e) => { e.preventDefault(); shareImage(); }} disabled={!!busy}>
             <ImageIcon />{t('export.shareImage')}

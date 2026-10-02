@@ -56,7 +56,7 @@ export function PullToRefresh({ onRefresh, children }) {
 
   return (
     <div
-      className="tw flex min-h-full flex-1 flex-col"
+      className="flex min-h-full flex-1 flex-col"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

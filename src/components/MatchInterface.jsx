@@ -44,7 +44,7 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
   if (!match) {
     return (
-      <div className="tw dark-mode flex flex-1 flex-col justify-center bg-background text-foreground">
+      <div className="dark-mode flex flex-1 flex-col justify-center bg-background text-foreground">
         <LoadingState text={t('common.loading')} />
       </div>
     );
@@ -1949,7 +1949,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
   if (showMatchStarter) {
     return (
-      <div className="tw dark-mode flex flex-1 flex-col bg-background text-foreground">
+      <div className="dark-mode flex flex-1 flex-col bg-background text-foreground">
         {isViewOnly ? (
           // Non-logged-in users cannot start matches - show view-only message
           <ViewOnlyDialog
@@ -1988,7 +1988,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   const metaTitle = [match.groupName, `${t('match.leg')} ${currentLeg}`].filter(Boolean).join(' · ');
 
   return (
-    <div className="tw dark-mode flex flex-1 flex-col bg-background text-foreground">
+    <div className="dark-mode flex flex-1 flex-col bg-background text-foreground">
       <CheckoutDialog
         pending={pendingCheckout}
         onChange={setPendingCheckout}

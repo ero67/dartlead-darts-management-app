@@ -94,7 +94,7 @@ export function PracticeAroundTheClock() {
 
   if (!session) {
     return (
-      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.aroundTheClock.title')} description={t('practice.aroundTheClock.rules')} />
         <PracticeSetup
           title={t('practice.aroundTheClock.setup.title')}

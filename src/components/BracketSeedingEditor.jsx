@@ -110,7 +110,7 @@ export function BracketSeedingEditor({ playoffSettings, groups, value, onChange,
 
   if (pool.length === 0) {
     return (
-      <p className="tw rounded-md border bg-muted p-3 text-sm text-muted-foreground italic">
+      <p className="rounded-md border bg-muted p-3 text-sm text-muted-foreground italic">
         {t('registration.customSeedingNoSlots')}
       </p>
     );
@@ -121,7 +121,7 @@ export function BracketSeedingEditor({ playoffSettings, groups, value, onChange,
   const showBody = hideToggle ? true : enabled;
 
   return (
-    <div className="tw flex flex-col gap-3 text-foreground">
+    <div className="flex flex-col gap-3 text-foreground">
       {!hideToggle && (
         <Label htmlFor="custom-seeding-enabled" className="cursor-pointer font-semibold">
           <Checkbox id="custom-seeding-enabled" checked={enabled} onCheckedChange={handleToggle} />
