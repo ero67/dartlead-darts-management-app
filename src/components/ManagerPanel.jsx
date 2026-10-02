@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
+import { confirmDialog } from '../lib/confirmDialog';
 
 const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
 
@@ -373,7 +374,7 @@ export function ManagerPanel() {
       return;
     }
 
-    if (!confirm(t('manager.confirmReset', { matchId: matchInfo.id }))) {
+    if (!(await confirmDialog(t('manager.confirmReset', { matchId: matchInfo.id }), { destructive: true }))) {
       return;
     }
 

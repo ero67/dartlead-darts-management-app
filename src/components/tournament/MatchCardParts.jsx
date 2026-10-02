@@ -3,6 +3,8 @@ import { Play, Eye, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { confirmDialog } from '../../lib/confirmDialog';
 
 // Shared pieces of the group and playoff match cards.
 
@@ -44,10 +46,10 @@ export function NotScorerHint({ t }) {
     <span
       className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground"
       title={t('management.notScorerHint')}
-      onClick={() => alert(t('management.notScorerHint'))}
+      onClick={() => toast.info(t('management.notScorerHint'))}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') alert(t('management.notScorerHint')); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toast.info(t('management.notScorerHint')); }}
     >
       <Lock className="size-3" />
       {t('management.notScorer')}
@@ -95,8 +97,8 @@ export function MatchActions({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => {
-              const ok = window.confirm(t('management.adminTakeOverConfirm'));
+            onClick={async () => {
+              const ok = (await confirmDialog(t('management.adminTakeOverConfirm')));
               if (!ok) return;
               onMatchStart(buildMatchData('admin'));
             }}

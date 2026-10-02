@@ -18,6 +18,8 @@ import { GroupsPreviewDialog } from './registration/GroupsPreviewDialog';
 import { getPublicAppUrl } from '../utils/publicUrl';
 import { getUserDisplayName } from '../utils/userDisplayName';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { confirmDialog } from '../lib/confirmDialog';
 
 const MAX_PLAYERS = 64;
 
@@ -196,7 +198,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
 
   const handleWithdrawRegistration = async () => {
     if (!myRegistration) return;
-    if (!confirm(t('registration.confirmWithdraw'))) return;
+    if (!(await confirmDialog(t('registration.confirmWithdraw'), { destructive: true }))) return;
     setRegisterLoading(true);
     setRegistrationError('');
     try {
@@ -306,12 +308,12 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
 
   const addPlayer = async () => {
     if (!newPlayerName.trim()) {
-      alert(t('registration.pleaseEnterPlayerName'));
+      toast.error(t('registration.pleaseEnterPlayerName'));
       return;
     }
 
     if (players.length >= MAX_PLAYERS) {
-      alert(t('registration.tournamentFull'));
+      toast.error(t('registration.tournamentFull'));
       return;
     }
 
@@ -323,7 +325,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       singlePlayerInputRef.current?.focus();
     } catch (error) {
       console.error('Error adding player:', error);
-      alert(t('registration.failedToAddPlayer'));
+      toast.error(t('registration.failedToAddPlayer'));
     }
   };
 
@@ -361,11 +363,11 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       setBulkPlayerNames('');
 
       if (namesToAdd.length < bulkPreview.fresh.length) {
-        alert(t('registration.tournamentFull'));
+        toast.error(t('registration.tournamentFull'));
       }
     } catch (error) {
       console.error('Error adding players in bulk:', error);
-      alert(t('registration.failedToAddPlayer'));
+      toast.error(t('registration.failedToAddPlayer'));
     } finally {
       setIsBulkAdding(false);
     }
@@ -373,11 +375,11 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
 
   const removePlayer = async (playerId) => {
     if (tournament.status !== 'open_for_registration') {
-      alert(t('registration.cannotRemovePlayerAfterStart') || 'Cannot remove players after tournament has started');
+      toast.error(t('registration.cannotRemovePlayerAfterStart') || 'Cannot remove players after tournament has started');
       return;
     }
 
-    if (!confirm(t('registration.confirmRemovePlayer') || `Are you sure you want to remove this player?`)) {
+    if (!(await confirmDialog(t("registration.confirmRemovePlayer") || `Are you sure you want to remove this player?`, { destructive: true }))) {
       return;
     }
 
@@ -385,7 +387,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       await removePlayerFromTournament(playerId);
     } catch (error) {
       console.error('Error removing player:', error);
-      alert(t('registration.failedToRemovePlayer') || 'Failed to remove player. Please try again.');
+      toast.error(t('registration.failedToRemovePlayer') || 'Failed to remove player. Please try again.');
     }
   };
 
@@ -403,7 +405,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
 
   const handleStartTournament = async () => {
     if (players.length < 2) {
-      alert(t('registration.needsAtLeast2Players'));
+      toast.error(t('registration.needsAtLeast2Players'));
       return;
     }
     if (isStarting) return;
@@ -425,7 +427,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       }
     } catch (error) {
       console.error('Error starting tournament:', error);
-      alert(t('registration.failedToStartTournament'));
+      toast.error(t('registration.failedToStartTournament'));
     } finally {
       setIsStarting(false);
     }
@@ -465,7 +467,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       setShowGroupsPreview(false);
     } catch (error) {
       console.error('Error starting tournament with custom groups:', error);
-      alert(t('registration.failedToStartTournament'));
+      toast.error(t('registration.failedToStartTournament'));
     } finally {
       setIsStarting(false);
     }
@@ -477,10 +479,10 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     try {
       await updateTournamentSettings(tournament.id, tournamentSettings);
       setShowEditSettings(false);
-      alert(t('registration.settingsUpdatedSuccessfully'));
+      toast.success(t('registration.settingsUpdatedSuccessfully'));
     } catch (error) {
       console.error('Error updating tournament settings:', error);
-      alert(t('registration.failedToUpdateSettings'));
+      toast.error(t('registration.failedToUpdateSettings'));
     } finally {
       setIsSavingSettings(false);
     }
@@ -541,7 +543,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error adding league players:', error);
-      alert(t('registration.failedToAddPlayer'));
+      toast.error(t('registration.failedToAddPlayer'));
     } finally {
       setAddingLeaguePlayers(false);
     }
@@ -570,14 +572,14 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     if (!tournament || !canManage) return;
 
     const confirmMessage = t('management.confirmDeleteTournament', { name: tournament.name });
-    if (!window.confirm(confirmMessage)) return;
+    if (!(await confirmDialog(confirmMessage))) return;
 
     try {
       await onDeleteTournament(tournament.id);
       onBack();
     } catch (error) {
       console.error('Error deleting tournament:', error);
-      alert(t('management.failedToDeleteTournament'));
+      toast.error(t('management.failedToDeleteTournament'));
     }
   };
 

@@ -26,8 +26,8 @@ Cypress.Commands.add('login', (email, password) => {
   // Fill in password
   cy.get('input[type="password"], input[name="password"], input[id="password"]').type(testPassword)
   
-  // Submit form
-  cy.contains('button', /sign in|prihlásiť/i).click()
+  // Submit form (scope to the form: the sidebar has a "Login" button with the same label)
+  cy.get('form').contains('button', /sign in|prihlásiť/i).click()
   
   // Wait for navigation to dashboard/tournaments
   cy.url().should('not.include', '/login')

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // SelectItem values must be non-empty; this stands in for "no opponent (bye)".
 const NONE = '__none';
@@ -65,11 +66,11 @@ function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onC
     // A playoff match may legitimately have only one player: that player gets a
     // bye (free pass) to the next round. So we require at least one player, not two.
     if (!selectedPlayer1 && !selectedPlayer2) {
-      alert(t('management.pleaseSelectAtLeastOnePlayer'));
+      toast.error(t('management.pleaseSelectAtLeastOnePlayer'));
       return;
     }
     if (selectedPlayer1 && selectedPlayer2 && selectedPlayer1.id === selectedPlayer2.id) {
-      alert(t('management.playersMustBeDifferent'));
+      toast.error(t('management.playersMustBeDifferent'));
       return;
     }
     onSave(selectedPlayer1 || null, selectedPlayer2 || null);

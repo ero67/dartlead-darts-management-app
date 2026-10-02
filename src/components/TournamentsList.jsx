@@ -13,6 +13,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
 import { EmptyState } from './shared/EmptyState';
 import { isTournamentRunning, tournamentStatusClass } from '../utils/tournamentStatus';
+import { toast } from 'sonner';
+import { confirmDialog } from '../lib/confirmDialog';
 
 export function TournamentsList({ tournaments, onCreateTournament, onSelectTournament, onDeleteTournament }) {
   const { t } = useLanguage();
@@ -59,10 +61,10 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
     return totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0;
   };
 
-  const handleDelete = (tournament) => {
-    if (!window.confirm(t('management.confirmDeleteTournament', { name: tournament.name }))) return;
+  const handleDelete = async (tournament) => {
+    if (!(await confirmDialog(t('management.confirmDeleteTournament', { name: tournament.name }), { destructive: true }))) return;
     Promise.resolve(onDeleteTournament(tournament.id)).catch(() => {
-      alert(t('management.failedToDeleteTournament'));
+      toast.error(t('management.failedToDeleteTournament'));
     });
   };
 

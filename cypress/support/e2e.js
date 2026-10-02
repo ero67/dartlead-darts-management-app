@@ -17,6 +17,12 @@
 import './commands'
 import './match-helpers'
 
+// The app defaults to Slovak; the English-only specs need the English UI.
+// Cypress clears storage between tests, so set it before every page load.
+Cypress.on('window:before:load', (win) => {
+  win.localStorage.setItem('language', 'en')
+})
+
 // Alternatively you can use CommonJS syntax:
 // require('./commands')
 

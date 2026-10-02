@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from './shared/EmptyState';
 import { cn } from '@/lib/utils';
+import { confirmDialog } from '../lib/confirmDialog';
 
 // Admin panel section: managers with billing state (monthly, invoiced
 // manually), resource counts, ban controls and role changes. Enforcement is
@@ -102,9 +103,9 @@ export function ManagerBilling() {
     });
   };
 
-  const toggleBan = (row) => {
+  const toggleBan = async (row) => {
     const action = row.is_banned ? 'unban' : 'ban';
-    if (!window.confirm(`Really ${action} ${row.email}? ${row.is_banned ? '' : 'They will be signed out everywhere and unable to log in.'}`)) return;
+    if (!(await confirmDialog(`Really ${action} ${row.email}? ${row.is_banned ? '' : 'They will be signed out everywhere and unable to log in.'}`, { destructive: true }))) return;
     runAction(row.user_id, async () => {
       const { data, error: rpcError } = await supabase.rpc('admin_set_user_ban', {
         user_email: row.email,
@@ -115,9 +116,9 @@ export function ManagerBilling() {
     });
   };
 
-  const changeRole = (row, newRole) => {
+  const changeRole = async (row, newRole) => {
     const label = newRole === null ? `remove the manager role from ${row.email}` : `make ${row.email} ${newRole === 'admin' ? 'an ADMIN (full access to everything)' : 'a manager'}`;
-    if (!window.confirm(`Really ${label}?`)) return;
+    if (!(await confirmDialog(`Really ${label}?`))) return;
     runAction(row.user_id, async () => {
       const { data, error: rpcError } = await supabase.rpc('set_user_role_secure', {
         user_email: row.email,

@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
 const PLAYOFF_LEGS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -169,7 +170,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
 
   const createTournament = () => {
     if (!tournamentName.trim()) {
-      alert(t('tournaments.pleaseEnterName'));
+      toast.error(t('tournaments.pleaseEnterName'));
       return;
     }
 

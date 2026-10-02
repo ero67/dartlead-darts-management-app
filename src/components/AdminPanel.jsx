@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from './shared/EmptyState';
 import { tournamentStatusClass } from '../utils/tournamentStatus';
 import { cn } from '@/lib/utils';
+import { confirmDialog } from '../lib/confirmDialog';
 
 // shadcn Select items need a non-empty value; '' sentinels map to this.
 const NONE = '__none';
@@ -122,7 +123,7 @@ export function AdminPanel() {
   };
 
   const removeManagerRole = async (userEmail) => {
-    if (!confirm(`Are you sure you want to remove manager role from ${userEmail}?`)) {
+    if (!(await confirmDialog(`Are you sure you want to remove manager role from ${userEmail}?`, { destructive: true }))) {
       return;
     }
 
@@ -266,7 +267,7 @@ export function AdminPanel() {
       return;
     }
 
-    if (!confirm(`Are you sure you want to change tournament "${tournamentInfo.name}" status from "${tournamentInfo.status}" to "${newStatus}"?`)) {
+    if (!(await confirmDialog(`Are you sure you want to change tournament "${tournamentInfo.name}" status from "${tournamentInfo.status}" to "${newStatus}"?`))) {
       return;
     }
 
@@ -418,12 +419,12 @@ export function AdminPanel() {
     const sourceNames = sourcePlayerIds.map(id => allPlayers.find(p => p.id === id)?.name || id);
     const targetName = allPlayers.find(p => p.id === targetPlayerId)?.name || targetPlayerId;
 
-    if (!confirm(
+    if (!(await confirmDialog(
       `⚠️ MERGE ${sourcePlayerIds.length} PLAYER(S)\n\n` +
       `All data from:\n${sourceNames.map(n => `  • "${n}"`).join('\n')}\n\n` +
       `will be moved to "${targetName}".\n` +
       `The source player(s) will be DELETED permanently.\n\nThis cannot be undone. Continue?`
-    )) return;
+    , { destructive: true }))) return;
 
     setMerging(true);
     setMergeLog([]);
@@ -530,7 +531,7 @@ export function AdminPanel() {
       extraNames.forEach(n => lines.push(`  • "${n}"`));
     }
     lines.push('', 'Continue?');
-    if (!confirm(lines.join('\n'))) return;
+    if (!(await confirmDialog(lines.join('\n')))) return;
 
     setLinking(true);
     setLinkLog([]);
@@ -572,10 +573,10 @@ export function AdminPanel() {
 
   const handleUnlinkPlayer = async () => {
     if (!linkUserPlayer) return;
-    if (!confirm(
+    if (!(await confirmDialog(
       `Unlink "${linkUserPlayer.name}" from ${linkUser?.email}?\n\n` +
       'The player record and all its match data stay intact — it just stops showing on that account\'s profile.'
-    )) return;
+    , { destructive: true }))) return;
 
     setLinking(true);
     try {

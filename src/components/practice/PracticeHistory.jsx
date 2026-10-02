@@ -9,6 +9,7 @@ import { EmptyState } from '../shared/EmptyState';
 import { loadHistory, clearHistory } from '../../lib/practiceStorage';
 import { practiceService } from '../../services/practiceService';
 import { SessionRow } from './PracticeHome';
+import { confirmDialog } from '../../lib/confirmDialog';
 
 export function PracticeHistory() {
   const { t, language } = useLanguage();
@@ -29,7 +30,7 @@ export function PracticeHistory() {
   };
 
   const handleClearAll = async () => {
-    if (!window.confirm(t(user ? 'practice.history.confirmClearCloud' : 'practice.history.confirmClear'))) return;
+    if (!(await confirmDialog(t(user ? 'practice.history.confirmClearCloud' : 'practice.history.confirmClear'), { destructive: true }))) return;
     setError(null);
     try {
       await practiceService.deleteAll(user?.id);

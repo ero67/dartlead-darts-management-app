@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState } from './components/shared/LoadingState';
 import { AccessNotice } from './components/shared/AccessNotice';
+import { ConfirmDialogHost } from './components/shared/ConfirmDialog';
+import { Toaster } from '@/components/ui/sonner';
 import { TournamentProvider, useTournament } from './contexts/TournamentContext';
 import { LeagueProvider, useLeague } from './contexts/LeagueContext';
 import { LiveMatchProvider } from './contexts/LiveMatchContext';
@@ -51,6 +53,7 @@ import { getUserDisplayName } from './utils/userDisplayName';
 import { DisplayNameEditor } from './components/DisplayNameEditor';
 import { PracticeBests } from './components/practice/PracticeBests';
 import { loadHistory } from './lib/practiceStorage';
+import { toast } from 'sonner';
 
 // Shown when a signed-in user has no player record yet (they have never been
 // approved into a tournament, so there are no stats to display).
@@ -461,7 +464,7 @@ function AppContent() {
       navigate(`/league/${leagueData.id}`);
     } catch (error) {
       console.error('Error creating league:', error);
-      alert(t('leagues.failedToCreateLeague'));
+      toast.error(t('leagues.failedToCreateLeague'));
     }
   };
 
@@ -492,6 +495,8 @@ function AppContent() {
       style={{ paddingTop: 'var(--safe-area-inset-top, 0px)', paddingBottom: 'var(--safe-area-inset-bottom, 0px)' }}
     >
       <OfflineBanner />
+      <Toaster />
+      <ConfirmDialogHost labels={{ confirm: t('common.yes'), cancel: t('common.cancel') }} />
 
       <Navigation
         currentView={location.pathname}

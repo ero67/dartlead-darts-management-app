@@ -31,6 +31,8 @@ import { leagueService } from '../services/leagueService';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { confirmDialog } from '../lib/confirmDialog';
 
   // Generate unique ID for playoff matches (using crypto.randomUUID for proper UUIDs)
   const generateId = () => {
@@ -237,7 +239,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // Belt and braces: the buttons below are hidden for non-scorers, but
     // the database would discard everything such a user scored.
     if (canScore !== true) {
-      alert(t('management.notScorerHint'));
+      toast.info(t('management.notScorerHint'));
       return;
     }
     setMatchToConfirm(matchData);
@@ -542,10 +544,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       await tournamentService.setPlayoffMatchPlayers(tournament.id, matchId, player1, player2);
       await getTournament(tournament.id);
       setEditingMatch(null);
-      alert(t('management.playoffMatchUpdated'));
+      toast.success(t('management.playoffMatchUpdated'));
     } catch (error) {
       console.error('Error updating playoff match:', error);
-      alert(t('management.failedToUpdatePlayoffMatch'));
+      toast.error(t('management.failedToUpdatePlayoffMatch'));
     }
   };
 
@@ -1534,14 +1536,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // For group-based tournaments, ensure group stage is complete first
     if (tournament.tournamentType !== 'playoff_only') {
       if (!isGroupStageComplete()) {
-        alert(t('management.groupStageMustBeCompleted'));
+        toast.error(t('management.groupStageMustBeCompleted'));
         return;
       }
     }
 
     const qualifyingPlayers = activeQualifyingPlayers;
     if (qualifyingPlayers.length === 0) {
-      alert(t('management.noQualifyingPlayers'));
+      toast.error(t('management.noQualifyingPlayers'));
       return;
     }
 
@@ -1558,10 +1560,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // matches) against a bracket that only exists locally.
     try {
       await contextStartPlayoffs(updatedPlayoffs);
-      alert(t('management.playoffsStartedSuccess', { count: qualifyingPlayers.length }));
+      toast.success(t('management.playoffsStartedSuccess', { count: qualifyingPlayers.length }));
     } catch (error) {
       console.error('Error starting playoffs:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
@@ -1572,13 +1574,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const confirmMessage = t('management.confirmResetPlayoffs') || 
       'Are you sure you want to reset the playoffs? This will clear all playoff matches and results. Group stage data will be preserved.';
     
-    if (window.confirm(confirmMessage)) {
+    if ((await confirmDialog(confirmMessage))) {
       try {
         await contextResetPlayoffs();
-        alert(t('management.playoffsResetSuccess'));
+        toast.success(t('management.playoffsResetSuccess'));
       } catch (error) {
         console.error('Error resetting playoffs:', error);
-        alert(t('management.failedToResetPlayoffs'));
+        toast.error(t('management.failedToResetPlayoffs'));
       }
     }
   };
@@ -1610,7 +1612,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error advancing bye:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
@@ -1649,20 +1651,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     if (!tournament) return;
     
     if (!canManage) {
-      alert(t('management.onlyAdminsCanDelete'));
+      toast.error(t('management.onlyAdminsCanDelete'));
       return;
     }
 
     const confirmMessage = t('management.confirmDeleteTournament', { name: tournament.name });
     
-    if (window.confirm(confirmMessage)) {
+    if ((await confirmDialog(confirmMessage))) {
       try {
         await onDeleteTournament(tournament.id);
         // Redirect to tournaments list after successful deletion
         onBack();
       } catch (error) {
         console.error('Error deleting tournament:', error);
-        alert(t('management.failedToDeleteTournament'));
+        toast.error(t('management.failedToDeleteTournament'));
       }
     }
   };
@@ -1671,10 +1673,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     try {
       await updateTournamentSettings(tournament.id, tournamentSettings);
       setShowEditSettings(false);
-      alert(t('registration.settingsUpdatedSuccessfully'));
+      toast.success(t('registration.settingsUpdatedSuccessfully'));
     } catch (error) {
       console.error('Error updating tournament settings:', error);
-      alert(t('registration.failedToUpdateSettings'));
+      toast.error(t('registration.failedToUpdateSettings'));
     }
   };
 
@@ -1724,11 +1726,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
 
   const handleAdminResetMatch = async (match) => {
-    if (!window.confirm(t('manager.confirmReset', { matchId: match.id }))) return;
+    if (!(await confirmDialog(t('manager.confirmReset', { matchId: match.id }), { destructive: true }))) return;
     try {
       const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
       if (ctx && isDownstreamBlocked(ctx)) {
-        alert(t('manager.downstreamStarted'));
+        toast.success(t('manager.downstreamStarted'));
         return;
       }
 
@@ -1780,7 +1782,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error resetting match:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
@@ -1794,14 +1796,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const score2 = parseInt(newScore2, 10) || 0;
     const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
     if (!winnerId) {
-      alert(t('manager.winnerMoreLegsError'));
+      toast.error(t('manager.winnerMoreLegsError'));
       return;
     }
 
     try {
       const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
       if (ctx && isDownstreamBlocked(ctx)) {
-        alert(t('manager.downstreamStarted'));
+        toast.success(t('manager.downstreamStarted'));
         return;
       }
 
@@ -1858,7 +1860,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error correcting match result:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 

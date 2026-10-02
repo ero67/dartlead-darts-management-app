@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { confirmDialog } from '../lib/confirmDialog';
 
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
@@ -251,7 +253,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     if (isSavingLeague) return;
     const name = editForm.name.trim();
     if (!name) {
-      alert(t('leagues.leagueNameRequired'));
+      toast.error(t('leagues.leagueNameRequired'));
       return;
     }
     setIsSavingLeague(true);
@@ -263,20 +265,20 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating league:', error);
-      alert(t('leagues.failedToUpdateLeague'));
+      toast.error(t('leagues.failedToUpdateLeague'));
     } finally {
       setIsSavingLeague(false);
     }
   };
 
   const handleDeleteLeague = async () => {
-    if (window.confirm(t('leagues.confirmDeleteLeague'))) {
+    if ((await confirmDialog(t('leagues.confirmDeleteLeague'), { destructive: true }))) {
       try {
         await deleteLeague(currentLeague.id);
         onBack();
       } catch (error) {
         console.error('Error deleting league:', error);
-        alert(t('leagues.failedToDeleteLeague'));
+        toast.error(t('leagues.failedToDeleteLeague'));
       }
     }
   };
@@ -315,7 +317,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
 
   const handleWithdrawLeagueReg = async () => {
     if (!myLeagueRegistration) return;
-    if (!confirm(t('registration.confirmWithdraw'))) return;
+    if (!(await confirmDialog(t('registration.confirmWithdraw'), { destructive: true }))) return;
     setRegisterLoading(true);
     setRegistrationError('');
     try {
@@ -366,7 +368,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       await selectLeague(currentLeague.id);
     } catch (error) {
       console.error('Error adding user to league:', error);
-      alert(t('leagues.failedToAddPlayer'));
+      toast.error(t('leagues.failedToAddPlayer'));
     } finally {
       setIsAddingMember(false);
     }
@@ -381,7 +383,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setIsAddingPlayer(false);
     } catch (error) {
       console.error('Error adding player:', error);
-      alert(t('leagues.failedToAddPlayer'));
+      toast.error(t('leagues.failedToAddPlayer'));
     } finally {
       setIsAddingMember(false);
     }
@@ -410,18 +412,18 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       });
     } catch (error) {
       console.error('Error updating player status:', error);
-      alert(t('leagues.failedToUpdatePlayerStatus'));
+      toast.error(t('leagues.failedToUpdatePlayerStatus'));
     }
   });
 
-  const handleRemovePlayer = (playerId) => {
-    if (!window.confirm(t('leagues.confirmRemovePlayer'))) return;
+  const handleRemovePlayer = async (playerId) => {
+    if (!(await confirmDialog(t('leagues.confirmRemovePlayer'), { destructive: true }))) return;
     return withMemberPending(playerId, async () => {
       try {
         await removeMember(currentLeague.id, playerId);
       } catch (error) {
         console.error('Error removing player:', error);
-        alert(t('leagues.failedToRemovePlayer'));
+        toast.error(t('leagues.failedToRemovePlayer'));
       }
     });
   };
@@ -441,13 +443,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     const points = parseInt(newPlacement.points) || 0;
     
     if (position === '' || (position !== 'default' && position !== 'playoffDefault' && (isNaN(position) || position < 1))) {
-      alert(t('leagues.invalidPosition'));
+      toast.error(t('leagues.invalidPosition'));
       return;
     }
     
     // Check if position already exists
     if (scoringRules.some(r => r.position === position)) {
-      alert(t('leagues.placementExists'));
+      toast.error(t('leagues.placementExists'));
       return;
     }
     
@@ -499,10 +501,10 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         }
       });
       
-      alert(t('leagues.scoringSaved'));
+      toast.success(t('leagues.scoringSaved'));
     } catch (error) {
       console.error('Error saving scoring rules:', error);
-      alert(t('leagues.scoringSaveFailed'));
+      toast.error(t('leagues.scoringSaveFailed'));
     } finally {
       setIsSavingScoring(false);
     }
@@ -514,10 +516,10 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       await updateLeague(currentLeague.id, {
         default_tournament_settings: tournamentDefaults
       });
-      alert(t('leagues.defaultsSaved'));
+      toast.success(t('leagues.defaultsSaved'));
     } catch (error) {
       console.error('Error saving tournament defaults:', error);
-      alert(t('leagues.defaultsSaveFailed'));
+      toast.error(t('leagues.defaultsSaveFailed'));
     } finally {
       setIsSavingDefaults(false);
     }
@@ -592,14 +594,14 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setUnlinkedTournaments([]);
     } catch (error) {
       console.error('Error linking tournament:', error);
-      alert(t('leagues.linkFailed'));
+      toast.error(t('leagues.linkFailed'));
     } finally {
       setIsLinking(false);
     }
   };
 
   const handleUnlinkTournament = async (tournamentId) => {
-    if (!window.confirm(t('leagues.confirmUnlinkTournament')) || isLinking) return;
+    if (!(await confirmDialog(t('leagues.confirmUnlinkTournament'), { destructive: true })) || isLinking) return;
     setIsLinking(true);
     try {
       await unlinkTournamentFromLeague(currentLeague.id, tournamentId);
@@ -608,7 +610,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       invalidateStats();
     } catch (error) {
       console.error('Error unlinking tournament:', error);
-      alert(t('leagues.unlinkFailed'));
+      toast.error(t('leagues.unlinkFailed'));
     } finally {
       setIsLinking(false);
     }
@@ -619,10 +621,10 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     try {
       await refreshLeaderboard(currentLeague.id);
       invalidateStats();
-      alert(t('leagues.recalculateSuccess'));
+      toast.success(t('leagues.recalculateSuccess'));
     } catch (error) {
       console.error('Error refreshing leaderboard:', error);
-      alert(t('leagues.recalculateFailed'));
+      toast.error(t('leagues.recalculateFailed'));
     } finally {
       setIsRecalculating(false);
     }
