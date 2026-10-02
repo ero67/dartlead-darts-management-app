@@ -513,7 +513,7 @@ function AppContent() {
         <span className="text-sm font-semibold">DartLead</span>
       </header>
 
-      <main className="app-main w-auto flex-1 min-w-0">
+      <main className="flex min-w-0 flex-1 flex-col">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={

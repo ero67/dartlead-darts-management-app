@@ -210,7 +210,7 @@ export function PracticePlay({ meta, onFinish, children }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   return (
-    <div className="tw dark-mode min-h-screen bg-background text-foreground">
+    <div className="tw dark-mode flex flex-1 flex-col bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 p-2 sm:p-4">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => navigate('/practice')}>
