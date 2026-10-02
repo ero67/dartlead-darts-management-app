@@ -5,9 +5,16 @@ import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { BracketVisualization } from './BracketVisualization';
+import { EmptyState } from './shared/EmptyState';
+import { StatusBadge } from './shared/StatusBadge';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
-import './TvDisplay.css';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
 // dark high-contrast palette independent of the app theme. Cycles through
@@ -38,6 +45,16 @@ const roundRobin = (queues) => {
   for (let i = 0; i < max; i++) for (const q of queues) if (q[i]) out.push(q[i]);
   return out;
 };
+
+// Standings: up to four group cards side by side on a wide screen.
+const GROUP_COLS = { 1: '', 2: 'xl:grid-cols-2', 3: 'xl:grid-cols-3', 4: 'xl:grid-cols-4' };
+
+// Each view stays mounted (rotation only toggles `hidden`) so scroll positions
+// survive. On a large screen inactive views are stacked in the same grid cell
+// and hidden with `visibility` — display:none would reset their scroll offsets
+// (the bracket "jumping back"). On phones the page scrolls normally and hidden
+// views simply collapse.
+const VIEW_CLASS = 'min-h-0 lg:col-start-1 lg:row-start-1 lg:h-full lg:[&[hidden]]:pointer-events-none lg:[&[hidden]]:invisible lg:[&[hidden]]:block';
 
 export function TvDisplay() {
   const { id } = useParams();
@@ -171,152 +188,174 @@ export function TvDisplay() {
   const qualifiersPerGroup = tournament?.playoffSettings?.enabled ? Number(tournament.playoffSettings.qualifiersPerGroup || tournament.playoffSettings.playersPerGroup || 0) : 0;
 
   // ---- render -------------------------------------------------------------
+  const renderPlayerRow = (name, legs, score, isThrowing) => (
+    <div
+      className={cn(
+        'grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-6 rounded-md border-l-4 border-transparent px-4 py-2',
+        isThrowing && 'border-primary bg-muted/40'
+      )}
+    >
+      <span className="truncate text-3xl font-semibold">{name}</span>
+      <span className="min-w-[2.5em] rounded-full bg-muted px-3 py-1 text-center text-xl font-semibold tabular-nums text-muted-foreground">{legs}</span>
+      <span className="min-w-[3ch] text-right text-8xl font-semibold leading-none tracking-tight tabular-nums">{score}</span>
+    </div>
+  );
+
   const renderLive = () => (
-    <div className="tv-live">
-      <section className="tv-boards">
-        <h2><Target size={28} />{t('tv.liveBoards')}</h2>
+    <div className="flex h-full min-h-0 flex-col gap-6 lg:flex-row">
+      <section className="flex min-w-0 flex-1 flex-col gap-4">
+        <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+          <Target className="size-5" />{t('tv.liveBoards')}
+        </h2>
         {boards.length === 0 ? (
-          <p className="tv-empty">{t('tv.noLiveMatches')}</p>
+          <EmptyState icon={Target} title={t('tv.noLiveMatches')} />
         ) : (
-          <div className={`tv-board-grid tv-board-grid--${Math.min(boards.length, 4)}`}>
+          <div className={cn('grid gap-4', boards.length > 1 && 'xl:grid-cols-2')}>
             {boards.map((m) => {
               const p1 = m.player1?.name || '—';
               const p2 = m.player2?.name || '—';
               const turn = m.current_player;
               return (
-                <div key={m.id} className="tv-board">
-                  <div className="tv-board__head">
-                    <span className="tv-board__number">{m.live_board_number ? `${t('deviceSettings.board')} ${m.live_board_number}` : (m.live_device_name || t('tv.board'))}</span>
-                    <span className="tv-board__format">{t('tv.leg')} {m.current_leg || 1} · {t('management.firstTo')} {m.legs_to_win || 3}</span>
-                  </div>
-                  <div className={`tv-board__player ${turn === 0 ? 'is-throwing' : ''}`}>
-                    <span className="tv-board__name">{p1}</span>
-                    <span className="tv-board__legs">{m.player1_legs ?? 0}</span>
-                    <span className="tv-board__score">{m.player1_current_score ?? m.starting_score ?? 501}</span>
-                  </div>
-                  <div className={`tv-board__player ${turn === 1 ? 'is-throwing' : ''}`}>
-                    <span className="tv-board__name">{p2}</span>
-                    <span className="tv-board__legs">{m.player2_legs ?? 0}</span>
-                    <span className="tv-board__score">{m.player2_current_score ?? m.starting_score ?? 501}</span>
-                  </div>
-                </div>
+                <Card key={m.id} className="gap-3 py-4">
+                  <CardHeader className="flex items-center justify-between gap-3 px-4">
+                    <span className="font-mono text-sm font-semibold uppercase tracking-wider text-primary">
+                      {m.live_board_number ? `${t('deviceSettings.board')} ${m.live_board_number}` : (m.live_device_name || t('tv.board'))}
+                    </span>
+                    <span className="text-sm text-muted-foreground">{t('tv.leg')} {m.current_leg || 1} · {t('management.firstTo')} {m.legs_to_win || 3}</span>
+                    <Badge className="bg-destructive text-white">{t('liveMatches.live')}</Badge>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-1 px-4">
+                    {renderPlayerRow(p1, m.player1_legs ?? 0, m.player1_current_score ?? m.starting_score ?? 501, turn === 0)}
+                    {renderPlayerRow(p2, m.player2_legs ?? 0, m.player2_current_score ?? m.starting_score ?? 501, turn === 1)}
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
         )}
       </section>
-      <aside className="tv-upnext">
-        <h2><Clock size={24} />{t('tv.upNext')}</h2>
-        {upNext.length === 0 ? (
-          <p className="tv-empty">{t('tv.nothingQueued')}</p>
-        ) : (
-          <ul>
-            {upNext.map((m) => (
-              <li key={m.id}>
-                <span className="tv-upnext__label">{m.label}</span>
-                <span className="tv-upnext__players">{m.p1} <em>vs</em> {m.p2}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </aside>
+      <Card className="shrink-0 gap-3 py-4 lg:w-96">
+        <CardHeader className="px-4">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            <Clock className="size-4" />{t('tv.upNext')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4">
+          {upNext.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t('tv.nothingQueued')}</p>
+          ) : (
+            <ul className="flex flex-col divide-y">
+              {upNext.map((m) => (
+                <li key={m.id} className="flex flex-col gap-0.5 py-2.5">
+                  <span className="text-xs uppercase tracking-wider text-muted-foreground">{m.label}</span>
+                  <span className="text-lg font-semibold">{m.p1} <span className="mx-1 font-normal text-muted-foreground">vs</span> {m.p2}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 
   const renderStandings = () => (
-    <div className={`tv-standings tv-standings--${Math.min((tournament.groups || []).length, 4)}`}>
+    <div className={cn('grid content-start gap-4', GROUP_COLS[Math.min((tournament.groups || []).length, 4)])}>
       {(tournament.groups || []).map((g) => {
         const rows = g.standings || [];
         return (
-          <div key={g.id} className="tv-group">
-            <h2>{g.name}</h2>
-            <table className="tv-table">
-              <thead>
-                <tr>
-                  <th className="pos">#</th>
-                  <th className="name">{t('management.player')}</th>
-                  <th>{t('management.played')}</th>
-                  <th>{t('management.won')}</th>
-                  <th>{t('management.legsWL')}</th>
-                  <th>{t('management.legsDiff')}</th>
-                  <th>{t('management.avg')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr><td colSpan={7} className="tv-empty">{t('management.noMatchesPlayedYet')}</td></tr>
-                ) : rows.map((s, i) => {
-                  const diff = (s.legsWon || 0) - (s.legsLost || 0);
-                  const qualifies = qualifiersPerGroup > 0 && i < qualifiersPerGroup;
-                  return (
-                    <tr key={s.player.id} className={qualifies ? 'qualifies' : ''}>
-                      <td className="pos">{i + 1}</td>
-                      <td className="name">{s.player.name}</td>
-                      <td>{s.matchesPlayed}</td>
-                      <td>{s.matchesWon}</td>
-                      <td>{s.legsWon}:{s.legsLost}</td>
-                      <td className={diff >= 0 ? 'pos-diff' : 'neg-diff'}>{diff > 0 ? '+' : ''}{diff}</td>
-                      <td>{(s.average || 0).toFixed(1)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Card key={g.id} className="gap-3 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm font-medium uppercase tracking-wider text-muted-foreground">{g.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4">
+              <Table className="text-lg">
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10 text-muted-foreground">#</TableHead>
+                    <TableHead className="text-muted-foreground">{t('management.player')}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t('management.played')}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t('management.won')}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t('management.legsWL')}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t('management.legsDiff')}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t('management.avg')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="py-6 text-center text-muted-foreground">{t('management.noMatchesPlayedYet')}</TableCell></TableRow>
+                  ) : rows.map((s, i) => {
+                    const diff = (s.legsWon || 0) - (s.legsLost || 0);
+                    const qualifies = qualifiersPerGroup > 0 && i < qualifiersPerGroup;
+                    return (
+                      <TableRow key={s.player.id}>
+                        <TableCell className={cn('font-semibold tabular-nums text-muted-foreground', qualifies && 'text-primary')}>{i + 1}</TableCell>
+                        <TableCell className="max-w-[40vw] truncate font-semibold">
+                          {s.player.name}
+                          {qualifies && <span className="ml-2 inline-block size-1.5 rounded-full bg-primary align-middle" />}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{s.matchesPlayed}</TableCell>
+                        <TableCell className="text-right tabular-nums">{s.matchesWon}</TableCell>
+                        <TableCell className="text-right tabular-nums">{s.legsWon}:{s.legsLost}</TableCell>
+                        <TableCell className={cn('text-right tabular-nums', diff >= 0 ? 'text-primary' : 'text-destructive')}>{diff > 0 ? '+' : ''}{diff}</TableCell>
+                        <TableCell className="text-right tabular-nums">{(s.average || 0).toFixed(1)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         );
       })}
     </div>
   );
 
   const renderBracket = () => (
-    <div className="tv-bracket">
-      <div className="tv-bracket-inner">
-        <BracketVisualization rounds={bracketRounds} playoffMatches={playoffRows} scale={1.6} />
-      </div>
+    <div className="h-full overflow-auto">
+      <BracketVisualization rounds={bracketRounds} playoffMatches={playoffRows} scale={1.6} />
     </div>
   );
 
   const viewLabel = { live: t('tv.liveBoards'), standings: t('management.standings'), bracket: t('management.playoffs') };
 
   return (
-    <div className="tv-root" ref={rootRef}>
-      <header className="tv-header">
-        <div className="tv-header__title">
-          <Trophy size={30} />
-          <div>
-            <h1>{tournament?.name || '…'}</h1>
-            {tournament && (
-              <span className={`tv-status tv-status--${tournament.status}`}>
-                {tournament.status === 'completed' ? t('tv.completed') : t('tv.inProgress')}
-              </span>
-            )}
-          </div>
+    <div className="tw dark-mode flex min-h-screen flex-col bg-background text-foreground lg:fixed lg:inset-0 lg:overflow-hidden [&:fullscreen]:cursor-none" ref={rootRef}>
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-3 lg:h-20 lg:flex-nowrap lg:py-0">
+        <div className="flex min-w-0 items-center gap-3">
+          <Trophy className="size-7 shrink-0 text-primary" />
+          <h1 className="truncate text-3xl font-semibold">{tournament?.name || '…'}</h1>
+          {tournament && <StatusBadge status={tournament.status} t={t} className="shrink-0" />}
         </div>
-        <nav className="tv-views" aria-label={t('tv.views')}>
-          {views.map((v, i) => (
-            <button key={v} type="button" className={v === activeView ? 'active' : ''} onClick={() => { setViewIndex(i); setPaused(true); }}>
-              {viewLabel[v]}
-            </button>
-          ))}
-        </nav>
-        <div className="tv-header__right">
-          <span className="tv-clock">{fmtClock(now)}</span>
+        <Tabs
+          value={activeView}
+          onValueChange={(v) => { setViewIndex(views.indexOf(v)); setPaused(true); }}
+          className="order-3 w-full items-center lg:order-none lg:w-auto"
+          aria-label={t('tv.views')}
+        >
+          <TabsList>
+            {views.map((v) => (
+              <TabsTrigger key={v} value={v}>{viewLabel[v]}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-semibold tabular-nums text-muted-foreground">{fmtClock(now)}</span>
           {!pinnedView && views.length > 1 && (
-            <button type="button" className="tv-icon-btn" onClick={() => setPaused((p) => !p)} title={paused ? t('tv.resume') : t('tv.pause')}>
-              {paused ? <Play size={20} /> : <Pause size={20} />}
-            </button>
+            <Button variant="ghost" size="icon-lg" onClick={() => setPaused((p) => !p)} title={paused ? t('tv.resume') : t('tv.pause')} aria-label={paused ? t('tv.resume') : t('tv.pause')}>
+              {paused ? <Play className="size-5" /> : <Pause className="size-5" />}
+            </Button>
           )}
-          <button type="button" className="tv-icon-btn" onClick={toggleFullscreen} title={t('tv.fullscreen')}>
-            <Maximize2 size={20} />
-          </button>
+          <Button variant="ghost" size="icon-lg" onClick={toggleFullscreen} title={t('tv.fullscreen')} aria-label={t('tv.fullscreen')}>
+            <Maximize2 className="size-5" />
+          </Button>
         </div>
       </header>
 
-      <main className="tv-main">
-        {error && <p className="tv-error">{error}</p>}
-        {!tournament && !error && <p className="tv-empty">{t('common.loading')}</p>}
+      <main className="min-h-0 flex-1 p-6 lg:grid lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+        {error && <p className="py-8 text-center text-xl text-destructive lg:col-start-1 lg:row-start-1 lg:self-start">{error}</p>}
+        {!tournament && !error && <p className="py-8 text-center text-xl text-muted-foreground lg:col-start-1 lg:row-start-1 lg:self-start">{t('common.loading')}</p>}
         {tournament && views.map((v) => (
-          <div key={v} className="tv-view" hidden={v !== activeView}>
+          <div key={v} className={cn(VIEW_CLASS, v === 'standings' && 'lg:overflow-auto')} hidden={v !== activeView}>
             {v === 'live' && renderLive()}
             {v === 'standings' && renderStandings()}
             {v === 'bracket' && renderBracket()}
@@ -324,7 +363,7 @@ export function TvDisplay() {
         ))}
       </main>
 
-      <footer className="tv-footer">
+      <footer className="flex h-12 items-center justify-between border-t px-6 text-sm text-muted-foreground">
         <span>dartlead.app</span>
         <span>
           {pinnedView

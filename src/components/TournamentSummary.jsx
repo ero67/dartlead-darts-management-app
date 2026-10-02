@@ -1,9 +1,16 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Trophy, Target, Zap, Award, Hash, Download, Loader } from 'lucide-react';
-import { deliverFile, elementToPngBlob, exportFileName } from '../lib/exportShare';
+import { Trophy, Target, Zap, Award, Hash, Download, Loader, Medal } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { deliverFile, elementToPngBlob, exportFileName } from '../lib/exportShare';
 import { isValidLegDartCount } from '../utils/dartStats';
 import logo from '../assets/logo.png';
+
+const PLACE_MEDAL_CLASS = { 1: 'text-amber-500', 2: 'text-zinc-400', 3: 'text-amber-700' };
+const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
 /**
  * TournamentSummary – shown automatically when a tournament is completed.
@@ -373,104 +380,114 @@ export function TournamentSummary({ tournament }) {
   }, [allMatches, t]);
 
   // ── Render ───────────────────────────────────────────────────────────
-  const placeEmoji = { 1: '🥇', 2: '🥈', 3: '🥉' };
   const placeLabel = {
     1: t('summary.firstPlace') || '1st Place',
     2: t('summary.secondPlace') || '2nd Place',
     3: t('summary.thirdPlace') || '3rd Place',
   };
 
+  const branding = (
+    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      <img src={logo} alt="DartLead" className="size-6" />
+      <span>{t('summary.poweredBy') || 'Powered by'} <strong className="font-semibold text-foreground">DartLead</strong></span>
+    </div>
+  );
+
   return (
-    <div className="tournament-summary">
-      <div className="summary-export-bar">
-        <button className="admin-button primary" onClick={handleExportImage} disabled={exporting}>
-          {exporting ? <Loader size={16} className="spinning" /> : <Download size={16} />}
+    <div className="tw flex flex-col gap-4 text-foreground">
+      <div className="flex flex-wrap items-center justify-end gap-4">
+        <Button variant="outline" onClick={handleExportImage} disabled={exporting}>
+          {exporting ? <Loader className="animate-spin" /> : <Download />}
           {exporting ? (t('summary.exporting') || 'Exporting...') : (t('summary.exportImage') || 'Export as Image')}
-        </button>
-      </div>
-      <div className="summary-content" ref={summaryRef}>
-      {/* Title + branding */}
-      <div className="summary-header">
-        <Trophy size={32} className="summary-trophy-icon" />
-        <h2>{t('summary.title') || 'Tournament Summary'}</h2>
-        <p className="summary-tournament-name">{tournament.name}</p>
-        <div className="summary-branding-inline">
-          <img src={logo} alt="DartLead" className="summary-branding-logo" />
-          <span className="summary-branding-text">
-            {t('summary.poweredBy') || 'Powered by'} <strong>DartLead</strong>
-          </span>
-        </div>
+        </Button>
       </div>
 
-      {/* Podium */}
-      {podium.length > 0 && (
-        <div className="summary-podium-section">
-          <h3 className="summary-section-title">{t('summary.finalStandings') || 'Final Standings'}</h3>
-          <div className="summary-podium">
-            {[2, 1, 3].map(place => {
-              const entries = podium.filter(p => p.place === place);
-              if (entries.length === 0) return null;
-              return entries.map((entry, idx) => (
-                <div key={`${place}-${idx}`} className={`podium-card podium-place-${place}`}>
-                  <div className="podium-emoji">{placeEmoji[place]}</div>
-                  <div className="podium-place-label">{placeLabel[place]}</div>
-                  <div className="podium-player-name">{entry.player?.name || '?'}</div>
-                  <div className={`podium-bar podium-bar-${place}`} />
-                </div>
-              ));
-            })}
-          </div>
-        </div>
-      )}
+      {/* Captured by the image export — needs its own opaque background. */}
+      <div className="flex flex-col gap-6 rounded-xl bg-background" ref={summaryRef}>
+        <Card>
+          <CardHeader className="flex items-center gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Trophy className="size-6" />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span className="truncate text-xs font-medium uppercase tracking-wider text-muted-foreground">{tournament.name}</span>
+              <h2 className="text-2xl font-semibold tracking-tight">
+                {podium.length > 0
+                  ? (t('summary.finalStandings') || 'Final Standings')
+                  : tournament.status === 'completed'
+                    ? (t('summary.tournamentCompleted') || 'Tournament Completed')
+                    : (t('summary.title') || 'Tournament Summary')}
+              </h2>
+            </div>
+          </CardHeader>
 
-      {podium.length === 0 && tournament.status === 'completed' && (
-        <div className="summary-podium-section">
-          <h3 className="summary-section-title">{t('summary.tournamentCompleted') || 'Tournament Completed'}</h3>
-          <p className="summary-no-podium">{t('summary.noPodiumAvailable') || 'No playoff results available for podium display.'}</p>
-        </div>
-      )}
-
-      {/* Stat Awards */}
-      {awards.length > 0 && (
-        <div className="summary-awards-section">
-          <h3 className="summary-section-title">{t('summary.tournamentAwards') || 'Tournament Awards'}</h3>
-          <div className="summary-awards-grid">
-            {awards.map(award => (
-              <div key={award.key} className="award-card">
-                <div className="award-icon" style={{ background: award.color }}>
-                  {award.icon}
-                </div>
-                <div className="award-info">
-                  <div className="award-label">{award.label}</div>
-                  <div className="award-players">
-                    {award.players.map((p, i) => (
-                      <span key={p.id} className="award-player">
-                        {p.name || '?'}{i < award.players.length - 1 ? ', ' : ''}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="award-value">{award.value}</div>
-                  {award.subtitle && <div className="award-subtitle">{award.subtitle}</div>}
-                </div>
+          {/* Podium */}
+          {podium.length > 0 && (
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {[1, 2, 3].map(place => {
+                  const entries = podium.filter(p => p.place === place);
+                  if (entries.length === 0) return null;
+                  return entries.map((entry, idx) => (
+                    <Card key={`${place}-${idx}`} className={cn('items-center gap-3 py-5 text-center', place === 1 && 'border-t-4 border-t-primary')}>
+                      <Medal className={cn('size-7', PLACE_MEDAL_CLASS[place])} />
+                      <Avatar size="lg">
+                        <AvatarFallback className="font-semibold">{initials(entry.player?.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col gap-0.5 px-4">
+                        <span className="text-lg font-semibold">{entry.player?.name || '?'}</span>
+                        <span className="text-xs text-muted-foreground">{placeLabel[place]}</span>
+                      </div>
+                    </Card>
+                  ));
+                })}
               </div>
-            ))}
+            </CardContent>
+          )}
+
+          {podium.length === 0 && tournament.status === 'completed' && (
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{t('summary.noPodiumAvailable') || 'No playoff results available for podium display.'}</p>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Stat Awards */}
+        {awards.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h3 className="text-lg font-semibold tracking-tight">{t('summary.tournamentAwards') || 'Tournament Awards'}</h3>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {awards.map(award => (
+                <Card key={award.key} className="flex-row items-start gap-4 px-5 py-5">
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                    {award.icon}
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{award.label}</span>
+                    <span className="font-semibold">
+                      {award.players.map((p, i) => (
+                        <span key={p.id}>
+                          {p.name || '?'}{i < award.players.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </span>
+                    <span className="text-2xl font-semibold tracking-tight tabular-nums">{award.value}</span>
+                    {award.subtitle && <span className="text-xs text-muted-foreground">{award.subtitle}</span>}
+                  </div>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {awards.length === 0 && (
-        <div className="summary-awards-section">
-          <p className="summary-no-podium">{t('summary.noAwardsAvailable') || 'No statistics available for awards.'}</p>
-        </div>
-      )}
+        {awards.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t('summary.noAwardsAvailable') || 'No statistics available for awards.'}</p>
+        )}
 
-      {/* Bottom branding (repeat for screenshots that crop to bottom) */}
-      <div className="summary-branding">
-        <img src={logo} alt="DartLead" className="summary-branding-logo" />
-        <span className="summary-branding-text">
-          {t('summary.poweredBy') || 'Powered by'} <strong>DartLead</strong>
-        </span>
-      </div>
+        {/* Bottom branding (kept inside the captured node so exports carry it) */}
+        <Card className="py-4">
+          <CardFooter className="justify-center">{branding}</CardFooter>
+        </Card>
       </div>
     </div>
   );
