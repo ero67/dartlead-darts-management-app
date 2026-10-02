@@ -698,7 +698,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
-        <TabsList className="h-auto max-w-full flex-wrap justify-start">
+        <TabsList>
           <TabsTrigger value="leaderboard"><TrendingUp />{t('leagues.leaderboard')}</TabsTrigger>
           <TabsTrigger value="tournaments"><Trophy />{t('tournaments.title')}</TabsTrigger>
           <TabsTrigger value="statistics"><BarChart3 />{t('leagues.statistics')}</TabsTrigger>

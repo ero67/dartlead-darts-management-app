@@ -66,7 +66,7 @@ export function PlayersSection({
       <CardContent className="flex flex-col gap-5">
         {canManage && (
           <Tabs value={addMode} onValueChange={setAddMode}>
-            <TabsList className="h-auto flex-wrap">
+            <TabsList>
               <TabsTrigger value="name"><UserPlus />{t('registration.addModeSingle')}</TabsTrigger>
               <TabsTrigger value="bulk"><ClipboardList />{t('registration.addModeBulk')}</TabsTrigger>
               <TabsTrigger value="users"><Search />{t('registration.addModeUsers')}</TabsTrigger>

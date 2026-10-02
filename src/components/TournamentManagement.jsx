@@ -2275,7 +2275,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="h-auto flex-wrap">
+        <TabsList>
           {!isPlayoffOnly && (
             <>
               <TabsTrigger value="groups">{t('management.groups')}</TabsTrigger>

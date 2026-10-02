@@ -641,7 +641,7 @@ export function AdminPanel() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
-        <TabsList className="h-auto flex-wrap">
+        <TabsList>
           {ADMIN_TABS.map((tab) => (
             <TabsTrigger key={tab.key} value={tab.key}>
               <tab.icon />

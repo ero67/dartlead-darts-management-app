@@ -552,7 +552,7 @@ export function ManagerPanel() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
-        <TabsList className="h-auto flex-wrap">
+        <TabsList>
           <TabsTrigger value="overview">
             <Activity />
             {t('manager.tabOverview')}
