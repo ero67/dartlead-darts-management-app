@@ -1,8 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Mail, Shield, Trophy, Activity, BarChart3, Users, Target } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, Mail, Shield, Trophy, Activity, BarChart3, Users, Target } from 'lucide-react';
 import appScreenshot from '../assets/logo.png'; // placeholder; replace with real screenshot
 import { useLanguage } from '../contexts/LanguageContext';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function LandingPage() {
   const { t } = useLanguage();
@@ -48,94 +51,104 @@ export function LandingPage() {
   };
 
   return (
-    <div className="landing-page">
-      <header className="hero">
-        <div className="hero-content">
-          <p className="badge">{t('landing.heroBadge')}</p>
-          <h1>{t('landing.heroTitle')}</h1>
-          <p className="subheadline">
+    <div className="tw mx-auto flex w-full max-w-7xl flex-col gap-16 p-4 text-foreground md:p-8">
+      <header className="grid items-center gap-10 md:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <Badge variant="secondary" className="w-fit">{t('landing.heroBadge')}</Badge>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">{t('landing.heroTitle')}</h1>
+          <p className="text-lg text-muted-foreground leading-7">
             {t('landing.heroSubtitle')}
           </p>
-          <div className="hero-actions">
-            <button className="primary-btn" onClick={scrollToContact}>
-              {t('landing.ctaPrimary')} <ArrowRight size={18} />
-            </button>
-            <button className="ghost-btn" onClick={() => navigate('/practice')}>
-              <Target size={18} /> {t('landing.ctaPractice')}
-            </button>
-            <span className="ghost-btn" style={{ cursor: 'default' }}>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="lg" onClick={scrollToContact}>
+              {t('landing.ctaPrimary')} <ArrowRight />
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => navigate('/practice')}>
+              <Target /> {t('landing.ctaPractice')}
+            </Button>
+            <span className="text-sm text-muted-foreground">
               {t('landing.ctaMail')} info@dartlead.app
             </span>
           </div>
-          <div className="hero-checklist">
-            <span><CheckCircle2 size={16} /> {t('landing.check1')}</span>
-            <span><CheckCircle2 size={16} /> {t('landing.check2')}</span>
-            <span><CheckCircle2 size={16} /> {t('landing.check3')}</span>
-          </div>
+          <ul className="flex flex-col gap-2 text-sm">
+            {[t('landing.check1'), t('landing.check2'), t('landing.check3')].map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200">
+                  <Check className="size-3" />
+                </span>
+                {item}
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="hero-visual">
-          <img src={appScreenshot} alt="DartLead preview" />
+        <div className="flex items-center justify-center">
+          <img src={appScreenshot} alt="DartLead preview" className="w-full max-w-sm" />
         </div>
       </header>
 
-      <section className="section features">
-        <div className="section-header">
-          <p className="eyebrow">{t('landing.featuresEyebrow')}</p>
-          <h2>{t('landing.featuresTitle')}</h2>
-          <p className="section-sub">
+      <section className="flex flex-col gap-8">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium uppercase tracking-wide text-primary">{t('landing.featuresEyebrow')}</p>
+          <h2 className="text-2xl font-semibold tracking-tight">{t('landing.featuresTitle')}</h2>
+          <p className="max-w-2xl text-muted-foreground">
             {t('landing.featuresSub')}
           </p>
         </div>
-        <div className="feature-grid">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {features.map((f) => (
-            <div className="feature-card" key={f.title}>
-              <f.icon size={24} />
-              <h3>{f.title}</h3>
-              <p>{f.description}</p>
-            </div>
+            <Card key={f.title}>
+              <CardHeader>
+                <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <f.icon className="size-5" />
+                </div>
+                <CardTitle>{f.title}</CardTitle>
+                <CardDescription>{f.description}</CardDescription>
+              </CardHeader>
+            </Card>
           ))}
         </div>
       </section>
 
-      <section className="section steps">
-        <div className="section-header">
-          <p className="eyebrow">{t('landing.stepsEyebrow')}</p>
-          <h2>{t('landing.stepsTitle')}</h2>
+      <section className="flex flex-col gap-8">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium uppercase tracking-wide text-primary">{t('landing.stepsEyebrow')}</p>
+          <h2 className="text-2xl font-semibold tracking-tight">{t('landing.stepsTitle')}</h2>
         </div>
-        <div className="steps-grid">
+        <div className="grid gap-4 md:grid-cols-3">
           {steps.map((s, idx) => (
-            <div className="step-card" key={s.title}>
-              <div className="step-number">{idx + 1}</div>
-              <div>
-                <h3>{s.title}</h3>
-                <p>{s.description}</p>
-              </div>
-            </div>
+            <Card key={s.title}>
+              <CardHeader>
+                <Badge className="mb-2 size-8 justify-center rounded-full px-0 text-sm tabular-nums">{idx + 1}</Badge>
+                <CardTitle>{s.title}</CardTitle>
+                <CardDescription>{s.description}</CardDescription>
+              </CardHeader>
+            </Card>
           ))}
         </div>
       </section>
 
-      <section className="section contact" id="contact">
-        <div className="contact-card">
-          <div>
-            <p className="eyebrow">{t('landing.contactEyebrow')}</p>
-            <h2>{t('landing.contactTitle')}</h2>
-            <p className="section-sub">
+      <section id="contact">
+        <Card>
+          <CardHeader>
+            <p className="text-sm font-medium uppercase tracking-wide text-primary">{t('landing.contactEyebrow')}</p>
+            <CardTitle className="text-2xl font-semibold tracking-tight">{t('landing.contactTitle')}</CardTitle>
+            <CardDescription className="max-w-2xl text-base">
               {t('landing.contactSub')}
-            </p>
-            <div className="contact-chips">
-              <span><Shield size={14} /> {t('landing.chip1')}</span>
-              <span><CheckCircle2 size={14} /> {t('landing.chip2')}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline"><Shield /> {t('landing.chip1')}</Badge>
+              <Badge variant="outline"><CheckCircle2 /> {t('landing.chip2')}</Badge>
             </div>
-            <div className="contact-email">
-              <Mail size={16} /> info@dartlead.app
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Mail className="size-4" /> info@dartlead.app
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );
 }
 
 export default LandingPage;
-

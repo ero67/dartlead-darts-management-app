@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from '../utils/postLoginRedirect';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import logo from '../assets/logo.png';
 
 export function Auth() {
@@ -146,21 +152,20 @@ export function Auth() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <img src={logo} alt="DartLead" className="auth-icon" />
-          <h1>DartLead</h1>
-          <p>{t('auth.signInAsAdmin')}</p>
-        </div>
+    <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="items-center text-center">
+          <img src={logo} alt="DartLead" className="mx-auto size-14" />
+          <CardTitle className="text-2xl font-semibold tracking-tight">DartLead</CardTitle>
+          <CardDescription>{t('auth.signInAsAdmin')}</CardDescription>
+        </CardHeader>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          {!isLogin && (
-            <div className="form-group">
-              <label htmlFor="fullName">{t('auth.fullName')}</label>
-              <div className="input-wrapper">
-                <User className="input-icon" />
-                <input
+        <CardContent className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {!isLogin && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="fullName">{t('auth.fullName')}</Label>
+                <Input
                   id="fullName"
                   name="fullName"
                   type="text"
@@ -170,14 +175,11 @@ export function Auth() {
                   required={!isLogin}
                 />
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="form-group">
-            <label htmlFor="email">{t('auth.email')}</label>
-            <div className="input-wrapper">
-              <Mail className="input-icon" />
-              <input
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">{t('auth.email')}</Label>
+              <Input
                 id="email"
                 name="email"
                 type="email"
@@ -187,37 +189,37 @@ export function Auth() {
                 required
               />
             </div>
-          </div>
 
-          <div className="form-group">
-            <label htmlFor="password">{t('auth.password')}</label>
-            <div className="input-wrapper">
-              <Lock className="input-icon" />
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={handleInputChange}
-                placeholder={t('auth.enterPassword')}
-                required
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">{t('auth.password')}</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder={t('auth.enterPassword')}
+                  required
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="absolute top-1/2 right-0.5 -translate-y-1/2 text-muted-foreground"
+                  aria-label={t('auth.password')}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </Button>
+              </div>
             </div>
-          </div>
 
-          {!isLogin && (
-            <div className="form-group">
-              <label htmlFor="confirmPassword">{t('auth.confirmPassword')}</label>
-              <div className="input-wrapper">
-                <Lock className="input-icon" />
-                <input
+            {!isLogin && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="confirmPassword">{t('auth.confirmPassword')}</Label>
+                <Input
                   id="confirmPassword"
                   name="confirmPassword"
                   type={showPassword ? 'text' : 'password'}
@@ -227,54 +229,62 @@ export function Auth() {
                   required={!isLogin}
                 />
               </div>
-            </div>
-          )}
+            )}
 
-          {(error || nativeAuthError) && <div className="error-message">{error || nativeAuthError}</div>}
-          {success && <div className="success-message">{success}</div>}
+            {(error || nativeAuthError) && (
+              <Alert variant="destructive">
+                <AlertDescription>{error || nativeAuthError}</AlertDescription>
+              </Alert>
+            )}
+            {success && (
+              <Alert>
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
 
-          <button
-            type="submit"
-            className="auth-button"
-            disabled={loading}
-          >
-            {loading ? t('common.loading') : (isLogin ? t('auth.signIn') : t('auth.signUp'))}
-          </button>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? t('common.loading') : (isLogin ? t('auth.signIn') : t('auth.signUp'))}
+            </Button>
 
-          {isLogin && (
-            <button
-              type="button"
-              className="forgot-password"
-              onClick={handleForgotPassword}
-              disabled={loading}
-            >
-              {t('auth.forgotPassword')}
-            </button>
-          )}
-        </form>
+            {isLogin && (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="self-center"
+                onClick={handleForgotPassword}
+                disabled={loading}
+              >
+                {t('auth.forgotPassword')}
+              </Button>
+            )}
+          </form>
 
-        <div className="auth-divider">
-          <span>{t('auth.or')}</span>
-        </div>
+          <div className="relative flex items-center justify-center">
+            <Separator />
+            <span className="absolute bg-card px-2 text-xs uppercase text-muted-foreground">{t('auth.or')}</span>
+          </div>
 
-        <div className="social-login">
-          <button
+          <Button
             type="button"
-            className="auth-button google-button"
+            variant="outline"
+            className="w-full"
             onClick={handleGoogleSignIn}
             disabled={loading}
           >
-            <span className="google-icon">G</span>
+            <span className="font-bold">G</span>
             {loading ? t('auth.redirectingToGoogle') : t('auth.continueWithGoogle')}
-          </button>
-        </div>
+          </Button>
+        </CardContent>
 
-        <div className="auth-footer">
-          <p>
+        <CardFooter className="justify-center">
+          <p className="flex items-center text-sm text-muted-foreground">
             {isLogin ? t('auth.dontHaveAccount') : t('auth.alreadyHaveAccount')}
-            <button
+            <Button
               type="button"
-              className="toggle-auth"
+              variant="link"
+              size="sm"
+              className="px-1"
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError('');
@@ -288,10 +298,10 @@ export function Auth() {
               }}
             >
               {isLogin ? t('auth.signUp') : t('auth.signIn')}
-            </button>
+            </Button>
           </p>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

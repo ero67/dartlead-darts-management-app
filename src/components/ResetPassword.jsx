@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 // Landing page of the password-recovery email link. Supabase exchanges the
 // token in the URL for a recovery session automatically (detectSessionInUrl),
@@ -45,9 +50,9 @@ export function ResetPassword() {
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t('common.loading')}</p>
+      <div className="tw min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center gap-3 p-6 bg-muted/40 text-foreground">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
@@ -55,72 +60,72 @@ export function ResetPassword() {
   // No recovery session: the link is expired, already used, or opened cold
   if (!user) {
     return (
-      <div className="unauthorized-container">
-        <h2>{t('auth.resetLinkInvalidTitle')}</h2>
-        <p>{t('auth.resetLinkInvalid')}</p>
-        <button
-          className="create-tournament-btn"
-          onClick={() => navigate('/login')}
-          style={{ marginTop: '1rem' }}
-        >
-          {t('auth.backToLogin')}
-        </button>
+      <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-semibold tracking-tight">{t('auth.resetLinkInvalidTitle')}</CardTitle>
+            <CardDescription>{t('auth.resetLinkInvalid')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="w-full" onClick={() => navigate('/login')}>
+              {t('auth.backToLogin')}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (isDone) {
     return (
-      <div className="unauthorized-container">
-        <h2>{t('auth.passwordUpdatedTitle')}</h2>
-        <p>{t('auth.passwordUpdated')}</p>
+      <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-semibold tracking-tight">{t('auth.passwordUpdatedTitle')}</CardTitle>
+            <CardDescription>{t('auth.passwordUpdated')}</CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="unauthorized-container" style={{ maxWidth: '400px', margin: '0 auto' }}>
-      <h2>{t('auth.setNewPasswordTitle')}</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder={t('auth.newPassword')}
-          autoComplete="new-password"
-          style={{
-            padding: '0.6rem 0.75rem',
-            borderRadius: '6px',
-            border: '1px solid var(--border-color)',
-            background: 'var(--bg-secondary)',
-            color: 'var(--text-primary)'
-          }}
-        />
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder={t('auth.confirmNewPassword')}
-          autoComplete="new-password"
-          style={{
-            padding: '0.6rem 0.75rem',
-            borderRadius: '6px',
-            border: '1px solid var(--border-color)',
-            background: 'var(--bg-secondary)',
-            color: 'var(--text-primary)'
-          }}
-        />
-        {error && (
-          <p style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.875rem', margin: 0 }}>{error}</p>
-        )}
-        <button
-          type="submit"
-          className="create-tournament-btn"
-          disabled={isSaving || !password || !confirmPassword}
-        >
-          {isSaving ? t('common.saving') : t('auth.updatePassword')}
-        </button>
-      </form>
+    <div className="tw min-h-[calc(100vh-4rem)] flex items-center justify-center p-6 bg-muted/40 text-foreground">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-semibold tracking-tight">{t('auth.setNewPasswordTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t('auth.newPassword')}
+              autoComplete="new-password"
+            />
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder={t('auth.confirmNewPassword')}
+              autoComplete="new-password"
+            />
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSaving || !password || !confirmPassword}
+            >
+              {isSaving ? t('common.saving') : t('auth.updatePassword')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
