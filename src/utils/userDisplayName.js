@@ -19,3 +19,10 @@ export function normalizeDisplayName(value) {
   if (cleaned.length < DISPLAY_NAME_MIN || cleaned.length > DISPLAY_NAME_MAX) return '';
   return cleaned;
 }
+
+// Up to two initials for avatars, falling back to the email's first letter.
+export function getUserInitials(user) {
+  const name = getUserDisplayName(user) || user?.email || '';
+  const parts = name.replace(/@.*$/, '').split(/[\s._-]+/).filter(Boolean);
+  return parts.slice(0, 2).map(p => p[0].toUpperCase()).join('') || '?';
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Menu, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { TournamentProvider, useTournament } from './contexts/TournamentContext';
 import { LeagueProvider, useLeague } from './contexts/LeagueContext';
 import { LiveMatchProvider } from './contexts/LiveMatchContext';
@@ -350,20 +351,6 @@ function AppContent() {
     selectLeague
   } = useLeague();
   
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Detect if we're on mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 1024);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -492,31 +479,13 @@ function AppContent() {
   }
 
   return (
-    <div className="app">
+    <SidebarProvider
+      className="tw bg-background text-foreground"
+      // Capacitor (Android 15+ edge-to-edge) injects --safe-area-inset-*; on the web these resolve to 0.
+      style={{ paddingTop: 'var(--safe-area-inset-top, 0px)', paddingBottom: 'var(--safe-area-inset-bottom, 0px)' }}
+    >
       <OfflineBanner />
 
-      {/* Mobile Header - only show on mobile */}
-      {isMobile && (
-        <div className="mobile-header">
-          <button 
-            className="hamburger-btn"
-            onClick={() => setIsMobileNavOpen(true)}
-          >
-            <Menu size={24} />
-          </button>
-          <div className="app-title">DartLead</div>
-        </div>
-      )}
-
-      {/* Mobile Navigation Backdrop - only show on mobile */}
-      {isMobile && isMobileNavOpen && (
-        <div 
-          className="mobile-overlay-backdrop open"
-          onClick={() => setIsMobileNavOpen(false)}
-        />
-      )}
-
-      {/* Navigation */}
       <Navigation
         currentView={location.pathname}
         onViewChange={(view) => {
@@ -529,11 +498,16 @@ function AppContent() {
           }
         }}
         tournament={currentTournament}
-        isMobileOpen={isMobileNavOpen}
-        onMobileClose={() => setIsMobileNavOpen(false)}
       />
-      
-      <main className="app-main">
+
+      <SidebarInset className="min-w-0">
+      {/* Mobile header: the sidebar is a drawer below 1024px */}
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur lg:hidden">
+        <SidebarTrigger />
+        <span className="text-sm font-semibold">DartLead</span>
+      </header>
+
+      <main className="app-main w-auto flex-1 min-w-0">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={
@@ -644,7 +618,8 @@ function AppContent() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 

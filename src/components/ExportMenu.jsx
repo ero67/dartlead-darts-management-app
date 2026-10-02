@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Share2, Image as ImageIcon, FileSpreadsheet, Loader } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { deliverFile, elementToPngBlob, buildStandingsCsv, buildResultsCsv, csvBlob, exportFileName } from '../lib/exportShare';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 // "Share / export" dropdown for a tournament view. `imageTarget` is a ref to the
 // DOM node to render as an image; the CSV items work from tournament data.
@@ -10,14 +12,6 @@ export function ExportMenu({ tournament, imageTarget, imageSuffix = 'standings',
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const wrapRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [open]);
 
   const run = async (key, fn) => {
     setBusy(key);
@@ -56,32 +50,35 @@ export function ExportMenu({ tournament, imageTarget, imageSuffix = 'standings',
     await deliverFile({ blob: csvBlob(buildResultsCsv(tournament, labels)), filename: exportFileName(tournament.name, 'results', 'csv'), title: tournament.name });
   });
 
+  // While an export runs the menu stays open so the spinner and any error are visible.
+  const handleOpenChange = (next) => { if (!busy) setOpen(next); };
+
   return (
-    <div className="export-menu" ref={wrapRef}>
-      <button type="button" className="export-menu__btn" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} title={t('export.title')}>
-        {busy ? <Loader size={16} className="spinning" /> : <Share2 size={16} />}
-        <span className="btn-label">{t('export.title')}</span>
-      </button>
-      {open && (
-        <div className="export-menu__list" role="menu">
-          {items.includes('image') && (
-            <button type="button" role="menuitem" onClick={shareImage} disabled={!!busy}>
-              <ImageIcon size={16} />{t('export.shareImage')}
-            </button>
-          )}
-          {items.includes('standings') && (
-            <button type="button" role="menuitem" onClick={downloadStandings} disabled={!!busy}>
-              <FileSpreadsheet size={16} />{t('export.standingsCsv')}
-            </button>
-          )}
-          {items.includes('results') && (
-            <button type="button" role="menuitem" onClick={downloadResults} disabled={!!busy}>
-              <FileSpreadsheet size={16} />{t('export.resultsCsv')}
-            </button>
-          )}
-          {error && <p className="export-menu__error">{error}</p>}
-        </div>
-      )}
-    </div>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="tw" title={t('export.title')}>
+          {busy ? <Loader className="animate-spin" /> : <Share2 />}
+          <span className="hidden sm:inline">{t('export.title')}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="tw min-w-48">
+        {items.includes('image') && (
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); shareImage(); }} disabled={!!busy}>
+            <ImageIcon />{t('export.shareImage')}
+          </DropdownMenuItem>
+        )}
+        {items.includes('standings') && (
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); downloadStandings(); }} disabled={!!busy}>
+            <FileSpreadsheet />{t('export.standingsCsv')}
+          </DropdownMenuItem>
+        )}
+        {items.includes('results') && (
+          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); downloadResults(); }} disabled={!!busy}>
+            <FileSpreadsheet />{t('export.resultsCsv')}
+          </DropdownMenuItem>
+        )}
+        {error && <p className="px-2 py-1.5 text-xs text-destructive">{error}</p>}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

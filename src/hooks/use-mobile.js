@@ -1,6 +1,6 @@
 import * as React from "react"
 
-const MOBILE_BREAKPOINT = 768
+const MOBILE_BREAKPOINT = 1024 // matches the legacy nav breakpoint: tablets at the board get the drawer
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(undefined)
