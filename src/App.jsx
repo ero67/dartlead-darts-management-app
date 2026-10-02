@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/s
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState } from './components/shared/LoadingState';
+import { AccessNotice } from './components/shared/AccessNotice';
 import { TournamentProvider, useTournament } from './contexts/TournamentContext';
 import { LeagueProvider, useLeague } from './contexts/LeagueContext';
 import { LiveMatchProvider } from './contexts/LiveMatchContext';
@@ -555,11 +556,7 @@ function AppContent() {
                 onBack={() => navigate('/dashboard')}
               />
             ) : user ? (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessRestricted')}</h2>
-                <p>{t('auth.onlyManagersCreateTournaments')}</p>
-                <p>{t('auth.contactAdminForManager')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessRestricted')} lines={[t('auth.onlyManagersCreateTournaments'), t('auth.contactAdminForManager')]} />
             ) : (
               <Auth />
             )
@@ -568,20 +565,14 @@ function AppContent() {
             isAdmin ? (
               <AdminPanel />
             ) : (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessDenied')}</h2>
-                <p>{t('auth.adminOnlyPage')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessDenied')} lines={[t('auth.adminOnlyPage')]} />
             )
           } />
           <Route path="/manager" element={
             canManage ? (
               <ManagerPanel />
             ) : (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessDenied')}</h2>
-                <p>{t('auth.managerOnlyPage')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessDenied')} lines={[t('auth.managerOnlyPage')]} />
             )
           } />
           <Route path="/tournament/:id" element={<TournamentRoute />} />
@@ -606,10 +597,7 @@ function AppContent() {
                 onBack={() => navigate('/leagues')}
               />
             ) : user ? (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessRestricted')}</h2>
-                <p>{t('auth.onlyManagersCreateLeagues')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessRestricted')} lines={[t('auth.onlyManagersCreateLeagues')]} />
             ) : (
               <Auth />
             )
