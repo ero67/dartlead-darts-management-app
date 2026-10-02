@@ -56,20 +56,19 @@ export function PullToRefresh({ onRefresh, children }) {
 
   return (
     <div
-      className="pull-to-refresh"
+      className="tw flex min-h-full flex-1 flex-col"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
     >
       <div
-        className={`pull-to-refresh__indicator${pullPx > 0 ? ' pull-to-refresh__indicator--visible' : ''}`}
+        className={`flex items-center justify-center gap-2 overflow-hidden text-xs text-muted-foreground transition-[height] ${pullPx > 0 ? 'opacity-100' : 'opacity-0'}`}
         style={{ height: pullPx }}
         aria-hidden={pullPx === 0}
       >
         <RefreshCw
-          size={18}
-          className={isRefreshing ? 'refresh-btn__icon--spinning' : ''}
+          className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`}
           style={{ transform: isRefreshing ? undefined : `rotate(${pullPx * 3}deg)` }}
         />
         <span>{isRefreshing ? t('common.refreshing') : armed ? t('common.releaseToRefresh') : t('common.pullToRefresh')}</span>
