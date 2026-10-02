@@ -1,6 +1,13 @@
 import React from 'react';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
+
+const OPTION = 'flex flex-col items-start gap-1 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent';
+const OPTION_ACTIVE = 'border-primary ring-1 ring-primary';
 
 // Asked when a 3-dart total lands exactly on zero: how many darts did the
 // finish take, and did it end on a double? `pending` is
@@ -12,69 +19,76 @@ export function CheckoutDialog({ pending, onChange, onConfirm, onCancel, doubleO
   if (!pending) return null;
 
   return (
-    <div className="leg-starter-dialog checkout-modal">
-      <div className="dialog-content checkout-card">
-        <div className="checkout-card__header">
-          <span className="checkout-card__title">{t('match.checkout.title')}</span>
-          <span className="checkout-card__total">{pending.total}</span>
-        </div>
+    <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
+      {/* Portalled to <body>: carries its own tw scope, and the board theme (scoring screens are dark). */}
+      <DialogContent className="tw dark-mode text-foreground sm:max-w-md" showCloseButton={false}>
+        <DialogHeader className="flex-row items-center justify-between text-left">
+          <DialogTitle>{t('match.checkout.title')}</DialogTitle>
+          <span className="text-3xl font-semibold tracking-tight tabular-nums">{pending.total}</span>
+        </DialogHeader>
 
-        <div className="checkout-card__section">
-          <span className="checkout-card__section-label">{t('match.checkout.dartsLabel')}</span>
-          <div className="checkout-darts-picker">
+        <div className="flex flex-col gap-2">
+          <DialogDescription>{t('match.checkout.dartsLabel')}</DialogDescription>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            spacing={2}
+            className="grid w-full grid-cols-3"
+            value={String(pending.dartsUsed)}
+            onValueChange={(v) => { if (v) onChange({ ...pending, dartsUsed: Number(v) }); }}
+          >
             {[1, 2, 3].map(n => (
-              <button
+              <ToggleGroupItem
                 key={n}
-                type="button"
-                className={`checkout-dart-option ${pending.dartsUsed === n ? 'active' : ''}`}
-                onClick={() => onChange({ ...pending, dartsUsed: n })}
+                value={String(n)}
+                className="h-14 w-full flex-col gap-0 rounded-lg data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
               >
-                <span className="checkout-dart-option__num">{n}</span>
-                <span className="checkout-dart-option__unit">
-                  {t(n === 1 ? 'match.checkout.dartUnitOne' : 'match.checkout.dartUnitMany')}
-                </span>
-              </button>
+                <span className="text-xl font-semibold tabular-nums">{n}</span>
+                <span className="text-xs opacity-80">{t(n === 1 ? 'match.checkout.dartUnitOne' : 'match.checkout.dartUnitMany')}</span>
+              </ToggleGroupItem>
             ))}
-          </div>
+          </ToggleGroup>
         </div>
 
-        <div className="checkout-card__section">
-          <span className="checkout-card__section-label">{t('match.checkout.outcomeLabel')}</span>
-          <div className="checkout-outcome-picker">
+        <div className="flex flex-col gap-2">
+          <DialogDescription>{t('match.checkout.outcomeLabel')}</DialogDescription>
+          <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
-              className={`checkout-outcome-card checkout-outcome-card--double ${pending.finishedOnDouble ? 'active' : ''}`}
+              className={cn(OPTION, pending.finishedOnDouble && OPTION_ACTIVE)}
+              aria-pressed={pending.finishedOnDouble}
               onClick={() => onChange({ ...pending, finishedOnDouble: true })}
             >
-              <CheckCircle size={22} />
-              <span className="checkout-outcome-card__title">{t('match.checkout.doubleOut')}</span>
-              <span className="checkout-outcome-card__hint">{doubleOutHint || t('match.checkout.doubleOutHint')}</span>
+              <CheckCircle className="size-5 text-primary" />
+              <span className="text-sm font-semibold">{t('match.checkout.doubleOut')}</span>
+              <span className="text-xs text-muted-foreground">{doubleOutHint || t('match.checkout.doubleOutHint')}</span>
             </button>
             <button
               type="button"
-              className={`checkout-outcome-card checkout-outcome-card--bust ${!pending.finishedOnDouble ? 'active' : ''}`}
+              className={cn(OPTION, !pending.finishedOnDouble && 'border-destructive ring-1 ring-destructive')}
+              aria-pressed={!pending.finishedOnDouble}
               onClick={() => onChange({ ...pending, finishedOnDouble: false })}
             >
-              <XCircle size={22} />
-              <span className="checkout-outcome-card__title">{t('match.checkout.bust')}</span>
-              <span className="checkout-outcome-card__hint">{bustHint || t('match.checkout.bustHint')}</span>
+              <XCircle className="size-5 text-destructive" />
+              <span className="text-sm font-semibold">{t('match.checkout.bust')}</span>
+              <span className="text-xs text-muted-foreground">{bustHint || t('match.checkout.bustHint')}</span>
             </button>
           </div>
         </div>
 
-        <div className="checkout-card__actions">
-          <button type="button" className="checkout-card__cancel" onClick={onCancel}>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onCancel}>
             {t('common.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={`checkout-card__confirm ${pending.finishedOnDouble ? '' : 'checkout-card__confirm--bust'}`}
+            variant={pending.finishedOnDouble ? 'default' : 'destructive'}
             onClick={() => onConfirm(pending)}
           >
             {t('match.checkout.confirm')}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

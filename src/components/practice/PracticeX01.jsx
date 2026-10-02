@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Flag, Keyboard, RotateCcw, Settings2, Target, Trophy, Users } from 'lucide-react';
+import { CheckCircle, Flag, Keyboard, Target, Trophy, Users } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { DartKeypad } from '../scoring/DartKeypad';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
-import { PracticeSetup, PracticeField, PracticeOptionCards } from './PracticeShared';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { StatTile } from '../shared/StatTile';
+import {
+  PracticeScreenHeader, PracticeSetup, PracticeField, PracticeOptionCards, PracticeChips,
+  PracticeSummaryHeader, PracticeSummaryActions, PracticePlay, PracticeBoard, PracticeBoardLabel,
+  PracticeBoardValue, PracticeCheckoutHint, PracticeLastThrows, PracticeBoardStats, PracticeKeypad
+} from './PracticeShared';
+import { cn } from '@/lib/utils';
 import {
   createSoloX01, applyDart, applyVisitTotal, undo, canUndo, dartFromInput,
   liveRemaining, lastVisitLabels, computeStats, STARTING_SCORES
@@ -26,7 +34,6 @@ import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
 import { hapticTap, hapticBust, hapticLegWon, hapticMatchWon } from '../../lib/haptics';
 import checkoutData from '../../data/checkouts.json';
-import './Practice.css';
 
 const GAME = 'x01';
 const LEG_OPTIONS = [1, 2, 3, 4, 5, 10, null];
@@ -60,7 +67,6 @@ const sanitizeSettings = (saved) => {
 export function PracticeX01() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const isOnScreenKeypad = useOnScreenKeypad();
 
   const [session, setSession] = useState(() => {
@@ -335,42 +341,23 @@ export function PracticeX01() {
           ? t('practice.match.opponentWon', { name: opponent.name, for: s.legsFor, against: s.legsAgainst })
           : t('practice.match.abandoned', { for: s.legsFor, against: s.legsAgainst });
     return (
-      <div className="practice-summary">
-        <div className="practice-summary-header">
-          {opponent ? <Trophy size={44} /> : <CheckCircle size={44} />}
-          <h2>{resultText}</h2>
-          <p>
+      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+        <PracticeSummaryHeader icon={opponent ? Trophy : CheckCircle} title={resultText}>
+          <p className="text-sm text-muted-foreground">
             {summary.settings.startingScore}
             {opponent && ` · ${t('practice.match.vs')} ${opponent.name}`}
             {duration && ` · ${duration}`}
           </p>
           {opponent && s.opponent?.stats && (
-            <p className="practice-summary-opponent">
+            <p className="text-sm text-muted-foreground">
               {t('practice.match.opponentAverage', { name: opponent.name, average: (s.opponent.stats.average ?? 0).toFixed(1) })}
             </p>
           )}
+        </PracticeSummaryHeader>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map(([label, value]) => <StatTile key={label} label={label} value={value} />)}
         </div>
-        <div className="stats-grid">
-          {cards.map(([label, value]) => (
-            <div className="stat-card" key={label}>
-              <div className="stat-content">
-                <h3>{value}</h3>
-                <p>{label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="practice-summary-actions">
-          <button type="button" className="create-tournament-btn" onClick={handleStart}>
-            <RotateCcw size={18} /> {t('practice.playAgain')}
-          </button>
-          <button type="button" className="practice-ghost-btn" onClick={() => setSummary(null)}>
-            <Settings2 size={16} /> {t('practice.changeSettings')}
-          </button>
-          <button type="button" className="practice-ghost-btn" onClick={() => navigate('/practice')}>
-            <ArrowLeft size={16} /> {t('practice.backToPractice')}
-          </button>
-        </div>
+        <PracticeSummaryActions onPlayAgain={handleStart} onChangeSettings={() => setSummary(null)} />
       </div>
     );
   }
@@ -386,16 +373,8 @@ export function PracticeX01() {
       legsTarget: opponent && !MATCH_LEG_OPTIONS.includes(s.legsTarget) ? DEFAULT_SETTINGS.legsTarget : s.legsTarget
     }));
     return (
-      <div className="practice-page">
-        <div className="practice-header">
-          <div>
-            <button type="button" className="practice-link-btn" onClick={() => navigate('/practice')}>
-              <ArrowLeft size={16} /> {t('practice.backToPractice')}
-            </button>
-            <h1>{t('practice.games.x01.title')}</h1>
-            <p>{t('practice.games.x01.desc')}</p>
-          </div>
-        </div>
+      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+        <PracticeScreenHeader title={t('practice.games.x01.title')} description={t('practice.games.x01.desc')} />
         <PracticeSetup
           title={t('practice.setup.title')}
           subtitle={t('practice.setup.subtitle')}
@@ -404,23 +383,17 @@ export function PracticeX01() {
         >
           <PracticeField
             icon={Target}
-            tone="green"
             label={t('practice.setup.startingScore')}
             value={settings.startingScore}
           >
-            <div className="practice-chips">
-              {STARTING_SCORES.map(score => (
-                <button
-                  key={score}
-                  type="button"
-                  className={`practice-chip ${settings.startingScore === score ? 'active' : ''}`}
-                  onClick={() => setSettings(s => ({ ...s, startingScore: score }))}
-                >
-                  {score}
-                </button>
-              ))}
-              <input
-                className="practice-chip-input"
+            <div className="flex flex-wrap items-center gap-2">
+              <PracticeChips
+                options={STARTING_SCORES}
+                value={settings.startingScore}
+                onChange={(startingScore) => setSettings(s => ({ ...s, startingScore }))}
+              />
+              <Input
+                className="h-11 w-28 rounded-full border-dashed text-center font-medium tabular-nums"
                 type="number"
                 min="2"
                 max="1001"
@@ -437,7 +410,6 @@ export function PracticeX01() {
 
           <PracticeField
             icon={Users}
-            tone="violet"
             label={t('practice.setup.opponent')}
             hint={t('practice.setup.opponentHint')}
             value={
@@ -448,51 +420,58 @@ export function PracticeX01() {
                   : t('practice.setup.opponentSolo')
             }
           >
-            <div className="practice-chips">
-              <button
+            <div className="flex flex-wrap gap-2">
+              <Button
                 type="button"
-                className={`practice-chip ${!hasOpponent ? 'active' : ''}`}
+                variant={!hasOpponent ? 'default' : 'outline'}
+                aria-pressed={!hasOpponent}
+                className="min-h-11 rounded-full px-4"
                 onClick={() => setOpponent(null)}
               >
                 {t('practice.setup.opponentSolo')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className={`practice-chip ${settings.opponent?.kind === 'human' ? 'active' : ''}`}
+                variant={settings.opponent?.kind === 'human' ? 'default' : 'outline'}
+                aria-pressed={settings.opponent?.kind === 'human'}
+                className="min-h-11 rounded-full px-4"
                 onClick={() => setOpponent({ kind: 'human', name: settings.opponent?.name || '' })}
               >
                 {t('practice.setup.opponentPlayer')}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className={`practice-chip ${settings.opponent?.kind === 'bot' ? 'active' : ''}`}
+                variant={settings.opponent?.kind === 'bot' ? 'default' : 'outline'}
+                aria-pressed={settings.opponent?.kind === 'bot'}
+                className="min-h-11 rounded-full px-4"
                 onClick={() => setOpponent({ kind: 'bot', level: settings.opponent?.level || 4 })}
               >
                 {t('practice.setup.opponentBot')}
-              </button>
+              </Button>
             </div>
             {settings.opponent?.kind === 'bot' && (
-              <div className="practice-bot-levels">
-                <div className="practice-chips">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
                   {BOT_LEVELS.map(l => (
-                    <button
+                    <Button
                       key={l.level}
                       type="button"
-                      className={`practice-chip practice-level-chip ${settings.opponent.level === l.level ? 'active' : ''}`}
+                      variant={settings.opponent.level === l.level ? 'default' : 'outline'}
+                      aria-pressed={settings.opponent.level === l.level}
+                      className="h-auto min-h-11 min-w-14 flex-col gap-0 rounded-full px-3 py-1.5 leading-tight tabular-nums"
                       onClick={() => setSettings(s => ({ ...s, opponent: { kind: 'bot', level: l.level } }))}
                     >
-                      {l.level}<small>~{l.average}</small>
-                    </button>
+                      {l.level}<small className="text-[0.7rem] font-medium opacity-75">~{l.average}</small>
+                    </Button>
                   ))}
                 </div>
-                <p className="practice-bot-hint">
+                <p className="text-xs text-muted-foreground">
                   {t('practice.bot.levelHint', { level: settings.opponent.level, average: getBotLevel(settings.opponent.level).average })}
                 </p>
               </div>
             )}
             {settings.opponent?.kind === 'human' && (
-              <input
-                className="practice-text-input"
+              <Input
                 type="text"
                 maxLength={OPPONENT_NAME_MAX}
                 placeholder={t('practice.setup.opponentName')}
@@ -504,53 +483,34 @@ export function PracticeX01() {
 
           <PracticeField
             icon={Trophy}
-            tone="blue"
             label={hasOpponent ? t('practice.setup.firstTo') : t('practice.setup.legs')}
             value={settings.legsTarget === null ? t('practice.setup.unlimited') : settings.legsTarget}
           >
-            <div className="practice-chips">
-              {legOptions.map(legs => (
-                <button
-                  key={legs === null ? 'unlimited' : legs}
-                  type="button"
-                  className={`practice-chip ${settings.legsTarget === legs ? 'active' : ''}`}
-                  onClick={() => setSettings(s => ({ ...s, legsTarget: legs }))}
-                >
-                  {legs === null ? t('practice.setup.unlimited') : legs}
-                </button>
-              ))}
-            </div>
+            <PracticeChips
+              options={legOptions}
+              value={settings.legsTarget}
+              onChange={(legsTarget) => setSettings(s => ({ ...s, legsTarget }))}
+              render={(legs) => (legs === null ? t('practice.setup.unlimited') : legs)}
+            />
           </PracticeField>
 
           {hasOpponent && (
             <PracticeField
               icon={Flag}
-              tone="rose"
               label={t('practice.setup.starter')}
               value={settings.starter === 0 ? myName : opponentName}
             >
-              <div className="practice-chips">
-                <button
-                  type="button"
-                  className={`practice-chip ${settings.starter === 0 ? 'active' : ''}`}
-                  onClick={() => setSettings(s => ({ ...s, starter: 0 }))}
-                >
-                  {myName}
-                </button>
-                <button
-                  type="button"
-                  className={`practice-chip ${settings.starter === 1 ? 'active' : ''}`}
-                  onClick={() => setSettings(s => ({ ...s, starter: 1 }))}
-                >
-                  {opponentName}
-                </button>
-              </div>
+              <PracticeChips
+                options={[0, 1]}
+                value={settings.starter}
+                onChange={(starter) => setSettings(s => ({ ...s, starter }))}
+                render={(i) => (i === 0 ? myName : opponentName)}
+              />
             </PracticeField>
           )}
 
           <PracticeField
             icon={Keyboard}
-            tone="amber"
             label={t('practice.setup.scoringMode')}
             value={t(settings.scoringMode === 'turnTotal' ? 'practice.setup.scoringTurnTotal' : 'practice.setup.scoringDart')}
           >
@@ -571,69 +531,65 @@ export function PracticeX01() {
   // ---- Play ----------------------------------------------------------------
   const remaining = liveRemaining(throwerState);
   const suggestion = throwerState.current.visit.darts.length === 0 ? checkoutData[String(remaining)] : null;
-  const flashClass = `${flash?.type === 'bust' ? 'bust' : ''} ${flash?.type === 'legWon' ? 'leg-won' : ''}`;
   const legWonText = (f) => {
     if (f.by === undefined) return t(`practice.legWon${pluralSuffix(f.darts)}`, { count: f.darts });
     return t(`practice.match.legWonBy${pluralSuffix(f.darts)}`, { name: playerName(f.by), count: f.darts });
   };
+  const boardFlash = flash?.type === 'bust'
+    ? { tone: 'bad', text: t('practice.bust') }
+    : flash?.type === 'legWon' ? { tone: 'good', text: legWonText(flash) } : null;
 
   const renderSoloBoard = () => {
     const stats = computeStats(session);
     const legDarts = session.current.visits.reduce((sum, v) => sum + v.darts, 0) + session.current.visit.darts.length;
     const labels = lastVisitLabels(session);
     return (
-      <div className={`practice-board ${flashClass}`}>
-        {flash?.type === 'bust' && <div className="practice-board-flash">{t('practice.bust')}</div>}
-        {flash?.type === 'legWon' && <div className="practice-board-flash">{legWonText(flash)}</div>}
-        <div className="practice-remaining-label">{t('practice.remaining')}</div>
-        <div className="practice-remaining">{remaining}</div>
-        <div className="practice-checkout-hint">{suggestion ? suggestion.join(' → ') : ''}</div>
-        <div className="practice-last-throws">
-          {labels.map((label, idx) => <span key={idx}>{label}</span>)}
-        </div>
-        <div className="practice-board-stats">
-          <span>{t('practice.thisLeg')}: <b>{t(`practice.stats.darts${pluralSuffix(legDarts)}`, { count: legDarts })}</b></span>
-          <span>{t('practice.stats.legs')}: <b>{session.legs.length}</b></span>
-          {stats.checkoutPercent !== null && (
-            <span>{t('practice.stats.checkout')}: <b>{stats.checkoutPercent.toFixed(0)}%</b></span>
-          )}
-        </div>
-      </div>
+      <PracticeBoard flash={boardFlash}>
+        <PracticeBoardLabel>{t('practice.remaining')}</PracticeBoardLabel>
+        <PracticeBoardValue>{remaining}</PracticeBoardValue>
+        <PracticeCheckoutHint>{suggestion ? suggestion.join(' → ') : ''}</PracticeCheckoutHint>
+        <PracticeLastThrows labels={labels} />
+        <PracticeBoardStats
+          items={[
+            [t('practice.thisLeg'), t(`practice.stats.darts${pluralSuffix(legDarts)}`, { count: legDarts })],
+            [t('practice.stats.legs'), session.legs.length],
+            ...(stats.checkoutPercent !== null ? [[t('practice.stats.checkout'), `${stats.checkoutPercent.toFixed(0)}%`]] : [])
+          ]}
+        />
+      </PracticeBoard>
     );
   };
 
   const renderMatchBoard = () => (
-    <div
-      className={`practice-board practice-board--match ${flashClass} ${botBusy ? 'bot-throwing' : ''}`}
+    <PracticeBoard
+      flash={boardFlash}
+      className={cn('px-3 py-3', botBusy && 'cursor-pointer')}
       onClick={botBusy ? commitBotVisit : undefined}
       title={botBusy ? t('practice.bot.skip') : undefined}
     >
-      {flash?.type === 'bust' && <div className="practice-board-flash">{t('practice.bust')}</div>}
-      {flash?.type === 'legWon' && <div className="practice-board-flash">{legWonText(flash)}</div>}
-      <div className="practice-scoreboard">
+      <div className="grid w-full grid-cols-2 gap-2">
         {session.players.map((p, i) => {
           const isTurn = i === session.turn;
           const stats = computeStats(p);
           const labels = lastVisitLabels(p);
           return (
-            <div key={i} className={`practice-player ${isTurn ? 'active' : ''}`}>
-              <div className="practice-player-head">
-                <span className="practice-player-name">{playerName(i)}</span>
-                <span className="practice-player-legs">{session.legsWon[i]}</span>
+            <div key={i} className={cn('flex flex-col items-center gap-1 rounded-lg border bg-muted/40 p-3', isTurn && 'ring-1 ring-primary border-primary')}>
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className="truncate text-sm font-semibold">{playerName(i)}</span>
+                <Badge variant="secondary" className="tabular-nums">{session.legsWon[i]}</Badge>
               </div>
-              <div className="practice-player-remaining">{isTurn ? remaining : p.current.remaining}</div>
-              <div className="practice-last-throws">
-                {labels.map((label, idx) => <span key={idx}>{label}</span>)}
-              </div>
-              <div className="practice-player-avg">{t('practice.stats.average')} <b>{stats.average.toFixed(1)}</b></div>
+              <div className="text-5xl font-semibold leading-none tracking-tight tabular-nums sm:text-6xl">{isTurn ? remaining : p.current.remaining}</div>
+              <PracticeLastThrows labels={labels} className="min-h-7" />
+              <div className="text-xs text-muted-foreground">{t('practice.stats.average')} <b className="font-semibold text-foreground tabular-nums">{stats.average.toFixed(1)}</b></div>
+              {isTurn && <Badge className="mt-1">{t('practice.match.toThrow', { name: playerName(i) })}</Badge>}
             </div>
           );
         })}
       </div>
-      <div className="practice-checkout-hint">
-        {botBusy ? <span className="practice-bot-skip">{t('practice.bot.skip')}</span> : (suggestion ? suggestion.join(' → ') : '')}
-      </div>
-    </div>
+      <PracticeCheckoutHint>
+        {botBusy ? <span className="text-sm font-medium text-muted-foreground">{t('practice.bot.skip')}</span> : (suggestion ? suggestion.join(' → ') : '')}
+      </PracticeCheckoutHint>
+    </PracticeBoard>
   );
 
   const metaLeg = isMatch(session)
@@ -643,7 +599,17 @@ export function PracticeX01() {
       : t('practice.legOf', { current: session.legs.length + 1, total: session.settings.legsTarget });
 
   return (
-    <div className="practice-play">
+    <PracticePlay
+      onFinish={handleFinishEarly}
+      meta={
+        <>
+          <span>{metaLeg}</span>
+          {isMatch(session)
+            ? <span>{t('practice.match.toThrow', { name: playerName(session.turn) })}</span>
+            : <span>{t('practice.stats.average')} <b>{computeStats(session).average.toFixed(1)}</b></span>}
+        </>
+      }
+    >
       <CheckoutDialog
         pending={pendingCheckout}
         onChange={setPendingCheckout}
@@ -651,21 +617,9 @@ export function PracticeX01() {
         onConfirm={handleConfirmCheckout}
       />
 
-      <div className="practice-play-top">
-        <button type="button" className="back-btn" onClick={() => navigate('/practice')}>
-          <ArrowLeft size={18} /> {t('practice.title')}
-        </button>
-        <div className="practice-play-meta">
-          <span>{metaLeg}</span>
-          {isMatch(session)
-            ? <span>{t('practice.match.toThrow', { name: playerName(session.turn) })}</span>
-            : <span>{t('practice.stats.average')} <b>{computeStats(session).average.toFixed(1)}</b></span>}
-        </div>
-      </div>
-
       {isMatch(session) ? renderMatchBoard() : renderSoloBoard()}
 
-      <div className="dart-board">
+      <PracticeKeypad>
         {session.settings.scoringMode === 'dart' ? (
           <DartKeypad
             inputMode={inputMode}
@@ -687,13 +641,7 @@ export function PracticeX01() {
             disabled={flash !== null || botBusy}
           />
         )}
-      </div>
-
-      <div className="practice-play-footer">
-        <button type="button" className="practice-ghost-btn" onClick={handleFinishEarly}>
-          <Flag size={16} /> {t('practice.finishSession')}
-        </button>
-      </div>
-    </div>
+      </PracticeKeypad>
+    </PracticePlay>
   );
 }

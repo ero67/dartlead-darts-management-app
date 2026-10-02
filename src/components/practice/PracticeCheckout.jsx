@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Crosshair, Flag, Repeat } from 'lucide-react';
+import { Crosshair, Repeat } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
 import {
   PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeHardestList,
-  PracticeSetup, PracticeField
+  PracticeSetup, PracticeField, PracticePlay, PracticeBoard, PracticeBoardLabel,
+  PracticeBoardValue, PracticeCheckoutHint, PracticeBoardStats, PracticeKeypad
 } from './PracticeShared';
+import { Badge } from '@/components/ui/badge';
 import {
   createCheckoutTrainer, applyVisitTotal, undo, canUndo, liveRemaining, computeStats,
   CHECKOUT_RANGES, ATTEMPT_OPTIONS
@@ -18,7 +19,6 @@ import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
 import { hapticTap, hapticBust, hapticLegWon } from '../../lib/haptics';
 import checkoutData from '../../data/checkouts.json';
-import './Practice.css';
 
 const GAME = 'checkout';
 const FLASH_MS = 800;
@@ -40,7 +40,6 @@ const sanitize = (saved) => {
 // trainer can tell a finish on a double from a bust.
 export function PracticeCheckout() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const isOnScreenKeypad = useOnScreenKeypad();
   const { session, setSession, settings, setSettings, summary, setSummary, start, finish, discard } =
     usePracticeSession(GAME, { defaultSettings: DEFAULT_SETTINGS, sanitize, computeStats });
@@ -132,7 +131,7 @@ export function PracticeCheckout() {
       ? t('practice.setup.unlimited')
       : t(`practice.checkout.attemptCount${pluralSuffix(settings.attemptsTarget)}`, { count: settings.attemptsTarget });
     return (
-      <div className="practice-page">
+      <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.checkout.title')} description={t('practice.games.checkout.desc')} />
         <PracticeSetup
           title={t('practice.checkout.setup.title')}
@@ -143,7 +142,6 @@ export function PracticeCheckout() {
         >
           <PracticeField
             icon={Crosshair}
-            tone="green"
             label={t('practice.checkout.setup.range')}
             hint={t('practice.checkout.setup.rangeHint')}
             value={rangeLabel(settings)}
@@ -158,7 +156,6 @@ export function PracticeCheckout() {
 
           <PracticeField
             icon={Repeat}
-            tone="blue"
             label={t('practice.checkout.setup.attempts')}
             hint={t('practice.checkout.setup.attemptsHint')}
             value={attemptsLabel}
@@ -180,10 +177,26 @@ export function PracticeCheckout() {
   const attemptNumber = session.attempts.length + 1;
   const suggestion = checkoutData[String(remaining)];
   const lastAttempt = session.attempts.at(-1);
-  const flashClass = flash?.type === 'hit' ? 'leg-won' : flash ? 'bust' : '';
+  const boardFlash = flash?.type === 'hit'
+    ? { tone: 'good', text: t(`practice.checkout.hit${pluralSuffix(flash.darts)}`, { count: flash.darts }) }
+    : flash?.type === 'miss'
+      ? { tone: 'bad', text: t('practice.checkout.miss') }
+      : flash?.type === 'bust' ? { tone: 'bad', text: t('practice.bust') } : null;
 
   return (
-    <div className="practice-play">
+    <PracticePlay
+      onFinish={handleFinishEarly}
+      meta={
+        <>
+          <span>
+            {session.settings.attemptsTarget === null
+              ? t('practice.checkout.attempt', { current: attemptNumber })
+              : t('practice.checkout.attemptOf', { current: attemptNumber, total: session.settings.attemptsTarget })}
+          </span>
+          <span>{t('practice.checkout.stats.hitRate')} <b>{stats.hitPercent === null ? t('practice.noStats') : `${stats.hitPercent.toFixed(0)}%`}</b></span>
+        </>
+      }
+    >
       <CheckoutDialog
         pending={pendingCheckout}
         onChange={setPendingCheckout}
@@ -193,45 +206,30 @@ export function PracticeCheckout() {
         bustHint={t('practice.checkout.dialogBust')}
       />
 
-      <div className="practice-play-top">
-        <button type="button" className="back-btn" onClick={() => navigate('/practice')}>
-          <ArrowLeft size={18} /> {t('practice.title')}
-        </button>
-        <div className="practice-play-meta">
-          <span>
-            {session.settings.attemptsTarget === null
-              ? t('practice.checkout.attempt', { current: attemptNumber })
-              : t('practice.checkout.attemptOf', { current: attemptNumber, total: session.settings.attemptsTarget })}
-          </span>
-          <span>{t('practice.checkout.stats.hitRate')} <b>{stats.hitPercent === null ? t('practice.noStats') : `${stats.hitPercent.toFixed(0)}%`}</b></span>
-        </div>
-      </div>
-
-      <div className={`practice-board ${flashClass}`}>
-        {flash?.type === 'hit' && <div className="practice-board-flash">{t(`practice.checkout.hit${pluralSuffix(flash.darts)}`, { count: flash.darts })}</div>}
-        {flash?.type === 'miss' && <div className="practice-board-flash">{t('practice.checkout.miss')}</div>}
-        {flash?.type === 'bust' && <div className="practice-board-flash">{t('practice.bust')}</div>}
-        <div className="practice-remaining-label">
+      <PracticeBoard flash={boardFlash}>
+        <PracticeBoardLabel>
           {t('practice.checkout.target')} {session.current.target}
           {remaining !== session.current.target && ` · ${t('practice.remaining')}`}
-        </div>
-        <div className="practice-remaining">{remaining}</div>
-        <div className="practice-checkout-hint">{suggestion ? suggestion.join(' → ') : ''}</div>
-        <div className="practice-last-throws">
+        </PracticeBoardLabel>
+        <PracticeBoardValue>{remaining}</PracticeBoardValue>
+        <PracticeCheckoutHint>{suggestion ? suggestion.join(' → ') : ''}</PracticeCheckoutHint>
+        <div className="flex min-h-8 justify-center">
           {lastAttempt && (
-            <span className="faded">
+            <Badge variant="outline" className="px-2.5 py-1 text-sm font-normal text-muted-foreground">
               {t('practice.checkout.lastAttempt', { target: lastAttempt.target })} {lastAttempt.hit ? '✓' : '✗'}
-            </span>
+            </Badge>
           )}
         </div>
-        <div className="practice-board-stats">
-          <span>{t('practice.checkout.stats.hits')}: <b>{stats.hits}/{stats.attempts}</b></span>
-          <span>{t('practice.checkout.stats.avgDartsPerHit')}: <b>{stats.avgDartsPerHit ?? t('practice.noStats')}</b></span>
-          <span>{t('practice.checkout.stats.bestStreak')}: <b>{stats.bestStreak}</b></span>
-        </div>
-      </div>
+        <PracticeBoardStats
+          items={[
+            [t('practice.checkout.stats.hits'), `${stats.hits}/${stats.attempts}`],
+            [t('practice.checkout.stats.avgDartsPerHit'), stats.avgDartsPerHit ?? t('practice.noStats')],
+            [t('practice.checkout.stats.bestStreak'), stats.bestStreak]
+          ]}
+        />
+      </PracticeBoard>
 
-      <div className="dart-board">
+      <PracticeKeypad>
         <TurnTotalKeypad
           value={turnTotalInput}
           onChange={(next) => { hapticTap(); setTurnTotalInput(next); }}
@@ -241,13 +239,7 @@ export function PracticeCheckout() {
           useOnScreenKeypad={isOnScreenKeypad}
           disabled={flash !== null}
         />
-      </div>
-
-      <div className="practice-play-footer">
-        <button type="button" className="practice-ghost-btn" onClick={handleFinishEarly}>
-          <Flag size={16} /> {t('practice.finishSession')}
-        </button>
-      </div>
-    </div>
+      </PracticeKeypad>
+    </PracticePlay>
   );
 }
