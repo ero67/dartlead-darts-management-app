@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoadingState } from './components/shared/LoadingState';
 import { TournamentProvider, useTournament } from './contexts/TournamentContext';
 import { LeagueProvider, useLeague } from './contexts/LeagueContext';
 import { LiveMatchProvider } from './contexts/LiveMatchContext';
@@ -55,38 +58,49 @@ function NoPlayerProfile({ onBrowseTournaments, onOpenPractice }) {
   const { user } = useAuth();
   const [isEditingName, setIsEditingName] = useState(false);
   const displayName = getUserDisplayName(user);
+  const practiceEntries = loadHistory();
   return (
-    <div className="unauthorized-container">
-      <h2>{t('playerProfile.noLinkedProfile')}</h2>
-      <p>{t('playerProfile.registerForTournamentToCreate')}</p>
-      {/* The name is still editable here — it is what the manager sees when
-          adding this account to a league or tournament. */}
-      <div className="no-profile-name">
-        {isEditingName ? (
-          <DisplayNameEditor
-            currentName={displayName}
-            onSaved={() => setIsEditingName(false)}
-            onCancel={() => setIsEditingName(false)}
-          />
-        ) : (
-          <p>
-            <span className="no-profile-name-label">{t('playerProfile.yourName')}:</span>{' '}
-            <strong>{displayName || user?.email}</strong>
-            <button type="button" className="profile-edit-name-btn" onClick={() => setIsEditingName(true)} title={t('playerProfile.editName')} aria-label={t('playerProfile.editName')}>
-              <Pencil size={14} />
-            </button>
-          </p>
-        )}
-      </div>
-      <button className="primary-btn" onClick={onBrowseTournaments}>
-        {t('navigation.tournaments')}
-      </button>
-      {loadHistory().length > 0 && (
-        <div className="no-profile-practice">
-          <h3>{t('practice.bests.profileTitle')}</h3>
-          <PracticeBests entries={loadHistory()} compact />
-          <button className="primary-btn" onClick={onOpenPractice}>{t('practice.bests.openPractice')}</button>
-        </div>
+    <div className="tw mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('playerProfile.noLinkedProfile')}</CardTitle>
+          <CardDescription>{t('playerProfile.registerForTournamentToCreate')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {/* The name is still editable here — it is what the manager sees when
+              adding this account to a league or tournament. */}
+          {isEditingName ? (
+            <DisplayNameEditor
+              currentName={displayName}
+              onSaved={() => setIsEditingName(false)}
+              onCancel={() => setIsEditingName(false)}
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">{t('playerProfile.yourName')}:</span>
+              <span className="font-semibold">{displayName || user?.email}</span>
+              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setIsEditingName(true)} title={t('playerProfile.editName')} aria-label={t('playerProfile.editName')}>
+                <Pencil />
+              </Button>
+            </div>
+          )}
+          <div>
+            <Button onClick={onBrowseTournaments}>{t('navigation.tournaments')}</Button>
+          </div>
+        </CardContent>
+      </Card>
+      {practiceEntries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('practice.bests.profileTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <PracticeBests entries={practiceEntries} compact />
+            <div>
+              <Button variant="outline" onClick={onOpenPractice}>{t('practice.bests.openPractice')}</Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
       <AccountDeletion />
     </div>
@@ -176,10 +190,7 @@ function TournamentRoute() {
   // the lightweight list stub (full groups/matches still being hydrated).
   if (!currentTournament || currentTournament.id !== id || currentTournament._summary === true) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t('common.loadingTournament')}</p>
-      </div>
+      <LoadingState text={t('common.loadingTournament')} />
     );
   }
 
@@ -324,9 +335,7 @@ function MyProfileRedirect() {
 
   if (profileLoading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-      </div>
+      <LoadingState />
     );
   }
   return <NoPlayerProfile onBrowseTournaments={() => navigate('/tournaments')} onOpenPractice={() => navigate('/practice')} />;
@@ -380,10 +389,7 @@ function AppContent() {
   // Show loading spinner while checking authentication
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t('common.loading')}</p>
-      </div>
+      <LoadingState text={t('common.loading')} />
     );
   }
 
