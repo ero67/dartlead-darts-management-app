@@ -21,7 +21,7 @@ export function CheckoutDialog({ pending, onChange, onConfirm, onCancel, doubleO
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onCancel(); }}>
       {/* Portalled to <body>: carries its own tw scope, and the board theme (scoring screens are dark). */}
-      <DialogContent className="dark-mode text-foreground sm:max-w-md" showCloseButton={false}>
+      <DialogContent className="text-foreground sm:max-w-md" showCloseButton={false}>
         <DialogHeader className="flex-row items-center justify-between text-left">
           <DialogTitle>{t('match.checkout.title')}</DialogTitle>
           <span className="text-3xl font-semibold tracking-tight tabular-nums">{pending.total}</span>

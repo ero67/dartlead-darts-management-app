@@ -21,7 +21,7 @@ function PlayerColumn({ player, isActive, isBusting }) {
       </div>
       <div className="text-6xl font-semibold leading-none tracking-tight tabular-nums">{player.score}</div>
       {player.checkout && (
-        <Badge className="max-w-full truncate bg-green-950 text-green-200 tabular-nums">{player.checkout.join(' → ')}</Badge>
+        <Badge className="max-w-full truncate bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 tabular-nums">{player.checkout.join(' → ')}</Badge>
       )}
       {player.throws.length > 0 && (
         <div className="flex flex-wrap gap-1">

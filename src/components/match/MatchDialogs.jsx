@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 // Portalled to <body>: carries its own tw scope and the dark board theme.
-const CONTENT = 'tw dark-mode text-foreground sm:max-w-md';
+const CONTENT = 'text-foreground sm:max-w-md';
 const stay = (e) => e.preventDefault();
 
 // Pre-match "who starts" — cannot be dismissed, the match needs a starter.

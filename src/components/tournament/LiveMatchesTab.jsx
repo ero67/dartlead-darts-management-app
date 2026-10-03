@@ -44,7 +44,7 @@ export function LiveMatchesTab({ liveMatches, favoriteMatchIds, toggleFavoriteMa
           {liveMatches.map(match => {
             const isFavorite = favoriteMatchIds.has(match.id);
             return (
-              <Card key={match.id} className={cn('dark-mode gap-3 bg-card p-4 text-foreground', isFavorite && 'border-amber-500/50')}>
+              <Card key={match.id} className={cn('gap-3 bg-card p-4 text-foreground', isFavorite && 'border-amber-500/50')}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3 font-mono text-xs text-muted-foreground tabular-nums">
                     {match.live_board_number ? (
