@@ -24,6 +24,7 @@ import { StatisticsTab } from './tournament/StatisticsTab';
 import { LiveMatchesTab } from './tournament/LiveMatchesTab';
 import { StartMatchDialog } from './tournament/StartMatchDialog';
 import { EditMatchPlayersDialog } from './tournament/EditMatchPlayersDialog';
+import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
@@ -97,6 +98,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const standingsRef = useRef(null);
   const bracketRef = useRef(null);
   const [editingMatch, setEditingMatch] = useState(null); // Match being edited
+  const [correctingMatch, setCorrectingMatch] = useState(null); // Match whose result is being corrected
   const [liveMatches, setLiveMatches] = useState([]);
   const [matchStatistics, setMatchStatistics] = useState(null); // Match to show statistics for
   const liveMatchesRef = useRef([]);
@@ -1730,7 +1732,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     try {
       const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
       if (ctx && isDownstreamBlocked(ctx)) {
-        toast.success(t('manager.downstreamStarted'));
+        toast.error(t('manager.downstreamStarted'));
         return;
       }
 
@@ -1786,14 +1788,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
 
-  const handleAdminCorrectMatch = async (match) => {
-    const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || t('management.player1') }), match.result?.player1Legs ?? 0);
-    if (newScore1 === null) return;
-    const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || t('management.player2') }), match.result?.player2Legs ?? 0);
-    if (newScore2 === null) return;
+  // Opens the correction dialog; applyCorrectedResult does the actual write.
+  const handleAdminCorrectMatch = (match) => setCorrectingMatch(match);
 
-    const score1 = parseInt(newScore1, 10) || 0;
-    const score2 = parseInt(newScore2, 10) || 0;
+  const applyCorrectedResult = async (match, score1, score2) => {
     const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
     if (!winnerId) {
       toast.error(t('manager.winnerMoreLegsError'));
@@ -1803,7 +1801,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     try {
       const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
       if (ctx && isDownstreamBlocked(ctx)) {
-        toast.success(t('manager.downstreamStarted'));
+        toast.error(t('manager.downstreamStarted'));
         return;
       }
 
@@ -1858,6 +1856,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
 
       await getTournament(tournament.id);
+      setCorrectingMatch(null);
     } catch (error) {
       console.error('Error correcting match result:', error);
       toast.error(error.message);
@@ -2442,6 +2441,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         allRounds={tournament.playoffs?.rounds || []}
         onSave={(player1, player2) => updatePlayoffMatchPlayers(editingMatch.id, player1, player2)}
         onCancel={() => setEditingMatch(null)}
+        t={t}
+      />
+
+      <CorrectResultDialog
+        match={correctingMatch}
+        onSave={(score1, score2) => applyCorrectedResult(correctingMatch, score1, score2)}
+        onCancel={() => setCorrectingMatch(null)}
         t={t}
       />
 
