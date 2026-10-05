@@ -25,7 +25,8 @@ export function Navigation({ currentView, onViewChange, tournament }) {
   const { boardNumber } = useLiveMatch();
   const { t, language, changeLanguage } = useLanguage();
   const { isDarkMode, toggleTheme } = useTheme();
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, state: sidebarState } = useSidebar();
+  const toggleLabel = sidebarState === 'collapsed' ? t('navigation.expandSidebar') : t('navigation.collapseSidebar');
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
 
   const groups = [
@@ -74,7 +75,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+        <div className="flex items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:px-0">
           <img src={logoIcon} alt="DartLead" className="size-8 shrink-0 rounded-lg object-cover" />
           <div className="flex min-w-0 flex-1 flex-col group-data-[collapsible=icon]:hidden">
             <span className="truncate text-sm font-semibold leading-tight">DartLead</span>
@@ -82,7 +83,12 @@ export function Navigation({ currentView, onViewChange, tournament }) {
               <span className="truncate text-xs text-muted-foreground" title={tournament.name}>{tournament.name}</span>
             )}
           </div>
-          <SidebarTrigger className="hidden group-data-[collapsible=icon]:hidden lg:flex" />
+          {/* Desktop only (phones use the header trigger); stays visible when collapsed so it can expand again */}
+          <SidebarTrigger
+            className="hidden lg:flex"
+            aria-label={toggleLabel}
+            title={toggleLabel}
+          />
         </div>
       </SidebarHeader>
 
