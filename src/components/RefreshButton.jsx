@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Button } from '@/components/ui/button';
 
 // Manual "get the latest data" control for the tournament pages. The app also
 // refreshes on its own (return to foreground, reconnect, navigation), so this
@@ -23,16 +24,18 @@ export function RefreshButton() {
   };
 
   return (
-    <button
+    <Button
       type="button"
-      className="refresh-btn"
+      variant="outline"
+      size="sm"
+     
       onClick={handleRefresh}
       disabled={isRefreshing}
       title={t('common.refresh')}
       aria-label={t('common.refresh')}
     >
-      <RefreshCw size={18} className={isRefreshing ? 'refresh-btn__icon--spinning' : ''} />
-      <span className="btn-label">{isRefreshing ? t('common.refreshing') : t('common.refresh')}</span>
-    </button>
+      <RefreshCw className={isRefreshing ? 'animate-spin' : ''} />
+      <span className="hidden sm:inline">{isRefreshing ? t('common.refreshing') : t('common.refresh')}</span>
+    </Button>
   );
 }

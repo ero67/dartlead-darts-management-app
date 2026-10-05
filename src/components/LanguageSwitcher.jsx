@@ -1,29 +1,31 @@
 import React from 'react';
-import { Globe } from 'lucide-react';
+import { Globe, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { LANGUAGES } from '../lib/languages';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
+// Standalone language menu (the sidebar has its own inline copy of this).
 export function LanguageSwitcher() {
   const { language, changeLanguage } = useLanguage();
-
-  const languages = [
-    { code: 'en', name: 'English', flag: '🇬🇧' },
-    { code: 'sk', name: 'Slovenčina', flag: '🇸🇰' }
-  ];
+  const current = LANGUAGES.find(l => l.code === language);
 
   return (
-    <div className="language-switcher">
-      <Globe size={16} />
-      <select 
-        value={language} 
-        onChange={(e) => changeLanguage(e.target.value)}
-        className="language-select"
-      >
-        {languages.map(lang => (
-          <option key={lang.code} value={lang.code}>
-            {lang.flag} {lang.name}
-          </option>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Globe />
+          {current?.name}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-40">
+        {LANGUAGES.map(lang => (
+          <DropdownMenuItem key={lang.code} onClick={() => changeLanguage(lang.code)}>
+            <span className="flex-1">{lang.name}</span>
+            {lang.code === language && <Check className="size-4" />}
+          </DropdownMenuItem>
         ))}
-      </select>
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

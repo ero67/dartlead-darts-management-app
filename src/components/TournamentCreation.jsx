@@ -5,6 +5,38 @@ import { useLeague } from '../contexts/LeagueContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { UserSearchPicker } from './UserSearchPicker';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
+const PLAYOFF_LEGS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
+const PLAYOFF_ROUNDS = [
+  [32, 'management.top32'],
+  [16, 'management.top16'],
+  [8, 'management.quarterFinals'],
+  [4, 'management.semiFinals'],
+  [2, 'management.final'],
+];
+const TOURNAMENT_TYPES = [
+  ['groups_with_playoffs', 'registration.tournamentTypeGroupsWithPlayoffs', 'Group stage with optional playoffs'],
+  ['playoff_only', 'registration.tournamentTypePlayoffOnly', 'Playoff only (no group stage)'],
+];
+const START_ROUNDS = [
+  [2, 'management.final', 'Final (2 players)'],
+  [4, 'management.semiFinals', 'Semi-finals (4 players)'],
+  [8, 'management.quarterFinals', 'Quarter-finals (8 players)'],
+  [16, 'management.top16', 'Round of 16 (16 players)'],
+  [32, 'management.top32', 'Round of 32 (32 players)'],
+];
 
 // Generate unique ID for tournaments
 const generateId = () => {
@@ -138,7 +170,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
 
   const createTournament = () => {
     if (!tournamentName.trim()) {
-      alert(t('tournaments.pleaseEnterName'));
+      toast.error(t('tournaments.pleaseEnterName'));
       return;
     }
 
@@ -164,610 +196,542 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     onTournamentCreated(tournament);
   };
 
+  const legsLabel = (n) => (n === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: n }));
+  const typeLabel = (value) => {
+    const entry = TOURNAMENT_TYPES.find(([v]) => v === value);
+    return entry ? (t(entry[1]) || entry[2]) : value;
+  };
+  const yesNo = (v) => (v ? t('common.yes') : t('common.no'));
+  const isGroups = tournamentType === 'groups_with_playoffs';
+  const criterionLabels = {
+    matchesWon: t('registration.matchesWon'),
+    legDifference: t('registration.legDifference'),
+    average: t('registration.average'),
+    headToHead: t('registration.headToHead')
+  };
 
+  const moveCriterion = (index, delta) => {
+    const target = index + delta;
+    if (target < 0 || target >= standingsCriteriaOrder.length) return;
+    const newOrder = [...standingsCriteriaOrder];
+    [newOrder[index], newOrder[target]] = [newOrder[target], newOrder[index]];
+    setStandingsCriteriaOrder(newOrder);
+  };
+
+  const summaryRows = [
+    [t('registration.tournamentType') || 'Tournament Type', typeLabel(tournamentType)],
+    [t('tournaments.defaultLegsToWin'), legsLabel(legsToWin)],
+    [t('tournaments.startingScore'), startingScore],
+    ...(isGroups ? [[
+      groupSettings.type === 'groups' ? t('registration.numberOfGroups') : t('registration.playersPerGroup'),
+      groupSettings.value,
+    ]] : []),
+    ...(isGroups ? [[t('registration.enablePlayoffs'), yesNo(playoffSettings.enabled)]] : []),
+    ...(playoffSettings.enabled && isGroups && playoffSettings.qualificationMode === 'perGroup'
+      ? [[t('registration.playersAdvancingPerGroup'), playoffSettings.playersPerGroup === 9999 ? t('registration.all') : playoffSettings.playersPerGroup]]
+      : []),
+    ...(playoffSettings.enabled && isGroups && playoffSettings.qualificationMode === 'totalPlayers'
+      ? [[t('registration.totalPlayersToAdvance'), playoffSettings.totalPlayersToAdvance || 8]]
+      : []),
+    ...(playoffSettings.enabled && !isGroups
+      ? [[t('registration.playoffStartStage') || 'Playoff starts from', (() => { const r = START_ROUNDS.find(([v]) => v === playoffSettings.startingRoundPlayers); return r ? (t(r[1]) || r[2]) : playoffSettings.startingRoundPlayers; })()]]
+      : []),
+    ...(playoffSettings.enabled ? [[t('registration.thirdPlaceMatch') || '3rd Place Match', yesNo(playoffSettings.thirdPlaceMatch === true)]] : []),
+  ];
+
+  const radioCard = 'flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm font-medium transition-colors hover:bg-muted/50 has-data-[state=checked]:border-primary has-data-[state=checked]:ring-2 has-data-[state=checked]:ring-primary/30';
+  const radioRow = 'flex cursor-pointer items-center gap-2 text-sm font-normal';
 
   return (
-    <div className="tournament-creation">
-      <div className="creation-header">
-        <button className="back-btn" onClick={onBack}>
-          <ArrowLeft size={20} />
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
+          <ArrowLeft />
           {t('common.backToDashboard')}
-        </button>
-        <div className="header-content">
-          <Trophy className="header-icon" />
-          <h2>{t('tournaments.createNew')}</h2>
-        </div>
+        </Button>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          <Trophy className="size-6 text-primary" />
+          {t('tournaments.createNew')}
+        </h1>
       </div>
 
-      <div className="creation-form">
-        <div className="form-section">
-          <h3>{t('registration.tournamentType') || 'Tournament Type'}</h3>
-          <div className="radio-group">
-            <label>
-              <input
-                type="radio"
-                name="tournamentType"
-                value="groups_with_playoffs"
-                checked={tournamentType === 'groups_with_playoffs'}
-                onChange={(e) => setTournamentType(e.target.value)}
-              />
-              {t('registration.tournamentTypeGroupsWithPlayoffs') || 'Group stage with optional playoffs'}
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="tournamentType"
-                value="playoff_only"
-                checked={tournamentType === 'playoff_only'}
-                onChange={(e) => setTournamentType(e.target.value)}
-              />
-              {t('registration.tournamentTypePlayoffOnly') || 'Playoff only (no group stage)'}
-            </label>
-          </div>
-        </div>
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex min-w-0 flex-1 flex-col gap-6 lg:max-w-[760px]">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('registration.tournamentType') || 'Tournament Type'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup value={tournamentType} onValueChange={setTournamentType} className="grid gap-3 sm:grid-cols-2">
+                {TOURNAMENT_TYPES.map(([value, labelKey, fallback]) => (
+                  <Label key={value} htmlFor={`tournament-type-${value}`} className={radioCard}>
+                    <RadioGroupItem id={`tournament-type-${value}`} value={value} className="mt-0.5" />
+                    <span>{t(labelKey) || fallback}</span>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </Card>
 
-        <div className="form-section">
-          <label htmlFor="tournament-name">{t('tournaments.tournamentName')}</label>
-          <input
-            id="tournament-name"
-            type="text"
-            value={tournamentName}
-            onChange={(e) => setTournamentName(e.target.value)}
-            placeholder={t('tournaments.enterTournamentName')}
-            maxLength={50}
-          />
-        </div>
-
-        {leaguePlayerPool.length > 0 && (
-          <div className="form-section">
-            <h3>
-              <Users size={18} />
-              {t('tournaments.leaguePlayersTitle')}
-            </h3>
-            <p className="settings-description">
-              {t('tournaments.leaguePlayersHint')}
-            </p>
-            <div className="league-players-controls">
-              <span className="league-players-count">
-                {t('tournaments.selectedCount', { selected: selectedPlayers.length, total: leaguePlayerPool.length })}
-              </span>
-              <button
-                type="button"
-                className="league-players-action"
-                onClick={() => setSelectedPlayers([...leaguePlayerPool])}
-                disabled={selectedPlayers.length === leaguePlayerPool.length}
-              >
-                {t('tournaments.selectAllPlayers')}
-              </button>
-              <button
-                type="button"
-                className="league-players-action"
-                onClick={() => setSelectedPlayers([])}
-                disabled={selectedPlayers.length === 0}
-              >
-                {t('tournaments.clearSelection')}
-              </button>
-            </div>
-            {leaguePlayerPool.length > 12 && (
-              <input
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('tournaments.tournamentName')}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              <Label htmlFor="tournament-name">{t('tournaments.tournamentName')}</Label>
+              <Input
+                id="tournament-name"
                 type="text"
-                className="league-players-filter"
-                placeholder={t('tournaments.filterPlayers')}
-                value={playerFilter}
-                onChange={(e) => setPlayerFilter(e.target.value)}
+                value={tournamentName}
+                onChange={(e) => setTournamentName(e.target.value)}
+                placeholder={t('tournaments.enterTournamentName')}
+                maxLength={50}
               />
-            )}
-            <div className="league-players-grid">
-              {visiblePoolPlayers.map(player => {
-                const isSelected = selectedPlayerIds.has(player.id);
-                return (
-                  <button
-                    key={player.id}
-                    type="button"
-                    className={`league-player-chip${isSelected ? ' league-player-chip--selected' : ''}`}
-                    onClick={() => togglePlayerSelection(player)}
-                  >
-                    {isSelected ? <Check size={14} /> : <Plus size={14} />}
-                    {player.name}
-                  </button>
-                );
-              })}
-              {visiblePoolPlayers.length === 0 && (
-                <span className="league-players-empty">{t('tournaments.noPlayersMatchFilter')}</span>
-              )}
-            </div>
-          </div>
-        )}
+            </CardContent>
+          </Card>
 
-        <div className="form-section">
-          <h3>
-            <ClipboardList size={18} />
-            {t('tournaments.scorersTitle')}
-          </h3>
-          <p className="settings-description">
-            {t('tournaments.scorersHint')}
-          </p>
-          <UserSearchPicker
-            onSelect={handleAddScorer}
-            excludeIds={[...scorers.map(s => s.id), ...(user?.id ? [user.id] : [])]}
-          />
-          {scorers.length > 0 ? (
-            <ul className="creation-scorer-list">
-              {scorers.map(scorer => (
-                <li key={scorer.id} className="creation-scorer-item">
-                  <span className="creation-scorer-name">
-                    {scorer.fullName && scorer.fullName !== scorer.email
-                      ? `${scorer.fullName} (${scorer.email})`
-                      : scorer.email}
+          {leaguePlayerPool.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="size-4" />
+                  {t('tournaments.leaguePlayersTitle')}
+                </CardTitle>
+                <CardDescription>{t('tournaments.leaguePlayersHint')}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mr-auto text-sm text-muted-foreground tabular-nums">
+                    {t('tournaments.selectedCount', { selected: selectedPlayers.length, total: leaguePlayerPool.length })}
                   </span>
-                  <button
+                  <Button
                     type="button"
-                    className="creation-scorer-remove"
-                    onClick={() => handleRemoveScorer(scorer.id)}
-                    aria-label={t('scorers.remove')}
-                    title={t('scorers.remove')}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedPlayers([...leaguePlayerPool])}
+                    disabled={selectedPlayers.length === leaguePlayerPool.length}
                   >
-                    <X size={16} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="creation-scorer-empty">{t('tournaments.scorersEmpty')}</p>
-          )}
-        </div>
-
-        <div className="form-section">
-          <h3>{t('registration.matchSettings')}</h3>
-          <div className="input-group">
-            <label htmlFor="legs-to-win">{t('tournaments.defaultLegsToWin')}</label>
-            <select
-              id="legs-to-win"
-              value={legsToWin}
-              onChange={(e) => setLegsToWin(parseInt(e.target.value))}
-              className="legs-selector"
-            >
-              <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-              <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-              <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-              <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-              <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-              <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-              <option value={9}>{t('tournaments.firstToLegs', { count: 9 })}</option>
-            </select>
-          </div>
-          <div className="input-group">
-            <label htmlFor="starting-score">{t('tournaments.startingScore')}:</label>
-            <select
-              id="starting-score"
-              value={startingScore}
-              onChange={(e) => setStartingScore(parseInt(e.target.value))}
-            >
-              <option value={301}>301</option>
-              <option value={501}>501</option>
-              <option value={701}>701</option>
-            </select>
-          </div>
-          <div className="input-group">
-            <label>{t('registration.scoringMode')}:</label>
-            <div className="radio-group" style={{ marginBottom: 0 }}>
-              <label>
-                <input
-                  type="radio"
-                  name="scoringModeCreate"
-                  value="dart"
-                  checked={defaultScoringMode === 'dart'}
-                  onChange={() => setDefaultScoringMode('dart')}
-                />
-                {t('registration.scoringModeDart')}
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="scoringModeCreate"
-                  value="turnTotal"
-                  checked={defaultScoringMode === 'turnTotal'}
-                  onChange={() => setDefaultScoringMode('turnTotal')}
-                />
-                {t('registration.scoringModeTurnTotal')}
-              </label>
-            </div>
-          </div>
-          <div className="checkbox-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={groupSettings.autoScorerAssignment === true}
-                onChange={(e) => setGroupSettings({
-                  ...groupSettings,
-                  autoScorerAssignment: e.target.checked
-                })}
-              />
-              {t('registration.autoScorerAssignment')}
-            </label>
-            <p className="add-panel-hint">{t('registration.autoScorerAssignmentHint')}</p>
-          </div>
-        </div>
-
-        <div className="form-section">
-          {tournamentType === 'groups_with_playoffs' && (
-          <>
-          <h3>{t('registration.standingsCriteriaOrder')}</h3>
-          <p className="settings-description" style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-            {t('registration.standingsCriteriaOrderDescription') || 'Set the order of criteria for sorting in group standings. Criteria will be used in this order when values are equal.'}
-          </p>
-          <div className="criteria-order-list" style={{ marginBottom: '1.5rem' }}>
-            {standingsCriteriaOrder.map((criterion, index) => {
-              const criterionLabels = {
-                matchesWon: t('registration.matchesWon'),
-                legDifference: t('registration.legDifference'),
-                average: t('registration.average'),
-                headToHead: t('registration.headToHead')
-              };
-              return (
-                <div key={criterion} className="criteria-order-item">
-                  <span className="criteria-number" style={{ marginRight: '0.75rem', fontWeight: 'bold', minWidth: '2rem' }}>{index + 1}.</span>
-                  <span className="criteria-label" style={{ flex: 1 }}>{criterionLabels[criterion] || criterion}</span>
-                  <div className="criteria-actions" style={{ display: 'flex', gap: '0.25rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (index > 0) {
-                          const newOrder = [...standingsCriteriaOrder];
-                          [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-                          setStandingsCriteriaOrder(newOrder);
-                        }
-                      }}
-                      title={t('registration.moveUp')}
-                      className={index === 0 ? 'move-btn disabled' : 'move-btn'}
-                      disabled={index === 0}
-                    >
-                      <ChevronUp size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (index < standingsCriteriaOrder.length - 1) {
-                          const newOrder = [...standingsCriteriaOrder];
-                          [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                          setStandingsCriteriaOrder(newOrder);
-                        }
-                      }}
-                      title={t('registration.moveDown')}
-                      className={index === standingsCriteriaOrder.length - 1 ? 'move-btn disabled' : 'move-btn'}
-                      disabled={index === standingsCriteriaOrder.length - 1}
-                    >
-                      <ChevronDown size={16} />
-                    </button>
-                  </div>
+                    {t('tournaments.selectAllPlayers')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedPlayers([])}
+                    disabled={selectedPlayers.length === 0}
+                  >
+                    {t('tournaments.clearSelection')}
+                  </Button>
                 </div>
-              );
-            })}
-          </div>
-          </>
-          )}
-        </div>
-
-        {tournamentType === 'groups_with_playoffs' && (
-          <div className="form-section">
-            <h3>{t('registration.groupSettings')}</h3>
-            <div className="radio-group">
-              <label>
-                <input
-                  type="radio"
-                  name="groupType"
-                  value="groups"
-                  checked={groupSettings.type === 'groups'}
-                  onChange={(e) => setGroupSettings({
-                    ...groupSettings,
-                    type: e.target.value
-                  })}
-                />
-                {t('registration.numberOfGroups')}
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="groupType"
-                  value="playersPerGroup"
-                  checked={groupSettings.type === 'playersPerGroup'}
-                  onChange={(e) => setGroupSettings({
-                    ...groupSettings,
-                    type: e.target.value
-                  })}
-                />
-                {t('registration.playersPerGroup')}
-              </label>
-            </div>
-            <div className="input-group">
-              <label>
-                {groupSettings.type === 'groups' ? t('registration.numberOfGroupsLabel') : t('registration.playersPerGroupLabel')}
-              </label>
-              <input
-                type="number"
-                min="1"
-                max={groupSettings.type === 'groups' ? '16' : '8'}
-                value={groupSettings.value}
-                onChange={(e) => setGroupSettings({
-                  ...groupSettings,
-                  value: parseInt(e.target.value) || 1
-                })}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="form-section">
-          <h3>{t('registration.playoffSettings')}</h3>
-          
-          {tournamentType === 'groups_with_playoffs' && (
-            <div className="checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={playoffSettings.enabled}
-                  onChange={(e) => setPlayoffSettings({
-                    ...playoffSettings,
-                    enabled: e.target.checked
-                  })}
-                />
-                {t('registration.enablePlayoffs')}
-              </label>
-            </div>
-          )}
-          
-          {playoffSettings.enabled && (
-            <div className="playoff-options">
-              {tournamentType === 'groups_with_playoffs' ? (
-                <>
-                  <div className="radio-section">
-                    <label className="radio-section-label">{t('registration.qualificationMode')}</label>
-                    <div className="radio-group">
-                      <label>
-                        <input
-                          type="radio"
-                          name="qualificationMode"
-                          value="perGroup"
-                          checked={playoffSettings.qualificationMode === 'perGroup'}
-                          onChange={(e) => setPlayoffSettings({
-                            ...playoffSettings,
-                            qualificationMode: e.target.value
-                          })}
-                        />
-                        {t('registration.qualificationModePerGroup')}
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="qualificationMode"
-                          value="totalPlayers"
-                          checked={playoffSettings.qualificationMode === 'totalPlayers'}
-                          onChange={(e) => setPlayoffSettings({
-                            ...playoffSettings,
-                            qualificationMode: e.target.value
-                          })}
-                        />
-                        {t('registration.qualificationModeTotalPlayers')}
-                      </label>
-                    </div>
-                  </div>
-                  
-                  {playoffSettings.qualificationMode === 'perGroup' ? (
-                    <div className="input-group">
-                      <label>{t('registration.playersAdvancingPerGroup')}</label>
-                      <select 
-                        value={playoffSettings.playersPerGroup}
-                        onChange={(e) => setPlayoffSettings({
-                          ...playoffSettings,
-                          playersPerGroup: parseInt(e.target.value)
-                        })}
+                {leaguePlayerPool.length > 12 && (
+                  <Input
+                    type="text"
+                    placeholder={t('tournaments.filterPlayers')}
+                    value={playerFilter}
+                    onChange={(e) => setPlayerFilter(e.target.value)}
+                  />
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {visiblePoolPlayers.map(player => {
+                    const isSelected = selectedPlayerIds.has(player.id);
+                    return (
+                      <Button
+                        key={player.id}
+                        type="button"
+                        variant={isSelected ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-9 rounded-full"
+                        aria-pressed={isSelected}
+                        onClick={() => togglePlayerSelection(player)}
                       >
-                        {Array.from({ length: 8 }, (_, i) => i + 1).map(num => (
-                          <option key={num} value={num}>{num}</option>
-                        ))}
-                        <option value={9999}>{t('registration.all')}</option>
-                      </select>
-                    </div>
+                        {isSelected ? <Check /> : <Plus />}
+                        {player.name}
+                      </Button>
+                    );
+                  })}
+                  {visiblePoolPlayers.length === 0 && (
+                    <span className="text-sm text-muted-foreground">{t('tournaments.noPlayersMatchFilter')}</span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="size-4" />
+                {t('tournaments.scorersTitle')}
+              </CardTitle>
+              <CardDescription>{t('tournaments.scorersHint')}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <UserSearchPicker
+                onSelect={handleAddScorer}
+                excludeIds={[...scorers.map(s => s.id), ...(user?.id ? [user.id] : [])]}
+              />
+              {scorers.length > 0 ? (
+                <ul className="flex flex-wrap gap-2">
+                  {scorers.map(scorer => (
+                    <li key={scorer.id}>
+                      <Badge variant="secondary" className="gap-1 py-1 pr-1 pl-2.5 text-sm font-normal">
+                        <span className="truncate">
+                          {scorer.fullName && scorer.fullName !== scorer.email
+                            ? `${scorer.fullName} (${scorer.email})`
+                            : scorer.email}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          className="rounded-full"
+                          onClick={() => handleRemoveScorer(scorer.id)}
+                          aria-label={t('scorers.remove')}
+                          title={t('scorers.remove')}
+                        >
+                          <X />
+                        </Button>
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">{t('tournaments.scorersEmpty')}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('registration.matchSettings')}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="legs-to-win">{t('tournaments.defaultLegsToWin')}</Label>
+                  <Select value={String(legsToWin)} onValueChange={(v) => setLegsToWin(parseInt(v))}>
+                    <SelectTrigger id="legs-to-win" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LEGS_OPTIONS.map(n => (
+                        <SelectItem key={n} value={String(n)}>{legsLabel(n)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="starting-score">{t('tournaments.startingScore')}</Label>
+                  <Select value={String(startingScore)} onValueChange={(v) => setStartingScore(parseInt(v))}>
+                    <SelectTrigger id="starting-score" className="w-full tabular-nums">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[301, 501, 701].map(n => (
+                        <SelectItem key={n} value={String(n)} className="tabular-nums">{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>{t('registration.scoringMode')}</Label>
+                <RadioGroup value={defaultScoringMode} onValueChange={setDefaultScoringMode} className="gap-2">
+                  <Label htmlFor="scoring-mode-dart" className={radioRow}>
+                    <RadioGroupItem id="scoring-mode-dart" value="dart" />
+                    {t('registration.scoringModeDart')}
+                  </Label>
+                  <Label htmlFor="scoring-mode-turnTotal" className={radioRow}>
+                    <RadioGroupItem id="scoring-mode-turnTotal" value="turnTotal" />
+                    {t('registration.scoringModeTurnTotal')}
+                  </Label>
+                </RadioGroup>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="auto-scorer-assignment" className="cursor-pointer font-normal">
+                  <Checkbox
+                    id="auto-scorer-assignment"
+                    checked={groupSettings.autoScorerAssignment === true}
+                    onCheckedChange={(checked) => setGroupSettings({
+                      ...groupSettings,
+                      autoScorerAssignment: checked === true
+                    })}
+                  />
+                  {t('registration.autoScorerAssignment')}
+                </Label>
+                <p className="pl-6 text-sm text-muted-foreground">{t('registration.autoScorerAssignmentHint')}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {isGroups && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('registration.standingsCriteriaOrder')}</CardTitle>
+                <CardDescription>
+                  {t('registration.standingsCriteriaOrderDescription') || 'Set the order of criteria for sorting in group standings. Criteria will be used in this order when values are equal.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ol className="flex flex-col divide-y rounded-lg border">
+                  {standingsCriteriaOrder.map((criterion, index) => (
+                    <li key={criterion} className="flex items-center gap-3 px-3 py-2">
+                      <span className="w-6 text-sm font-semibold text-muted-foreground tabular-nums">{index + 1}.</span>
+                      <span className="flex-1 text-sm">{criterionLabels[criterion] || criterion}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => moveCriterion(index, -1)}
+                          title={t('registration.moveUp')}
+                          disabled={index === 0}
+                        >
+                          <ChevronUp />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => moveCriterion(index, 1)}
+                          title={t('registration.moveDown')}
+                          disabled={index === standingsCriteriaOrder.length - 1}
+                        >
+                          <ChevronDown />
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </CardContent>
+            </Card>
+          )}
+
+          {isGroups && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('registration.groupSettings')}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <RadioGroup
+                  value={groupSettings.type}
+                  onValueChange={(v) => setGroupSettings({ ...groupSettings, type: v })}
+                  className="gap-2"
+                >
+                  <Label htmlFor="group-type-groups" className={radioRow}>
+                    <RadioGroupItem id="group-type-groups" value="groups" />
+                    {t('registration.numberOfGroups')}
+                  </Label>
+                  <Label htmlFor="group-type-playersPerGroup" className={radioRow}>
+                    <RadioGroupItem id="group-type-playersPerGroup" value="playersPerGroup" />
+                    {t('registration.playersPerGroup')}
+                  </Label>
+                </RadioGroup>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="group-value">
+                    {groupSettings.type === 'groups' ? t('registration.numberOfGroupsLabel') : t('registration.playersPerGroupLabel')}
+                  </Label>
+                  <Input
+                    id="group-value"
+                    type="number"
+                    min="1"
+                    max={groupSettings.type === 'groups' ? '16' : '8'}
+                    className="w-32 tabular-nums"
+                    value={groupSettings.value}
+                    onChange={(e) => setGroupSettings({
+                      ...groupSettings,
+                      value: parseInt(e.target.value) || 1
+                    })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('registration.playoffSettings')}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              {isGroups && (
+                <Label htmlFor="enable-playoffs" className="cursor-pointer gap-3">
+                  <Switch
+                    id="enable-playoffs"
+                    checked={playoffSettings.enabled}
+                    onCheckedChange={(checked) => setPlayoffSettings({
+                      ...playoffSettings,
+                      enabled: checked
+                    })}
+                  />
+                  {t('registration.enablePlayoffs')}
+                </Label>
+              )}
+
+              {playoffSettings.enabled && (
+                <>
+                  {isGroups ? (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <Label>{t('registration.qualificationMode')}</Label>
+                        <RadioGroup
+                          value={playoffSettings.qualificationMode}
+                          onValueChange={(v) => setPlayoffSettings({ ...playoffSettings, qualificationMode: v })}
+                          className="gap-2"
+                        >
+                          <Label htmlFor="qualification-perGroup" className={radioRow}>
+                            <RadioGroupItem id="qualification-perGroup" value="perGroup" />
+                            {t('registration.qualificationModePerGroup')}
+                          </Label>
+                          <Label htmlFor="qualification-totalPlayers" className={radioRow}>
+                            <RadioGroupItem id="qualification-totalPlayers" value="totalPlayers" />
+                            {t('registration.qualificationModeTotalPlayers')}
+                          </Label>
+                        </RadioGroup>
+                      </div>
+
+                      {playoffSettings.qualificationMode === 'perGroup' ? (
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="players-per-group">{t('registration.playersAdvancingPerGroup')}</Label>
+                          <Select
+                            value={String(playoffSettings.playersPerGroup)}
+                            onValueChange={(v) => setPlayoffSettings({ ...playoffSettings, playersPerGroup: parseInt(v) })}
+                          >
+                            <SelectTrigger id="players-per-group" className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 8 }, (_, i) => i + 1).map(num => (
+                                <SelectItem key={num} value={String(num)} className="tabular-nums">{num}</SelectItem>
+                              ))}
+                              <SelectItem value="9999">{t('registration.all')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="total-players-advance">{t('registration.totalPlayersToAdvance')}</Label>
+                          <Input
+                            id="total-players-advance"
+                            type="number"
+                            min="1"
+                            max="64"
+                            className="w-32 tabular-nums"
+                            value={playoffSettings.totalPlayersToAdvance || 8}
+                            onChange={(e) => setPlayoffSettings({
+                              ...playoffSettings,
+                              totalPlayersToAdvance: parseInt(e.target.value) || 8
+                            })}
+                          />
+                          <p className="text-sm text-muted-foreground">{t('registration.totalPlayersDescription')}</p>
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <div className="input-group">
-                      <label>{t('registration.totalPlayersToAdvance')}</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="64"
-                        value={playoffSettings.totalPlayersToAdvance || 8}
-                        onChange={(e) => setPlayoffSettings({
-                          ...playoffSettings,
-                          totalPlayersToAdvance: parseInt(e.target.value) || 8
-                        })}
-                      />
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                        {t('registration.totalPlayersDescription')}
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="starting-round">{t('registration.playoffStartStage') || 'Playoff starts from'}</Label>
+                      <Select
+                        value={String(playoffSettings.startingRoundPlayers)}
+                        onValueChange={(v) => setPlayoffSettings({ ...playoffSettings, startingRoundPlayers: parseInt(v) })}
+                      >
+                        <SelectTrigger id="starting-round" className="w-full sm:w-72">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {START_ROUNDS.map(([value, labelKey, fallback]) => (
+                            <SelectItem key={value} value={String(value)}>{t(labelKey) || fallback}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        {t('registration.playoffStartStageDescription') || 'This defines from which round the knockout bracket begins.'}
                       </p>
                     </div>
                   )}
-                </>
-              ) : (
-                <>
-                  <div className="input-group">
-                    <label>{t('registration.playoffStartStage') || 'Playoff starts from'}</label>
-                    <select
-                      value={playoffSettings.startingRoundPlayers}
-                      onChange={(e) => setPlayoffSettings({
-                        ...playoffSettings,
-                        startingRoundPlayers: parseInt(e.target.value)
-                      })}
+
+                  <div className="flex flex-col gap-2">
+                    <Label>{t('registration.thirdPlaceMatch') || '3rd Place Match'}</Label>
+                    <RadioGroup
+                      value={String(playoffSettings.thirdPlaceMatch)}
+                      onValueChange={(v) => setPlayoffSettings({ ...playoffSettings, thirdPlaceMatch: v === 'true' })}
+                      className="gap-2"
                     >
-                      <option value={2}>{t('management.final') || 'Final (2 players)'}</option>
-                      <option value={4}>{t('management.semiFinals') || 'Semi-finals (4 players)'}</option>
-                      <option value={8}>{t('management.quarterFinals') || 'Quarter-finals (8 players)'}</option>
-                      <option value={16}>{t('management.top16') || 'Round of 16 (16 players)'}</option>
-                      <option value={32}>{t('management.top32') || 'Round of 32 (32 players)'}</option>
-                    </select>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                      {t('registration.playoffStartStageDescription') || 'This defines from which round the knockout bracket begins.'}
-                    </p>
+                      <Label htmlFor="third-place-yes" className={radioRow}>
+                        <RadioGroupItem id="third-place-yes" value="true" />
+                        {t('registration.thirdPlaceMatchYes') || 'Yes - Semifinal losers play for 3rd/4th place'}
+                      </Label>
+                      <Label htmlFor="third-place-no" className={radioRow}>
+                        <RadioGroupItem id="third-place-no" value="false" />
+                        {t('registration.thirdPlaceMatchNo') || 'No - Both semifinal losers share 3rd place'}
+                      </Label>
+                    </RadioGroup>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <Label>{t('registration.playoffLegsToWin')}</Label>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {PLAYOFF_ROUNDS.map(([round, labelKey]) => (
+                        <div key={round} className="flex flex-col gap-1.5">
+                          <Label htmlFor={`playoff-legs-${round}`} className="text-xs text-muted-foreground">{t(labelKey)}</Label>
+                          <Select
+                            value={String(playoffSettings.legsToWinByRound?.[round] || 3)}
+                            onValueChange={(v) => setPlayoffSettings({
+                              ...playoffSettings,
+                              legsToWinByRound: {
+                                ...playoffSettings.legsToWinByRound,
+                                [round]: parseInt(v)
+                              }
+                            })}
+                          >
+                            <SelectTrigger id={`playoff-legs-${round}`} size="sm" className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PLAYOFF_LEGS_OPTIONS.map(n => (
+                                <SelectItem key={n} value={String(n)}>{legsLabel(n)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
-              
-
-
-              <div className="radio-section">
-                <label className="radio-section-label">{t('registration.thirdPlaceMatch') || '3rd Place Match'}</label>
-                <div className="radio-group">
-                  <label>
-                    <input
-                      type="radio"
-                      name="thirdPlaceMatch"
-                      value="true"
-                      checked={playoffSettings.thirdPlaceMatch === true}
-                      onChange={() => setPlayoffSettings({
-                        ...playoffSettings,
-                        thirdPlaceMatch: true
-                      })}
-                    />
-                    {t('registration.thirdPlaceMatchYes') || 'Yes - Semifinal losers play for 3rd/4th place'}
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="thirdPlaceMatch"
-                      value="false"
-                      checked={playoffSettings.thirdPlaceMatch === false}
-                      onChange={() => setPlayoffSettings({
-                        ...playoffSettings,
-                        thirdPlaceMatch: false
-                      })}
-                    />
-                    {t('registration.thirdPlaceMatchNo') || 'No - Both semifinal losers share 3rd place'}
-                  </label>
-                </div>
-              </div>
-              
-              <div className="playoff-legs-settings">
-                <h5>{t('registration.playoffLegsToWin')}:</h5>
-                <div className="input-group">
-                  <label>{t('management.top32')}:</label>
-                  <select 
-                    value={playoffSettings.legsToWinByRound?.[32] || 3}
-                    onChange={(e) => setPlayoffSettings({
-                      ...playoffSettings,
-                      legsToWinByRound: {
-                        ...playoffSettings.legsToWinByRound,
-                        32: parseInt(e.target.value)
-                      }
-                    })}
-                  >
-                    <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                    <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                    <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                    <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                    <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                    <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                    <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>{t('management.top16')}:</label>
-                  <select 
-                    value={playoffSettings.legsToWinByRound?.[16] || 3}
-                    onChange={(e) => setPlayoffSettings({
-                      ...playoffSettings,
-                      legsToWinByRound: {
-                        ...playoffSettings.legsToWinByRound,
-                        16: parseInt(e.target.value)
-                      }
-                    })}
-                  >
-                    <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                    <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                    <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                    <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                    <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                    <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                    <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>{t('management.quarterFinals')}:</label>
-                  <select 
-                    value={playoffSettings.legsToWinByRound?.[8] || 3}
-                    onChange={(e) => setPlayoffSettings({
-                      ...playoffSettings,
-                      legsToWinByRound: {
-                        ...playoffSettings.legsToWinByRound,
-                        8: parseInt(e.target.value)
-                      }
-                    })}
-                  >
-                    <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                    <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                    <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                    <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                    <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                    <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                    <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>{t('management.semiFinals')}:</label>
-                  <select 
-                    value={playoffSettings.legsToWinByRound?.[4] || 3}
-                    onChange={(e) => setPlayoffSettings({
-                      ...playoffSettings,
-                      legsToWinByRound: {
-                        ...playoffSettings.legsToWinByRound,
-                        4: parseInt(e.target.value)
-                      }
-                    })}
-                  >
-                    <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                    <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                    <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                    <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                    <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                    <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                    <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>{t('management.final')}:</label>
-                  <select 
-                    value={playoffSettings.legsToWinByRound?.[2] || 3}
-                    onChange={(e) => setPlayoffSettings({
-                      ...playoffSettings,
-                      legsToWinByRound: {
-                        ...playoffSettings.legsToWinByRound,
-                        2: parseInt(e.target.value)
-                      }
-                    })}
-                  >
-                    <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                    <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                    <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                    <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                    <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                    <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                    <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
+            </CardContent>
+          </Card>
         </div>
 
-
-
-
-        <button 
-          className="create-tournament-btn"
-          onClick={createTournament}
-          disabled={!tournamentName.trim()}
-        >
-          <Trophy size={20} />
-          {t('tournaments.create')}
-        </button>
+        <aside className="w-full shrink-0 lg:sticky lg:top-6 lg:w-80">
+          <Card>
+            <CardHeader>
+              <CardTitle className="truncate">{tournamentName.trim() || t('tournaments.tournamentName')}</CardTitle>
+              <CardDescription>{typeLabel(tournamentType)}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <dl className="flex flex-col gap-2 text-sm">
+                {summaryRows.map(([label, value]) => (
+                  <div key={label} className="flex items-start justify-between gap-3">
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className={cn('text-right font-medium', typeof value === 'number' && 'tabular-nums')}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardContent>
+            <CardFooter className="flex-col items-stretch gap-2">
+              <Button
+                size="lg"
+                onClick={createTournament}
+                disabled={!tournamentName.trim()}
+              >
+                <Trophy />
+                {t('tournaments.create')}
+              </Button>
+              {!tournamentName.trim() && (
+                <p className="text-center text-xs text-muted-foreground">{t('tournaments.pleaseEnterName')}</p>
+              )}
+            </CardFooter>
+          </Card>
+        </aside>
       </div>
     </div>
   );

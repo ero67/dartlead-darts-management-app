@@ -5,7 +5,13 @@ import {
   signaturesEqual,
   slotId,
 } from '../utils/seedSlots';
-import './BracketSeedingEditor.css';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+
+const BYE = '__bye';
 
 // Editor for the configurable playoff seed-slot template. The user assigns
 // abstract seed slots ("A1", "B4", or global seed "3") to first-round bracket
@@ -65,8 +71,8 @@ export function BracketSeedingEditor({ playoffSettings, groups, value, onChange,
     });
   };
 
-  const handleToggle = (e) => {
-    if (e.target.checked) {
+  const handleToggle = (checked) => {
+    if (checked === true) {
       emit(new Array(bracketSize).fill(null));
     } else {
       onChange(null); // disable -> remove template, fall back to automatic seeding
@@ -104,7 +110,7 @@ export function BracketSeedingEditor({ playoffSettings, groups, value, onChange,
 
   if (pool.length === 0) {
     return (
-      <p className="seeding-editor-note">
+      <p className="rounded-md border bg-muted p-3 text-sm text-muted-foreground italic">
         {t('registration.customSeedingNoSlots')}
       </p>
     );
@@ -115,59 +121,66 @@ export function BracketSeedingEditor({ playoffSettings, groups, value, onChange,
   const showBody = hideToggle ? true : enabled;
 
   return (
-    <div className="bracket-seeding-editor">
+    <div className="flex flex-col gap-3 text-foreground">
       {!hideToggle && (
-        <label className="seeding-editor-toggle">
-          <input type="checkbox" checked={enabled} onChange={handleToggle} />
+        <Label htmlFor="custom-seeding-enabled" className="cursor-pointer font-semibold">
+          <Checkbox id="custom-seeding-enabled" checked={enabled} onCheckedChange={handleToggle} />
           {t('registration.customSeedingEnable')}
-        </label>
+        </Label>
       )}
 
       {showBody && (
         <>
           {isStale && (
-            <div className="seeding-editor-stale">
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-400 bg-amber-100 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
               {t('registration.customSeedingStale')}
-              <button type="button" className="seeding-editor-rebuild" onClick={handleClear}>
+              <Button type="button" variant="outline" size="xs" className="border-amber-400 text-amber-800 dark:text-amber-200" onClick={handleClear}>
                 {t('registration.customSeedingRebuild')}
-              </button>
+              </Button>
             </div>
           )}
 
-          <div className="seeding-editor-actions">
-            <button type="button" onClick={handleAutoFill}>{t('registration.customSeedingAutoFill')}</button>
-            <button type="button" onClick={handleClear}>{t('registration.customSeedingClear')}</button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleAutoFill}>{t('registration.customSeedingAutoFill')}</Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleClear}>{t('registration.customSeedingClear')}</Button>
           </div>
 
-          <div className="seeding-editor-matches">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: numMatches }, (_, m) => {
               const p1Index = m * 2;
               const p2Index = m * 2 + 1;
               return (
-                <div key={m} className="seeding-editor-match">
-                  <span className="seeding-editor-match-num">{m + 1}</span>
-                  <div className="seeding-editor-slots">
+                <div key={m} className="flex items-center gap-2 rounded-lg border bg-muted/40 p-2">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border bg-card text-xs font-bold text-muted-foreground tabular-nums">{m + 1}</span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     {[p1Index, p2Index].map((slotIndex) => {
                       const current = slots[slotIndex];
                       const currentId = slotId(current);
                       return (
-                        <select
+                        <Select
                           key={slotIndex}
-                          className="seeding-editor-select"
-                          value={currentId}
-                          onChange={(e) => handleSlotChange(slotIndex, e.target.value)}
+                          value={currentId || BYE}
+                          onValueChange={(v) => handleSlotChange(slotIndex, v === BYE ? '' : v)}
                         >
-                          <option value="">{t('registration.customSeedingBye')}</option>
-                          {pool.map((p) => (
-                            <option
-                              key={p.id}
-                              value={p.id}
-                              disabled={p.id !== currentId && usedIds.has(p.id)}
-                            >
-                              {p.label}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger
+                            size="sm"
+                            className={cn('w-full bg-background', currentId ? 'border-primary ring-2 ring-primary/30' : 'text-muted-foreground')}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={BYE}>{t('registration.customSeedingBye')}</SelectItem>
+                            {pool.map((p) => (
+                              <SelectItem
+                                key={p.id}
+                                value={p.id}
+                                disabled={p.id !== currentId && usedIds.has(p.id)}
+                              >
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       );
                     })}
                   </div>

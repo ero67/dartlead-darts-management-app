@@ -2,11 +2,13 @@ import React from 'react';
 import { TrendingUp, Crosshair, Hash, Clock, Flame, Zap, Target, Activity } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { computePracticeSummary } from '../../lib/practiceSummary';
-import './Practice.css';
+import { StatTile } from '../shared/StatTile';
+import { cn } from '@/lib/utils';
 
 const secs = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 // Personal bests across all practice games, from the finished-session history.
+// Also rendered inside not-yet-migrated screens (profile), hence the own `tw` root.
 export function PracticeBests({ entries, compact = false }) {
   const { t } = useLanguage();
   const s = computePracticeSummary(entries);
@@ -30,15 +32,9 @@ export function PracticeBests({ entries, compact = false }) {
   ].filter(Boolean);
 
   return (
-    <div className={`stats-grid practice-bests ${compact ? 'compact' : ''}`}>
+    <div className={cn('tw grid gap-3 text-foreground', compact ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4')}>
       {tiles.map((tile) => (
-        <div className="stat-card" key={tile.key}>
-          <div className="stat-icon"><tile.icon size={22} /></div>
-          <div className="stat-content">
-            <h3>{tile.value}</h3>
-            <p>{tile.label}{tile.sub ? <span className="practice-bests-sub"> · {tile.sub}</span> : null}</p>
-          </div>
-        </div>
+        <StatTile key={tile.key} label={tile.label} value={tile.value} hint={tile.sub} icon={tile.icon} />
       ))}
     </div>
   );

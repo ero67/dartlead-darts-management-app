@@ -14,14 +14,14 @@ describe('32 Player Tournament Flow', () => {
       .type(tournamentName)
     
     // Enable playoffs
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     
     // Configure groups: 8 groups with all players advancing
     // With 32 players and 8 groups = 4 players per group
     // If all players advance = 4 × 8 = 32 qualifiers (perfect for Round of 32)
     
     // First ensure "Number of Groups" radio is selected
-    cy.get('input[type="radio"][value="groups"]').check()
+    cy.get('[role="radio"][value="groups"]').click()
     
     // Set number of groups to 8
     cy.get('input[type="number"]').first().clear().type('8')
@@ -29,16 +29,17 @@ describe('32 Player Tournament Flow', () => {
     
     // Set players advancing per group to "All" (value 9999)
     cy.get('body').then(($body) => {
-      if ($body.text().includes('Players Advancing Per Group') || $body.text().includes('Hráči Postupujúci')) {
+      if (/players advancing per group|hráči postupujúci/i.test($body.text())) {
         // Find the select dropdown for players per group
-        cy.contains(/players advancing|hráči postupujúci/i).parent().find('select').then(($select) => {
+        cy.contains(/players advancing|hráči postupujúci/i).parent().find('[data-slot="select-trigger"]').then(($trigger) => {
           // Select "All" option (value 9999)
-          cy.wrap($select).select('9999')
+          cy.selectOption($trigger, /^all$|^všetci$/i)
           cy.log('✅ Set players advancing per group to "All" (all 4 players from each group)')
         })
       } else {
         // Fallback: try to find select by looking for "All" option
-        cy.get('select').contains('option', /all/i).parent().select('9999')
+        cy.get('[data-slot="select-trigger"]').contains(/all|všetci/i).click()
+        cy.get('[role="option"]').contains(/^all$|^všetci$/i).click()
       }
     })
     
@@ -61,10 +62,7 @@ describe('32 Player Tournament Flow', () => {
     cy.log('✅ All 32 players added successfully')
     
     // Step 3: Start tournament
-    cy.contains('button', /start tournament/i).click()
-    
-    // Wait for tournament to start - check URL first
-    cy.url().should('include', '/tournament/')
+    cy.startTournament()
     
     // Wait for page to load and look for tab buttons or tournament management content
     cy.get('body').should('be.visible')
@@ -199,12 +197,14 @@ describe('32 Player Tournament Flow', () => {
     cy.contains('button', /create tournament/i).click()
     cy.get('input[placeholder*="tournament name" i], input[name*="tournament" i]').first()
       .type(tournamentName)
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     
     // Configure groups: 8 groups with all players advancing
-    cy.get('input[type="radio"][value="groups"]').check()
+    cy.get('[role="radio"][value="groups"]').click()
     cy.get('input[type="number"]').first().clear().type('8')
-    cy.contains(/players advancing|hráči postupujúci/i).parent().find('select').select('9999')
+    cy.contains(/players advancing|hráči postupujúci/i).parent().find('[data-slot="select-trigger"]').then(($trigger) => {
+      cy.selectOption($trigger, /^all$|^všetci$/i)
+    })
     
     cy.contains('button', /create/i).click()
     
@@ -217,8 +217,7 @@ describe('32 Player Tournament Flow', () => {
     cy.contains(/players.*32|hráči.*32/i).should('be.visible')
     
     // Start tournament
-    cy.contains('button', /start tournament/i).click()
-    cy.url().should('include', '/tournament/')
+    cy.startTournament()
     
     // Verify groups were created - wait for page to load
     cy.wait(2000)

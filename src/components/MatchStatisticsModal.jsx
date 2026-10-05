@@ -1,8 +1,12 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { X, BarChart3 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCloseOnBack } from '../hooks/useCloseOnBack';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { HIGH_SCORE_BANDS, countHighScores, checkoutRate } from '../utils/dartStats';
 
 // Statistics of one completed match: score hero, side-by-side comparison with
@@ -36,6 +40,8 @@ const bandCount = (stats, bands, band) => {
   if (hasVisitScores(stats)) return bands[band];
   return band === 180 ? num(stats?.oneEighties) : null;
 };
+
+const WINNER_BADGE = 'border-transparent bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200';
 
 export function MatchStatisticsModal({ match, onClose }) {
   // Back button closes the dialog rather than leaving the page behind it
@@ -86,7 +92,7 @@ export function MatchStatisticsModal({ match, onClose }) {
   const legCount = Math.max(s1.legs?.length || 0, s2.legs?.length || 0);
   const legs = Array.from({ length: legCount }, (_, i) => ({ l1: s1.legs?.[i], l2: s2.legs?.[i] }));
 
-  const renderValue = (row, side) => {
+  const sideInfo = (row, side) => {
     const v = side === 'a' ? row.a : row.b;
     const o = side === 'a' ? row.b : row.a;
     const shown = v === null || v === undefined ? '—' : row.fmt ? row.fmt(v) : String(v);
@@ -97,130 +103,161 @@ export function MatchStatisticsModal({ match, onClose }) {
     const total = num(row.a) + num(row.b);
     const pct = total > 0 ? Math.round((num(v) / total) * 100) : 0;
     const sub = side === 'a' ? row.subA : row.subB;
+    return { shown, better, pct, total, sub };
+  };
+
+  const renderValue = (row, side) => {
+    const { shown, better, sub } = sideInfo(row, side);
     return (
-      <div className={`mstats-row__value ${side === 'b' ? 'right' : ''} ${better ? 'better' : ''}`}>
-        <span>{shown}{sub ? <small className="mstats-row__sub">{sub}</small> : null}</span>
-        {!row.neutral && total > 0 && <div className="mstats-bar"><span style={{ width: `${pct}%` }} /></div>}
+      <span className={cn('flex items-baseline gap-1 tabular-nums', side === 'b' && 'justify-end', better ? 'font-semibold' : 'text-muted-foreground')}>
+        {shown}
+        {sub ? <small className="text-xs font-normal text-muted-foreground">{sub}</small> : null}
+      </span>
+    );
+  };
+
+  const renderBar = (row) => {
+    const a = sideInfo(row, 'a');
+    const b = sideInfo(row, 'b');
+    if (row.neutral || a.total <= 0) return null;
+    return (
+      <div className="flex gap-1">
+        <div className="flex flex-1 justify-end">
+          <div className={cn('h-1.5 rounded-full', a.better ? 'bg-primary' : 'bg-muted')} style={{ width: `${a.pct}%` }} />
+        </div>
+        <div className="flex flex-1">
+          <div className={cn('h-1.5 rounded-full', b.better ? 'bg-primary' : 'bg-muted')} style={{ width: `${b.pct}%` }} />
+        </div>
       </div>
     );
   };
 
-  return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal match-statistics-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3><BarChart3 size={18} />{t('matchStats.title')}</h3>
-          <button type="button" className="close-btn" onClick={onClose} aria-label={t('common.close', 'Close')}>
-            <X size={18} />
-          </button>
-        </div>
-        <div className="modal-content">
-          <div className="mstats-hero">
-            <div className={`mstats-hero__player ${p1Won ? 'winner' : ''}`}>
-              <span className="mstats-hero__name">{p1}</span>
-              {p1Won && <span className="mstats-hero__tag">{t('matchStats.winner')}</span>}
-            </div>
-            <div className="mstats-hero__score">
-              <span className={p1Won ? 'win' : ''}>{num(r.player1Legs)}</span>
-              <span className="sep">:</span>
-              <span className={p2Won ? 'win' : ''}>{num(r.player2Legs)}</span>
-            </div>
-            <div className={`mstats-hero__player right ${p2Won ? 'winner' : ''}`}>
-              <span className="mstats-hero__name">{p2}</span>
-              {p2Won && <span className="mstats-hero__tag">{t('matchStats.winner')}</span>}
-            </div>
+  const renderCompare = (list) => (
+    <div className="flex flex-col divide-y">
+      {list.map((row) => (
+        <div key={row.key} className="flex flex-col gap-1.5 py-2.5">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-3 text-sm">
+            {renderValue(row, 'a')}
+            <span className="text-center text-xs text-muted-foreground">{row.label}</span>
+            {renderValue(row, 'b')}
           </div>
-          {(match.tournamentName || match.groupName || match.roundName || match.isPlayoff) && (
-            <div className="mstats-context">
-              {match.tournamentName && <span>{match.tournamentName}</span>}
-              {match.groupName && <span>{match.groupName}</span>}
-              {match.roundName && <span>{match.roundName}</span>}
-              {!match.roundName && match.isPlayoff && <span>{t('management.playoffMatch')}</span>}
-            </div>
-          )}
-
-          {!hasDetails ? (
-            <p className="mstats-empty">{t('matchStats.noDetails')}</p>
-          ) : (
-            <>
-              <div className="mstats-compare">
-                {rows.map((row) => (
-                  <div key={row.key} className="mstats-row">
-                    {renderValue(row, 'a')}
-                    <div className="mstats-row__label">{row.label}</div>
-                    {renderValue(row, 'b')}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mstats-section">
-                <h4>{t('matchStats.highScores')}</h4>
-                <div className="mstats-compare">
-                  {bandRows.map((row) => (
-                    <div key={row.key} className="mstats-row">
-                      {renderValue(row, 'a')}
-                      <div className="mstats-row__label">{row.label}</div>
-                      {renderValue(row, 'b')}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {legs.length > 0 && (
-                <div className="mstats-section">
-                  <h4>{t('matchStats.legByLeg')}</h4>
-                  <table className="mstats-legs">
-                    <thead>
-                      <tr>
-                        <th>{t('matchStats.leg')}</th>
-                        <th>{p1}</th>
-                        <th>{p2}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {legs.map(({ l1, l2 }, i) => {
-                        const cell = (leg) => {
-                          if (!leg) return <td className="muted">—</td>;
-                          return (
-                            <td className={leg.isWin ? 'won' : ''}>
-                              {num(leg.darts) > 0 ? `${num(leg.darts)} ${t('matchStats.darts').toLowerCase()}` : '—'}
-                              {leg.average ? <span className="co"> · {t('matchStats.legAvg')} {num(leg.average).toFixed(1)}</span> : null}
-                              {leg.isWin && num(leg.checkout) > 0 ? <span className="co"> · ✓ {num(leg.checkout)}</span> : null}
-                            </td>
-                          );
-                        };
-                        return (
-                          <tr key={i}>
-                            <td className="leg-no">{i + 1}</td>
-                            {cell(l1)}
-                            {cell(l2)}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div className="mstats-checkouts">
-                <div>
-                  <h4>{t('matchStats.checkoutsOf')} · {p1}</h4>
-                  <div className="mstats-chips">
-                    {co1.length ? co1.map((c, i) => <span key={i} className={`mstats-chip ${i === 0 ? 'top' : ''}`}>{c}</span>) : <span className="mstats-empty">{t('matchStats.noCheckouts')}</span>}
-                  </div>
-                </div>
-                <div className="right">
-                  <h4>{t('matchStats.checkoutsOf')} · {p2}</h4>
-                  <div className="mstats-chips">
-                    {co2.length ? co2.map((c, i) => <span key={i} className={`mstats-chip ${i === 0 ? 'top' : ''}`}>{c}</span>) : <span className="mstats-empty">{t('matchStats.noCheckouts')}</span>}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+          {renderBar(row)}
         </div>
-      </div>
-    </div>,
-    document.body
+      ))}
+    </div>
+  );
+
+  const renderCheckouts = (values, alignRight) => (
+    <div className={cn('flex flex-wrap gap-1.5', alignRight && 'justify-end')}>
+      {values.length
+        ? values.map((c, i) => (
+          <Badge key={i} variant={i === 0 ? 'default' : 'secondary'} className="tabular-nums">{c}</Badge>
+        ))
+        : <span className="text-sm text-muted-foreground">{t('matchStats.noCheckouts')}</span>}
+    </div>
+  );
+
+  const legCell = (leg) => {
+    if (!leg) return <TableCell className="text-muted-foreground">—</TableCell>;
+    return (
+      <TableCell className={cn('whitespace-normal tabular-nums', leg.isWin ? 'font-medium' : 'text-muted-foreground')}>
+        {num(leg.darts) > 0 ? `${num(leg.darts)} ${t('matchStats.darts').toLowerCase()}` : '—'}
+        {leg.average ? <span className="text-xs text-muted-foreground"> · {t('matchStats.legAvg')} {num(leg.average).toFixed(1)}</span> : null}
+        {leg.isWin && num(leg.checkout) > 0 ? <span className="text-xs text-muted-foreground"> · ✓ {num(leg.checkout)}</span> : null}
+      </TableCell>
+    );
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[90vh] flex-col gap-4 overflow-y-auto text-foreground sm:max-w-2xl"
+      >
+        <DialogHeader className="flex-row items-center justify-between gap-4 space-y-0">
+          <DialogTitle className="flex items-center gap-2">
+            <BarChart3 className="size-4 text-muted-foreground" />
+            {t('matchStats.title')}
+          </DialogTitle>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost" size="icon-sm" aria-label={t('common.close', 'Close')}>
+              <X />
+            </Button>
+          </DialogClose>
+        </DialogHeader>
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
+            <span className={cn('truncate text-base font-semibold', !p1Won && 'text-muted-foreground')}>{p1}</span>
+            {p1Won && <Badge variant="outline" className={WINNER_BADGE}>{t('matchStats.winner')}</Badge>}
+          </div>
+          <div className="flex items-baseline gap-2 text-4xl font-semibold tracking-tight tabular-nums">
+            <span className={cn(!p1Won && 'text-muted-foreground')}>{num(r.player1Legs)}</span>
+            <span className="text-muted-foreground">:</span>
+            <span className={cn(!p2Won && 'text-muted-foreground')}>{num(r.player2Legs)}</span>
+          </div>
+          <div className="flex min-w-0 flex-col items-end gap-1.5 text-right">
+            <span className={cn('truncate text-base font-semibold', !p2Won && 'text-muted-foreground')}>{p2}</span>
+            {p2Won && <Badge variant="outline" className={WINNER_BADGE}>{t('matchStats.winner')}</Badge>}
+          </div>
+        </div>
+        {(match.tournamentName || match.groupName || match.roundName || match.isPlayoff) && (
+          <div className="flex flex-wrap justify-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            {match.tournamentName && <span>{match.tournamentName}</span>}
+            {match.groupName && <span>{match.groupName}</span>}
+            {match.roundName && <span>{match.roundName}</span>}
+            {!match.roundName && match.isPlayoff && <span>{t('management.playoffMatch')}</span>}
+          </div>
+        )}
+
+        {!hasDetails ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">{t('matchStats.noDetails')}</p>
+        ) : (
+          <>
+            {renderCompare(rows)}
+
+            <section className="flex flex-col gap-2">
+              <h4 className="text-sm font-semibold">{t('matchStats.highScores')}</h4>
+              {renderCompare(bandRows)}
+            </section>
+
+            {legs.length > 0 && (
+              <section className="flex flex-col gap-2">
+                <h4 className="text-sm font-semibold">{t('matchStats.legByLeg')}</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">{t('matchStats.leg')}</TableHead>
+                      <TableHead>{p1}</TableHead>
+                      <TableHead>{p2}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {legs.map(({ l1, l2 }, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                        {legCell(l1)}
+                        {legCell(l2)}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </section>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <section className="flex flex-col gap-2">
+                <h4 className="text-sm font-semibold">{t('matchStats.checkoutsOf')} · {p1}</h4>
+                {renderCheckouts(co1, false)}
+              </section>
+              <section className="flex flex-col gap-2 sm:text-right">
+                <h4 className="text-sm font-semibold">{t('matchStats.checkoutsOf')} · {p2}</h4>
+                {renderCheckouts(co2, true)}
+              </section>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

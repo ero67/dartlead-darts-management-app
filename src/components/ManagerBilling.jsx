@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CreditCard, Loader, RefreshCw, Ban, Undo2, Crown, X, StickyNote } from 'lucide-react';
+import { Loader, RefreshCw, Ban, Undo2, Crown, X, StickyNote, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from './shared/EmptyState';
+import { cn } from '@/lib/utils';
+import { confirmDialog } from '../lib/confirmDialog';
 
 // Admin panel section: managers with billing state (monthly, invoiced
 // manually), resource counts, ban controls and role changes. Enforcement is
@@ -97,9 +103,9 @@ export function ManagerBilling() {
     });
   };
 
-  const toggleBan = (row) => {
+  const toggleBan = async (row) => {
     const action = row.is_banned ? 'unban' : 'ban';
-    if (!window.confirm(`Really ${action} ${row.email}? ${row.is_banned ? '' : 'They will be signed out everywhere and unable to log in.'}`)) return;
+    if (!(await confirmDialog(`Really ${action} ${row.email}? ${row.is_banned ? '' : 'They will be signed out everywhere and unable to log in.'}`, { destructive: true }))) return;
     runAction(row.user_id, async () => {
       const { data, error: rpcError } = await supabase.rpc('admin_set_user_ban', {
         user_email: row.email,
@@ -110,9 +116,9 @@ export function ManagerBilling() {
     });
   };
 
-  const changeRole = (row, newRole) => {
+  const changeRole = async (row, newRole) => {
     const label = newRole === null ? `remove the manager role from ${row.email}` : `make ${row.email} ${newRole === 'admin' ? 'an ADMIN (full access to everything)' : 'a manager'}`;
-    if (!window.confirm(`Really ${label}?`)) return;
+    if (!(await confirmDialog(`Really ${label}?`))) return;
     runAction(row.user_id, async () => {
       const { data, error: rpcError } = await supabase.rpc('set_user_role_secure', {
         user_email: row.email,
@@ -124,117 +130,111 @@ export function ManagerBilling() {
   };
 
   const paidBadge = (row) => {
-    if (row.role === 'admin') return <span style={{ color: 'var(--text-secondary)' }}>—</span>;
-    if (!row.paid_until) return <span style={{ color: 'var(--text-secondary)' }}>not set</span>;
+    if (row.role === 'admin') return <span className="text-muted-foreground">—</span>;
+    if (!row.paid_until) return <span className="text-muted-foreground">not set</span>;
     const until = new Date(row.paid_until);
     const now = new Date();
     const soon = new Date();
     soon.setDate(soon.getDate() + 7);
-    const color = until < now ? '#e5484d' : until < soon ? '#f5a623' : '#30a46c';
+    const color = until < now
+      ? 'text-red-600 dark:text-red-400'
+      : until < soon ? 'text-amber-600 dark:text-amber-400' : 'text-green-700 dark:text-green-400';
     const label = until < now ? `expired ${row.paid_until}` : `paid until ${row.paid_until}`;
-    return <span style={{ color, fontWeight: 600 }}>{label}</span>;
+    return <span className={cn('font-semibold tabular-nums', color)}>{label}</span>;
   };
 
   return (
-    <div className="admin-section">
-      <div className="admin-section-header">
-        <CreditCard size={20} />
-        <h2>Managers & Billing</h2>
-        <button
-          className="admin-button small"
-          onClick={loadOverview}
-          disabled={isLoading}
-          title="Refresh"
-          style={{ marginLeft: 'auto' }}
-        >
-          <RefreshCw size={14} className={isLoading ? 'spinning' : ''} />
-        </button>
-      </div>
-      <p className="admin-section-description">
-        Monthly billing per manager, invoiced manually. New managers start on a 30-day trial.
-        Nothing blocks automatically — expired means it is time to chase the invoice.
-        Every change here is recorded in the audit log.
-      </p>
+    <Card>
+      <CardHeader className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1.5">
+          <CardTitle>Managers & Billing</CardTitle>
+          <CardDescription>
+            Monthly billing per manager, invoiced manually. New managers start on a 30-day trial.
+            Nothing blocks automatically — expired means it is time to chase the invoice.
+            Every change here is recorded in the audit log.
+          </CardDescription>
+        </div>
+        <Button variant="outline" size="icon" onClick={loadOverview} disabled={isLoading} title="Refresh" aria-label="Refresh">
+          <RefreshCw className={isLoading ? 'animate-spin' : ''} />
+        </Button>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {error && (
-        <p style={{ color: '#e5484d', fontSize: '0.875rem' }}>{error}</p>
-      )}
-
-      {isLoading && rows.length === 0 ? (
-        <div className="admin-loading">
-          <Loader size={20} className="spinning" />
-          <span>Loading managers...</span>
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="admin-empty">
-          <p>No managers yet.</p>
-        </div>
-      ) : (
-        <div className="managers-list">
-          {rows.map((row) => {
-            const isSelf = row.user_id === user?.id;
-            const busy = busyUserId === row.user_id;
-            return (
-              <div key={row.user_id} className="manager-item" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div className="manager-info" style={{ minWidth: '220px' }}>
-                  <div className="manager-email">
-                    {row.email}
-                    {row.role === 'admin' && <Crown size={14} style={{ marginLeft: '0.4rem', verticalAlign: 'text-bottom', color: '#f5a623' }} />}
-                    {row.is_banned && <span style={{ marginLeft: '0.4rem', color: '#e5484d', fontWeight: 700 }}>BANNED</span>}
+        {isLoading && rows.length === 0 ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader className="size-5 animate-spin" />
+            <span>Loading managers...</span>
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState icon={Users} title="No managers yet." />
+        ) : (
+          <div className="divide-y rounded-lg border">
+            {rows.map((row) => {
+              const isSelf = row.user_id === user?.id;
+              const busy = busyUserId === row.user_id;
+              return (
+                <div key={row.user_id} className="flex flex-wrap items-start justify-between gap-3 p-4">
+                  <div className="flex min-w-56 flex-1 flex-col gap-1 text-sm">
+                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                      {row.email}
+                      {row.role === 'admin' && <Crown className="size-3.5 text-amber-600 dark:text-amber-400" />}
+                      {row.is_banned && <Badge variant="destructive">BANNED</Badge>}
+                    </div>
+                    {row.full_name && <div>{row.full_name}</div>}
+                    <div className="text-xs text-muted-foreground tabular-nums">
+                      {row.tournament_count} tournaments · {row.league_count} leagues
+                      {row.last_sign_in_at ? ` · last seen ${new Date(row.last_sign_in_at).toLocaleDateString()}` : ''}
+                    </div>
+                    <div>{paidBadge(row)}</div>
+                    {row.notes && (
+                      <div className="text-xs italic text-muted-foreground">{row.notes}</div>
+                    )}
                   </div>
-                  {row.full_name && <div className="manager-name">{row.full_name}</div>}
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {row.tournament_count} tournaments · {row.league_count} leagues
-                    {row.last_sign_in_at ? ` · last seen ${new Date(row.last_sign_in_at).toLocaleDateString()}` : ''}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {row.role === 'manager' && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => addMonth(row)} disabled={busy} title="Extend paid period by one month">
+                          +1 month
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setDate(row)} disabled={busy} title="Set paid-until date">
+                          Set date
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => editNotes(row)} disabled={busy} title="Edit notes" aria-label="Edit notes">
+                      <StickyNote />
+                    </Button>
+                    {!isSelf && row.role === 'manager' && (
+                      <Button variant="outline" size="sm" onClick={() => changeRole(row, 'admin')} disabled={busy} title="Promote to admin">
+                        <Crown />
+                        Promote
+                      </Button>
+                    )}
+                    {!isSelf && row.role === 'admin' && (
+                      <Button variant="outline" size="sm" onClick={() => changeRole(row, 'manager')} disabled={busy} title="Demote to manager">
+                        Demote
+                      </Button>
+                    )}
+                    {!isSelf && row.role !== 'admin' && (
+                      <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => toggleBan(row)} disabled={busy} title={row.is_banned ? 'Unban user' : 'Ban user (blocks login)'}>
+                        {row.is_banned ? <Undo2 /> : <Ban />}
+                        {row.is_banned ? 'Unban' : 'Ban'}
+                      </Button>
+                    )}
+                    {!isSelf && row.role === 'manager' && (
+                      <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => changeRole(row, null)} disabled={busy} title="Remove manager role">
+                        <X />
+                        Remove role
+                      </Button>
+                    )}
                   </div>
-                  <div style={{ fontSize: '0.85rem' }}>{paidBadge(row)}</div>
-                  {row.notes && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>{row.notes}</div>
-                  )}
                 </div>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {row.role === 'manager' && (
-                    <>
-                      <button className="admin-button small" onClick={() => addMonth(row)} disabled={busy} title="Extend paid period by one month">
-                        +1 month
-                      </button>
-                      <button className="admin-button small" onClick={() => setDate(row)} disabled={busy} title="Set paid-until date">
-                        Set date
-                      </button>
-                    </>
-                  )}
-                  <button className="admin-button small" onClick={() => editNotes(row)} disabled={busy} title="Edit notes">
-                    <StickyNote size={14} />
-                  </button>
-                  {!isSelf && row.role === 'manager' && (
-                    <button className="admin-button small" onClick={() => changeRole(row, 'admin')} disabled={busy} title="Promote to admin">
-                      <Crown size={14} />
-                      Promote
-                    </button>
-                  )}
-                  {!isSelf && row.role === 'admin' && (
-                    <button className="admin-button small" onClick={() => changeRole(row, 'manager')} disabled={busy} title="Demote to manager">
-                      Demote
-                    </button>
-                  )}
-                  {!isSelf && row.role !== 'admin' && (
-                    <button className="admin-button danger small" onClick={() => toggleBan(row)} disabled={busy} title={row.is_banned ? 'Unban user' : 'Ban user (blocks login)'}>
-                      {row.is_banned ? <Undo2 size={14} /> : <Ban size={14} />}
-                      {row.is_banned ? 'Unban' : 'Ban'}
-                    </button>
-                  )}
-                  {!isSelf && row.role === 'manager' && (
-                    <button className="admin-button danger small" onClick={() => changeRole(row, null)} disabled={busy} title="Remove manager role">
-                      <X size={14} />
-                      Remove role
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

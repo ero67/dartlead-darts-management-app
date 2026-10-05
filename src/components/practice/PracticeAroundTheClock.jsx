@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, CircleDot, X, RotateCcw, Flag, Target } from 'lucide-react';
+import { Check, CircleDot, X, RotateCcw, Target } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import {
-  PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeHardestList, PracticeSetup, PracticeField
+  PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeHardestList, PracticeSetup, PracticeField,
+  PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeBoardStats, PracticeKeypad
 } from './PracticeShared';
+import { Progress } from '@/components/ui/progress';
 import { createAroundTheClock, applyThrow, undo, canUndo, currentTarget, computeStats, ATC_MODES } from '../../lib/aroundTheClock';
 import { describeSession, pluralSuffix } from '../../lib/practiceGames';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { hapticTap, hapticBust, hapticLegWon } from '../../lib/haptics';
-import './Practice.css';
 
 const GAME = 'aroundTheClock';
 const DEFAULT_SETTINGS = { mode: 'singles', includeBull: true };
@@ -25,7 +25,6 @@ const formatSeconds = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 
 export function PracticeAroundTheClock() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const { session, setSession, settings, setSettings, summary, setSummary, start, finish, discard } =
     usePracticeSession(GAME, { defaultSettings: DEFAULT_SETTINGS, sanitize, computeStats });
   const [, setTick] = useState(0);
@@ -95,7 +94,7 @@ export function PracticeAroundTheClock() {
 
   if (!session) {
     return (
-      <div className="practice-page">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.aroundTheClock.title')} description={t('practice.aroundTheClock.rules')} />
         <PracticeSetup
           title={t('practice.aroundTheClock.setup.title')}
@@ -105,7 +104,6 @@ export function PracticeAroundTheClock() {
         >
           <PracticeField
             icon={CircleDot}
-            tone="green"
             label={t('practice.aroundTheClock.setup.mode')}
             hint={t('practice.aroundTheClock.setup.modeHint')}
             value={t(`practice.aroundTheClock.modes.${settings.mode}`)}
@@ -115,7 +113,6 @@ export function PracticeAroundTheClock() {
           {settings.mode !== 'trebles' && (
             <PracticeField
               icon={Target}
-              tone="blue"
               label={t('practice.aroundTheClock.setup.includeBull')}
               value={settings.includeBull ? t('common.yes') : t('common.no')}
             >
@@ -132,49 +129,56 @@ export function PracticeAroundTheClock() {
   const progress = (session.targetIndex / session.targets.length) * 100;
 
   return (
-    <div className="practice-play">
-      <div className="practice-play-top">
-        <button type="button" className="back-btn" onClick={() => navigate('/practice')}>
-          <ArrowLeft size={18} /> {t('practice.title')}
-        </button>
-        <div className="practice-play-meta">
-          <span>{session.targetIndex}/{session.targets.length}</span>
+    <PracticePlay
+      onFinish={handleFinishEarly}
+      meta={
+        <>
+          <span className="tabular-nums">{session.targetIndex}/{session.targets.length}</span>
           <span>{t('practice.aroundTheClock.time')} <b>{formatSeconds(stats.seconds)}</b></span>
-        </div>
-      </div>
+        </>
+      }
+    >
+      <PracticeBoard>
+        <Progress value={progress} className="mb-2 h-1.5" />
+        <PracticeBoardLabel>{t('practice.aroundTheClock.target')} · {t(`practice.aroundTheClock.modes.${session.settings.mode}`)}</PracticeBoardLabel>
+        <PracticeBoardValue>{target === 25 ? targetLabel(target) : `${modePrefix(session.settings.mode)}${targetLabel(target)}`}</PracticeBoardValue>
+        <PracticeBoardStats
+          items={[
+            [t('practice.aroundTheClock.dartsAtTarget'), session.currentDarts],
+            [t('practice.stats.darts'), stats.totalDarts],
+            [t('practice.aroundTheClock.stats.firstDartHits'), stats.firstDartHits]
+          ]}
+        />
+      </PracticeBoard>
 
-      <div className="practice-board">
-        <div className="practice-progress"><div className="practice-progress-bar" style={{ width: `${progress}%` }} /></div>
-        <div className="practice-remaining-label">{t('practice.aroundTheClock.target')} · {t(`practice.aroundTheClock.modes.${session.settings.mode}`)}</div>
-        <div className="practice-remaining">{target === 25 ? targetLabel(target) : `${modePrefix(session.settings.mode)}${targetLabel(target)}`}</div>
-        <div className="practice-board-stats">
-          <span>{t('practice.aroundTheClock.dartsAtTarget')}: <b>{session.currentDarts}</b></span>
-          <span>{t('practice.stats.darts')}: <b>{stats.totalDarts}</b></span>
-          <span>{t('practice.aroundTheClock.stats.firstDartHits')}: <b>{stats.firstDartHits}</b></span>
-        </div>
-      </div>
-
-      <div className="dart-board practice-atc-pad">
-        <div className="practice-atc-buttons">
-          <button type="button" className="practice-atc-btn miss" onClick={() => handleThrow(false)}>
-            <X size={28} /> {t('practice.aroundTheClock.miss')}
+      <PracticeKeypad>
+        <div className="flex flex-col gap-2 p-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="flex min-h-28 items-center justify-center gap-2 rounded-lg bg-destructive text-xl font-semibold text-white transition-transform active:scale-[0.98]"
+              onClick={() => handleThrow(false)}
+            >
+              <X className="size-7" /> {t('practice.aroundTheClock.miss')}
+            </button>
+            <button
+              type="button"
+              className="flex min-h-28 items-center justify-center gap-2 rounded-lg bg-primary text-xl font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+              onClick={() => handleThrow(true)}
+            >
+              <Check className="size-7" /> {t('practice.aroundTheClock.hit')}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 text-base font-semibold text-destructive disabled:pointer-events-none disabled:opacity-40"
+            onClick={handleUndo}
+            disabled={!canUndo(session)}
+          >
+            <RotateCcw className="size-5" /> <span>{t('match.undo')}</span>
           </button>
-          <button type="button" className="practice-atc-btn hit" onClick={() => handleThrow(true)}>
-            <Check size={28} /> {t('practice.aroundTheClock.hit')}
-          </button>
         </div>
-        <div className="remove-last-row">
-          <button type="button" className="remove-last-btn dart-btn" onClick={handleUndo} disabled={!canUndo(session)}>
-            <RotateCcw size={20} /> <span>{t('match.undo')}</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="practice-play-footer">
-        <button type="button" className="practice-ghost-btn" onClick={handleFinishEarly}>
-          <Flag size={16} /> {t('practice.finishSession')}
-        </button>
-      </div>
-    </div>
+      </PracticeKeypad>
+    </PracticePlay>
   );
 }

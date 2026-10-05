@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Flag, Keyboard, Repeat, Target, TrendingDown } from 'lucide-react';
+import { Keyboard, Repeat, Target, TrendingDown } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DartKeypad } from '../scoring/DartKeypad';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
 import {
-  PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeSetup, PracticeField, PracticeOptionCards
+  PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeSetup, PracticeField, PracticeOptionCards,
+  PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeCheckoutHint, PracticeLastThrows, PracticeKeypad
 } from './PracticeShared';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { dartFromInput, liveRemaining, lastVisitLabels, canUndo as x01CanUndo } from '../../lib/x01Engine';
 import {
   createOneTwentyOne, applyDart, applyVisitTotal, undo, canUndo, computeStats, visitsLeft,
@@ -19,7 +21,6 @@ import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
 import { hapticTap, hapticBust, hapticLegWon } from '../../lib/haptics';
 import checkoutData from '../../data/checkouts.json';
-import './Practice.css';
 
 const GAME = 'oneTwentyOne';
 const FLASH_MS = 900;
@@ -42,7 +43,6 @@ const sanitize = (saved) => {
 
 export function PracticeOneTwentyOne() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const isOnScreenKeypad = useOnScreenKeypad();
   const { session, setSession, settings, setSettings, summary, setSummary, start, finish, discard } =
     usePracticeSession(GAME, { defaultSettings: DEFAULT_SETTINGS, sanitize, computeStats });
@@ -134,7 +134,7 @@ export function PracticeOneTwentyOne() {
       ? t('practice.setup.unlimited')
       : t(`practice.oneTwentyOne.roundCount${pluralSuffix(settings.roundsTarget)}`, { count: settings.roundsTarget });
     return (
-      <div className="practice-page">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.oneTwentyOne.title')} description={t('practice.oneTwentyOne.rules')} />
         <PracticeSetup
           title={t('practice.oneTwentyOne.setup.title')}
@@ -144,17 +144,14 @@ export function PracticeOneTwentyOne() {
         >
           <PracticeField
             icon={Target}
-            tone="green"
             label={t('practice.oneTwentyOne.setup.startTarget')}
             hint={t('practice.oneTwentyOne.setup.startTargetHint')}
             value={settings.startTarget}
           >
-            <div className="practice-chips">
-              {START_OPTIONS.map(n => (
-                <button key={n} type="button" className={`practice-chip ${settings.startTarget === n ? 'active' : ''}`} onClick={() => setSettings(s => ({ ...s, startTarget: n }))}>{n}</button>
-              ))}
-              <input
-                className="practice-chip-input"
+            <div className="flex flex-wrap items-center gap-2">
+              <PracticeChips options={START_OPTIONS} value={settings.startTarget} onChange={(startTarget) => setSettings(s => ({ ...s, startTarget }))} />
+              <Input
+                className="h-11 w-28 rounded-full border-dashed text-center font-medium tabular-nums"
                 type="number"
                 min={MIN_TARGET}
                 max={MAX_TARGET}
@@ -171,7 +168,6 @@ export function PracticeOneTwentyOne() {
 
           <PracticeField
             icon={Repeat}
-            tone="blue"
             label={t('practice.oneTwentyOne.setup.rounds')}
             hint={t('practice.oneTwentyOne.setup.roundsHint')}
             value={roundsLabel}
@@ -181,7 +177,6 @@ export function PracticeOneTwentyOne() {
 
           <PracticeField
             icon={TrendingDown}
-            tone="amber"
             label={t('practice.oneTwentyOne.setup.onFail')}
             hint={t('practice.oneTwentyOne.setup.onFailHint', { target: settings.startTarget })}
             value={t(`practice.oneTwentyOne.setup.onFail_${settings.onFail}`)}
@@ -191,7 +186,6 @@ export function PracticeOneTwentyOne() {
 
           <PracticeField
             icon={Keyboard}
-            tone="violet"
             label={t('practice.setup.scoringMode')}
             value={t(settings.scoringMode === 'turnTotal' ? 'practice.setup.scoringTurnTotal' : 'practice.setup.scoringDart')}
           >
@@ -215,46 +209,43 @@ export function PracticeOneTwentyOne() {
   const roundNumber = session.rounds.length + 1;
   const labels = lastVisitLabels(session.round);
   const suggestion = session.round.current.visit.darts.length === 0 ? checkoutData[String(remaining)] : null;
-  const flashClass = flash?.type === 'success' ? 'leg-won' : flash ? 'bust' : '';
+  const boardFlash = flash?.type === 'success'
+    ? { tone: 'good', text: t('practice.oneTwentyOne.success', { target: flash.target }) }
+    : flash?.type === 'fail'
+      ? { tone: 'bad', text: t('practice.oneTwentyOne.fail', { target: flash.target }) }
+      : flash?.type === 'bust' ? { tone: 'bad', text: t('practice.bust') } : null;
 
   return (
-    <div className="practice-play">
-      <CheckoutDialog pending={pendingCheckout} onChange={setPendingCheckout} onCancel={() => setPendingCheckout(null)} onConfirm={handleConfirmCheckout} />
-
-      <div className="practice-play-top">
-        <button type="button" className="back-btn" onClick={() => navigate('/practice')}>
-          <ArrowLeft size={18} /> {t('practice.title')}
-        </button>
-        <div className="practice-play-meta">
+    <PracticePlay
+      onFinish={handleFinishEarly}
+      meta={
+        <>
           <span>
             {session.settings.roundsTarget === null
               ? t('practice.oneTwentyOne.round', { current: roundNumber })
               : t('practice.oneTwentyOne.roundOf', { current: roundNumber, total: session.settings.roundsTarget })}
           </span>
           <span>{t('practice.oneTwentyOne.stats.successes')} <b>{stats.successes}/{stats.rounds}</b></span>
-        </div>
-      </div>
+        </>
+      }
+    >
+      <CheckoutDialog pending={pendingCheckout} onChange={setPendingCheckout} onCancel={() => setPendingCheckout(null)} onConfirm={handleConfirmCheckout} />
 
-      <div className={`practice-board ${flashClass}`}>
-        {flash?.type === 'success' && <div className="practice-board-flash">{t('practice.oneTwentyOne.success', { target: flash.target })}</div>}
-        {flash?.type === 'fail' && <div className="practice-board-flash">{t('practice.oneTwentyOne.fail', { target: flash.target })}</div>}
-        {flash?.type === 'bust' && <div className="practice-board-flash">{t('practice.bust')}</div>}
-        <div className="practice-remaining-label">
+      <PracticeBoard flash={boardFlash}>
+        <PracticeBoardLabel>
           {t('practice.checkout.target')} {session.target}
           {remaining !== session.target && ` · ${t('practice.remaining')}`}
+        </PracticeBoardLabel>
+        <PracticeBoardValue>{remaining}</PracticeBoardValue>
+        <PracticeCheckoutHint>{suggestion ? suggestion.join(' → ') : ''}</PracticeCheckoutHint>
+        <PracticeLastThrows labels={labels} />
+        <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+          {[0, 1, 2].map(i => <span key={i} className={cn('size-3 rounded-full border-2 border-primary', i < 3 - left && 'bg-primary')} />)}
+          <span className="ml-1.5">{t(`practice.oneTwentyOne.visitsLeft${pluralSuffix(left)}`, { count: left })}</span>
         </div>
-        <div className="practice-remaining">{remaining}</div>
-        <div className="practice-checkout-hint">{suggestion ? suggestion.join(' → ') : ''}</div>
-        <div className="practice-last-throws">
-          {labels.map((label, idx) => <span key={idx}>{label}</span>)}
-        </div>
-        <div className="practice-visits">
-          {[0, 1, 2].map(i => <span key={i} className={`practice-visit-dot ${i < 3 - left ? 'used' : ''}`} />)}
-          <span className="practice-visits-label">{t(`practice.oneTwentyOne.visitsLeft${pluralSuffix(left)}`, { count: left })}</span>
-        </div>
-      </div>
+      </PracticeBoard>
 
-      <div className="dart-board">
+      <PracticeKeypad>
         {session.settings.scoringMode === 'dart' ? (
           <DartKeypad
             inputMode={inputMode}
@@ -276,13 +267,7 @@ export function PracticeOneTwentyOne() {
             disabled={flash !== null}
           />
         )}
-      </div>
-
-      <div className="practice-play-footer">
-        <button type="button" className="practice-ghost-btn" onClick={handleFinishEarly}>
-          <Flag size={16} /> {t('practice.finishSession')}
-        </button>
-      </div>
-    </div>
+      </PracticeKeypad>
+    </PracticePlay>
   );
 }

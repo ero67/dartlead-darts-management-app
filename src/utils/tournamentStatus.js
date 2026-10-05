@@ -10,3 +10,12 @@ export const tournamentStatusLabel = (status, t) => {
   if (status === 'completed') return t('tournaments.statusCompleted');
   return status;
 };
+
+// Tailwind classes for the status badge (shadcn Badge variant="outline").
+const STATUS_BADGE_CLASS = {
+  open_for_registration: 'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
+  completed: 'border-transparent bg-secondary text-secondary-foreground',
+  running: 'border-transparent bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
+};
+export const tournamentStatusClass = (status) =>
+  isTournamentRunning(status) ? STATUS_BADGE_CLASS.running : (STATUS_BADGE_CLASS[status] ?? STATUS_BADGE_CLASS.completed);

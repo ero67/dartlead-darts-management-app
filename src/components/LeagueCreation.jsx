@@ -1,168 +1,124 @@
 import React, { useState } from 'react';
-import { Trophy, ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
-const generateId = () => {
-  return crypto.randomUUID();
-};
+const PLACEMENTS = [
+  ['1', 'leagues.1stPlace'],
+  ['2', 'leagues.2ndPlace'],
+  ['3', 'leagues.3rdPlace'],
+  ['4', 'leagues.4thPlace'],
+  ['5', 'leagues.5thPlace'],
+  ['default', 'leagues.defaultSixthPlus'],
+];
 
 export function LeagueCreation({ onLeagueCreated, onBack }) {
   const { t } = useLanguage();
   const [leagueName, setLeagueName] = useState('');
   const [description, setDescription] = useState('');
   const [scoringRules, setScoringRules] = useState({
-    placementPoints: {
-      "1": 12,
-      "2": 9,
-      "3": 7,
-      "4": 5,
-      "5": 3,
-      "default": 1
-    },
-    allowManualOverride: true
+    placementPoints: { '1': 12, '2': 9, '3': 7, '4': 5, '5': 3, default: 1 },
+    allowManualOverride: true,
   });
 
   const createLeague = () => {
     if (!leagueName.trim()) {
-      alert(t('leagues.pleaseEnterLeagueName'));
+      toast.error(t('leagues.pleaseEnterLeagueName'));
       return;
     }
-
-    const league = {
-      id: generateId(),
+    onLeagueCreated({
+      id: crypto.randomUUID(),
       name: leagueName.trim(),
       description: description.trim() || null,
       status: 'active',
-      scoringRules: scoringRules,
+      scoringRules,
       defaultTournamentSettings: null, // Can be set later in settings
-      players: [] // Players can be added after creation
-    };
-
-    onLeagueCreated(league);
-  };
-
-  const updatePlacementPoints = (placement, value) => {
-    const numValue = parseInt(value) || 0;
-    setScoringRules({
-      ...scoringRules,
-      placementPoints: {
-        ...scoringRules.placementPoints,
-        [placement]: numValue
-      }
+      players: [], // Players can be added after creation
     });
   };
 
+  const updatePlacementPoints = (placement, value) => {
+    setScoringRules(prev => ({
+      ...prev,
+      placementPoints: { ...prev.placementPoints, [placement]: parseInt(value) || 0 },
+    }));
+  };
+
   return (
-    <div className="tournament-creation">
-      <div className="creation-header">
-        <button className="back-btn" onClick={onBack}>
-          <ArrowLeft size={20} />
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
+          <ArrowLeft />
           {t('leagues.backToLeagues')}
-        </button>
-        <div className="header-content">
-          <Trophy className="header-icon" />
-          <h2>{t('leagues.createNewLeague')}</h2>
-        </div>
+        </Button>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('leagues.createNewLeague')}</h1>
       </div>
 
-      <div className="creation-form">
-        <div className="form-section">
-          <label htmlFor="league-name">{t('leagues.leagueName')} *</label>
-          <input
-            id="league-name"
-            type="text"
-            value={leagueName}
-            onChange={(e) => setLeagueName(e.target.value)}
-            placeholder={t('leagues.enterLeagueName')}
-            maxLength={100}
-          />
-        </div>
-
-        <div className="form-section">
-          <label htmlFor="league-description">{t('leagues.descriptionOptional')}</label>
-          <textarea
-            id="league-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t('leagues.describeLeague')}
-            rows={3}
-            maxLength={500}
-          />
-        </div>
-
-        <div className="form-section">
-          <h3>{t('leagues.scoringRules')}</h3>
-          <p className="settings-description" style={{ fontSize: '0.9rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-            {t('leagues.scoringRulesCreateDescription')}
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div className="input-group">
-              <label>{t('leagues.1stPlace')}:</label>
-              <input
-                type="number"
-                min="0"
-                value={scoringRules.placementPoints["1"] || 0}
-                onChange={(e) => updatePlacementPoints("1", e.target.value)}
-              />
-            </div>
-            <div className="input-group">
-              <label>{t('leagues.2ndPlace')}:</label>
-              <input
-                type="number"
-                min="0"
-                value={scoringRules.placementPoints["2"] || 0}
-                onChange={(e) => updatePlacementPoints("2", e.target.value)}
-              />
-            </div>
-            <div className="input-group">
-              <label>{t('leagues.3rdPlace')}:</label>
-              <input
-                type="number"
-                min="0"
-                value={scoringRules.placementPoints["3"] || 0}
-                onChange={(e) => updatePlacementPoints("3", e.target.value)}
-              />
-            </div>
-            <div className="input-group">
-              <label>{t('leagues.4thPlace')}:</label>
-              <input
-                type="number"
-                min="0"
-                value={scoringRules.placementPoints["4"] || 0}
-                onChange={(e) => updatePlacementPoints("4", e.target.value)}
-              />
-            </div>
-            <div className="input-group">
-              <label>{t('leagues.5thPlace')}:</label>
-              <input
-                type="number"
-                min="0"
-                value={scoringRules.placementPoints["5"] || 0}
-                onChange={(e) => updatePlacementPoints("5", e.target.value)}
-              />
-            </div>
-            <div className="input-group">
-              <label>{t('leagues.defaultSixthPlus')}:</label>
-              <input
-                type="number"
-                min="0"
-                value={scoringRules.placementPoints["default"] || 0}
-                onChange={(e) => updatePlacementPoints("default", e.target.value)}
-              />
-            </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('leagues.leagueName')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="league-name">{t('leagues.leagueName')} *</Label>
+            <Input
+              id="league-name"
+              value={leagueName}
+              onChange={(e) => setLeagueName(e.target.value)}
+              placeholder={t('leagues.enterLeagueName')}
+              maxLength={100}
+            />
           </div>
-        </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="league-description">{t('leagues.descriptionOptional')}</Label>
+            <Textarea
+              id="league-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t('leagues.describeLeague')}
+              rows={3}
+              maxLength={500}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        <button
-          className="create-tournament-btn"
-          onClick={createLeague}
-          disabled={!leagueName.trim()}
-        >
-          <Save size={20} />
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('leagues.scoringRules')}</CardTitle>
+          <CardDescription>{t('leagues.scoringRulesCreateDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {PLACEMENTS.map(([key, labelKey]) => (
+              <div key={key} className="flex flex-col gap-2">
+                <Label htmlFor={`points-${key}`}>{t(labelKey)}</Label>
+                <Input
+                  id={`points-${key}`}
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  className="tabular-nums"
+                  value={scoringRules.placementPoints[key] || 0}
+                  onChange={(e) => updatePlacementPoints(key, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button size="lg" onClick={createLeague} disabled={!leagueName.trim()}>
+          <Save />
           {t('leagues.createLeague')}
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Badge, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save, Activity, UserCheck, ClipboardList, CreditCard, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { Badge as BadgeIcon, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save, Activity, UserCheck, ClipboardList, CreditCard, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { tournamentService, matchService } from '../services/tournamentService';
@@ -10,6 +10,17 @@ import { useTournament } from '../contexts/TournamentContext';
 import { useLeague } from '../contexts/LeagueContext';
 import { ScorersPanel } from './ScorersPanel';
 import { tournamentStatusLabel } from '../utils/tournamentStatus';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EmptyState } from './shared/EmptyState';
+import { StatTile } from './shared/StatTile';
+import { confirmDialog } from '../lib/confirmDialog';
 
 const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
 
@@ -363,7 +374,7 @@ export function ManagerPanel() {
       return;
     }
 
-    if (!confirm(t('manager.confirmReset', { matchId: matchInfo.id }))) {
+    if (!(await confirmDialog(t('manager.confirmReset', { matchId: matchInfo.id }), { destructive: true }))) {
       return;
     }
 
@@ -529,539 +540,540 @@ export function ManagerPanel() {
     });
   };
 
+  const NONE = '__none';
+  const manualResultError = getManualResultError();
+
   return (
-    <div className="admin-panel-page">
-      <div className="admin-panel-header">
-        <div className="admin-panel-title">
-          <Badge size={24} />
-          <h1>{t('manager.title')}</h1>
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('manager.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('manager.subtitle')}</p>
         </div>
-        <p className="admin-panel-subtitle">{t('manager.subtitle')}</p>
       </div>
 
-      <div className="management-tabs manager-panel-tabs">
-        <button
-          className={activeTab === 'overview' ? 'active' : ''}
-          onClick={() => setActiveTab('overview')}
-        >
-          <Activity size={18} />
-          {t('manager.tabOverview')}
-        </button>
-        <button
-          className={activeTab === 'requests' ? 'active' : ''}
-          onClick={() => setActiveTab('requests')}
-        >
-          <UserCheck size={18} />
-          {t('manager.tabRequests')}
-          {requests.length > 0 && <span className="requests-count">{requests.length}</span>}
-        </button>
-        <button
-          className={activeTab === 'scorers' ? 'active' : ''}
-          onClick={() => setActiveTab('scorers')}
-        >
-          <ClipboardList size={18} />
-          {t('manager.tabScorers')}
-        </button>
-        <button
-          className={activeTab === 'matches' ? 'active' : ''}
-          onClick={() => setActiveTab('matches')}
-        >
-          <RotateCcw size={18} />
-          {t('manager.tabMatches')}
-        </button>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
+        <TabsList>
+          <TabsTrigger value="overview">
+            <Activity />
+            {t('manager.tabOverview')}
+          </TabsTrigger>
+          <TabsTrigger value="requests">
+            <UserCheck />
+            {t('manager.tabRequests')}
+            {requests.length > 0 && <Badge variant="secondary" className="tabular-nums">{requests.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="scorers">
+            <ClipboardList />
+            {t('manager.tabScorers')}
+          </TabsTrigger>
+          <TabsTrigger value="matches">
+            <RotateCcw />
+            {t('manager.tabMatches')}
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="admin-panel-content">
-        {activeTab === 'overview' && (
-          <div className="admin-section">
-            <div className="stats-grid manager-stats-grid">
-              <div className="stat-card">
-                <div className="stat-icon active">
-                  <Activity size={24} />
-                </div>
-                <div className="stat-content">
-                  <h3>{liveMatchesNow}</h3>
-                  <p>{t('manager.overviewLiveNow')}</p>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">
-                  <RotateCcw size={24} />
-                </div>
-                <div className="stat-content">
-                  <h3>{pendingMatchesCount}</h3>
-                  <p>{t('manager.overviewPendingMatches')}</p>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">
-                  <UserCheck size={24} />
-                </div>
-                <div className="stat-content">
-                  <h3>{requests.length}</h3>
-                  <p>{t('manager.overviewPendingRequests')}</p>
-                </div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-icon">
-                  <Badge size={24} />
-                </div>
-                <div className="stat-content">
-                  <h3>{openTournaments.length}</h3>
-                  <p>{t('manager.overviewOpenTournaments')}</p>
-                </div>
-              </div>
-            </div>
+        <TabsContent value="overview" className="flex flex-col gap-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile label={t('manager.overviewLiveNow')} value={liveMatchesNow} icon={Activity} />
+            <StatTile label={t('manager.overviewPendingMatches')} value={pendingMatchesCount} icon={RotateCcw} />
+            <StatTile label={t('manager.overviewPendingRequests')} value={requests.length} icon={UserCheck} />
+            <StatTile label={t('manager.overviewOpenTournaments')} value={openTournaments.length} icon={BadgeIcon} />
+          </div>
 
-            <div className="group-card manager-subscription-card">
-              <h3>
-                <CreditCard size={16} />
-                {t('manager.subscriptionTitle')}
-              </h3>
-              {!subscription.loaded ? (
-                <p className="manager-subscription-note">{t('common.loading')}</p>
-              ) : isAdmin ? (
-                <p className="manager-subscription-note">{t('manager.subscriptionAdmin')}</p>
-              ) : !subscriptionState ? (
-                <p className="manager-subscription-note">{t('manager.subscriptionNone')}</p>
-              ) : (
-                <div className={`subscription-status subscription-status--${subscriptionState.level}`}>
-                  {subscriptionState.level === 'expired'
-                    ? t('manager.subscriptionExpired', { date: subscriptionState.date })
-                    : t('manager.subscriptionActiveUntil', { date: subscriptionState.date })}
-                  {subscriptionState.level === 'warn' && ` — ${t('manager.subscriptionExpiresSoon')}`}
-                </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="size-4" />
+                  {t('manager.overviewActiveTitle')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {attentionTournaments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t('manager.overviewNothingActive')}</p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {attentionTournaments.map((tr) => (
+                      <li key={tr.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm font-medium">{tr.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {tournamentStatusLabel(tr.status, t)}
+                            {(tr.inProgressMatches ?? 0) > 0 && ` · ${tr.inProgressMatches} ${t('manager.overviewLiveNow').toLowerCase()}`}
+                            {tr.status !== 'open_for_registration' && (tr.pendingMatches ?? 0) > 0 && ` · ${tr.pendingMatches} ${t('manager.overviewPendingMatches').toLowerCase()}`}
+                          </span>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/tournament/${tr.id}`)}>
+                          <ExternalLink />
+                          {t('manager.openTournament')}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="size-4" />
+                  {t('manager.subscriptionTitle')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 text-sm">
+                {!subscription.loaded ? (
+                  <p className="text-muted-foreground">{t('common.loading')}</p>
+                ) : isAdmin ? (
+                  <p className="text-muted-foreground">{t('manager.subscriptionAdmin')}</p>
+                ) : !subscriptionState ? (
+                  <p className="text-muted-foreground">{t('manager.subscriptionNone')}</p>
+                ) : (
+                  <>
+                    <Badge
+                      variant="outline"
+                      className={
+                        subscriptionState.level === 'expired'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
+                          : subscriptionState.level === 'warn'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+                            : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
+                      }
+                    >
+                      {subscriptionState.level === 'expired'
+                        ? t('manager.subscriptionExpired', { date: subscriptionState.date })
+                        : t('manager.subscriptionActiveUntil', { date: subscriptionState.date })}
+                    </Badge>
+                    {subscriptionState.level === 'warn' && (
+                      <p className="text-muted-foreground">{t('manager.subscriptionExpiresSoon')}</p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="requests">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCheck className="size-4" />
+                {t('manager.requestsTitle')}
+              </CardTitle>
+              <CardDescription>{t('manager.requestsDescription')}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {requestsError && (
+                <Alert variant="destructive">
+                  <AlertCircle />
+                  <AlertDescription>{requestsError}</AlertDescription>
+                </Alert>
               )}
-            </div>
 
-            <div className="admin-section-header" style={{ marginTop: '0.5rem' }}>
-              <Activity size={20} />
-              <h2>{t('manager.overviewActiveTitle')}</h2>
-            </div>
-            {attentionTournaments.length === 0 ? (
-              <p className="admin-section-description">{t('manager.overviewNothingActive')}</p>
-            ) : (
-              <div className="manager-overview-list">
-                {attentionTournaments.map((tr) => (
-                  <div key={tr.id} className="registration-request-card">
-                    <div className="request-info">
-                      <span className="request-name">{tr.name}</span>
-                      <span className="request-date">
-                        {tournamentStatusLabel(tr.status, t)}
-                        {(tr.inProgressMatches ?? 0) > 0 && ` · ${tr.inProgressMatches} ${t('manager.overviewLiveNow').toLowerCase()}`}
-                        {tr.status !== 'open_for_registration' && (tr.pendingMatches ?? 0) > 0 && ` · ${tr.pendingMatches} ${t('manager.overviewPendingMatches').toLowerCase()}`}
-                      </span>
-                    </div>
-                    <button
-                      className="settings-btn"
-                      onClick={() => navigate(`/tournament/${tr.id}`)}
-                    >
-                      <ExternalLink size={14} />
-                      {t('manager.openTournament')}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'requests' && (
-          <div className="admin-section">
-            <div className="admin-section-header">
-              <UserCheck size={20} />
-              <h2>{t('manager.requestsTitle')}</h2>
-            </div>
-            <p className="admin-section-description">{t('manager.requestsDescription')}</p>
-
-            {requestsError && (
-              <div className="admin-message error">
-                <AlertCircle size={16} />
-                <span>{requestsError}</span>
-              </div>
-            )}
-
-            {loadingRequests ? (
-              <div className="admin-loading">
-                <Loader size={16} className="spinning" />
-                <span>{t('common.loading')}</span>
-              </div>
-            ) : requests.length === 0 ? (
-              <p className="admin-section-description">{t('manager.requestsEmpty')}</p>
-            ) : (
-              <div className="manager-overview-list">
-                {requests.map((reg) => (
-                  <div key={reg.id} className="registration-request-card status-pending">
-                    <div className="request-info">
-                      <span className="request-name">{reg.player_name}</span>
-                      <span className="request-date">
-                        {reg.tournament?.name} · {new Date(reg.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="request-actions">
-                      <button
-                        className="approve-btn"
-                        onClick={() => handleApproveRequest(reg.id)}
-                        disabled={processingRegId === reg.id}
-                      >
-                        <CheckCircle size={14} /> {t('registration.approve')}
-                      </button>
-                      <button
-                        className="reject-btn"
-                        onClick={() => handleRejectRequest(reg.id)}
-                        disabled={processingRegId === reg.id}
-                      >
-                        <XCircle size={14} /> {t('registration.reject')}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'scorers' && (
-          <div className="admin-section">
-            <div className="admin-section-header">
-              <ClipboardList size={20} />
-              <h2>{t('manager.scorersHubTitle')}</h2>
-            </div>
-            <p className="admin-section-description">{t('manager.scorersHubDescription')}</p>
-
-            <div className="form-group" style={{ maxWidth: '420px', marginBottom: '1rem' }}>
-              <label htmlFor="scorerTarget">{t('manager.scorersSelectEntity')}</label>
-              <select
-                id="scorerTarget"
-                value={scorerTarget}
-                onChange={(e) => setScorerTarget(e.target.value)}
-              >
-                <option value="">{t('manager.selectTournamentPlaceholder')}</option>
-                {myTournaments.length > 0 && (
-                  <optgroup label={t('navigation.tournaments')}>
-                    {myTournaments.map((tr) => (
-                      <option key={tr.id} value={`t:${tr.id}`}>{tr.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {myLeagues.length > 0 && (
-                  <optgroup label={t('navigation.leagues')}>
-                    {myLeagues.map((l) => (
-                      <option key={l.id} value={`l:${l.id}`}>{l.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
-
-            {scorerTarget && (
-              <ScorersPanel
-                key={scorerTarget}
-                type={scorerTarget.startsWith('l:') ? 'league' : 'tournament'}
-                entityId={scorerTarget.slice(2)}
-              />
-            )}
-          </div>
-        )}
-
-        {activeTab === 'matches' && (
-        <div className="admin-section">
-          <div className="admin-section-header">
-                    <RotateCcw size={20} />
-                    <h2>{t('manager.manageMatchState')}</h2>
-                  </div>
-                  <p className="admin-section-description">
-                    {t('manager.manageMatchStateDescription')}
-                  </p>
-
-          <div className="admin-form">
-            <div className="form-group">
-              <label htmlFor="tournamentForMatch">
-                <Search size={16} />
-                {t('manager.selectTournament')}
-              </label>
-              <select
-                id="tournamentForMatch"
-                value={selectedTournamentForMatch}
-                onChange={(e) => handleTournamentSelectForMatch(e.target.value)}
-              >
-                <option value="">{t('manager.selectTournamentPlaceholder')}</option>
-                {myTournaments.map((tournament) => (
-                  <option key={tournament.id} value={tournament.id}>
-                    {tournament.name} ({tournamentStatusLabel(tournament.status, t)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedTournamentForMatch && (
-              <>
-                <div className="form-group">
-                  <label htmlFor="matchSelect">
-                    <Search size={16} />
-                    {t('manager.selectMatch')}
-                  </label>
-                  <div className="manager-match-filters">
-                    <input
-                      id="matchSearch"
-                      type="text"
-                      value={matchSearchTerm}
-                      onChange={(e) => setMatchSearchTerm(e.target.value)}
-                      placeholder={t('manager.searchPlaceholder')}
-                      disabled={loadingMatches || matchesForTournament.length === 0}
-                    />
-                    <select
-                      id="matchStateFilter"
-                      value={matchStateFilter}
-                      onChange={(e) => setMatchStateFilter(e.target.value)}
-                      disabled={loadingMatches || matchesForTournament.length === 0}
-                    >
-                      {MATCH_STATE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {loadingMatches ? (
-                    <div className="admin-loading">
-                      <Loader size={16} className="spinning" />
-                      <span>{t('manager.loadingMatches')}</span>
-                    </div>
-                  ) : (
-                    <select
-                      id="matchSelect"
-                      value={selectedMatchId}
-                      onChange={(e) => handleMatchSelect(e.target.value)}
-                      disabled={loadingMatch || filteredMatchesForTournament.length === 0}
-                    >
-                      <option value="">{t('manager.selectMatchPlaceholder')}</option>
-                      {filteredMatchesForTournament.map((match) => {
-                        const player1Name = match.player1?.name || t('common.unknown');
-                        const player2Name = match.player2?.name || t('common.unknown');
-                        const matchType = match.is_playoff ? t('manager.playoff') : (match.group?.name || t('manager.group'));
-                        const score = match.player1_legs !== null ? `${match.player1_legs} - ${match.player2_legs}` : '';
-                        return (
-                          <option key={match.id} value={match.id}>
-                            {matchType}: {player1Name} vs {player2Name} {score && `(${score})`} - {formatMatchStateLabel(match.status)}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  )}
+              {loadingRequests ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader className="size-4 animate-spin" />
+                  <span>{t('common.loading')}</span>
                 </div>
-
-                {matchesForTournament.length === 0 && !loadingMatches && (
-                  <div className="admin-empty" style={{ marginTop: '1rem' }}>
-                    <p>{t('manager.noMatchesForTournament')}</p>
-                  </div>
-                )}
-
-                {matchesForTournament.length > 0 && filteredMatchesForTournament.length === 0 && !loadingMatches && (
-                  <div className="admin-empty" style={{ marginTop: '1rem' }}>
-                    <p>{t('manager.noMatchesMatchingFilter')}</p>
-                  </div>
-                )}
-
-                    {matchInfo && (
-                  <div className="match-info manager-match-card">
-                    <div className="manager-match-card__header">
-                      <div>
-                        <div className="manager-match-card__title">
-                          {matchInfo.player1?.name || t('common.unknown')} vs {matchInfo.player2?.name || t('common.unknown')}
-                        </div>
-                        <div className="manager-match-card__meta">
-                          {matchInfo.tournaments?.name || matchInfo.group?.tournament?.name || 'N/A'} - {matchInfo.is_playoff ? t('manager.playoff') : (matchInfo.group?.name || t('manager.group'))}
-                        </div>
-                      </div>
-                      <span className={`status-badge ${matchInfo.status}`}>{matchInfo.status}</span>
-                    </div>
-
-                    <div className="manager-match-card__stats">
-                      <div className="manager-stat-pill">
-                        <span className="manager-stat-pill__label">{t('manager.matchId')}</span>
-                        <span className="manager-stat-pill__value">{matchInfo.id}</span>
-                      </div>
-                      <div className="manager-stat-pill">
-                        <span className="manager-stat-pill__label">{t('manager.currentScore')}</span>
-                        <span className="manager-stat-pill__value">
-                          {matchInfo.player1_legs !== null ? `${matchInfo.player1_legs} - ${matchInfo.player2_legs}` : t('manager.notSet')}
+              ) : requests.length === 0 ? (
+                <EmptyState icon={UserCheck} title={t('manager.requestsEmpty')} />
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {requests.map((reg) => (
+                    <li key={reg.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium">{reg.player_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {reg.tournament?.name} · {new Date(reg.created_at).toLocaleDateString()}
                         </span>
                       </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveRequest(reg.id)}
+                          disabled={processingRegId === reg.id}
+                        >
+                          <CheckCircle /> {t('registration.approve')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRejectRequest(reg.id)}
+                          disabled={processingRegId === reg.id}
+                        >
+                          <XCircle /> {t('registration.reject')}
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="scorers" className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="size-4" />
+                {t('manager.scorersHubTitle')}
+              </CardTitle>
+              <CardDescription>{t('manager.scorersHubDescription')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex max-w-md flex-col gap-2">
+                <Label htmlFor="scorerTarget">{t('manager.scorersSelectEntity')}</Label>
+                <Select
+                  value={scorerTarget || NONE}
+                  onValueChange={(v) => setScorerTarget(v === NONE ? '' : v)}
+                >
+                  <SelectTrigger id="scorerTarget" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>{t('manager.selectTournamentPlaceholder')}</SelectItem>
+                    {myTournaments.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>{t('navigation.tournaments')}</SelectLabel>
+                        {myTournaments.map((tr) => (
+                          <SelectItem key={tr.id} value={`t:${tr.id}`}>{tr.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {myLeagues.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>{t('navigation.leagues')}</SelectLabel>
+                        {myLeagues.map((l) => (
+                          <SelectItem key={l.id} value={`l:${l.id}`}>{l.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {scorerTarget && (
+            <ScorersPanel
+              key={scorerTarget}
+              type={scorerTarget.startsWith('l:') ? 'league' : 'tournament'}
+              entityId={scorerTarget.slice(2)}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="matches">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <RotateCcw className="size-4" />
+                {t('manager.manageMatchState')}
+              </CardTitle>
+              <CardDescription>{t('manager.manageMatchStateDescription')}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="tournamentForMatch">
+                  <Search className="size-4" />
+                  {t('manager.selectTournament')}
+                </Label>
+                <Select
+                  value={selectedTournamentForMatch || NONE}
+                  onValueChange={(v) => handleTournamentSelectForMatch(v === NONE ? '' : v)}
+                >
+                  <SelectTrigger id="tournamentForMatch" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>{t('manager.selectTournamentPlaceholder')}</SelectItem>
+                    {myTournaments.map((tournament) => (
+                      <SelectItem key={tournament.id} value={tournament.id}>
+                        {tournament.name} ({tournamentStatusLabel(tournament.status, t)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedTournamentForMatch && (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="matchSelect">
+                      <Search className="size-4" />
+                      {t('manager.selectMatch')}
+                    </Label>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <Input
+                        id="matchSearch"
+                        type="text"
+                        value={matchSearchTerm}
+                        onChange={(e) => setMatchSearchTerm(e.target.value)}
+                        placeholder={t('manager.searchPlaceholder')}
+                        disabled={loadingMatches || matchesForTournament.length === 0}
+                      />
+                      <Select
+                        value={matchStateFilter}
+                        onValueChange={setMatchStateFilter}
+                        disabled={loadingMatches || matchesForTournament.length === 0}
+                      >
+                        <SelectTrigger id="matchStateFilter" className="w-full sm:w-44">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MATCH_STATE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
+                    {loadingMatches ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader className="size-4 animate-spin" />
+                        <span>{t('manager.loadingMatches')}</span>
+                      </div>
+                    ) : (
+                      <Select
+                        value={selectedMatchId || NONE}
+                        onValueChange={(v) => handleMatchSelect(v === NONE ? '' : v)}
+                        disabled={loadingMatch || filteredMatchesForTournament.length === 0}
+                      >
+                        <SelectTrigger id="matchSelect" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE}>{t('manager.selectMatchPlaceholder')}</SelectItem>
+                          {filteredMatchesForTournament.map((match) => {
+                            const player1Name = match.player1?.name || t('common.unknown');
+                            const player2Name = match.player2?.name || t('common.unknown');
+                            const matchType = match.is_playoff ? t('manager.playoff') : (match.group?.name || t('manager.group'));
+                            const score = match.player1_legs !== null ? `${match.player1_legs} - ${match.player2_legs}` : '';
+                            return (
+                              <SelectItem key={match.id} value={match.id}>
+                                {matchType}: {player1Name} vs {player2Name} {score && `(${score})`} - {formatMatchStateLabel(match.status)}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
 
-                    <div className="manager-tools-grid">
-                      <div className="manager-tool-card">
-                        <div className="manager-tool-card__header">
-                          <Edit3 size={16} />
-                          <h4>{t('manager.manualMatchResult')}</h4>
-                        </div>
-                        <p className="manager-tool-card__description">
-                          {t('manager.manualMatchResultDescription')}
-                        </p>
+                  {matchesForTournament.length === 0 && !loadingMatches && (
+                    <EmptyState icon={Search} title={t('manager.noMatchesForTournament')} />
+                  )}
 
-                        {!editMode && (
-                          <button
-                            className="admin-button primary"
-                            onClick={handleEditResult}
-                            style={{ width: '100%' }}
-                          >
-                            <Edit3 size={16} />
-                            {t('manager.openResultEditor')}
-                          </button>
-                        )}
+                  {matchesForTournament.length > 0 && filteredMatchesForTournament.length === 0 && !loadingMatches && (
+                    <EmptyState icon={Search} title={t('manager.noMatchesMatchingFilter')} />
+                  )}
 
-                        {editMode && (
-                          <div className="manager-manual-result-form">
-                            <div className="form-group">
-                              <label htmlFor="manualWinner">{t('manager.winner')}</label>
-                              <select
-                                id="manualWinner"
-                                value={manualResult.winner || ''}
-                                onChange={(e) => setManualResult({ ...manualResult, winner: e.target.value })}
-                              >
-                                <option value="">{t('manager.selectWinner')}</option>
-                                <option value={matchInfo.player1_id}>{matchInfo.player1?.name || 'Player 1'}</option>
-                                <option value={matchInfo.player2_id}>{matchInfo.player2?.name || 'Player 2'}</option>
-                              </select>
+                  {matchInfo && (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <div className="text-base font-semibold">
+                              {matchInfo.player1?.name || t('common.unknown')} vs {matchInfo.player2?.name || t('common.unknown')}
                             </div>
+                            <div className="text-sm text-muted-foreground">
+                              {matchInfo.tournaments?.name || matchInfo.group?.tournament?.name || 'N/A'} - {matchInfo.is_playoff ? t('manager.playoff') : (matchInfo.group?.name || t('manager.group'))}
+                            </div>
+                          </div>
+                          <Badge variant="outline">{matchInfo.status}</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary" className="gap-1.5">
+                            <span className="text-muted-foreground">{t('manager.matchId')}</span>
+                            <span className="tabular-nums">{matchInfo.id}</span>
+                          </Badge>
+                          <Badge variant="secondary" className="gap-1.5">
+                            <span className="text-muted-foreground">{t('manager.currentScore')}</span>
+                            <span className="tabular-nums">
+                              {matchInfo.player1_legs !== null ? `${matchInfo.player1_legs} - ${matchInfo.player2_legs}` : t('manager.notSet')}
+                            </span>
+                          </Badge>
+                        </div>
+                      </div>
 
-                            {manualResult.winner && (
-                              <div className="form-group">
-                                <label>{t('manager.quickScore')}</label>
-                                <div className="manager-preset-row">
-                                  {getScorePresets().map(({ winnerLegs, loserLegs }) => {
-                                    const winnerIsP1 = manualResult.winner === matchInfo.player1_id;
-                                    const p1 = winnerIsP1 ? winnerLegs : loserLegs;
-                                    const p2 = winnerIsP1 ? loserLegs : winnerLegs;
-                                    const active = manualResult.player1Legs === p1 && manualResult.player2Legs === p2;
-                                    return (
-                                      <button
-                                        key={`${winnerLegs}-${loserLegs}`}
-                                        type="button"
-                                        className={`manager-preset-btn ${active ? 'active' : ''}`}
-                                        onClick={() => applyPreset(manualResult.winner, winnerLegs, loserLegs)}
-                                      >
-                                        {winnerLegs} - {loserLegs}
-                                      </button>
-                                    );
-                                  })}
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Edit3 className="size-4" />
+                              {t('manager.manualMatchResult')}
+                            </CardTitle>
+                            <CardDescription>{t('manager.manualMatchResultDescription')}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="flex flex-col gap-4">
+                            {!editMode && (
+                              <Button className="w-full" onClick={handleEditResult}>
+                                <Edit3 />
+                                {t('manager.openResultEditor')}
+                              </Button>
+                            )}
+
+                            {editMode && (
+                              <div className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                  <Label htmlFor="manualWinner">{t('manager.winner')}</Label>
+                                  <Select
+                                    value={manualResult.winner || NONE}
+                                    onValueChange={(v) => setManualResult({ ...manualResult, winner: v === NONE ? '' : v })}
+                                  >
+                                    <SelectTrigger id="manualWinner" className="w-full">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value={NONE}>{t('manager.selectWinner')}</SelectItem>
+                                      <SelectItem value={matchInfo.player1_id}>{matchInfo.player1?.name || 'Player 1'}</SelectItem>
+                                      <SelectItem value={matchInfo.player2_id}>{matchInfo.player2?.name || 'Player 2'}</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                {manualResult.winner && (
+                                  <div className="flex flex-col gap-2">
+                                    <Label>{t('manager.quickScore')}</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                      {getScorePresets().map(({ winnerLegs, loserLegs }) => {
+                                        const winnerIsP1 = manualResult.winner === matchInfo.player1_id;
+                                        const p1 = winnerIsP1 ? winnerLegs : loserLegs;
+                                        const p2 = winnerIsP1 ? loserLegs : winnerLegs;
+                                        const active = manualResult.player1Legs === p1 && manualResult.player2Legs === p2;
+                                        return (
+                                          <Button
+                                            key={`${winnerLegs}-${loserLegs}`}
+                                            type="button"
+                                            variant={active ? 'default' : 'outline'}
+                                            size="sm"
+                                            className="tabular-nums"
+                                            onClick={() => applyPreset(manualResult.winner, winnerLegs, loserLegs)}
+                                          >
+                                            {winnerLegs} - {loserLegs}
+                                          </Button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <div className="flex flex-col gap-2">
+                                    <Label htmlFor="manualPlayer1Legs">{matchInfo.player1?.name || 'Player 1'} {t('manager.legs')}</Label>
+                                    <Input
+                                      id="manualPlayer1Legs"
+                                      type="number"
+                                      min="0"
+                                      className="tabular-nums"
+                                      value={manualResult.player1Legs}
+                                      onChange={(e) => setManualResult({ ...manualResult, player1Legs: parseInt(e.target.value, 10) || 0 })}
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <Label htmlFor="manualPlayer2Legs">{matchInfo.player2?.name || 'Player 2'} {t('manager.legs')}</Label>
+                                    <Input
+                                      id="manualPlayer2Legs"
+                                      type="number"
+                                      min="0"
+                                      className="tabular-nums"
+                                      value={manualResult.player2Legs}
+                                      onChange={(e) => setManualResult({ ...manualResult, player2Legs: parseInt(e.target.value, 10) || 0 })}
+                                    />
+                                  </div>
+                                </div>
+
+                                {manualResultError ? (
+                                  <Alert variant="destructive">
+                                    <AlertCircle />
+                                    <AlertDescription>{manualResultError}</AlertDescription>
+                                  </Alert>
+                                ) : (
+                                  <Alert>
+                                    <AlertCircle />
+                                    <AlertDescription>{t('manager.statsNotRecalculatedHint')}</AlertDescription>
+                                  </Alert>
+                                )}
+
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    onClick={saveManualResult}
+                                    disabled={savingResult || !!manualResultError}
+                                  >
+                                    {savingResult ? (
+                                      <>
+                                        <Loader className="animate-spin" />
+                                        {t('manager.saving')}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Save />
+                                        {t('manager.saveResult')}
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    onClick={cancelEdit}
+                                    disabled={savingResult}
+                                  >
+                                    {t('manager.cancel')}
+                                  </Button>
                                 </div>
                               </div>
                             )}
+                          </CardContent>
+                        </Card>
 
-                            <div className="manager-score-grid">
-                              <div className="form-group">
-                                <label htmlFor="manualPlayer1Legs">{matchInfo.player1?.name || 'Player 1'} {t('manager.legs')}</label>
-                                <input
-                                  id="manualPlayer1Legs"
-                                  type="number"
-                                  min="0"
-                                  value={manualResult.player1Legs}
-                                  onChange={(e) => setManualResult({ ...manualResult, player1Legs: parseInt(e.target.value, 10) || 0 })}
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label htmlFor="manualPlayer2Legs">{matchInfo.player2?.name || 'Player 2'} {t('manager.legs')}</label>
-                                <input
-                                  id="manualPlayer2Legs"
-                                  type="number"
-                                  min="0"
-                                  value={manualResult.player2Legs}
-                                  onChange={(e) => setManualResult({ ...manualResult, player2Legs: parseInt(e.target.value, 10) || 0 })}
-                                />
-                              </div>
-                            </div>
-
-                            {getManualResultError() ? (
-                              <div className="manager-inline-error">
-                                <AlertCircle size={14} />
-                                <span>{getManualResultError()}</span>
-                              </div>
-                            ) : (
-                              <div className="manager-inline-hint">
-                                <AlertCircle size={14} />
-                                <span>{t('manager.statsNotRecalculatedHint')}</span>
-                              </div>
-                            )}
-
-                            <div className="manager-tool-card__actions">
-                              <button
-                                className="admin-button primary"
-                                onClick={saveManualResult}
-                                disabled={savingResult || !!getManualResultError()}
-                              >
-                                {savingResult ? (
-                                  <>
-                                    <Loader size={16} className="spinning" />
-                                    {t('manager.saving')}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Save size={16} />
-                                    {t('manager.saveResult')}
-                                  </>
-                                )}
-                              </button>
-                              <button
-                                className="admin-button"
-                                onClick={cancelEdit}
-                                disabled={savingResult}
-                              >
-                                {t('manager.cancel')}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="manager-tool-card manager-tool-card--danger">
-                        <div className="manager-tool-card__header">
-                          <RotateCcw size={16} />
-                          <h4>{t('manager.resetMatchToPending')}</h4>
-                        </div>
-                        <p className="manager-tool-card__description">
-                          {t('manager.resetMatchDescription')}
-                        </p>
-                        <button
-                          className="admin-button danger"
-                          onClick={resetMatchToPending}
-                          disabled={loadingMatch || matchInfo.status === 'pending'}
-                          style={{ width: '100%' }}
-                        >
-                          {loadingMatch ? (
-                            <>
-                              <Loader size={16} className="spinning" />
-                              {t('manager.resetting')}
-                            </>
-                          ) : (
-                            <>
-                              <RotateCcw size={16} />
-                              {t('manager.resetToPending')}
-                            </>
-                          )}
-                        </button>
+                        <Card className="border-destructive/40">
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <RotateCcw className="size-4" />
+                              {t('manager.resetMatchToPending')}
+                            </CardTitle>
+                            <CardDescription>{t('manager.resetMatchDescription')}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <Button
+                              variant="outline"
+                              className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={resetMatchToPending}
+                              disabled={loadingMatch || matchInfo.status === 'pending'}
+                            >
+                              {loadingMatch ? (
+                                <>
+                                  <Loader className="animate-spin" />
+                                  {t('manager.resetting')}
+                                </>
+                              ) : (
+                                <>
+                                  <RotateCcw />
+                                  {t('manager.resetToPending')}
+                                </>
+                              )}
+                            </Button>
+                          </CardContent>
+                        </Card>
                       </div>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
+                  )}
+                </>
+              )}
 
-            {message.text && (
-              <div className={`admin-message ${message.type}`}>
-                {message.type === 'success' ? (
-                  <Check size={16} />
-                ) : (
-                  <AlertCircle size={16} />
-                )}
-                <span>{message.text}</span>
-              </div>
-            )}
-          </div>
-        </div>
-        )}
-      </div>
+              {message.text && (
+                <Alert variant={message.type === 'success' ? 'default' : 'destructive'}>
+                  {message.type === 'success' ? <Check /> : <AlertCircle />}
+                  <AlertDescription>{message.text}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -3,7 +3,10 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { BracketSeedingEditor } from './BracketSeedingEditor';
 import { presetKey, nextPow2 } from '../utils/seedSlots';
-import './SeedingPresetLibrary.css';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // A library of prepared seeding configs, each keyed by (number of groups, bracket
 // start size). At tournament time the matching preset is auto-selected by
@@ -66,67 +69,80 @@ export function SeedingPresetLibrary({ presets, onChange }) {
   const bracketLabel = (size) => t('registration.presetBracketTop', { count: size });
 
   return (
-    <div className="seeding-preset-library">
-      <div className="preset-add-row">
-        <div className="preset-add-field">
-          <label>{t('registration.presetGroups')}</label>
-          <select value={newGroups} onChange={(e) => setNewGroups(parseInt(e.target.value, 10))}>
-            {GROUP_OPTIONS.map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
+    <div className="flex flex-col gap-4 text-foreground">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-muted/40 p-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="preset-groups" className="text-xs text-muted-foreground">{t('registration.presetGroups')}</Label>
+          <Select value={String(newGroups)} onValueChange={(v) => setNewGroups(parseInt(v, 10))}>
+            <SelectTrigger id="preset-groups" className="w-24 bg-background tabular-nums">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {GROUP_OPTIONS.map((n) => (
+                <SelectItem key={n} value={String(n)} className="tabular-nums">{n}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="preset-add-field">
-          <label>{t('registration.presetBracketStart')}</label>
-          <select value={newBracket} onChange={(e) => setNewBracket(parseInt(e.target.value, 10))}>
-            {BRACKET_START_OPTIONS.map((n) => (
-              <option key={n} value={n}>{bracketLabel(n)}</option>
-            ))}
-          </select>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="preset-bracket" className="text-xs text-muted-foreground">{t('registration.presetBracketStart')}</Label>
+          <Select value={String(newBracket)} onValueChange={(v) => setNewBracket(parseInt(v, 10))}>
+            <SelectTrigger id="preset-bracket" className="w-36 bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BRACKET_START_OPTIONS.map((n) => (
+                <SelectItem key={n} value={String(n)}>{bracketLabel(n)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <button
+        <Button
           type="button"
-          className="preset-add-btn"
           onClick={addPreset}
           disabled={!!library[presetKey(newGroups, newBracket)]}
         >
-          <Plus size={16} />
+          <Plus />
           {t('registration.presetAdd')}
-        </button>
+        </Button>
       </div>
 
       {entries.length === 0 ? (
-        <p className="seeding-editor-note">{t('registration.presetEmpty')}</p>
+        <p className="rounded-md border bg-muted p-3 text-sm text-muted-foreground italic">{t('registration.presetEmpty')}</p>
       ) : (
-        <div className="preset-list">
+        <div className="grid items-start gap-4 lg:grid-cols-2">
           {entries
             .sort((a, b) => (b[1].numGroups - a[1].numGroups) || (b[1].bracketSize - a[1].bracketSize))
             .map(([key, preset]) => {
               const numGroups = preset.numGroups || 0;
               return (
-                <div key={key} className="preset-card">
-                  <div className="preset-card-header">
-                    <span className="preset-card-title">
+                <Card key={key} className="gap-4 py-4">
+                  <CardHeader className="flex items-center justify-between px-4">
+                    <CardTitle>
                       {t('registration.presetCardTitle', { groups: numGroups, bracket: preset.bracketSize })}
-                    </span>
-                    <button
+                    </CardTitle>
+                    <Button
                       type="button"
-                      className="preset-remove-btn"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-destructive hover:text-destructive"
                       onClick={() => removePreset(key)}
                       aria-label={t('registration.presetRemove')}
                     >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <BracketSeedingEditor
-                    playoffSettings={{ qualificationMode: 'perGroup' }}
-                    groups={synthesizeGroups(numGroups)}
-                    bracketSizeOverride={preset.bracketSize || nextPow2(numGroups)}
-                    value={preset}
-                    onChange={(customSeeding) => updatePreset(key, customSeeding)}
-                    hideToggle
-                  />
-                </div>
+                      <Trash2 />
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="px-4">
+                    <BracketSeedingEditor
+                      playoffSettings={{ qualificationMode: 'perGroup' }}
+                      groups={synthesizeGroups(numGroups)}
+                      bracketSizeOverride={preset.bracketSize || nextPow2(numGroups)}
+                      value={preset}
+                      onChange={(customSeeding) => updatePreset(key, customSeeding)}
+                      hideToggle
+                    />
+                  </CardContent>
+                </Card>
               );
             })}
         </div>

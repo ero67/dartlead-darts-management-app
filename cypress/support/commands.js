@@ -26,8 +26,8 @@ Cypress.Commands.add('login', (email, password) => {
   // Fill in password
   cy.get('input[type="password"], input[name="password"], input[id="password"]').type(testPassword)
   
-  // Submit form
-  cy.contains('button', /sign in|prihlásiť/i).click()
+  // Submit form (scope to the form: the sidebar has a "Login" button with the same label)
+  cy.get('form').contains('button', /sign in|prihlásiť/i).click()
   
   // Wait for navigation to dashboard/tournaments
   cy.url().should('not.include', '/login')
@@ -113,9 +113,33 @@ Cypress.Commands.add('addPlayers', (playerNames) => {
  */
 Cypress.Commands.add('startTournament', () => {
   cy.contains('button', /start tournament/i).click()
+  // The groups preview dialog asks for a second confirmation before starting.
+  cy.get('[role="dialog"]').contains('button', /start tournament|spustiť turnaj/i).click()
+  cy.get('[role="dialog"]').should('not.exist')
   // Wait for tournament to start and navigate to management page
   cy.url().should('include', '/tournament/')
   cy.contains(/groups|matches|standings/i).should('be.visible')
+})
+
+/**
+ * Playoffs are enabled by default; only toggle the switch when they are off.
+ * @example cy.ensurePlayoffsEnabled()
+ */
+Cypress.Commands.add('ensurePlayoffsEnabled', () => {
+  cy.get('#enable-playoffs').then(($switch) => {
+    if ($switch.attr('aria-checked') !== 'true') cy.wrap($switch).click()
+  })
+})
+
+/**
+ * Click text that may not be rendered on this screen (e.g. a seeding option
+ * that only exists in the settings dialog of a started tournament).
+ * @example cy.clickIfPresent(/group-based seeding/i)
+ */
+Cypress.Commands.add('clickIfPresent', (matcher) => {
+  cy.get('body').then(($body) => {
+    if (matcher.test($body.text())) cy.contains(matcher).click()
+  })
 })
 
 /**
@@ -193,3 +217,17 @@ Cypress.Commands.add('waitForTournament', () => {
   cy.get('[class*="tournament"], [class*="management"]').should('be.visible')
 })
 
+
+/**
+ * Pick an option in a shadcn/Radix Select (no native <select>).
+ * `trigger` is a zero-based index among the comboboxes inside `scope`, or a jQuery/element.
+ * @example cy.selectOption(0, /701/)            // first select on the page
+ * @example cy.selectOption(1, /5/, '[role="dialog"]')
+ */
+Cypress.Commands.add('selectOption', (trigger, optionText, scope = 'body') => {
+  const open = typeof trigger === 'number'
+    ? cy.get(scope).find('[data-slot="select-trigger"]').eq(trigger)
+    : cy.wrap(trigger)
+  open.click()
+  cy.get('[role="option"]').contains(optionText).click()
+})

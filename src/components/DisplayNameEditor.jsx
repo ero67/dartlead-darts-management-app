@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { tournamentService } from '../services/tournamentService';
 import { normalizeDisplayName, DISPLAY_NAME_MAX } from '../utils/userDisplayName';
 
@@ -47,31 +50,30 @@ export function DisplayNameEditor({ currentName, onSaved, onCancel }) {
   };
 
   return (
-    <form className="display-name-editor" onSubmit={handleSubmit}>
-      <label className="display-name-editor-label" htmlFor="display-name-input">
-        {t('playerProfile.yourName')}
-      </label>
-      <div className="display-name-editor-row">
-        <input
+    <form className="flex w-full max-w-sm flex-col gap-2 text-foreground" onSubmit={handleSubmit}>
+      <Label htmlFor="display-name-input">{t('playerProfile.yourName')}</Label>
+      <div className="flex items-center gap-2">
+        <Input
           id="display-name-input"
           type="text"
           value={value}
           maxLength={DISPLAY_NAME_MAX}
           autoFocus
           disabled={isSaving}
+          aria-invalid={error ? true : undefined}
           onChange={(e) => { setValue(e.target.value); setError(''); }}
           onKeyDown={(e) => { if (e.key === 'Escape') onCancel(); }}
         />
-        <button type="submit" className="action-btn play" disabled={isSaving} title={t('common.save')}>
-          <Check size={16} />
-        </button>
-        <button type="button" className="action-btn delete" disabled={isSaving} onClick={onCancel} title={t('common.cancel')}>
-          <X size={16} />
-        </button>
+        <Button type="submit" size="icon" disabled={isSaving} title={t('common.save')} aria-label={t('common.save')}>
+          <Check />
+        </Button>
+        <Button type="button" variant="outline" size="icon" disabled={isSaving} onClick={onCancel} title={t('common.cancel')} aria-label={t('common.cancel')}>
+          <X />
+        </Button>
       </div>
       {error
-        ? <p className="display-name-editor-error">{error}</p>
-        : <p className="display-name-editor-hint">{t('playerProfile.nameHint')}</p>}
+        ? <p className="text-xs text-destructive">{error}</p>
+        : <p className="text-xs text-muted-foreground">{t('playerProfile.nameHint')}</p>}
     </form>
   );
 }

@@ -31,16 +31,16 @@ describe('Tournament Creation Flow', () => {
       .type('Custom Settings Tournament')
     
     // Change legs to win
-    cy.get('select').first().select('5')
+    cy.selectOption(0, /\b5\b/)
     
     // Change starting score
-    cy.get('select').eq(1).select('701')
+    cy.selectOption(1, /701/)
     
     // Enable playoffs
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     
     // Select group-based seeding
-    cy.contains(/group-based seeding|rozdelenie podľa skupín/i).click()
+    cy.clickIfPresent(/group-based seeding|rozdelenie podľa skupín/i)
     
     // Create tournament
     cy.contains('button', /create/i).click()

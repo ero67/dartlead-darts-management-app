@@ -20,10 +20,14 @@ export function OfflineBanner() {
   }
 
   return (
-    <div className="offline-banner-stack">
+    <div
+      className="fixed inset-x-0 z-50 flex flex-col gap-px text-sm font-medium"
+      style={{ top: 'var(--safe-area-inset-top, 0px)' }}
+      role="status"
+    >
       {!isOnline && (
-        <div className="offline-banner offline-banner--offline">
-          <WifiOff size={16} />
+        <div className="flex items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-amber-950">
+          <WifiOff className="size-4 shrink-0" />
           <span>
             {t('offline.youAreOffline')}
             {hasPendingWrites
@@ -34,8 +38,8 @@ export function OfflineBanner() {
       )}
 
       {needRefresh && (
-        <div className="offline-banner offline-banner--update">
-          <RefreshCw size={16} />
+        <div className="flex items-center justify-center gap-2 bg-primary px-4 py-2 text-primary-foreground">
+          <RefreshCw className="size-4 shrink-0" />
           <span>{t('offline.updateAvailable')}</span>
         </div>
       )}

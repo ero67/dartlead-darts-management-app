@@ -1,25 +1,39 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Play, Users, Trophy, Target, Wifi, WifiOff, Eye, Trash2, CheckCircle, Settings, Edit2, ChevronUp, ChevronDown, Clock, Activity, BarChart3, X, Search, Grid3x3, List, RotateCcw, Star, Lock, ClipboardList, Tv } from 'lucide-react';
+import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-import { tournamentService, matchService } from '../services/tournamentService';
-import { leagueService } from '../services/leagueService';
-import { BracketVisualization } from './BracketVisualization';
-import { mergeBracketRounds } from '../utils/bracketView';
-import { BracketSeedingEditor } from './BracketSeedingEditor';
-import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TournamentSummary } from './TournamentSummary';
 import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
-import { ExportMenu } from './ExportMenu';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
-import { isValidLegDartCount, HIGH_SCORE_BANDS, countHighScores, addHighScores } from '../utils/dartStats';
+import { StatusBadge } from './shared/StatusBadge';
+import { LoadingState } from './shared/LoadingState';
+import { GroupsTab } from './tournament/GroupsTab';
+import { MatchesTab } from './tournament/MatchesTab';
+import { StandingsTab } from './tournament/StandingsTab';
+import { PlayoffsTab } from './tournament/PlayoffsTab';
+import { StatisticsTab } from './tournament/StatisticsTab';
+import { LiveMatchesTab } from './tournament/LiveMatchesTab';
+import { StartMatchDialog } from './tournament/StartMatchDialog';
+import { EditMatchPlayersDialog } from './tournament/EditMatchPlayersDialog';
+import { CorrectResultDialog } from './tournament/CorrectResultDialog';
+import { EditSettingsDialog } from './tournament/EditSettingsDialog';
+import { supabase } from '../lib/supabase';
+import { tournamentService, matchService } from '../services/tournamentService';
+import { leagueService } from '../services/leagueService';
+import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { confirmDialog } from '../lib/confirmDialog';
 
   // Generate unique ID for playoff matches (using crypto.randomUUID for proper UUIDs)
   const generateId = () => {
@@ -49,7 +63,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     return (
       <button
         type="button"
-        className={`player-profile-link ${className}`}
+        className={cn('font-medium text-foreground hover:underline', className)}
         onClick={(e) => { e.stopPropagation(); navigate(`/player/${player.id}`); }}
         title={t('playerProfile.viewProfile')}
       >
@@ -84,6 +98,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const standingsRef = useRef(null);
   const bracketRef = useRef(null);
   const [editingMatch, setEditingMatch] = useState(null); // Match being edited
+  const [correctingMatch, setCorrectingMatch] = useState(null); // Match whose result is being corrected
   const [liveMatches, setLiveMatches] = useState([]);
   const [matchStatistics, setMatchStatistics] = useState(null); // Match to show statistics for
   const liveMatchesRef = useRef([]);
@@ -139,6 +154,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const playoffMatches = tournament.playoffMatches || [];
     return [...groupMatches, ...playoffMatches].some(m => m?.status && m.status !== 'pending');
   }, [uniqueGroups, tournament.playoffMatches]);
+  // Live legs/board/leg lookup for the match cards (fed by the realtime channel below)
+  const liveInfoById = useMemo(() => new Map(liveMatches.map(m => [m.id, m])), [liveMatches]);
   
   // Update URL when tab changes
   const handleTabChange = (tab) => {
@@ -224,7 +241,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // Belt and braces: the buttons below are hidden for non-scorers, but
     // the database would discard everything such a user scored.
     if (canScore !== true) {
-      alert(t('management.notScorerHint'));
+      toast.info(t('management.notScorerHint'));
       return;
     }
     setMatchToConfirm(matchData);
@@ -288,8 +305,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       };
     })()
   });
-  const { isMatchLive, isMatchLiveOnThisDevice, isMatchStartedByCurrentUser, getLiveMatchInfo, toggleFavoriteGroup, isGroupFavorite, hasFavoriteGroups, getFavoriteGroups } = useLiveMatch();
-  const { isAdmin, isAdminMode } = useAdmin();
+  const { isMatchLive, toggleFavoriteGroup, isGroupFavorite, getFavoriteGroups } = useLiveMatch();
+  const { isAdmin } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   const canManage = isAdmin || isOwner;
 
@@ -379,20 +396,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const showScorerNudge = canManage && scorerCount === 0 && !isScorerNudgeDismissed
     && tournament?.status !== 'completed' && activeTab !== 'scorers';
 
-  // Shown in place of "Start match" to a signed-in user who is not a scorer.
-  const renderNotScorerHint = () => (
-    <span
-      className="login-hint not-scorer-hint"
-      title={t('management.notScorerHint')}
-      onClick={() => alert(t('management.notScorerHint'))}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') alert(t('management.notScorerHint')); }}
-    >
-      <Lock size={11} />
-      {t('management.notScorer')}
-    </span>
-  );
   const { startPlayoffs: contextStartPlayoffs, resetPlayoffs: contextResetPlayoffs, updateTournamentSettings, getTournament, applyRemoteMatchResult } = useTournament();
 
   // Keep the apply-remote fn in a ref for the realtime channel handlers.
@@ -543,10 +546,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       await tournamentService.setPlayoffMatchPlayers(tournament.id, matchId, player1, player2);
       await getTournament(tournament.id);
       setEditingMatch(null);
-      alert(t('management.playoffMatchUpdated'));
+      toast.success(t('management.playoffMatchUpdated'));
     } catch (error) {
       console.error('Error updating playoff match:', error);
-      alert(t('management.failedToUpdatePlayoffMatch'));
+      toast.error(t('management.failedToUpdatePlayoffMatch'));
     }
   };
 
@@ -742,19 +745,21 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 case 'matchesWon':
                   comparison = b.matchesWon - a.matchesWon;
                   break;
-                case 'legDifference':
+                case 'legDifference': {
                   const legDiffA = a.legsWon - a.legsLost;
                   const legDiffB = b.legsWon - b.legsLost;
                   comparison = legDiffB - legDiffA;
                   break;
+                }
                 case 'average':
                   comparison = (b.average || 0) - (a.average || 0);
                   break;
-                case 'headToHead':
+                case 'headToHead': {
                   const aWinsVsB = a.headToHeadWins?.[b.player.id] || 0;
                   const bWinsVsA = b.headToHeadWins?.[a.player.id] || 0;
                   comparison = bWinsVsA - aWinsVsB;
                   break;
+                }
               }
               if (comparison !== 0) return comparison;
             }
@@ -1262,19 +1267,21 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           case 'matchesWon':
             comparison = (b.matchesWon || b.points / 3 || 0) - (a.matchesWon || a.points / 3 || 0);
             break;
-          case 'legDifference':
+          case 'legDifference': {
             const legDiffA = (a.legsWon || 0) - (a.legsLost || 0);
             const legDiffB = (b.legsWon || 0) - (b.legsLost || 0);
             comparison = legDiffB - legDiffA;
             break;
+          }
           case 'average':
             comparison = (b.average || 0) - (a.average || 0);
             break;
-          case 'headToHead':
+          case 'headToHead': {
             const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
             const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
             comparison = bWinsVsA - aWinsVsB;
             break;
+          }
         }
         if (comparison !== 0) return comparison;
       }
@@ -1295,11 +1302,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         case 'average':
           comparison = (b.average || 0) - (a.average || 0);
           break;
-        case 'headToHead':
+        case 'headToHead': {
           const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
           const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
           comparison = bWinsVsA - aWinsVsB;
           break;
+        }
       }
       if (comparison !== 0) return comparison;
     }
@@ -1530,14 +1538,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // For group-based tournaments, ensure group stage is complete first
     if (tournament.tournamentType !== 'playoff_only') {
       if (!isGroupStageComplete()) {
-        alert(t('management.groupStageMustBeCompleted'));
+        toast.error(t('management.groupStageMustBeCompleted'));
         return;
       }
     }
 
     const qualifyingPlayers = activeQualifyingPlayers;
     if (qualifyingPlayers.length === 0) {
-      alert(t('management.noQualifyingPlayers'));
+      toast.error(t('management.noQualifyingPlayers'));
       return;
     }
 
@@ -1554,10 +1562,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     // matches) against a bracket that only exists locally.
     try {
       await contextStartPlayoffs(updatedPlayoffs);
-      alert(t('management.playoffsStartedSuccess', { count: qualifyingPlayers.length }));
+      toast.success(t('management.playoffsStartedSuccess', { count: qualifyingPlayers.length }));
     } catch (error) {
       console.error('Error starting playoffs:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
@@ -1568,13 +1576,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const confirmMessage = t('management.confirmResetPlayoffs') || 
       'Are you sure you want to reset the playoffs? This will clear all playoff matches and results. Group stage data will be preserved.';
     
-    if (window.confirm(confirmMessage)) {
+    if ((await confirmDialog(confirmMessage))) {
       try {
         await contextResetPlayoffs();
-        alert(t('management.playoffsResetSuccess'));
+        toast.success(t('management.playoffsResetSuccess'));
       } catch (error) {
         console.error('Error resetting playoffs:', error);
-        alert(t('management.failedToResetPlayoffs'));
+        toast.error(t('management.failedToResetPlayoffs'));
       }
     }
   };
@@ -1606,13 +1614,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error advancing bye:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
   // Get round name based on number of matches, not players
   // This ensures standard names even with odd numbers of qualifiers
-  const getRoundNameByMatches = (numMatches, roundIndex) => {
+  const getRoundNameByMatches = (numMatches) => {
     // Determine round name based on number of matches
     // Standard tournament naming: 1 match = Final, 2 matches = Semifinals, 4 matches = Quarterfinals, etc.
     switch (numMatches) {
@@ -1641,29 +1649,24 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
   
-  // Keep old function for backwards compatibility (not used anymore)
-  const getRoundName = (roundSize) => {
-    return getRoundNameByMatches(Math.ceil(roundSize / 2), 0);
-  };
-
   const handleDeleteTournament = async () => {
     if (!tournament) return;
     
     if (!canManage) {
-      alert(t('management.onlyAdminsCanDelete'));
+      toast.error(t('management.onlyAdminsCanDelete'));
       return;
     }
 
     const confirmMessage = t('management.confirmDeleteTournament', { name: tournament.name });
     
-    if (window.confirm(confirmMessage)) {
+    if ((await confirmDialog(confirmMessage))) {
       try {
         await onDeleteTournament(tournament.id);
         // Redirect to tournaments list after successful deletion
         onBack();
       } catch (error) {
         console.error('Error deleting tournament:', error);
-        alert(t('management.failedToDeleteTournament'));
+        toast.error(t('management.failedToDeleteTournament'));
       }
     }
   };
@@ -1672,10 +1675,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     try {
       await updateTournamentSettings(tournament.id, tournamentSettings);
       setShowEditSettings(false);
-      alert(t('registration.settingsUpdatedSuccessfully'));
+      toast.success(t('registration.settingsUpdatedSuccessfully'));
     } catch (error) {
       console.error('Error updating tournament settings:', error);
-      alert(t('registration.failedToUpdateSettings'));
+      toast.error(t('registration.failedToUpdateSettings'));
     }
   };
 
@@ -1725,11 +1728,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
 
   const handleAdminResetMatch = async (match) => {
-    if (!window.confirm(t('manager.confirmReset', { matchId: match.id }))) return;
+    if (!(await confirmDialog(t('manager.confirmReset', { matchId: match.id }), { destructive: true }))) return;
     try {
       const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
       if (ctx && isDownstreamBlocked(ctx)) {
-        alert(t('manager.downstreamStarted'));
+        toast.error(t('manager.downstreamStarted'));
         return;
       }
 
@@ -1781,28 +1784,24 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       await getTournament(tournament.id);
     } catch (error) {
       console.error('Error resetting match:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
-  const handleAdminCorrectMatch = async (match) => {
-    const newScore1 = window.prompt(t('manager.enterNewScoreFor', { player: match.player1?.name || t('management.player1') }), match.result?.player1Legs ?? 0);
-    if (newScore1 === null) return;
-    const newScore2 = window.prompt(t('manager.enterNewScoreFor', { player: match.player2?.name || t('management.player2') }), match.result?.player2Legs ?? 0);
-    if (newScore2 === null) return;
+  // Opens the correction dialog; applyCorrectedResult does the actual write.
+  const handleAdminCorrectMatch = (match) => setCorrectingMatch(match);
 
-    const score1 = parseInt(newScore1, 10) || 0;
-    const score2 = parseInt(newScore2, 10) || 0;
+  const applyCorrectedResult = async (match, score1, score2) => {
     const winnerId = score1 > score2 ? match.player1?.id : (score2 > score1 ? match.player2?.id : null);
     if (!winnerId) {
-      alert(t('manager.winnerMoreLegsError'));
+      toast.error(t('manager.winnerMoreLegsError'));
       return;
     }
 
     try {
       const ctx = getBracketContext(tournament?.playoffs?.rounds, match.id);
       if (ctx && isDownstreamBlocked(ctx)) {
-        alert(t('manager.downstreamStarted'));
+        toast.error(t('manager.downstreamStarted'));
         return;
       }
 
@@ -1857,9 +1856,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
 
       await getTournament(tournament.id);
+      setCorrectingMatch(null);
     } catch (error) {
       console.error('Error correcting match result:', error);
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
@@ -1880,918 +1880,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       default: return t('management.pending');
     }
   };
-
-  // Returns a semantic status class so the badge inherits design-system
-  // colors (token-driven) instead of hardcoded inline hex values.
-  const getMatchStatusClass = (status, matchId) => {
-    if (isMatchActuallyLive(matchId)) {
-      return 'status-live';
-    }
-
-    switch (status) {
-      case 'completed': return 'status-completed';
-      case 'in_progress': return 'status-live';
-      default: return 'status-pending';
-    }
-  };
-
-  const renderGroups = () => {
-    const favoriteGroupIds = getFavoriteGroups(tournament.id);
-    const hasFavorites = favoriteGroupIds.length > 0;
-    
-    // Sort groups - favorites first
-    const sortedGroups = [...(uniqueGroups || [])].sort((a, b) => {
-      const aIsFavorite = favoriteGroupIds.includes(a.id);
-      const bIsFavorite = favoriteGroupIds.includes(b.id);
-      if (aIsFavorite && !bIsFavorite) return -1;
-      if (!aIsFavorite && bIsFavorite) return 1;
-      return 0;
-    });
-
-    return (
-      <div className="groups-view">
-        <div className="groups-header-row">
-          <h3>{t('management.tournamentGroups')}</h3>
-          {hasFavorites && (
-            <div className="favorites-indicator">
-              <Star size={14} className="filled" />
-              <span>{t('favorites.showingFavorites')}</span>
-            </div>
-          )}
-        </div>
-        <div className="groups-grid">
-          {sortedGroups && sortedGroups.length > 0 ? sortedGroups.map(group => {
-            const isFavorite = isGroupFavorite(tournament.id, group.id);
-            return (
-              <div key={group.id} className={`group-card ${isFavorite ? 'is-favorite' : ''}`}>
-                <div className="group-header">
-                  <h4>{group.name}</h4>
-                  <div className="group-header-actions">
-                    <button
-                      className={`favorite-btn ${isFavorite ? 'active' : ''}`}
-                      onClick={() => toggleFavoriteGroup(tournament.id, group.id)}
-                      title={isFavorite ? t('favorites.removeFromFavorites') : t('favorites.addToFavorites')}
-                    >
-                      <Star size={16} className={isFavorite ? 'filled' : ''} />
-                    </button>
-                    <span className="player-count">{group.players.length} {t('common.players')}</span>
-                  </div>
-                </div>
-                <div className="group-players">
-                  {group.players.map(player => (
-                    <div key={player.id} className="player-name">
-                      {renderPlayerLink(player)}
-                    </div>
-                  ))}
-                </div>
-                <div className="group-stats">
-                  <div className="stat">
-                    <Target size={16} />
-                    <span>{group.matches.length} {t('common.matches')}</span>
-                  </div>
-                  <div className="stat">
-                    <span>
-                      {group.matches.filter(m => m.status === 'completed').length} {t('management.completed')}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          }) : (
-            <div className="no-groups">
-              <p>{t('management.noGroupsYet')}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderMatches = () => {
-    // Get favorite groups for this tournament
-    const favoriteGroupIds = getFavoriteGroups(tournament.id);
-    const hasFavorites = favoriteGroupIds.length > 0;
-    const showOnlyFavorites = hasFavorites && matchGroupFilter === 'favorites';
-
-    // Collect all matches from all groups
-    const allMatches = uniqueGroups?.flatMap(group => 
-      group.matches.map(match => ({ ...match, groupId: group.id, groupName: group.name }))
-    ) || [];
-
-    // Filter matches
-    const filteredMatches = allMatches.filter(match => {
-      // Filter by favorites
-      if (showOnlyFavorites) {
-        if (!favoriteGroupIds.includes(match.groupId)) {
-          return false;
-        }
-      } else if (matchGroupFilter !== 'all' && match.groupId !== matchGroupFilter) {
-        // Filter by specific group
-        return false;
-      }
-
-      // Filter by player name
-      if (matchPlayerFilter.trim()) {
-        const searchTerm = matchPlayerFilter.trim().toLowerCase();
-        const player1Name = (match.player1?.name || '').toLowerCase();
-        const player2Name = (match.player2?.name || '').toLowerCase();
-        if (!player1Name.includes(searchTerm) && !player2Name.includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-
-    // Group filtered matches by group
-    const matchesByGroup = filteredMatches.reduce((acc, match) => {
-      if (!acc[match.groupId]) {
-        acc[match.groupId] = {
-          groupId: match.groupId,
-          groupName: match.groupName,
-          isFavorite: favoriteGroupIds.includes(match.groupId),
-          matches: []
-        };
-      }
-      acc[match.groupId].matches.push(match);
-      return acc;
-    }, {});
-
-    // Sort groups - favorites first
-    const sortedGroupData = Object.values(matchesByGroup).sort((a, b) => {
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-      return 0;
-    });
-
-    return (
-      <div className="matches-view">
-        <div className="matches-header">
-          <h3>{t('management.allMatches')}</h3>
-          <div className="matches-filters">
-            <div className="filter-group">
-              <label htmlFor="group-filter">{t('management.filterByGroup')}:</label>
-              <select
-                id="group-filter"
-                className="filter-select"
-                value={matchGroupFilter}
-                onChange={(e) => setMatchGroupFilter(e.target.value)}
-              >
-                <option value="all">{t('management.allGroups')}</option>
-                {hasFavorites && (
-                  <option value="favorites">⭐ {t('favorites.favoriteGroups')}</option>
-                )}
-                {uniqueGroups.map(group => {
-                  const isFav = favoriteGroupIds.includes(group.id);
-                  return (
-                    <option key={group.id} value={group.id}>
-                      {isFav ? '⭐ ' : ''}{group.name}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-            <div className="filter-group">
-              <label htmlFor="player-filter">{t('management.filterByPlayer')}:</label>
-              <div className="filter-input-wrapper">
-                <Search size={16} className="filter-icon" />
-                <input
-                  id="player-filter"
-                  type="text"
-                  className="filter-input"
-                  placeholder={t('management.searchPlayerName')}
-                  value={matchPlayerFilter}
-                  onChange={(e) => setMatchPlayerFilter(e.target.value)}
-                />
-                {matchPlayerFilter && (
-                  <button
-                    className="filter-clear-btn"
-                    onClick={() => setMatchPlayerFilter('')}
-                    title={t('management.clearFilter')}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="matches-list">
-          {sortedGroupData.length > 0 ? sortedGroupData.map(groupData => (
-            <div key={groupData.groupId} className={`group-matches ${groupData.isFavorite ? 'is-favorite' : ''}`}>
-              <div className="group-matches-header">
-                <h4>
-                  {groupData.isFavorite && <Star size={14} className="filled" />}
-                  {groupData.groupName}
-                </h4>
-                <button
-                  className={`favorite-btn-small ${groupData.isFavorite ? 'active' : ''}`}
-                  onClick={() => toggleFavoriteGroup(tournament.id, groupData.groupId)}
-                  title={groupData.isFavorite ? t('favorites.removeFromFavorites') : t('favorites.addToFavorites')}
-                >
-                  <Star size={14} className={groupData.isFavorite ? 'filled' : ''} />
-                </button>
-              </div>
-              <div className="matches-grid">
-                {groupData.matches.map(match => {
-                const isPlayer1Winner = match.status === 'completed' && match.result && match.result.winner === match.player1?.id;
-                const isPlayer2Winner = match.status === 'completed' && match.result && match.result.winner === match.player2?.id;
-                
-                return (
-                <div key={match.id} className={`match-card ${getMatchStatusClass(match.status, match.id)}`}>
-                  <div className="match-header">
-                    <div className="match-status">
-                      <span className={`match-badge ${getMatchStatusClass(match.status, match.id)}`}>
-                        {getMatchStatusText(match.status, match.id)}
-                      </span>
-                      {isMatchActuallyLive(match.id) && (
-                        <div className="live-indicator">
-                          {isMatchInLocalStorage(match.id) ? (
-                            <Wifi size={14} className="live-icon this-device" />
-                          ) : (
-                            <Eye size={14} className="live-icon other-device" />
-                          )}
-                        </div>
-                      )}
-                      {match.status === 'pending' && !user && !isMatchActuallyLive(match.id) && (
-                        <span className="login-hint" title={t('management.loginToStartMatch')}>
-                          <Lock size={11} />
-                          {t('navigation.login')}
-                        </span>
-                      )}
-                    </div>
-                    <div className="match-header-actions">
-                      {match.status === 'completed' && match.result && (
-                        <button
-                          className="view-statistics-btn"
-                          onClick={() => setMatchStatistics(match)}
-                          title={t('management.viewStatistics')}
-                        >
-                          <BarChart3 size={16} />
-                        </button>
-                      )}
-                      {canManage && user && (
-                        <div className="admin-controls">
-                          {match.status !== 'pending' && (
-                            <button
-                              className="admin-btn admin-reset-btn"
-                              onClick={() => handleAdminResetMatch(match)}
-                              title={t('manager.resetMatchToPending')}
-                              aria-label={t('manager.resetMatchToPending')}
-                            >
-                              <RotateCcw size={15} />
-                            </button>
-                          )}
-                          <button
-                            className="admin-btn admin-correct-btn"
-                            onClick={() => handleAdminCorrectMatch(match)}
-                            title={t('manager.manualMatchResult')}
-                            aria-label={t('manager.manualMatchResult')}
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {match.status === 'completed' && match.result ? (
-                    <div className="match-result-compact">
-                      <div className="player-result">
-                        <div className="player-name-row">
-                          <span className={`player-name ${isPlayer1Winner ? 'winner' : ''}`}>
-                            {match.player1?.name || t('common.unknown')}
-                          </span>
-                          <span className="score">{match.result.player1Legs}</span>
-                        </div>
-                      </div>
-                      <div className="score-divider">:</div>
-                      <div className="player-result">
-                        <div className="player-name-row">
-                          <span className={`player-name ${isPlayer2Winner ? 'winner' : ''}`}>
-                            {match.player2?.name || t('common.unknown')}
-                          </span>
-                          <span className="score">{match.result.player2Legs}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="match-players-compact">
-                      <span className="player">{match.player1?.name || t('common.unknown')}</span>
-                      <span className="vs">{t('common.vs')}</span>
-                      <span className="player">{match.player2?.name || t('common.unknown')}</span>
-                    </div>
-                  )}
-                  {match.status === 'pending' && groupScorerByMatch.has(match.id) && (
-                    <div className="scorer-hint" title={t('management.suggestedScorerHint')}>
-                      <ClipboardList size={12} />
-                      {t('management.scorerLabel')}: <strong>{groupScorerByMatch.get(match.id).name}</strong>
-                    </div>
-                  )}
-                  {match.status === 'pending' && !isMatchActuallyLive(match.id) && (
-                    !user ? null : canScore === false ? renderNotScorerHint() : (
-                      <button 
-                        className="start-match-btn"
-                        disabled={canScore !== true}
-                        onClick={() => handleStartMatchRequest({ 
-                          ...match,
-                          tournamentId: tournament.id,
-                          groupId: match.groupId,
-                          legsToWin: match.legsToWin || tournament.legsToWin,
-                          startingScore: match.startingScore || tournament.startingScore,
-                          defaultScoringMode: tournament.defaultScoringMode
-                        })}
-                      >
-                        <Play size={16} />
-                        {t('management.startMatch')}
-                      </button>
-                    )
-                  )}
-                  {/* Same device, match in progress here (scorer backed out of the
-                      match view) — resume from the locally saved state. This state
-                      previously rendered NO button, stranding the scorer. */}
-                  {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && user && (
-                    <button
-                      className="continue-match-btn"
-                      onClick={() => onMatchStart({
-                        ...match,
-                        tournamentId: tournament.id,
-                        groupId: match.groupId,
-                        legsToWin: match.legsToWin || tournament.legsToWin,
-                        startingScore: match.startingScore || tournament.startingScore,
-                        defaultScoringMode: tournament.defaultScoringMode
-                      })}
-                    >
-                      <Play size={16} />
-                      {t('management.continueMatch')}
-                    </button>
-                  )}
-                  {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
-                    isAdmin && user ? (
-                      <button
-                        className="continue-match-btn admin-override-btn"
-                        onClick={() => {
-                          const ok = window.confirm(
-                            t('management.adminTakeOverConfirm')
-                          );
-                          if (!ok) return;
-                          onMatchStart({
-                            ...match,
-                            adminOverride: true,
-                            legsToWin: match.legsToWin || tournament.legsToWin,
-                            startingScore: match.startingScore || tournament.startingScore,
-                            defaultScoringMode: tournament.defaultScoringMode
-                          });
-                        }}
-                      >
-                        <Play size={16} />
-                        {t('management.adminTakeOver')}
-                      </button>
-                    ) : (
-                      <button className="view-match-btn" disabled>
-                        <Eye size={16} />
-                        {t('management.liveOtherDevice')}
-                      </button>
-                    )
-                  )}
-
-{/* Emergency: match is in progress but not detected as live on this device */}
-                  {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && canManage && user && (
-                    <button
-                      className="continue-match-btn admin-override-btn"
-                      onClick={() => onMatchStart({
-                        ...match,
-                        adminOverride: true,
-                        legsToWin: match.legsToWin || tournament.legsToWin,
-                        startingScore: match.startingScore || tournament.startingScore,
-                        defaultScoringMode: tournament.defaultScoringMode
-                      })}
-                      title={t('management.adminOverride')}
-                    >
-                      <Play size={16} />
-                      {t('management.adminScore')}
-                    </button>
-                  )}
-                  
-                </div>
-              )})}
-            </div>
-          </div>
-        )) : (
-          <div className="no-matches">
-            <p>{matchGroupFilter !== 'all' || matchPlayerFilter ? 
-              t('management.noMatchesFound') :
-              t('management.noMatchesYet')
-            }</p>
-          </div>
-        )}
-      </div>
-    </div>
-    );
-  };
-
-  const renderStandings = () => {
-    const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
-    // Highlight the players who actually qualify under the configured mode
-    // (per group or best N overall) — not a fixed per-group count.
-    return (
-    <div className="standings-view">
-      <div className="standings-view-header">
-        <h3>{t('management.groupStandings')}</h3>
-        <ExportMenu tournament={tournament} imageTarget={standingsRef} imageSuffix="standings" />
-        {playoffsEnabled && (
-          <div className="standings-legend">
-            <span className="standings-legend-item">
-              <span className="standings-legend-dot qualify" />
-              {t('management.qualifies')}
-            </span>
-            <span className="standings-legend-item">
-              <span className="standings-legend-dot eliminate" />
-              {t('management.eliminated')}
-            </span>
-          </div>
-        )}
-      </div>
-      <div className="standings-list" ref={standingsRef}>
-        {uniqueGroups && uniqueGroups.length > 0 ? uniqueGroups.map(group => {
-          const standings = group.standings || [];
-          const hasData = standings.length > 0;
-          return (
-          <div key={group.id} className="group-standings">
-            <div className="group-standings-title">
-              <Trophy size={15} />
-              <h4>{group.name}</h4>
-              {hasData && (
-                <span className="group-standings-count">
-                  {standings.length} {t('common.players')}
-                </span>
-              )}
-            </div>
-            <div className="standings-table">
-              <div className="table-header">
-                <span className="col-pos">{t('management.pos')}</span>
-                <span className="col-player">{t('management.player')}</span>
-                <span className="col-num" title={t('management.played')}>{t('management.played')}</span>
-                <span className="col-num" title={t('management.won')}>{t('management.won')}</span>
-                <span className="col-num" title={t('management.lost')}>{t('management.lost')}</span>
-                <span className="col-legs">{t('management.legsWL')}</span>
-                <span className="col-num">{t('management.legsDiff')}</span>
-                <span className="col-num">{t('management.avg')}</span>
-                <span className="col-pts">{t('management.pts')}</span>
-              </div>
-              {hasData ? (
-                standings.map((standing, index) => {
-                  const rank = index + 1;
-                  const qualifyCount = standings.filter(st => defaultQualifierIdSet.has(st.player?.id)).length;
-                  const isQualify = playoffsEnabled && defaultQualifierIdSet.has(standing.player?.id);
-                  const rowClass = playoffsEnabled ? (isQualify ? 'qualify-row' : 'eliminate-row') : '';
-                  const isCutLine = playoffsEnabled && rank === qualifyCount && standings.length > qualifyCount;
-                  const legDiff = standing.legsWon - standing.legsLost;
-                  return (
-                  <div
-                    key={standing.player.id}
-                    className={`table-row ${rowClass} ${isCutLine ? 'cut-line' : ''}`}
-                  >
-                    <span className="col-pos">
-                      <span className={`standings-rank rank-${rank}`}>{rank}</span>
-                    </span>
-                    <span className="col-player player-name">{renderPlayerLink(standing.player)}</span>
-                    <span className="col-num">{standing.matchesPlayed}</span>
-                    <span className="col-num col-won">{standing.matchesWon}</span>
-                    <span className="col-num">{standing.matchesLost}</span>
-                    <span className="col-legs">{standing.legsWon}:{standing.legsLost}</span>
-                    <span className={`col-num ${legDiff >= 0 ? 'positive' : 'negative'}`}>
-                      {legDiff > 0 ? '+' : ''}{legDiff}
-                    </span>
-                    <span className="col-num">{standing.average.toFixed(1)}</span>
-                    <span className="col-pts points">{standing.points}</span>
-                  </div>
-                  );
-                })
-              ) : (
-                <div className="no-standings">
-                  <p>{t('management.noMatchesPlayedYet')}</p>
-                </div>
-              )}
-            </div>
-          </div>
-          );
-        }) : (
-          <div className="no-standings">
-            <p>{t('management.noGroupsYet')}</p>
-          </div>
-        )}
-      </div>
-    </div>
-    );
-  };
-
-  const renderStatistics = () => {
-    // Helper function to get checkout value (handles both numeric and legacy string format)
-    const getCheckoutValue = (checkout) => {
-      if (typeof checkout === 'number') {
-        return checkout;
-      }
-      if (typeof checkout === 'string') {
-        // Legacy format: parse combination string like "T20 + T20 + D25" -> 170
-        const parts = checkout.split('+').map(p => p.trim());
-        let total = 0;
-        parts.forEach(part => {
-          part = part.trim();
-          if (part.startsWith('T')) {
-            const num = parseInt(part.substring(1));
-            total += num * 3;
-          } else if (part.startsWith('D')) {
-            const num = parseInt(part.substring(1));
-            total += num * 2;
-          } else if (part.startsWith('S')) {
-            const num = parseInt(part.substring(1));
-            total += num;
-          } else {
-            const num = parseInt(part);
-            if (!isNaN(num)) total += num;
-          }
-        });
-        return total;
-      }
-      return 0;
-    };
-
-    // Collect all statistics from completed matches
-    const allAverages = [];
-    const allCheckouts = [];
-    const allLegs = [];
-    // playerId -> { player, bands: { 80: n, 95: n, 133: n, 170: n, 180: n } }
-    const playerHighScores = new Map();
-    let hasLegacyMatches = false;
-    const collectLegs = (playerStats, player, opponent, matchId, startingScore) => {
-      if (!playerStats?.legs?.length) {
-        return false;
-      }
-      playerStats.legs.forEach(leg => {
-        if (!leg || !leg.isWin || !leg.darts) {
-          return;
-        }
-        // Skip impossible dart counts (e.g. corrupt "1-dart leg") so they
-        // never pollute the fewest-darts records.
-        if (!isValidLegDartCount(leg.darts, startingScore)) {
-          return;
-        }
-        allLegs.push({
-          player,
-          darts: leg.darts,
-          leg: leg.leg,
-          checkout: leg.checkout || null,
-          matchId,
-          opponent: opponent?.name || t('common.unknown')
-        });
-      });
-      return true;
-    };
-
-    // Helper function to process a match and collect statistics
-    const processMatch = (match) => {
-      // Check if match is completed and has result data
-      if (match.status !== 'completed') {
-        return;
-      }
-      
-      // Match result can be in match.result (from database JSONB) or needs to be constructed
-      if (!match.result) {
-        // If no result object but match is completed, skip it (data might not be loaded yet)
-        console.warn('Match is completed but has no result data:', match.id);
-        return;
-      }
-
-      // Debug: Log match result structure
-      if (match.id && (!match.result.player1Stats?.checkouts || !match.result.player2Stats?.checkouts)) {
-        console.log('Match result structure for match', match.id, ':', {
-          hasPlayer1Stats: !!match.result.player1Stats,
-          hasPlayer1Checkouts: !!match.result.player1Stats?.checkouts,
-          player1CheckoutsCount: match.result.player1Stats?.checkouts?.length || 0,
-          hasPlayer1LegAverages: !!match.result.player1Stats?.legAverages,
-          player1LegAveragesCount: match.result.player1Stats?.legAverages?.length || 0,
-          hasPlayer2Stats: !!match.result.player2Stats,
-          hasPlayer2Checkouts: !!match.result.player2Stats?.checkouts,
-          player2CheckoutsCount: match.result.player2Stats?.checkouts?.length || 0,
-          hasPlayer2LegAverages: !!match.result.player2Stats?.legAverages,
-          player2LegAveragesCount: match.result.player2Stats?.legAverages?.length || 0
-        });
-      }
-      
-      // Best averages
-      if (match.result.player1Stats?.average) {
-        allAverages.push({
-          player: match.player1,
-          average: match.result.player1Stats.average,
-          matchId: match.id,
-          opponent: match.player2?.name || t('common.unknown')
-        });
-      }
-      if (match.result.player2Stats?.average) {
-        allAverages.push({
-          player: match.player2,
-          average: match.result.player2Stats.average,
-          matchId: match.id,
-          opponent: match.player1?.name || t('common.unknown')
-        });
-      }
-
-      // High scores per player across all matches. Matches played before the
-      // per-visit scores were stored only know their 180s — those still count
-      // towards the 180 column, and the note under the table explains the rest.
-      const addHighScoreBands = (player, playerStats) => {
-        const playerId = player?.id;
-        if (!playerId || !playerStats) return;
-        let entry = playerHighScores.get(playerId);
-        if (!entry) {
-          entry = { player, bands: countHighScores([]) };
-          playerHighScores.set(playerId, entry);
-        }
-        if (Array.isArray(playerStats.visitScores) && playerStats.visitScores.length > 0) {
-          addHighScores(entry.bands, countHighScores(playerStats.visitScores));
-          return;
-        }
-        const oneEighties = Number(playerStats.oneEighties) || 0;
-        if (Number(playerStats.totalDarts) > 0) hasLegacyMatches = true;
-        entry.bands[180] += oneEighties;
-      };
-      addHighScoreBands(match.player1, match.result.player1Stats);
-      addHighScoreBands(match.player2, match.result.player2Stats);
-
-      // Best checkouts
-      const addCheckoutEntries = (playerStats, player, opponent) => {
-        if (!playerStats?.checkouts?.length) {
-          return;
-        }
-        playerStats.checkouts.forEach(checkout => {
-          if (checkout?.checkout === null || checkout?.checkout === undefined) {
-            return;
-          }
-          // Checkout is now stored as a number, but handle legacy string format too
-          const checkoutValue = getCheckoutValue(checkout.checkout);
-          if (checkoutValue > 0) {
-            allCheckouts.push({
-              player,
-              checkout: checkoutValue,
-              leg: checkout.leg,
-              darts: checkout.totalDarts || checkout.darts,
-              matchId: match.id,
-              opponent: opponent?.name || t('common.unknown')
-            });
-          }
-        });
-      };
-
-      addCheckoutEntries(match.result.player1Stats, match.player1, match.player2);
-      addCheckoutEntries(match.result.player2Stats, match.player2, match.player1);
-
-      const player1LegsAdded = collectLegs(match.result.player1Stats, match.player1, match.player2, match.id, match.startingScore);
-      const player2LegsAdded = collectLegs(match.result.player2Stats, match.player2, match.player1, match.id, match.startingScore);
-
-      if (!player1LegsAdded && !player2LegsAdded) {
-        // Fallback for legacy data without legs array
-        const fallbackFromCheckouts = (playerStats, player, opponent) => {
-          if (!playerStats?.checkouts?.length) return;
-          playerStats.checkouts.forEach(checkout => {
-            if (!checkout?.checkout) return;
-            const startingScore = match.startingScore || 501;
-            let totalDarts = checkout.totalDarts || checkout.darts;
-            if ((!totalDarts || totalDarts <= 3) && playerStats.legAverages?.length >= checkout.leg) {
-              const legAverage = playerStats.legAverages[checkout.leg - 1];
-              if (legAverage > 0) {
-                totalDarts = Math.round((startingScore / legAverage) * 3);
-              }
-            }
-            // Skip impossible dart counts (corrupt data or a bad estimate).
-            if (!isValidLegDartCount(totalDarts, startingScore)) return;
-            allLegs.push({
-              player,
-              darts: totalDarts,
-              leg: checkout.leg,
-              checkout: checkout.checkout,
-              matchId: match.id,
-              opponent: opponent?.name || t('common.unknown')
-            });
-          });
-        };
-        fallbackFromCheckouts(match.result.player1Stats, match.player1, match.player2);
-        fallbackFromCheckouts(match.result.player2Stats, match.player2, match.player1);
-      }
-    };
-
-    // Iterate through all groups and matches - use uniqueGroups to avoid duplicates
-    if (uniqueGroups && uniqueGroups.length > 0) {
-      uniqueGroups.forEach(group => {
-        if (group.matches) {
-          group.matches.forEach(match => {
-            // Process all matches in the group - they should already be filtered by the database query
-            processMatch(match);
-          });
-        }
-      });
-    }
-
-    // Iterate through playoff matches
-    if (tournament.playoffMatches) {
-      tournament.playoffMatches.forEach(match => {
-        processMatch(match);
-      });
-    }
-
-    // Sort leaderboards
-    // For averages: group by player and take only the best average for each player
-    const playerBestAverages = new Map();
-    allAverages.forEach(entry => {
-      const playerId = entry.player?.id;
-      if (!playerId) return;
-      const existing = playerBestAverages.get(playerId);
-      if (!existing || entry.average > existing.average) {
-        playerBestAverages.set(playerId, entry);
-      }
-    });
-    const bestAverages = Array.from(playerBestAverages.values())
-      .sort((a, b) => b.average - a.average)
-      .slice(0, 10);
-    
-    // For checkouts: group by player and collect all checkouts above 50
-    const playerCheckouts = new Map();
-    allCheckouts.forEach(entry => {
-      const playerId = entry.player?.id;
-      if (!playerId) return;
-      const checkoutValue = entry.checkout;
-      if (checkoutValue > 50) {
-        if (!playerCheckouts.has(playerId)) {
-          playerCheckouts.set(playerId, {
-            player: entry.player,
-            checkouts: []
-          });
-        }
-        const playerData = playerCheckouts.get(playerId);
-        // Only add unique checkouts (avoid duplicates)
-        if (!playerData.checkouts.includes(checkoutValue)) {
-          playerData.checkouts.push(checkoutValue);
-        }
-      }
-    });
-    // Sort checkouts for each player in descending order
-    playerCheckouts.forEach((playerData) => {
-      playerData.checkouts.sort((a, b) => b - a);
-    });
-    const bestCheckouts = Array.from(playerCheckouts.values())
-      .sort((a, b) => {
-        // Sort by highest checkout first, then by number of checkouts
-        const maxA = Math.max(...a.checkouts);
-        const maxB = Math.max(...b.checkouts);
-        if (maxB !== maxA) return maxB - maxA;
-        return b.checkouts.length - a.checkouts.length;
-      })
-      .slice(0, 10);
-
-    // For fewest darts: group by player and take only the best (fewest darts) for each player
-    const playerBestLegs = new Map();
-    allLegs.forEach(entry => {
-      const playerId = entry.player?.id;
-      if (!playerId) return;
-      const existing = playerBestLegs.get(playerId);
-      if (!existing || entry.darts < existing.darts) {
-        playerBestLegs.set(playerId, entry);
-      }
-    });
-    const fewestDarts = Array.from(playerBestLegs.values())
-      .sort((a, b) => a.darts - b.darts)
-      .slice(0, 10);
-
-    // Rank on the rarest band first, then downwards.
-    const rankedBands = [...HIGH_SCORE_BANDS].reverse();
-    const highScores = Array.from(playerHighScores.values())
-      .filter(entry => rankedBands.some(band => entry.bands[band] > 0))
-      .sort((a, b) => {
-        for (const band of rankedBands) {
-          if (b.bands[band] !== a.bands[band]) return b.bands[band] - a.bands[band];
-        }
-        return 0;
-      })
-      .slice(0, 10);
-
-    return (
-      <div className="statistics-view">
-        <h3>{t('management.statistics')}</h3>
-        
-        {/* Best Averages Leaderboard */}
-        <div className="statistics-section">
-          <h4>{t('management.bestAverages')}</h4>
-          {bestAverages.length > 0 ? (
-            <div className="leaderboard">
-              <div className="leaderboard-header">
-                <span>#</span>
-                <span>{t('management.player')}</span>
-                <span>{t('management.avg')}</span>
-                <span>{t('management.opponent')}</span>
-              </div>
-              {bestAverages.map((entry, index) => (
-                <div key={`avg-${index}`} className="leaderboard-row">
-                  <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
-                  <span className="value">{entry.average.toFixed(1)}</span>
-                  <span className="opponent">{entry.opponent}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="no-stats">{t('management.noStatisticsYet')}</p>
-          )}
-        </div>
-
-        {/* Best Checkouts Leaderboard */}
-        <div className="statistics-section">
-          <h4>{t('management.bestCheckouts')}</h4>
-          {bestCheckouts.length > 0 ? (
-            <div className="leaderboard">
-              <div className="leaderboard-header">
-                <span>#</span>
-                <span>{t('management.player')}</span>
-                <span>{t('management.checkout')}</span>
-              </div>
-              {bestCheckouts.map((entry, index) => (
-                <div key={`checkout-${index}`} className="leaderboard-row">
-                  <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
-                  <span className="value">{entry.checkouts.join(', ')}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="no-stats">{t('management.noStatisticsYet')}</p>
-          )}
-        </div>
-
-        {/* Fewest Darts Leaderboard */}
-        <div className="statistics-section">
-          <h4>{t('management.fewestDarts')}</h4>
-          {fewestDarts.length > 0 ? (
-            <div className="leaderboard">
-              <div className="leaderboard-header">
-                <span>#</span>
-                <span>{t('management.player')}</span>
-                <span>{t('management.darts')}</span>
-                <span>{t('management.opponent')}</span>
-              </div>
-              {fewestDarts.map((entry, index) => (
-                <div key={`darts-${index}`} className="leaderboard-row">
-                  <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                  <span className="player-name">{renderPlayerLink(entry.player)}</span>
-                  <span className="value">{entry.darts}</span>
-                  <span className="opponent">{entry.opponent}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="no-stats">{t('management.noStatisticsYet')}</p>
-          )}
-        </div>
-
-        {/* High scores (visits of 80+, 95+, 133+, 170+ and 180) */}
-        <div className="statistics-section">
-          <h4>{t('management.highScores')}</h4>
-          {highScores.length > 0 ? (
-            <>
-              <div className="leaderboard-scroll">
-                <div className="leaderboard leaderboard--bands">
-                  <div className="leaderboard-header">
-                    <span>#</span>
-                    <span>{t('management.player')}</span>
-                    {HIGH_SCORE_BANDS.map(band => (
-                      <span key={band} className="band">{band === 180 ? '180' : `${band}+`}</span>
-                    ))}
-                  </div>
-                  {highScores.map((entry, index) => (
-                    <div key={`hs-${entry.player?.id || index}`} className="leaderboard-row">
-                      <span className={`position ${index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : ''}`}>{index + 1}</span>
-                      <span className="player-name">{renderPlayerLink(entry.player)}</span>
-                      {HIGH_SCORE_BANDS.map(band => (
-                        <span key={band} className={`band ${band === 180 ? 'value' : ''}`}>{entry.bands[band]}</span>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {hasLegacyMatches && <p className="stats-note">{t('management.highScoresLegacyNote')}</p>}
-            </>
-          ) : (
-            <p className="no-stats">{t('management.noStatisticsYet')}</p>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Load and subscribe to live matches for this tournament
   useEffect(() => {
     if (!tournament?.id) {
       return;
     }
 
-    let isMounted = true;
     // Reset previously viewed tournament live matches to avoid cross-tournament bleed
     setLiveMatches([]);
     liveMatchesRef.current = [];
@@ -3077,7 +2170,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       .subscribe();
 
     return () => {
-      isMounted = false;
       clearInterval(livePollInterval);
       supabase.removeChannel(channel);
     };
@@ -3087,772 +2179,236 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   // every hook call (rules of hooks): an early return above a hook makes the
   // hook count differ between the null render and the hydrated render.
   if (!tournament) {
-    return (
-      <div className="tournament-management">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>{t('common.loading')}</p>
-        </div>
-      </div>
-    );
+    return <LoadingState text={t('common.loading')} />;
   }
 
-  const renderLiveMatches = () => {
-    const belongsToThisTournament = (match) => {
-      const matchGroupId = match.group_id || match.group?.id;
-      return tournamentGroupIds.has(matchGroupId) || tournamentPlayoffIds.has(match.id);
-    };
-    const filteredLiveMatches = liveMatches
-      .filter(belongsToThisTournament)
-      .sort((a, b) => {
-        // Favorites pinned first (deliberate user action), then a stable order
-        // (board, then id) so cards don't reshuffle as scores update.
-        const aFav = favoriteMatchIds.has(a.id) ? 1 : 0;
-        const bFav = favoriteMatchIds.has(b.id) ? 1 : 0;
-        if (aFav !== bFav) return bFav - aFav;
-        return compareLiveMatchesStable(a, b);
-      });
+  const belongsToThisTournament = (match) => {
+    const matchGroupId = match.group_id || match.group?.id;
+    return tournamentGroupIds.has(matchGroupId) || tournamentPlayoffIds.has(match.id);
+  };
+  const filteredLiveMatches = liveMatches
+    .filter(belongsToThisTournament)
+    .sort((a, b) => {
+      // Favorites pinned first (deliberate user action), then a stable order
+      // (board, then id) so cards don't reshuffle as scores update.
+      const aFav = favoriteMatchIds.has(a.id) ? 1 : 0;
+      const bFav = favoriteMatchIds.has(b.id) ? 1 : 0;
+      if (aFav !== bFav) return bFav - aFav;
+      return compareLiveMatchesStable(a, b);
+    });
 
-    return (
-      <div className="live-matches-view">
-        <div className="live-matches-header">
-          <h3>
-            <Activity size={20} />
-            {t('management.liveMatches')}
-          </h3>
-          <p className="live-matches-count">
-            {filteredLiveMatches.length} {t('management.matchesInProgress')}
-          </p>
-        </div>
-
-        {filteredLiveMatches.length === 0 ? (
-          <div className="no-live-matches">
-            <Activity size={48} className="no-matches-icon" />
-            <h4>{t('management.noLiveMatches')}</h4>
-            <p>{t('management.noLiveMatchesDescription')}</p>
-          </div>
-        ) : (
-          <div className="live-matches-grid">
-            {filteredLiveMatches.map(match => (
-              <div key={match.id} className={`live-match-card scoreboard-style${favoriteMatchIds.has(match.id) ? ' is-favorite-match' : ''}`}>
-                <div className="scoreboard-header">
-                  {match.live_board_number ? (
-                    <div className="board-indicator">
-                      <Target size={14} />
-                      <span>{t('deviceSettings.board')} {match.live_board_number}</span>
-                    </div>
-                  ) : (
-                    <div className="match-format">{t('management.firstTo')} {match.legs_to_win || 3}</div>
-                  )}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button
-                      className={`live-match-favorite-btn${favoriteMatchIds.has(match.id) ? ' active' : ''}`}
-                      onClick={() => toggleFavoriteMatch(match.id)}
-                      title={t('management.toggleFavorite')}
-                    >
-                      <Star size={14} fill={favoriteMatchIds.has(match.id) ? 'currentColor' : 'none'} />
-                    </button>
-                    <div className="live-badge">
-                      <Activity size={12} />
-                      <span>{t('management.live')}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="scoreboard-content">
-                  <div className="scoreboard-row">
-                    <div className="scoreboard-label">{t('management.legs')}</div>
-                  </div>
-
-                  <div className={`player-row player1-row${match.current_player === 0 ? ' is-active-turn' : ''}`}>
-                    <div className="player-info">
-                      {match.current_player === 0 && (
-                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn')} />
-                      )}
-                      <div className="player-name-large">{match.player1?.name || t('common.unknown')}</div>
-                    </div>
-                    <div className="scoreboard-scores">
-                      <div className="legs-score">{match.player1_legs || 0}</div>
-                      <div className="current-score-large">{match.player1_current_score || 501}</div>
-                    </div>
-                  </div>
-
-                  <div className={`player-row player2-row${match.current_player === 1 ? ' is-active-turn' : ''}`}>
-                    <div className="player-info">
-                      {match.current_player === 1 && (
-                        <Play size={14} className="turn-indicator-arrow" fill="currentColor" aria-label={t('management.playerTurn')} />
-                      )}
-                      <div className="player-name-large">{match.player2?.name || t('common.unknown')}</div>
-                    </div>
-                    <div className="scoreboard-scores">
-                      <div className="legs-score">{match.player2_legs || 0}</div>
-                      <div className="current-score-large">{match.player2_current_score || 501}</div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="scoreboard-footer">
-                  {match.group && (
-                    <span className="group-name">{match.group.name}</span>
-                  )}
-                  {match.live_board_number && (
-                    <span className="match-format-footer">{t('management.firstTo')} {match.legs_to_win || 3}</span>
-                  )}
-                  {match.live_device_name && (
-                    <span className="device-name-footer">{match.live_device_name}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+  // Everything a group/playoff match card needs from this component.
+  const card = {
+    user, canScore, canManage, isAdmin, isMatchActuallyLive, isMatchInLocalStorage, getMatchStatusText, liveInfoById,
+    setMatchStatistics, handleAdminResetMatch, handleAdminCorrectMatch, handleStartMatchRequest, onMatchStart
   };
 
-  const renderStartPlayoffsSection = () => {
-    const selectedCount = activeQualifierIds.length;
-    const autoQualifiedCount = defaultQualifierIds.length;
-    const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-
-    const renderQualifierRow = (player, position) => {
-      if (!player) return null;
-      const isSelected = activeQualifierIdSet.has(player.id);
-      const isAutoQualified = defaultQualifierIdSet.has(player.id);
-      return (
-        <label
-          key={player.id}
-          className={`qualifier selectable ${isSelected ? 'selected' : 'unselected'}`}
-        >
-          <input
-            type="checkbox"
-            className="qualifier-checkbox"
-            checked={isSelected}
-            onChange={() => toggleQualifierSelection(player.id)}
-          />
-          <span className="position">{position}</span>
-          <span className="player-name">{player.name}</span>
-          {isAutoQualified && (
-            <span className="qualifier-tag">
-              {t('management.autoQualifiedTag')}
-            </span>
-          )}
-        </label>
-      );
-    };
-
-    const renderGroupQualifiers = (group) => {
-      const groupPlayers = group.standings && group.standings.length > 0
-        ? sortStandingsByCriteria(group.standings, criteriaOrder)
-            .map((standing, index) => ({ player: standing.player, position: index + 1 }))
-        : (group.players || []).map((player, index) => ({ player, position: index + 1 }));
-
-      return (
-        <div key={group.id} className="group-qualifiers">
-          <h5>{group.name}</h5>
-          <div className="qualifiers-list">
-            {groupPlayers.length > 0 ? (
-              groupPlayers.map(({ player, position }) => renderQualifierRow(player, position))
-            ) : (
-              <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                {t('management.noPlayersInGroup')}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    const playoffOnlyPlayers = tournament.tournamentType === 'playoff_only'
-      ? rankedPlayersForSeeding
-      : [];
-
-    return (
-      <div className="start-playoffs-section">
-        <div className="playoffs-header">
-          <h3>{t('management.readyToStartPlayoffs')}</h3>
-          <div className="playoff-info">
-            <span>{t('management.groupStageCompleted')}</span>
-            <span>{selectedCount} {t('management.playersQualified')}</span>
-          </div>
-        </div>
-
-        <div className="qualifying-controls">
-          <div className="qualifying-summary">
-            <span>{t('management.selectedPlayers', { count: selectedCount })}</span>
-            <span>{t('management.autoQualified', { count: autoQualifiedCount })}</span>
-          </div>
-          <button
-            className="qualifiers-reset-btn"
-            onClick={resetQualifierSelection}
-            disabled={!qualifiersTouched}
-          >
-            {t('management.resetQualifiers')}
-          </button>
-        </div>
-
-        <div className="qualifying-players">
-          <h4>{t('management.qualifyingPlayers')}:</h4>
-          <p className="qualifying-hint">
-            {t('management.qualifyingAdjustHint')}
-          </p>
-          <div className="players-grid">
-            {tournament.tournamentType === 'playoff_only' ? (
-              <div className="group-qualifiers">
-                <h5>{t('management.allPlayers')}</h5>
-                <div className="qualifiers-list">
-                  {playoffOnlyPlayers.length > 0 ? (
-                    playoffOnlyPlayers.map((player, index) => renderQualifierRow(player, index + 1))
-                  ) : (
-                    <div className="no-qualifiers" style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                      {t('management.noPlayersInGroup')}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              uniqueGroups && uniqueGroups.length > 0 ? (
-                uniqueGroups.map(group => renderGroupQualifiers(group))
-              ) : (
-                <div className="no-groups">
-                  <p>{t('management.noGroupsYet')}</p>
-                </div>
-              )
-            )}
-          </div>
-        </div>
-
-        <div className="start-playoffs-actions">
-          <button
-            className="start-playoffs-btn"
-            onClick={startPlayoffs}
-          >
-            <Trophy size={20} />
-            {t('management.startPlayoffs')}
-          </button>
-          <p className="playoffs-note">
-            {t('management.playoffsNote')}
-          </p>
-        </div>
-      </div>
-    );
-  };
-
-  const renderPlayoffs = () => {
-    // Check if playoffs are enabled
-    if (!tournament.playoffSettings?.enabled) {
-      return (
-        <div className="playoffs-view">
-          <div className="no-playoffs">
-            <Trophy size={48} />
-            <h3>{t('management.playoffsNotEnabled')}</h3>
-            <p>{t('management.tournamentWithoutPlayoffs')}</p>
-          </div>
-        </div>
-      );
-    }
-
-    // If playoffs object doesn't exist but playoffs are enabled, show group stage completion check
-    if (!tournament.playoffs) {
-      const groupStageComplete = isGroupStageComplete();
-      if (groupStageComplete) {
-        return (
-          <div className="playoffs-view">
-            {renderStartPlayoffsSection()}
-          </div>
-        );
-      } else {
-        return (
-          <div className="playoffs-view">
-            <div className="no-playoffs">
-              <Trophy size={48} />
-              <h3>{t('management.playoffsNotAvailable')}</h3>
-              <p>{t('management.playoffsAvailableAfterGroups')}</p>
-            </div>
-          </div>
-        );
-      }
-    }
-
-    // Check if group stage is complete but playoffs haven't started
-    const groupStageComplete = isGroupStageComplete();
-    const hasQualifyingPlayers = tournament.playoffs?.qualifyingPlayers && tournament.playoffs.qualifyingPlayers.length > 0;
-    const hasPlayoffRounds = tournament.playoffs?.rounds && tournament.playoffs.rounds.length > 0;
-    // Playoffs are started if we have qualifying players and rounds (players don't need to be assigned yet)
-    const playoffsStarted = hasQualifyingPlayers && hasPlayoffRounds;
-    
-
-    if (groupStageComplete && !playoffsStarted) {
-      return (
-        <div className="playoffs-view">
-          {renderStartPlayoffsSection()}
-        </div>
-      );
-    }
-
-    const { rounds, currentRound, qualifyingPlayers } = tournament.playoffs;
-    const playoffMatches = tournament.playoffMatches || [];
-
-
-    // Check if players need to be assigned to matches
-    const needsPlayerAssignment = rounds.some(round => 
-      round.matches.some(match => !match.player1 || !match.player2)
-    );
-
-    return (
-      <div className="playoffs-view">
-        <div className="playoffs-header">
-          <h3>{t('management.playoffBracket')}</h3>
-          <div className="playoff-info">
-            <span>{qualifyingPlayers.length} {t('management.playersQualified')}</span>
-            <span>{t('management.currentRound')}: {rounds[currentRound - 1]?.name || t('common.completed')}</span>
-          </div>
-          <ExportMenu tournament={tournament} imageTarget={bracketRef} imageSuffix="bracket" items={['image', 'results']} />
-          <div className="bracket-view-toggle">
-            <button
-              className={`view-toggle-btn ${bracketViewMode === 'detailed' ? 'active' : ''}`}
-              onClick={() => setBracketViewMode('detailed')}
-              title={t('management.detailedView')}
-            >
-              <List size={18} />
-              {t('management.detailed')}
-            </button>
-            <button
-              className={`view-toggle-btn ${bracketViewMode === 'compact' ? 'active' : ''}`}
-              onClick={() => setBracketViewMode('compact')}
-              title={t('management.bracket')}
-            >
-              <Grid3x3 size={18} />
-              {t('management.bracket')}
-            </button>
-          </div>
-        </div>
-
-        <div ref={bracketRef} className="bracket-export-target">
-        {bracketViewMode === 'compact' ? (
-          <BracketVisualization rounds={mergeBracketRounds(rounds, playoffMatches, tournament.players)} playoffMatches={playoffMatches} />
-        ) : (
-        <div className="bracket-container">
-          {rounds.map((round, index) => (
-            <div key={round.id} className={`bracket-round ${index + 1 === currentRound ? 'current' : ''}`}>
-              <div className="round-header">
-                <h4>{round.name}</h4>
-                <span className="match-count">
-                  {(() => {
-                    const count = round.matches.filter(m => !m.isThirdPlaceMatch).length;
-                    return t(count === 1 ? 'common.matchCountOne' : count < 5 ? 'common.matchCountFew' : 'common.matchCountMany', { count });
-                  })()}
-                  {round.matches.some(m => m.isThirdPlaceMatch) && ` ${t('management.plusThirdPlace')}`}
-                </span>
-              </div>
-              
-              <div className="round-matches">
-                {round.matches.map((bracketMatch) => {
-                  // Find the actual database match for this bracket match
-                  const match = playoffMatches.find(pm => pm.id === bracketMatch.id) || bracketMatch;
-                  return (
-                  <div key={match.id} className={`playoff-match ${match.status} ${bracketMatch.isThirdPlaceMatch ? 'third-place-match' : ''}`}>
-                    {bracketMatch.isThirdPlaceMatch && (
-                      <div className="match-label">
-                        {t('management.thirdPlaceMatch')}
-                      </div>
-                    )}
-                    <div className="match-header">
-                      <div className="match-status">
-                        <span className={`match-badge ${getMatchStatusClass(match.status, match.id)}`}>
-                          {getMatchStatusText(match.status, match.id)}
-                        </span>
-                        {match.status === 'pending' && !user && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
-                          <span className="login-hint" title={t('management.loginToStartMatch')}>
-                            <Lock size={11} />
-                            {t('navigation.login')}
-                          </span>
-                        )}
-                        {isMatchActuallyLive(match.id) && (
-                          <div className="live-indicator">
-                            {isMatchInLocalStorage(match.id) ? (
-                              <Wifi size={14} className="live-icon this-device" />
-                            ) : (
-                              <Eye size={14} className="live-icon other-device" />
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="match-header-actions">
-                        {canManage && match.status === 'pending' && !isMatchActuallyLive(match.id) && (
-                          <button
-                            className="edit-match-icon-btn"
-                            onClick={() => setEditingMatch({ ...match, isThirdPlaceMatch: bracketMatch.isThirdPlaceMatch })}
-                            title={t('management.editMatchPlayers')}
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                        )}
-                        {match.status === 'completed' && match.result && (
-                          <button
-                            className="view-statistics-btn"
-                            onClick={() => setMatchStatistics(match)}
-                            title={t('management.viewStatistics')}
-                          >
-                            <BarChart3 size={16} />
-                          </button>
-                        )}
-                        {canManage && user && match.status !== 'pending' && (
-                          <div className="admin-controls">
-                            <button
-                              className="admin-btn admin-reset-btn"
-                              onClick={() => handleAdminResetMatch(match)}
-                              title={t('manager.resetMatchToPending')}
-                              aria-label={t('manager.resetMatchToPending')}
-                            >
-                              <RotateCcw size={15} />
-                            </button>
-                            <button
-                              className="admin-btn admin-correct-btn"
-                              onClick={() => handleAdminCorrectMatch(match)}
-                              title={t('manager.manualMatchResult')}
-                              aria-label={t('manager.manualMatchResult')}
-                            >
-                              <Edit2 size={15} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {match.status === 'completed' && match.result ? (
-                      match.result.isBye ? (
-                        <div className="playoff-match-result bye-result">
-                          <div className="playoff-player-row winner">
-                            <span className="playoff-player-name">{(match.player1 || match.player2)?.name || t('management.tbd')}</span>
-                            <span className="playoff-player-score bye-badge">{t('management.bye')}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="playoff-match-result">
-                          <div className={`playoff-player-row ${match.result?.winner === match.player1?.id ? 'winner' : ''}`}>
-                            <span className="playoff-player-name">{match.player1?.name || t('management.tbd')}</span>
-                            <span className="playoff-player-score">{match.result.player1Legs}</span>
-                          </div>
-                          <div className={`playoff-player-row ${match.result?.winner === match.player2?.id ? 'winner' : ''}`}>
-                            <span className="playoff-player-name">{match.player2?.name || t('management.tbd')}</span>
-                            <span className="playoff-player-score">{match.result.player2Legs}</span>
-                          </div>
-                        </div>
-                      )
-                    ) : (
-                      <div className="playoff-match-players">
-                        <div className="playoff-player-row">
-                          <span className="playoff-player-name">{match.player1?.name || (!match.player2 ? t('management.tbd') : t('management.bye'))}</span>
-                    </div>
-                        <div className="playoff-vs">{t('common.vs')}</div>
-                        <div className="playoff-player-row">
-                          <span className="playoff-player-name">{match.player2?.name || (!match.player1 ? t('management.tbd') : t('management.bye'))}</span>
-                      </div>
-                      </div>
-                    )}
-                    {match.status === 'pending' && match.player1 && match.player2 && playoffScorerByMatch.has(match.id) && (
-                      <div className="scorer-hint" title={t('management.suggestedScorerHint')}>
-                        <ClipboardList size={12} />
-                        {t('management.scorerLabel')}: <strong>{playoffScorerByMatch.get(match.id).name}</strong>
-                      </div>
-                    )}
-
-                    <div className="match-actions">
-                      {match.status === 'pending' && ((match.player1 && !match.player2) || (!match.player1 && match.player2)) && (
-                        <button
-                          className="start-match-btn bye-advance-btn"
-                          onClick={() => handleAdvanceBye(match)}
-                        >
-                          <CheckCircle size={16} />
-                          {t('management.advancePlayer')}
-                        </button>
-                      )}
-                      {match.status === 'pending' && match.player1 && match.player2 && !isMatchActuallyLive(match.id) && (
-                        !user ? null : canScore === false ? renderNotScorerHint() : (
-                          <button 
-                            className="start-match-btn"
-                            disabled={canScore !== true}
-                            onClick={() => {
-                              // Calculate round size from number of matches (each match has 2 players)
-                              const roundSize = getRoundSize(round);
-                              const legsToWin = getPlayoffLegsToWin(roundSize);
-                              handleStartMatchRequest({ 
-                                ...match,
-                                tournamentId: tournament.id,
-                                legsToWin: legsToWin,
-                                startingScore: tournament.startingScore,
-                                defaultScoringMode: tournament.defaultScoringMode,
-                                isPlayoff: true
-                              });
-                            }}
-                          >
-                            <Play size={16} />
-                            {t('management.startMatch')}
-                          </button>
-                        )
-                      )}
-                      {/* Same device resume — see the group-match card note */}
-                      {isMatchActuallyLive(match.id) && isMatchInLocalStorage(match.id) && user && (
-                        <button
-                          className="continue-match-btn"
-                          onClick={() => {
-                            const roundSize = getRoundSize(round);
-                            const legsToWin = getPlayoffLegsToWin(roundSize);
-                            onMatchStart({
-                              ...match,
-                              legsToWin: legsToWin,
-                              startingScore: tournament.startingScore,
-                              defaultScoringMode: tournament.defaultScoringMode,
-                              isPlayoff: true
-                            });
-                          }}
-                        >
-                          <Play size={16} />
-                          {t('management.continueMatch')}
-                        </button>
-                      )}
-                      {isMatchActuallyLive(match.id) && !isMatchInLocalStorage(match.id) && (
-                        isAdmin && user ? (
-                          <button
-                            className="continue-match-btn admin-override-btn"
-                            onClick={() => {
-                              const ok = window.confirm(
-                                t('management.adminTakeOverConfirm')
-                              );
-                              if (!ok) return;
-                              const roundSize = getRoundSize(round);
-                              const legsToWin = getPlayoffLegsToWin(roundSize);
-                              onMatchStart({
-                                ...match,
-                                adminOverride: true,
-                                legsToWin: legsToWin,
-                                startingScore: tournament.startingScore,
-                                defaultScoringMode: tournament.defaultScoringMode,
-                                isPlayoff: true
-                              });
-                            }}
-                          >
-                            <Play size={16} />
-                            {t('management.adminTakeOver')}
-                          </button>
-                        ) : (
-                          <button className="view-match-btn" disabled>
-                            <Eye size={16} />
-                            {t('management.liveOtherDevice')}
-                          </button>
-                        )
-                      )}
-
-{/* Emergency: playoff match is in progress but not detected as live on this device */}
-                      {match.status === 'in_progress' && !isMatchActuallyLive(match.id) && canManage && user && (
-                        <button
-                          className="continue-match-btn admin-override-btn"
-                          onClick={() => {
-                            const roundSize = getRoundSize(round);
-                            const legsToWin = getPlayoffLegsToWin(roundSize);
-                            onMatchStart({
-                              ...match,
-                              adminOverride: true,
-                              legsToWin: legsToWin,
-                              startingScore: tournament.startingScore,
-                              defaultScoringMode: tournament.defaultScoringMode,
-                              isPlayoff: true
-                            });
-                          }}
-                          title={t('management.adminOverride')}
-                        >
-                          <Play size={16} />
-                          {t('management.adminScore')}
-                        </button>
-                      )}
-                      
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        )}
-        </div>
-
-        {canManage && (
-          <div className="playoffs-footer">
-            <button
-              type="button"
-              className="danger-outline-btn"
-              onClick={handleResetPlayoffs}
-              title={t('management.confirmResetPlayoffs')}
-            >
-              <RotateCcw size={16} />
-              {t('management.resetPlayoffs')}
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
+  const isPlayoffOnly = tournament.tournamentType === 'playoff_only';
+  const playerCount = tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0;
+  const overview = [
+    `${playerCount} ${t('common.players')}`,
+    `${uniqueGroups?.length || 0} ${t('common.groups')}`,
+    tournament.legsToWin && (tournament.legsToWin === 1
+      ? t('tournaments.firstToLeg', { count: 1 })
+      : t('tournaments.firstToLegs', { count: tournament.legsToWin })),
+    tournament.startingScore && `${t('tournaments.startingScore')} ${tournament.startingScore}`
+  ].filter(Boolean);
 
   return (
-    <div className="tournament-management">
-      <div className="management-header">
-        <button className="back-btn" onClick={onBack}>
-          <ArrowLeft size={20} />
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="flex flex-col gap-4">
+        <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
+          <ArrowLeft />
           {t('common.backToDashboard')}
-        </button>
-        <div className="tournament-title">
-          <Trophy size={24} />
-          <h2>{tournament.name}</h2>
-          {user && (
-            canManage ? (
-              <span className="management-indicator managing">{t('management.youAreManaging')}</span>
-            ) : (
-              <span className="management-indicator viewing">{t('management.youAreViewing')}</span>
-            )
-          )}
-        </div>
-        <div className="tournament-overview">
-          <div className="overview-stat">
-            <Users size={20} />
-            <span>{tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0} {t('common.players')}</span>
-          </div>
-          <div className="overview-stat">
-            <span>{uniqueGroups?.length || 0} {t('common.groups')}</span>
-          </div>
-        </div>
-        <div className="header-actions">
-          <RefreshButton />
-          <a
-            className="edit-settings-btn tv-mode-btn"
-            href={`/tv/${tournament.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={t('management.tvModeHint')}
-            aria-label={t('management.tvMode')}
-          >
-            <Tv size={18} />
-            <span className="btn-label">{t('management.tvMode')}</span>
-          </a>
-          {canManage && user && (
-            <button
-              className="edit-settings-btn"
-              onClick={() => setShowEditSettings(true)}
-              title={t('registration.editTournamentSettings')}
-              aria-label={t('registration.editSettings')}
-            >
-              <Settings size={18} />
-              <span className="btn-label">{t('registration.editSettings')}</span>
-            </button>
-          )}
-          {canManage && user && (
-            <button
-              className="delete-tournament-btn"
-              onClick={handleDeleteTournament}
-              title={t('management.deleteTournament')}
-              aria-label={t('management.deleteTournament')}
-            >
-              <Trash2 size={20} />
-              <span className="btn-label">{t('management.deleteTournament')}</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="management-tabs">
-        {tournament.tournamentType !== 'playoff_only' && (
-          <>
-            <button 
-              className={activeTab === 'groups' ? 'active' : ''}
-              onClick={() => handleTabChange('groups')}
-            >
-              {t('management.groups')}
-            </button>
-            <button 
-              className={activeTab === 'matches' ? 'active' : ''}
-              onClick={() => handleTabChange('matches')}
-            >
-              {t('management.matches')}
-            </button>
-            <button 
-              className={activeTab === 'standings' ? 'active' : ''}
-              onClick={() => handleTabChange('standings')}
-            >
-              {t('management.standings')}
-            </button>
-          </>
-        )}
-        {tournament.playoffSettings?.enabled && (
-          <button 
-            className={activeTab === 'playoffs' ? 'active' : ''}
-            onClick={() => handleTabChange('playoffs')}
-          >
-            {t('management.playoffs')}
-          </button>
-        )}
-        <button 
-          className={activeTab === 'statistics' ? 'active' : ''}
-          onClick={() => handleTabChange('statistics')}
-        >
-          {t('management.statistics')}
-        </button>
-        <button 
-          className={activeTab === 'liveMatches' ? 'active' : ''}
-          onClick={() => handleTabChange('liveMatches')}
-        >
-          <Activity size={16} />
-          {t('management.liveMatches')}
-        </button>
-        {canManage && (
-          <button
-            className={activeTab === 'scorers' ? 'active' : ''}
-            onClick={() => handleTabChange('scorers')}
-          >
-            <ClipboardList size={16} />
-            {t('scorers.title')}
-          </button>
-        )}
-        {tournament.status === 'completed' && (
-          <button 
-            className={`summary-tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
-            onClick={() => handleTabChange('summary')}
-          >
-            <Trophy size={16} />
-            {t('summary.tab')}
-          </button>
-        )}
-      </div>
-
-      <div className="management-content">
-        {showScorerNudge && (
-          <div className="scorer-nudge" role="status">
-            <ClipboardList size={18} className="scorer-nudge-icon" />
-            <div className="scorer-nudge-text">
-              <strong>{t('management.noScorersTitle')}</strong>
-              <span>{t('management.noScorersText')}</span>
+        </Button>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">{tournament.name}</h1>
+              <StatusBadge status={tournament.status} t={t} />
+              {user && (
+                <Badge variant="outline">
+                  {canManage ? t('management.youAreManaging') : t('management.youAreViewing')}
+                </Badge>
+              )}
             </div>
-            <div className="scorer-nudge-actions">
-              <button type="button" className="scorer-nudge-btn" onClick={() => handleTabChange('scorers')}>
-                {t('management.addScorers')}
-              </button>
-              <button
-                type="button"
-                className="scorer-nudge-dismiss"
-                onClick={dismissScorerNudge}
-                aria-label={t('common.close')}
-                title={t('common.close')}
+            <p className="text-sm text-muted-foreground tabular-nums">{overview.join(' · ')}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <RefreshButton />
+            <Button variant="outline" asChild>
+              <a
+                href={`/tv/${tournament.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={t('management.tvModeHint')}
+                aria-label={t('management.tvMode')}
               >
-                <X size={16} />
-              </button>
-            </div>
+                <Monitor />
+                {t('management.tvMode')}
+              </a>
+            </Button>
+            {canManage && user && (
+              <Button
+                variant="outline"
+                onClick={() => setShowEditSettings(true)}
+                title={t('registration.editTournamentSettings')}
+                aria-label={t('registration.editSettings')}
+              >
+                <Settings />
+                {t('registration.editSettings')}
+              </Button>
+            )}
+            {canManage && user && (
+              <Button
+                variant="ghost"
+                className="text-destructive hover:text-destructive"
+                onClick={handleDeleteTournament}
+                title={t('management.deleteTournament')}
+                aria-label={t('management.deleteTournament')}
+              >
+                <Trash2 />
+                {t('management.deleteTournament')}
+              </Button>
+            )}
           </div>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList>
+          {!isPlayoffOnly && (
+            <>
+              <TabsTrigger value="groups">{t('management.groups')}</TabsTrigger>
+              <TabsTrigger value="matches">{t('management.matches')}</TabsTrigger>
+              <TabsTrigger value="standings">{t('management.standings')}</TabsTrigger>
+            </>
+          )}
+          {tournament.playoffSettings?.enabled && (
+            <TabsTrigger value="playoffs">{t('management.playoffs')}</TabsTrigger>
+          )}
+          <TabsTrigger value="statistics">{t('management.statistics')}</TabsTrigger>
+          <TabsTrigger value="liveMatches">
+            <Activity />
+            {t('management.liveMatches')}
+            {filteredLiveMatches.length > 0 && (
+              <Badge variant="destructive" className="h-5 min-w-5 px-1 tabular-nums">{filteredLiveMatches.length}</Badge>
+            )}
+          </TabsTrigger>
+          {canManage && (
+            <TabsTrigger value="scorers">
+              <ClipboardList />
+              {t('scorers.title')}
+            </TabsTrigger>
+          )}
+          {tournament.status === 'completed' && (
+            <TabsTrigger value="summary">
+              <Trophy />
+              {t('summary.tab')}
+            </TabsTrigger>
+          )}
+        </TabsList>
+      </Tabs>
+
+      <div className="flex flex-col gap-4">
+        {showScorerNudge && (
+          <Alert role="status" className="pr-12">
+            <ClipboardList />
+            <AlertTitle>{t('management.noScorersTitle')}</AlertTitle>
+            <AlertDescription>
+              <p>{t('management.noScorersText')}</p>
+              <Button type="button" size="sm" className="mt-1" onClick={() => handleTabChange('scorers')}>
+                {t('management.addScorers')}
+              </Button>
+            </AlertDescription>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-2 right-2"
+              onClick={dismissScorerNudge}
+              aria-label={t('common.close')}
+              title={t('common.close')}
+            >
+              <X />
+            </Button>
+          </Alert>
         )}
-        {tournament.tournamentType !== 'playoff_only' && activeTab === 'groups' && renderGroups()}
-        {tournament.tournamentType !== 'playoff_only' && activeTab === 'matches' && renderMatches()}
-        {tournament.tournamentType !== 'playoff_only' && activeTab === 'standings' && renderStandings()}
-        {activeTab === 'playoffs' && renderPlayoffs()}
-        {activeTab === 'statistics' && renderStatistics()}
-        {activeTab === 'liveMatches' && renderLiveMatches()}
+        {!isPlayoffOnly && activeTab === 'groups' && (
+          <GroupsTab
+            tournament={tournament}
+            uniqueGroups={uniqueGroups}
+            getFavoriteGroups={getFavoriteGroups}
+            isGroupFavorite={isGroupFavorite}
+            toggleFavoriteGroup={toggleFavoriteGroup}
+            renderPlayerLink={renderPlayerLink}
+            t={t}
+          />
+        )}
+        {!isPlayoffOnly && activeTab === 'matches' && (
+          <MatchesTab
+            tournament={tournament}
+            uniqueGroups={uniqueGroups}
+            matchGroupFilter={matchGroupFilter}
+            setMatchGroupFilter={setMatchGroupFilter}
+            matchPlayerFilter={matchPlayerFilter}
+            setMatchPlayerFilter={setMatchPlayerFilter}
+            getFavoriteGroups={getFavoriteGroups}
+            toggleFavoriteGroup={toggleFavoriteGroup}
+            groupScorerByMatch={groupScorerByMatch}
+            card={card}
+            t={t}
+          />
+        )}
+        {!isPlayoffOnly && activeTab === 'standings' && (
+          <StandingsTab
+            tournament={tournament}
+            uniqueGroups={uniqueGroups}
+            defaultQualifierIdSet={defaultQualifierIdSet}
+            standingsRef={standingsRef}
+            renderPlayerLink={renderPlayerLink}
+            t={t}
+          />
+        )}
+        {activeTab === 'playoffs' && (
+          <PlayoffsTab
+            tournament={tournament}
+            uniqueGroups={uniqueGroups}
+            isGroupStageComplete={isGroupStageComplete}
+            bracketViewMode={bracketViewMode}
+            setBracketViewMode={setBracketViewMode}
+            bracketRef={bracketRef}
+            handleResetPlayoffs={handleResetPlayoffs}
+            getRoundSize={getRoundSize}
+            getPlayoffLegsToWin={getPlayoffLegsToWin}
+            setEditingMatch={setEditingMatch}
+            handleAdvanceBye={handleAdvanceBye}
+            playoffScorerByMatch={playoffScorerByMatch}
+            activeQualifierIds={activeQualifierIds}
+            defaultQualifierIds={defaultQualifierIds}
+            activeQualifierIdSet={activeQualifierIdSet}
+            defaultQualifierIdSet={defaultQualifierIdSet}
+            rankedPlayersForSeeding={rankedPlayersForSeeding}
+            sortStandingsByCriteria={sortStandingsByCriteria}
+            toggleQualifierSelection={toggleQualifierSelection}
+            resetQualifierSelection={resetQualifierSelection}
+            qualifiersTouched={qualifiersTouched}
+            startPlayoffs={startPlayoffs}
+            card={card}
+            t={t}
+          />
+        )}
+        {activeTab === 'statistics' && (
+          <StatisticsTab tournament={tournament} uniqueGroups={uniqueGroups} renderPlayerLink={renderPlayerLink} t={t} />
+        )}
+        {activeTab === 'liveMatches' && (
+          <LiveMatchesTab
+            liveMatches={filteredLiveMatches}
+            favoriteMatchIds={favoriteMatchIds}
+            toggleFavoriteMatch={toggleFavoriteMatch}
+            t={t}
+          />
+        )}
         {activeTab === 'scorers' && canManage && (
           <ScorersPanel
             type="tournament"
@@ -3864,993 +2420,39 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       </div>
 
       {/* Match Start Confirmation Modal */}
-      {matchToConfirm && (
-        <div className="modal-overlay" onClick={cancelStartMatch}>
-          <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{t('management.confirmStartMatch')}</h3>
-              <button 
-                className="close-btn"
-                onClick={cancelStartMatch}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-content confirm-modal-content">
-              <div className="confirm-match-info">
-                <div className="confirm-match-players">
-                  <span className="confirm-player">{matchToConfirm.player1?.name || t('management.player1')}</span>
-                  <span className="confirm-vs">{t('common.vs')}</span>
-                  <span className="confirm-player">{matchToConfirm.player2?.name || t('management.player2')}</span>
-                </div>
-                {matchToConfirm.groupName && (
-                  <div className="confirm-match-group">
-                    {matchToConfirm.groupName}
-                  </div>
-                )}
-                {matchToConfirm.isPlayoff && (
-                  <div className="confirm-match-playoff">
-                    {t('management.playoffMatch')}
-                  </div>
-                )}
-              </div>
-              <p className="confirm-message">
-                {t('management.confirmStartMatchMessage')}
-              </p>
-            </div>
-            <div className="modal-actions confirm-modal-actions">
-              <button 
-                className="cancel-btn"
-                onClick={cancelStartMatch}
-              >
-                <X size={16} />
-                {t('common.cancel')}
-              </button>
-              <button 
-                className="confirm-btn start-match-confirm-btn"
-                onClick={confirmStartMatch}
-              >
-                <Play size={16} />
-                {t('management.startMatch')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StartMatchDialog match={matchToConfirm} onConfirm={confirmStartMatch} onCancel={cancelStartMatch} t={t} />
 
       {/* Edit Settings Modal */}
-      {showEditSettings && user && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>{t('registration.editTournamentSettings')}</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setShowEditSettings(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-content">
-              <div className="group-settings">
-                <h4>{t('registration.matchSettings')}</h4>
-                <div className="input-group">
-                  <label>{t('registration.legsToWin')}:</label>
-                  <select 
-                    value={tournamentSettings.legsToWin}
-                    onChange={(e) => setTournamentSettings({
-                      ...tournamentSettings,
-                      legsToWin: parseInt(e.target.value)
-                    })}
-                  >
-                    <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                    <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                    <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                    <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                    <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                    <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                    <option value={9}>{t('tournaments.firstToLegs', { count: 9 })}</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>{t('tournaments.startingScore')}:</label>
-                  <select
-                    value={tournamentSettings.startingScore}
-                    onChange={(e) => setTournamentSettings({
-                      ...tournamentSettings,
-                      startingScore: parseInt(e.target.value)
-                    })}
-                  >
-                    <option value={301}>301</option>
-                    <option value={501}>501</option>
-                    <option value={701}>701</option>
-                  </select>
-                </div>
-                <div className="input-group">
-                  <label>{t('registration.scoringMode')}:</label>
-                  <div className="radio-group" style={{ marginBottom: 0 }}>
-                    <label>
-                      <input
-                        type="radio"
-                        name="scoringModeMgmt"
-                        value="dart"
-                        checked={tournamentSettings.defaultScoringMode !== 'turnTotal'}
-                        onChange={() => setTournamentSettings(prev => ({ ...prev, defaultScoringMode: 'dart' }))}
-                      />
-                      {t('registration.scoringModeDart')}
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="scoringModeMgmt"
-                        value="turnTotal"
-                        checked={tournamentSettings.defaultScoringMode === 'turnTotal'}
-                        onChange={() => setTournamentSettings(prev => ({ ...prev, defaultScoringMode: 'turnTotal' }))}
-                      />
-                      {t('registration.scoringModeTurnTotal')}
-                    </label>
-                  </div>
-                </div>
-                <div className="checkbox-group">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={tournamentSettings.groupSettings?.autoScorerAssignment === true}
-                      onChange={(e) => setTournamentSettings({
-                        ...tournamentSettings,
-                        groupSettings: {
-                          ...tournamentSettings.groupSettings,
-                          autoScorerAssignment: e.target.checked
-                        }
-                      })}
-                    />
-                    {t('registration.autoScorerAssignment')}
-                  </label>
-                  <p className="add-panel-hint">{t('registration.autoScorerAssignmentHint')}</p>
-                </div>
-              </div>
-
-              <div className="group-settings">
-                <h4>{t('registration.standingsCriteriaOrder')}</h4>
-                <p className="settings-description" style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
-                  {t('registration.standingsCriteriaOrderDescription')}
-                </p>
-                <div className="criteria-order-list" style={{ marginBottom: '1.5rem' }}>
-                  {tournamentSettings.standingsCriteriaOrder.map((criterion, index) => {
-                    const criterionLabels = {
-                      matchesWon: t('registration.matchesWon'),
-                      legDifference: t('registration.legDifference'),
-                      average: t('registration.average'),
-                      headToHead: t('registration.headToHead')
-                    };
-                    return (
-                      <div key={criterion} className="criteria-order-item">
-                        <span className="criteria-number" style={{ marginRight: '0.75rem', fontWeight: 'bold', minWidth: '2rem' }}>{index + 1}.</span>
-                        <span className="criteria-label" style={{ flex: 1 }}>{criterionLabels[criterion] || criterion}</span>
-                        <div className="criteria-actions" style={{ display: 'flex', gap: '0.25rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (index > 0) {
-                                const newOrder = [...tournamentSettings.standingsCriteriaOrder];
-                                [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-                                setTournamentSettings({
-                                  ...tournamentSettings,
-                                  standingsCriteriaOrder: newOrder
-                                });
-                              }
-                            }}
-                            title={t('registration.moveUp')}
-                            className={index === 0 ? 'move-btn disabled' : 'move-btn'}
-                            disabled={index === 0}
-                          >
-                            <ChevronUp size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (index < tournamentSettings.standingsCriteriaOrder.length - 1) {
-                                const newOrder = [...tournamentSettings.standingsCriteriaOrder];
-                                [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                                setTournamentSettings({
-                                  ...tournamentSettings,
-                                  standingsCriteriaOrder: newOrder
-                                });
-                              }
-                            }}
-                            title={t('registration.moveDown')}
-                            className={index === tournamentSettings.standingsCriteriaOrder.length - 1 ? 'move-btn disabled' : 'move-btn'}
-                            disabled={index === tournamentSettings.standingsCriteriaOrder.length - 1}
-                          >
-                            <ChevronDown size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="group-settings">
-                <h4>{t('registration.groupSettings')}</h4>
-                {hasTournamentStarted && (
-                  <p className="settings-description" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                    {t('registration.groupSettingsLocked')}
-                  </p>
-                )}
-                <div className="radio-group">
-                  <label>
-                    <input
-                      type="radio"
-                      name="groupType"
-                      value="groups"
-                      checked={tournamentSettings.groupSettings.type === 'groups'}
-                      disabled={hasTournamentStarted}
-                      onChange={(e) => setTournamentSettings({
-                        ...tournamentSettings,
-                        groupSettings: {
-                          ...tournamentSettings.groupSettings,
-                          type: e.target.value
-                        }
-                      })}
-                    />
-                    {t('registration.numberOfGroups')}
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="groupType"
-                      value="playersPerGroup"
-                      checked={tournamentSettings.groupSettings.type === 'playersPerGroup'}
-                      disabled={hasTournamentStarted}
-                      onChange={(e) => setTournamentSettings({
-                        ...tournamentSettings,
-                        groupSettings: {
-                          ...tournamentSettings.groupSettings,
-                          type: e.target.value
-                        }
-                      })}
-                    />
-                    {t('registration.playersPerGroup')}
-                  </label>
-                </div>
-                <div className="input-group">
-                  <label>
-                    {tournamentSettings.groupSettings.type === 'groups' ? t('registration.numberOfGroupsLabel') : t('registration.playersPerGroupLabel')}
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={tournamentSettings.groupSettings.type === 'groups' ? '16' : '8'}
-                    value={tournamentSettings.groupSettings.value}
-                    disabled={hasTournamentStarted}
-                    onChange={(e) => setTournamentSettings({
-                      ...tournamentSettings,
-                      groupSettings: {
-                        ...tournamentSettings.groupSettings,
-                        value: parseInt(e.target.value) || 1
-                      }
-                    })}
-                  />
-                </div>
-              </div>
-
-              <div className="group-settings">
-                <h4>{t('registration.playoffSettings')}</h4>
-                <div className="checkbox-group">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={tournamentSettings.playoffSettings.enabled}
-                      onChange={(e) => setTournamentSettings({
-                        ...tournamentSettings,
-                        playoffSettings: {
-                          ...tournamentSettings.playoffSettings,
-                          enabled: e.target.checked
-                        }
-                      })}
-                    />
-                    {t('registration.enablePlayoffs')}
-                  </label>
-                </div>
-                
-                {tournamentSettings.playoffSettings.enabled && (() => {
-                  // Calculate max players per group from actual tournament groups
-                  const calculateMaxPlayersPerGroup = () => {
-                    if (tournament?.groups && tournament.groups.length > 0) {
-                      return Math.max(...tournament.groups.map(group => 
-                        group.players?.length || group.standings?.length || 0
-                      ));
-                    }
-                    // Fallback: calculate from group settings if groups not yet created
-                    if (tournamentSettings.groupSettings.type === 'groups') {
-                      const totalPlayers = tournament?.players?.length || 0;
-                      return totalPlayers > 0 ? Math.ceil(totalPlayers / tournamentSettings.groupSettings.value) : 4;
-                    } else {
-                      return tournamentSettings.groupSettings.value || 4;
-                    }
-                  };
-                  const maxPlayersPerGroup = calculateMaxPlayersPerGroup();
-                  const allPlayersValue = 9999; // Special value to represent "all players"
-                  
-                  return (
-                    <div className="playoff-options">
-                      <div className="input-group">
-                        <label>{t('registration.qualificationMode')}</label>
-                        <div className="radio-group">
-                          <label>
-                            <input
-                              type="radio"
-                              name="qualificationMode"
-                              value="perGroup"
-                              checked={tournamentSettings.playoffSettings.qualificationMode === 'perGroup'}
-                              onChange={(e) => setTournamentSettings({
-                                ...tournamentSettings,
-                                playoffSettings: {
-                                  ...tournamentSettings.playoffSettings,
-                                  qualificationMode: e.target.value
-                                }
-                              })}
-                            />
-                            {t('registration.qualificationModePerGroup')}
-                          </label>
-                          <label>
-                            <input
-                              type="radio"
-                              name="qualificationMode"
-                              value="totalPlayers"
-                              checked={tournamentSettings.playoffSettings.qualificationMode === 'totalPlayers'}
-                              onChange={(e) => setTournamentSettings({
-                                ...tournamentSettings,
-                                playoffSettings: {
-                                  ...tournamentSettings.playoffSettings,
-                                  qualificationMode: e.target.value
-                                }
-                              })}
-                            />
-                            {t('registration.qualificationModeTotalPlayers')}
-                          </label>
-                        </div>
-                      </div>
-                      
-                      {tournamentSettings.playoffSettings.qualificationMode === 'perGroup' ? (
-                        <div className="input-group">
-                          <label>{t('registration.playersAdvancingPerGroup')}</label>
-                          <select 
-                            value={tournamentSettings.playoffSettings.playersPerGroup}
-                            onChange={(e) => setTournamentSettings({
-                              ...tournamentSettings,
-                              playoffSettings: {
-                                ...tournamentSettings.playoffSettings,
-                                playersPerGroup: parseInt(e.target.value)
-                              }
-                            })}
-                          >
-                            {Array.from({ length: maxPlayersPerGroup }, (_, i) => i + 1).map(num => (
-                              <option key={num} value={num}>{num}</option>
-                            ))}
-                            <option value={allPlayersValue}>{t('registration.all')}</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <div className="input-group">
-                          <label>{t('registration.totalPlayersToAdvance')}</label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="64"
-                            value={tournamentSettings.playoffSettings.totalPlayersToAdvance || 8}
-                            onChange={(e) => setTournamentSettings({
-                              ...tournamentSettings,
-                              playoffSettings: {
-                                ...tournamentSettings.playoffSettings,
-                                totalPlayersToAdvance: parseInt(e.target.value) || 8
-                              }
-                            })}
-                          />
-                          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                            {t('registration.totalPlayersDescription')}
-                          </p>
-                        </div>
-                      )}
-                      
-                      <div className="input-group">
-                        <label>{t('registration.seedingMethod')}</label>
-                        <div className="radio-group">
-                          <label>
-                            <input
-                              type="radio"
-                              name="seedingMethod"
-                              value="standard"
-                              checked={tournamentSettings.playoffSettings.seedingMethod === 'standard'}
-                              onChange={(e) => setTournamentSettings({
-                                ...tournamentSettings,
-                                playoffSettings: {
-                                  ...tournamentSettings.playoffSettings,
-                                  seedingMethod: e.target.value
-                                }
-                              })}
-                            />
-                            {t('registration.seedingMethodStandard')}
-                          </label>
-                          <label>
-                            <input
-                              type="radio"
-                              name="seedingMethod"
-                              value="groupBased"
-                              checked={tournamentSettings.playoffSettings.seedingMethod === 'groupBased'}
-                              onChange={(e) => setTournamentSettings({
-                                ...tournamentSettings,
-                                playoffSettings: {
-                                  ...tournamentSettings.playoffSettings,
-                                  seedingMethod: e.target.value
-                                }
-                              })}
-                            />
-                            {t('registration.seedingMethodGroupBased')}
-                          </label>
-                        </div>
-                      </div>
-
-                      {tournamentSettings.playoffSettings.seedingMethod === 'groupBased' && (
-                        <div className="input-group">
-                          <label>{t('registration.groupMatchups')}</label>
-                          {tournament?.groups && tournament.groups.length > 0 ? (
-                            <>
-                              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                                {t('registration.groupMatchupsDescription')}
-                              </p>
-                          <div className="group-matchups-config" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {(() => {
-                              const groups = tournament.groups || [];
-                              const matchups = tournamentSettings.playoffSettings.groupMatchups || [];
-                              
-                              // Initialize matchups if empty
-                              if (matchups.length === 0 && groups.length >= 2) {
-                                const defaultMatchups = [];
-                                for (let i = 0; i < Math.floor(groups.length / 2); i++) {
-                                  const group1Index = i;
-                                  const group2Index = groups.length - 1 - i;
-                                  defaultMatchups.push({
-                                    group1: groups[group1Index]?.name || `Group ${String.fromCharCode(65 + group1Index)}`,
-                                    group2: groups[group2Index]?.name || `Group ${String.fromCharCode(65 + group2Index)}`
-                                  });
-                                }
-                                setTimeout(() => {
-                                  setTournamentSettings({
-                                    ...tournamentSettings,
-                                    playoffSettings: {
-                                      ...tournamentSettings.playoffSettings,
-                                      groupMatchups: defaultMatchups
-                                    }
-                                  });
-                                }, 0);
-                                return null;
-                              }
-                              
-                              return matchups.map((matchup, index) => {
-                                const availableGroups = groups.map(g => g.name);
-                                return (
-                                  <div key={index} style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '0.5rem',
-                                    padding: '0.75rem',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: '4px',
-                                    backgroundColor: 'var(--bg-tertiary)'
-                                  }}>
-                                    <select
-                                      value={matchup.group1}
-                                      onChange={(e) => {
-                                        const newMatchups = [...matchups];
-                                        newMatchups[index].group1 = e.target.value;
-                                        setTournamentSettings({
-                                          ...tournamentSettings,
-                                          playoffSettings: {
-                                            ...tournamentSettings.playoffSettings,
-                                            groupMatchups: newMatchups
-                                          }
-                                        });
-                                      }}
-                                      style={{ 
-                                        flex: 1, 
-                                        padding: '0.5rem',
-                                        backgroundColor: 'var(--input-bg)',
-                                        color: 'var(--text-primary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '4px'
-                                      }}
-                                    >
-                                      {availableGroups.map(groupName => (
-                                        <option key={groupName} value={groupName}>{groupName}</option>
-                                      ))}
-                                    </select>
-                                    <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{t('common.vs')}</span>
-                                    <select
-                                      value={matchup.group2}
-                                      onChange={(e) => {
-                                        const newMatchups = [...matchups];
-                                        newMatchups[index].group2 = e.target.value;
-                                        setTournamentSettings({
-                                          ...tournamentSettings,
-                                          playoffSettings: {
-                                            ...tournamentSettings.playoffSettings,
-                                            groupMatchups: newMatchups
-                                          }
-                                        });
-                                      }}
-                                      style={{ 
-                                        flex: 1, 
-                                        padding: '0.5rem',
-                                        backgroundColor: 'var(--input-bg)',
-                                        color: 'var(--text-primary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '4px'
-                                      }}
-                                    >
-                                      {availableGroups.map(groupName => (
-                                        <option key={groupName} value={groupName}>{groupName}</option>
-                                      ))}
-                                    </select>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const newMatchups = matchups.filter((_, i) => i !== index);
-                                        setTournamentSettings({
-                                          ...tournamentSettings,
-                                          playoffSettings: {
-                                            ...tournamentSettings.playoffSettings,
-                                            groupMatchups: newMatchups
-                                          }
-                                        });
-                                      }}
-                                      style={{ 
-                                        padding: '0.25rem 0.5rem',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '4px',
-                                        backgroundColor: 'var(--card-bg)',
-                                        color: 'var(--text-primary)',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.target.style.backgroundColor = 'var(--bg-tertiary)';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.target.style.backgroundColor = 'var(--card-bg)';
-                                      }}
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                  </div>
-                                );
-                              });
-                            })()}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const groups = tournament.groups || [];
-                                const availableGroups = groups.map(g => g.name);
-                                if (availableGroups.length >= 2) {
-                                  const newMatchups = [
-                                    ...(tournamentSettings.playoffSettings.groupMatchups || []),
-                                    { group1: availableGroups[0], group2: availableGroups[1] }
-                                  ];
-                                  setTournamentSettings({
-                                    ...tournamentSettings,
-                                    playoffSettings: {
-                                      ...tournamentSettings.playoffSettings,
-                                      groupMatchups: newMatchups
-                                    }
-                                  });
-                                }
-                              }}
-                              style={{
-                                padding: '0.5rem',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '4px',
-                                backgroundColor: 'var(--card-bg)',
-                                color: 'var(--text-primary)',
-                                cursor: 'pointer',
-                                alignSelf: 'flex-start',
-                                transition: 'all 0.2s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = 'var(--bg-tertiary)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'var(--card-bg)';
-                              }}
-                            >
-                              {t('registration.addGroupMatchup')}
-                            </button>
-                          </div>
-                            </>
-                          ) : (
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                              {t('registration.groupMatchupsNote')}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                    <div className="input-group">
-                      <label>{t('registration.customSeedingLabel')}</label>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                        {t('registration.customSeedingDescription')}
-                      </p>
-                      <BracketSeedingEditor
-                        playoffSettings={tournamentSettings.playoffSettings}
-                        groups={tournament?.groups || []}
-                        value={tournamentSettings.playoffSettings.customSeeding || null}
-                        onChange={(customSeeding) => setTournamentSettings({
-                          ...tournamentSettings,
-                          playoffSettings: {
-                            ...tournamentSettings.playoffSettings,
-                            customSeeding
-                          }
-                        })}
-                      />
-                    </div>
-
-                    <div className="playoff-legs-settings">
-                      <h5>{t('registration.playoffLegsToWin')}:</h5>
-                      <div className="input-group">
-                        <label>{t('management.top32')}:</label>
-                        <select 
-                          value={tournamentSettings.playoffSettings.legsToWinByRound?.[32] || 3}
-                          onChange={(e) => setTournamentSettings({
-                            ...tournamentSettings,
-                            playoffSettings: {
-                              ...tournamentSettings.playoffSettings,
-                              legsToWinByRound: {
-                                ...tournamentSettings.playoffSettings.legsToWinByRound,
-                                32: parseInt(e.target.value)
-                              }
-                            }
-                          })}
-                        >
-                          <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                          <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                          <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                          <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                          <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.top16')}:</label>
-                        <select 
-                          value={tournamentSettings.playoffSettings.legsToWinByRound?.[16] || 3}
-                          onChange={(e) => setTournamentSettings({
-                            ...tournamentSettings,
-                            playoffSettings: {
-                              ...tournamentSettings.playoffSettings,
-                              legsToWinByRound: {
-                                ...tournamentSettings.playoffSettings.legsToWinByRound,
-                                16: parseInt(e.target.value)
-                              }
-                            }
-                          })}
-                        >
-                          <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                          <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                          <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                          <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                          <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.quarterFinals')}:</label>
-                        <select 
-                          value={tournamentSettings.playoffSettings.legsToWinByRound?.[8] || 3}
-                          onChange={(e) => setTournamentSettings({
-                            ...tournamentSettings,
-                            playoffSettings: {
-                              ...tournamentSettings.playoffSettings,
-                              legsToWinByRound: {
-                                ...tournamentSettings.playoffSettings.legsToWinByRound,
-                                8: parseInt(e.target.value)
-                              }
-                            }
-                          })}
-                        >
-                          <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                          <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                          <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                          <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                          <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.semiFinals')}:</label>
-                        <select 
-                          value={tournamentSettings.playoffSettings.legsToWinByRound?.[4] || 3}
-                          onChange={(e) => setTournamentSettings({
-                            ...tournamentSettings,
-                            playoffSettings: {
-                              ...tournamentSettings.playoffSettings,
-                              legsToWinByRound: {
-                                ...tournamentSettings.playoffSettings.legsToWinByRound,
-                                4: parseInt(e.target.value)
-                              }
-                            }
-                          })}
-                        >
-                          <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                          <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                          <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                          <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                          <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.final')}:</label>
-                        <select 
-                          value={tournamentSettings.playoffSettings.legsToWinByRound?.[2] || 3}
-                          onChange={(e) => setTournamentSettings({
-                            ...tournamentSettings,
-                            playoffSettings: {
-                              ...tournamentSettings.playoffSettings,
-                              legsToWinByRound: {
-                                ...tournamentSettings.playoffSettings.legsToWinByRound,
-                                2: parseInt(e.target.value)
-                              }
-                            }
-                          })}
-                        >
-                          <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                          <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                          <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                          <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                          <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                          <option value={6}>{t('tournaments.firstToLegs', { count: 6 })}</option>
-                          <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  );
-                })()}
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button 
-                className="cancel-btn"
-                onClick={() => setShowEditSettings(false)}
-              >
-                {t('registration.cancel')}
-              </button>
-              <button 
-                className="confirm-btn"
-                onClick={updateSettings}
-              >
-                {t('registration.updateSettings')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EditSettingsDialog
+        open={showEditSettings && !!user}
+        onClose={() => setShowEditSettings(false)}
+        onSave={updateSettings}
+        tournament={tournament}
+        tournamentSettings={tournamentSettings}
+        setTournamentSettings={setTournamentSettings}
+        hasTournamentStarted={hasTournamentStarted}
+        t={t}
+      />
 
       {/* Edit Playoff Match Modal */}
-      {editingMatch && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>{t('management.editMatchPlayers')}</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setEditingMatch(null)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-content">
-              <EditPlayoffMatchForm
-                match={editingMatch}
-                qualifyingPlayers={tournament.playoffs?.qualifyingPlayers || []}
-                allRounds={tournament.playoffs?.rounds || []}
-                onSave={(player1, player2) => updatePlayoffMatchPlayers(editingMatch.id, player1, player2)}
-                onCancel={() => setEditingMatch(null)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <EditMatchPlayersDialog
+        match={editingMatch}
+        qualifyingPlayers={tournament.playoffs?.qualifyingPlayers || []}
+        allRounds={tournament.playoffs?.rounds || []}
+        onSave={(player1, player2) => updatePlayoffMatchPlayers(editingMatch.id, player1, player2)}
+        onCancel={() => setEditingMatch(null)}
+        t={t}
+      />
+
+      <CorrectResultDialog
+        match={correctingMatch}
+        onSave={(score1, score2) => applyCorrectedResult(correctingMatch, score1, score2)}
+        onCancel={() => setCorrectingMatch(null)}
+        t={t}
+      />
 
       {/* Match Statistics Modal */}
       <MatchStatisticsModal match={matchStatistics} onClose={() => setMatchStatistics(null)} />
-    </div>
-  );
-}
-
-// Component for editing playoff match players
-function EditPlayoffMatchForm({ match, qualifyingPlayers, allRounds, onSave, onCancel }) {
-  const { t } = useLanguage();
-  const [selectedPlayer1, setSelectedPlayer1] = useState(match.player1);
-  const [selectedPlayer2, setSelectedPlayer2] = useState(match.player2);
-
-  // Find which round this match belongs to
-  const currentRound = allRounds.find(round => 
-    round.matches.some(m => m.id === match.id)
-  );
-  
-  const currentRoundIndex = allRounds.findIndex(round => 
-    round.matches.some(m => m.id === match.id)
-  );
-
-  // Get players who advanced from previous round
-  const getAdvancedPlayers = () => {
-    // If this is the first round, all qualifying players are available
-    if (currentRoundIndex === 0) {
-      return qualifyingPlayers.map(qp => qp.player || qp);
-    }
-    
-    // If this is a 3rd place match, get players who lost in semifinals
-    if (match.isThirdPlaceMatch) {
-      const previousRound = allRounds[currentRoundIndex - 1];
-      if (!previousRound) return [];
-      
-      const losers = [];
-      previousRound.matches.forEach(m => {
-        if (m.status === 'completed' && m.result && m.result.winner) {
-          // Get the loser (the player who didn't win)
-          const loser = m.result.winner === m.player1?.id ? m.player2 : m.player1;
-          if (loser) {
-            losers.push(loser);
-          }
-        }
-      });
-      
-      // If no matches completed yet, return empty (can't determine losers)
-      return losers;
-    }
-    
-    // For other rounds, get players who won in the previous round
-    const previousRound = allRounds[currentRoundIndex - 1];
-    if (!previousRound) return [];
-    
-    const winners = [];
-    previousRound.matches.forEach(m => {
-      if (m.status === 'completed' && m.result && m.result.winner) {
-        // Get the winner
-        const winner = m.result.winner === m.player1?.id ? m.player1 : m.player2;
-        if (winner) {
-          winners.push(winner);
-        }
-      }
-    });
-    
-    // If no matches completed yet, return empty (can't determine winners)
-    return winners;
-  };
-
-  const advancedPlayers = getAdvancedPlayers();
-
-  // Build a stable pool of all players who are in playoffs (qualified + anyone already present in the bracket)
-  const playoffPlayersPool = useMemo(() => {
-    const byId = new Map();
-
-    (qualifyingPlayers || []).forEach(qp => {
-      const p = qp?.player || qp;
-      if (p?.id) byId.set(p.id, p);
-    });
-
-    (allRounds || []).forEach(r => {
-      (r?.matches || []).forEach(m => {
-        if (m?.player1?.id) byId.set(m.player1.id, m.player1);
-        if (m?.player2?.id) byId.set(m.player2.id, m.player2);
-      });
-    });
-
-    return Array.from(byId.values());
-  }, [qualifyingPlayers, allRounds]);
-  
-  // Check if previous round is complete
-  const isPreviousRoundComplete = () => {
-    if (currentRoundIndex === 0) return true; // First round, no previous round
-    const previousRound = allRounds[currentRoundIndex - 1];
-    if (!previousRound) return false;
-    return previousRound.matches.every(m => m.status === 'completed');
-  };
-
-  // Allow selecting from ALL playoff players to make manual bracket editing possible.
-  // Players already in other matches are still selectable for flexibility.
-  const getAvailablePlayers = (excludePlayerId = null) => {
-    const basePlayers = playoffPlayersPool.length > 0
-      ? playoffPlayersPool
-      : (qualifyingPlayers || []).map(qp => qp.player || qp);
-    
-    return basePlayers.filter(player => {
-      // Exclude the other selected player in the same dropdown (can't have same player twice in one match)
-      if (excludePlayerId && player.id === excludePlayerId) {
-        return false;
-      }
-      // Allow all playoff players to be selected - no exclusion based on other match assignments
-      return true;
-    });
-  };
-
-  const handleSave = () => {
-    // A playoff match may legitimately have only one player: that player gets a
-    // bye (free pass) to the next round. So we require at least one player, not two.
-    if (!selectedPlayer1 && !selectedPlayer2) {
-      alert(t('management.pleaseSelectAtLeastOnePlayer'));
-      return;
-    }
-    if (selectedPlayer1 && selectedPlayer2 && selectedPlayer1.id === selectedPlayer2.id) {
-      alert(t('management.playersMustBeDifferent'));
-      return;
-    }
-    onSave(selectedPlayer1 || null, selectedPlayer2 || null);
-  };
-
-  const availablePlayers1 = getAvailablePlayers(selectedPlayer2?.id);
-  const availablePlayers2 = getAvailablePlayers(selectedPlayer1?.id);
-  const previousRoundComplete = isPreviousRoundComplete();
-
-  return (
-    <div className="edit-playoff-match-form">
-      {currentRoundIndex > 0 && (
-        <div className={`info-message ${!previousRoundComplete ? 'warning' : ''}`}>
-          {/* We still show a warning if previous round isn't complete, but allow manual selection. */}
-          {!previousRoundComplete
-            ? t('management.completePreviousRoundFirst', { 
-                roundName: allRounds[currentRoundIndex - 1]?.name || t('management.previousRound')
-              })
-            : t('management.youCanSelectAnyPlayoffPlayer')}
-        </div>
-      )}
-      <div className="input-group">
-        <label>{t('management.player1')}:</label>
-        <select
-          value={selectedPlayer1?.id || ''}
-          onChange={(e) => {
-            const player = availablePlayers1.find(p => p.id === e.target.value);
-            setSelectedPlayer1(player || null);
-          }}
-        >
-          <option value="">{t('management.noOpponentBye')}</option>
-          {availablePlayers1.map(player => (
-            <option key={player.id} value={player.id}>
-              {player.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="input-group">
-        <label>{t('management.player2')}:</label>
-        <select
-          value={selectedPlayer2?.id || ''}
-          onChange={(e) => {
-            const player = availablePlayers2.find(p => p.id === e.target.value);
-            setSelectedPlayer2(player || null);
-          }}
-        >
-          <option value="">{t('management.noOpponentBye')}</option>
-          {availablePlayers2.map(player => (
-            <option key={player.id} value={player.id}>
-              {player.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="modal-actions">
-        <button className="cancel-btn" onClick={onCancel}>
-          {t('registration.cancel')}
-        </button>
-        <button className="confirm-btn" onClick={handleSave}>
-          {t('common.save')}
-        </button>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Menu, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LoadingState } from './components/shared/LoadingState';
+import { AccessNotice } from './components/shared/AccessNotice';
+import { ConfirmDialogHost } from './components/shared/ConfirmDialog';
+import { Toaster } from '@/components/ui/sonner';
 import { TournamentProvider, useTournament } from './contexts/TournamentContext';
 import { LeagueProvider, useLeague } from './contexts/LeagueContext';
 import { LiveMatchProvider } from './contexts/LiveMatchContext';
@@ -46,7 +53,7 @@ import { getUserDisplayName } from './utils/userDisplayName';
 import { DisplayNameEditor } from './components/DisplayNameEditor';
 import { PracticeBests } from './components/practice/PracticeBests';
 import { loadHistory } from './lib/practiceStorage';
-import './App.css';
+import { toast } from 'sonner';
 
 // Shown when a signed-in user has no player record yet (they have never been
 // approved into a tournament, so there are no stats to display).
@@ -55,38 +62,49 @@ function NoPlayerProfile({ onBrowseTournaments, onOpenPractice }) {
   const { user } = useAuth();
   const [isEditingName, setIsEditingName] = useState(false);
   const displayName = getUserDisplayName(user);
+  const practiceEntries = loadHistory();
   return (
-    <div className="unauthorized-container">
-      <h2>{t('playerProfile.noLinkedProfile')}</h2>
-      <p>{t('playerProfile.registerForTournamentToCreate')}</p>
-      {/* The name is still editable here — it is what the manager sees when
-          adding this account to a league or tournament. */}
-      <div className="no-profile-name">
-        {isEditingName ? (
-          <DisplayNameEditor
-            currentName={displayName}
-            onSaved={() => setIsEditingName(false)}
-            onCancel={() => setIsEditingName(false)}
-          />
-        ) : (
-          <p>
-            <span className="no-profile-name-label">{t('playerProfile.yourName')}:</span>{' '}
-            <strong>{displayName || user?.email}</strong>
-            <button type="button" className="profile-edit-name-btn" onClick={() => setIsEditingName(true)} title={t('playerProfile.editName')} aria-label={t('playerProfile.editName')}>
-              <Pencil size={14} />
-            </button>
-          </p>
-        )}
-      </div>
-      <button className="primary-btn" onClick={onBrowseTournaments}>
-        {t('navigation.tournaments')}
-      </button>
-      {loadHistory().length > 0 && (
-        <div className="no-profile-practice">
-          <h3>{t('practice.bests.profileTitle')}</h3>
-          <PracticeBests entries={loadHistory()} compact />
-          <button className="primary-btn" onClick={onOpenPractice}>{t('practice.bests.openPractice')}</button>
-        </div>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('playerProfile.noLinkedProfile')}</CardTitle>
+          <CardDescription>{t('playerProfile.registerForTournamentToCreate')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {/* The name is still editable here — it is what the manager sees when
+              adding this account to a league or tournament. */}
+          {isEditingName ? (
+            <DisplayNameEditor
+              currentName={displayName}
+              onSaved={() => setIsEditingName(false)}
+              onCancel={() => setIsEditingName(false)}
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">{t('playerProfile.yourName')}:</span>
+              <span className="font-semibold">{displayName || user?.email}</span>
+              <Button type="button" variant="ghost" size="icon-sm" onClick={() => setIsEditingName(true)} title={t('playerProfile.editName')} aria-label={t('playerProfile.editName')}>
+                <Pencil />
+              </Button>
+            </div>
+          )}
+          <div>
+            <Button onClick={onBrowseTournaments}>{t('navigation.tournaments')}</Button>
+          </div>
+        </CardContent>
+      </Card>
+      {practiceEntries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('practice.bests.profileTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <PracticeBests entries={practiceEntries} compact />
+            <div>
+              <Button variant="outline" onClick={onOpenPractice}>{t('practice.bests.openPractice')}</Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
       <AccountDeletion />
     </div>
@@ -176,10 +194,7 @@ function TournamentRoute() {
   // the lightweight list stub (full groups/matches still being hydrated).
   if (!currentTournament || currentTournament.id !== id || currentTournament._summary === true) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t('common.loadingTournament')}</p>
-      </div>
+      <LoadingState text={t('common.loadingTournament')} />
     );
   }
 
@@ -324,9 +339,7 @@ function MyProfileRedirect() {
 
   if (profileLoading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-      </div>
+      <LoadingState />
     );
   }
   return <NoPlayerProfile onBrowseTournaments={() => navigate('/tournaments')} onOpenPractice={() => navigate('/practice')} />;
@@ -350,20 +363,6 @@ function AppContent() {
     createLeague,
     selectLeague
   } = useLeague();
-  
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Detect if we're on mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 1024);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -394,10 +393,7 @@ function AppContent() {
   // Show loading spinner while checking authentication
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t('common.loading')}</p>
-      </div>
+      <LoadingState text={t('common.loading')} />
     );
   }
 
@@ -468,7 +464,7 @@ function AppContent() {
       navigate(`/league/${leagueData.id}`);
     } catch (error) {
       console.error('Error creating league:', error);
-      alert(t('leagues.failedToCreateLeague'));
+      toast.error(t('leagues.failedToCreateLeague'));
     }
   };
 
@@ -493,31 +489,15 @@ function AppContent() {
   }
 
   return (
-    <div className="app">
+    <SidebarProvider
+      className="bg-background text-foreground"
+      // Capacitor (Android 15+ edge-to-edge) injects --safe-area-inset-*; on the web these resolve to 0.
+      style={{ paddingTop: 'var(--safe-area-inset-top, 0px)', paddingBottom: 'var(--safe-area-inset-bottom, 0px)' }}
+    >
       <OfflineBanner />
+      <Toaster />
+      <ConfirmDialogHost labels={{ confirm: t('common.yes'), cancel: t('common.cancel') }} />
 
-      {/* Mobile Header - only show on mobile */}
-      {isMobile && (
-        <div className="mobile-header">
-          <button 
-            className="hamburger-btn"
-            onClick={() => setIsMobileNavOpen(true)}
-          >
-            <Menu size={24} />
-          </button>
-          <div className="app-title">DartLead</div>
-        </div>
-      )}
-
-      {/* Mobile Navigation Backdrop - only show on mobile */}
-      {isMobile && isMobileNavOpen && (
-        <div 
-          className="mobile-overlay-backdrop open"
-          onClick={() => setIsMobileNavOpen(false)}
-        />
-      )}
-
-      {/* Navigation */}
       <Navigation
         currentView={location.pathname}
         onViewChange={(view) => {
@@ -530,11 +510,16 @@ function AppContent() {
           }
         }}
         tournament={currentTournament}
-        isMobileOpen={isMobileNavOpen}
-        onMobileClose={() => setIsMobileNavOpen(false)}
       />
-      
-      <main className="app-main">
+
+      <SidebarInset className="min-w-0">
+      {/* Mobile header: the sidebar is a drawer below 1024px */}
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur lg:hidden">
+        <SidebarTrigger />
+        <span className="text-sm font-semibold">DartLead</span>
+      </header>
+
+      <main className="flex min-w-0 flex-1 flex-col">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={
@@ -576,11 +561,7 @@ function AppContent() {
                 onBack={() => navigate('/dashboard')}
               />
             ) : user ? (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessRestricted')}</h2>
-                <p>{t('auth.onlyManagersCreateTournaments')}</p>
-                <p>{t('auth.contactAdminForManager')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessRestricted')} lines={[t('auth.onlyManagersCreateTournaments'), t('auth.contactAdminForManager')]} />
             ) : (
               <Auth />
             )
@@ -589,20 +570,14 @@ function AppContent() {
             isAdmin ? (
               <AdminPanel />
             ) : (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessDenied')}</h2>
-                <p>{t('auth.adminOnlyPage')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessDenied')} lines={[t('auth.adminOnlyPage')]} />
             )
           } />
           <Route path="/manager" element={
             canManage ? (
               <ManagerPanel />
             ) : (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessDenied')}</h2>
-                <p>{t('auth.managerOnlyPage')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessDenied')} lines={[t('auth.managerOnlyPage')]} />
             )
           } />
           <Route path="/tournament/:id" element={<TournamentRoute />} />
@@ -627,10 +602,7 @@ function AppContent() {
                 onBack={() => navigate('/leagues')}
               />
             ) : user ? (
-              <div className="unauthorized-container">
-                <h2>{t('auth.accessRestricted')}</h2>
-                <p>{t('auth.onlyManagersCreateLeagues')}</p>
-              </div>
+              <AccessNotice title={t('auth.accessRestricted')} lines={[t('auth.onlyManagersCreateLeagues')]} />
             ) : (
               <Auth />
             )
@@ -645,7 +617,8 @@ function AppContent() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 

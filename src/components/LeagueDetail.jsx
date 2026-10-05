@@ -1,19 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Plus, Edit, Trash2, X, Check, Calendar, Save, ChevronUp, ChevronDown, Link, Unlink, BarChart3, Target, Zap, Hash, Clock, CheckCircle, XCircle, AlertCircle, RotateCcw, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Pencil, Trash2, X, Check, BarChart3 } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
-import { tournamentStatusLabel } from '../utils/tournamentStatus';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { leagueService } from '../services/leagueService';
-import { UserSearchPicker } from './UserSearchPicker';
-import { ScorersPanel } from './ScorersPanel';
-import { LeagueManagersPanel } from './LeagueManagersPanel';
 import { HeadToHead } from './HeadToHead';
-import { SeedingPresetLibrary } from './SeedingPresetLibrary';
-import { DisplayNameEditor } from './DisplayNameEditor';
+import { StatusBadge } from './shared/StatusBadge';
+import { EmptyState } from './shared/EmptyState';
+import { LeaderboardTab } from './league/LeaderboardTab';
+import { TournamentsTab } from './league/TournamentsTab';
+import { StatisticsTab } from './league/StatisticsTab';
+import { PlayersTab } from './league/PlayersTab';
+import { SettingsTab } from './league/SettingsTab';
 import { getUserDisplayName } from '../utils/userDisplayName';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { confirmDialog } from '../lib/confirmDialog';
 
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
@@ -39,7 +46,6 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
-  const navigate = useNavigate();
   const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, approveLeagueRegistration, rejectLeagueRegistration, withdrawLeagueRegistration } = useLeague();
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
   const [isEditing, setIsEditing] = useState(false);
@@ -216,19 +222,23 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   if (!currentLeague) {
     if (loadError) {
       return (
-        <div className="unauthorized-container">
-          <h2>{t('leagues.notFound')}</h2>
-          <button className="primary-btn" onClick={onBack}>
-            <ArrowLeft size={18} />
-            {t('leagues.backToLeagues')}
-          </button>
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+          <EmptyState icon={Trophy} title={t('leagues.notFound')}>
+            <Button onClick={onBack}>
+              <ArrowLeft />
+              {t('leagues.backToLeagues')}
+            </Button>
+          </EmptyState>
         </div>
       );
     }
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>{t('leagues.loading')}</p>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8" aria-busy="true">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-10 w-80 max-w-full" />
+        <p className="text-sm text-muted-foreground">{t('leagues.loading')}</p>
+        <Skeleton className="h-9 w-full max-w-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
@@ -239,26 +249,11 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     ? (currentLeague.members || []).find(m => m.player?.user_id === user.id)
     : null;
 
-  // Player names open the player's profile (same affordance as tournament views)
-  const renderPlayerLink = (player, className = '') => {
-    if (!player?.id) return <span className={className}>{player?.name || t('common.unknown')}</span>;
-    return (
-      <button
-        type="button"
-        className={`player-profile-link ${className}`}
-        onClick={(e) => { e.stopPropagation(); navigate(`/player/${player.id}`); }}
-        title={t('playerProfile.viewProfile')}
-      >
-        {player.name}
-      </button>
-    );
-  };
-
   const handleUpdateLeague = async () => {
     if (isSavingLeague) return;
     const name = editForm.name.trim();
     if (!name) {
-      alert(t('leagues.leagueNameRequired'));
+      toast.error(t('leagues.leagueNameRequired'));
       return;
     }
     setIsSavingLeague(true);
@@ -270,20 +265,20 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating league:', error);
-      alert(t('leagues.failedToUpdateLeague'));
+      toast.error(t('leagues.failedToUpdateLeague'));
     } finally {
       setIsSavingLeague(false);
     }
   };
 
   const handleDeleteLeague = async () => {
-    if (window.confirm(t('leagues.confirmDeleteLeague'))) {
+    if ((await confirmDialog(t('leagues.confirmDeleteLeague'), { destructive: true }))) {
       try {
         await deleteLeague(currentLeague.id);
         onBack();
       } catch (error) {
         console.error('Error deleting league:', error);
-        alert(t('leagues.failedToDeleteLeague'));
+        toast.error(t('leagues.failedToDeleteLeague'));
       }
     }
   };
@@ -322,7 +317,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
 
   const handleWithdrawLeagueReg = async () => {
     if (!myLeagueRegistration) return;
-    if (!confirm(t('registration.confirmWithdraw'))) return;
+    if (!(await confirmDialog(t('registration.confirmWithdraw'), { destructive: true }))) return;
     setRegisterLoading(true);
     setRegistrationError('');
     try {
@@ -373,7 +368,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       await selectLeague(currentLeague.id);
     } catch (error) {
       console.error('Error adding user to league:', error);
-      alert(t('leagues.failedToAddPlayer'));
+      toast.error(t('leagues.failedToAddPlayer'));
     } finally {
       setIsAddingMember(false);
     }
@@ -388,7 +383,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setIsAddingPlayer(false);
     } catch (error) {
       console.error('Error adding player:', error);
-      alert(t('leagues.failedToAddPlayer'));
+      toast.error(t('leagues.failedToAddPlayer'));
     } finally {
       setIsAddingMember(false);
     }
@@ -417,18 +412,18 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       });
     } catch (error) {
       console.error('Error updating player status:', error);
-      alert(t('leagues.failedToUpdatePlayerStatus'));
+      toast.error(t('leagues.failedToUpdatePlayerStatus'));
     }
   });
 
-  const handleRemovePlayer = (playerId) => {
-    if (!window.confirm(t('leagues.confirmRemovePlayer'))) return;
+  const handleRemovePlayer = async (playerId) => {
+    if (!(await confirmDialog(t('leagues.confirmRemovePlayer'), { destructive: true }))) return;
     return withMemberPending(playerId, async () => {
       try {
         await removeMember(currentLeague.id, playerId);
       } catch (error) {
         console.error('Error removing player:', error);
-        alert(t('leagues.failedToRemovePlayer'));
+        toast.error(t('leagues.failedToRemovePlayer'));
       }
     });
   };
@@ -448,13 +443,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     const points = parseInt(newPlacement.points) || 0;
     
     if (position === '' || (position !== 'default' && position !== 'playoffDefault' && (isNaN(position) || position < 1))) {
-      alert(t('leagues.invalidPosition'));
+      toast.error(t('leagues.invalidPosition'));
       return;
     }
     
     // Check if position already exists
     if (scoringRules.some(r => r.position === position)) {
-      alert(t('leagues.placementExists'));
+      toast.error(t('leagues.placementExists'));
       return;
     }
     
@@ -506,10 +501,10 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         }
       });
       
-      alert(t('leagues.scoringSaved'));
+      toast.success(t('leagues.scoringSaved'));
     } catch (error) {
       console.error('Error saving scoring rules:', error);
-      alert(t('leagues.scoringSaveFailed'));
+      toast.error(t('leagues.scoringSaveFailed'));
     } finally {
       setIsSavingScoring(false);
     }
@@ -521,10 +516,10 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       await updateLeague(currentLeague.id, {
         default_tournament_settings: tournamentDefaults
       });
-      alert(t('leagues.defaultsSaved'));
+      toast.success(t('leagues.defaultsSaved'));
     } catch (error) {
       console.error('Error saving tournament defaults:', error);
-      alert(t('leagues.defaultsSaveFailed'));
+      toast.error(t('leagues.defaultsSaveFailed'));
     } finally {
       setIsSavingDefaults(false);
     }
@@ -599,14 +594,14 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setUnlinkedTournaments([]);
     } catch (error) {
       console.error('Error linking tournament:', error);
-      alert(t('leagues.linkFailed'));
+      toast.error(t('leagues.linkFailed'));
     } finally {
       setIsLinking(false);
     }
   };
 
   const handleUnlinkTournament = async (tournamentId) => {
-    if (!window.confirm(t('leagues.confirmUnlinkTournament')) || isLinking) return;
+    if (!(await confirmDialog(t('leagues.confirmUnlinkTournament'), { destructive: true })) || isLinking) return;
     setIsLinking(true);
     try {
       await unlinkTournamentFromLeague(currentLeague.id, tournamentId);
@@ -615,1478 +610,210 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       invalidateStats();
     } catch (error) {
       console.error('Error unlinking tournament:', error);
-      alert(t('leagues.unlinkFailed'));
+      toast.error(t('leagues.unlinkFailed'));
     } finally {
       setIsLinking(false);
     }
   };
-
-  const getPlacementLabel = (position) => {
-    if (position === 'playoffDefault') return t('leagues.playoffParticipant') || '🏟️ Other Playoff Participants';
-    if (position === 'default') return t('leagues.nonPlayoffParticipant') || '👥 Non-Playoff Participants';
-    if (position === 1) return `${t('leagues.1stPlace')} 🥇`;
-    if (position === 2) return `${t('leagues.2ndPlace')} 🥈`;
-    if (position === 3) return `${t('leagues.3rdPlace')} 🥉`;
-    return `${position}. ${t('leagues.position').replace(':', '')}`;
+  const handleRecalculate = async () => {
+    if (isRecalculating) return;
+    setIsRecalculating(true);
+    try {
+      await refreshLeaderboard(currentLeague.id);
+      invalidateStats();
+      toast.success(t('leagues.recalculateSuccess'));
+    } catch (error) {
+      console.error('Error refreshing leaderboard:', error);
+      toast.error(t('leagues.recalculateFailed'));
+    } finally {
+      setIsRecalculating(false);
+    }
   };
 
   return (
-    <div className="tournament-management">
-      <div className="management-header">
-        <button className="back-btn" onClick={onBack}>
-          <ArrowLeft size={20} />
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
+          <ArrowLeft />
           {t('leagues.backToLeagues')}
-        </button>
-        <div className="tournament-title">
-          {isEditing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
-              <input
-                type="text"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder={t('leagues.leagueName')}
-                style={{
-                  padding: '0.75rem',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-primary)',
-                  fontSize: '1.5rem',
-                  fontWeight: '600'
-                }}
-              />
-              <textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                placeholder={t('leagues.descriptionOptional')}
-                style={{
-                  padding: '0.75rem',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  background: 'var(--input-bg)',
-                  color: 'var(--text-primary)',
-                  minHeight: '80px',
-                  resize: 'vertical'
-                }}
-              />
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
-                  className="action-btn play"
-                  onClick={handleUpdateLeague}
-                  disabled={isSavingLeague || !editForm.name.trim()}
-                  style={{ padding: '0.5rem 1rem' }}
-                >
-                  <Check size={16} />
-                  {t('common.save')}
-                </button>
-                <button 
-                  className="action-btn delete"
-                  onClick={() => setIsEditing(false)}
-                  style={{ padding: '0.5rem 1rem' }}
-                >
-                  <X size={16} />
-                  {t('common.cancel')}
-                </button>
-              </div>
+        </Button>
+
+        {isEditing ? (
+          <div className="flex w-full max-w-3xl flex-col gap-3">
+            <Input
+              type="text"
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              placeholder={t('leagues.leagueName')}
+              className="h-11 text-xl font-semibold md:text-xl"
+            />
+            <Textarea
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              placeholder={t('leagues.descriptionOptional')}
+              rows={3}
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleUpdateLeague} disabled={isSavingLeague || !editForm.name.trim()}>
+                <Check />
+                {t('common.save')}
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <X />
+                {t('common.cancel')}
+              </Button>
             </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <h2>{currentLeague.name}</h2>
-                <span className={`status-badge ${currentLeague.status}`}>
-                  {tournamentStatusLabel(currentLeague.status, t)}
-                </span>
-                {isManager && (
-                  <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
-                    <button 
-                      className="action-btn play"
-                      onClick={() => setIsEditing(true)}
-                      title={t('leagues.editLeague')}
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button 
-                      className="action-btn delete"
-                      onClick={handleDeleteLeague}
-                      title={t('leagues.deleteLeague')}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                )}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-semibold tracking-tight">{currentLeague.name}</h1>
+                <StatusBadge status={currentLeague.status} t={t} />
               </div>
               {currentLeague.description && (
-                <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                  {currentLeague.description}
-                </p>
+                <p className="text-sm text-muted-foreground">{currentLeague.description}</p>
               )}
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                <div className="stat">
-                  <Users size={16} />
-                  <span>{currentLeague.members?.length || 0} {t('leagues.members')}</span>
-                </div>
-                <div className="stat">
-                  <Trophy size={16} />
-                  <span>{currentLeague.tournaments?.length || 0} {t('leagues.tournaments')}</span>
-                </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Users className="size-4" />
+                  <span className="tabular-nums">{currentLeague.members?.length || 0}</span> {t('leagues.members')}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Trophy className="size-4" />
+                  <span className="tabular-nums">{currentLeague.tournaments?.length || 0}</span> {t('leagues.tournaments')}
+                </span>
               </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="management-tabs">
-        <button
-          className={activeTab === 'leaderboard' ? 'active' : ''}
-          onClick={() => setActiveTab('leaderboard')}
-        >
-          <TrendingUp size={18} />
-          {t('leagues.leaderboard')}
-        </button>
-        <button
-          className={activeTab === 'tournaments' ? 'active' : ''}
-          onClick={() => setActiveTab('tournaments')}
-        >
-          <Trophy size={18} />
-          {t('tournaments.title')}
-        </button>
-        <button
-          className={activeTab === 'statistics' ? 'active' : ''}
-          onClick={() => setActiveTab('statistics')}
-        >
-          <BarChart3 size={18} />
-          {t('leagues.statistics')}
-        </button>
-        <button
-          className={activeTab === 'h2h' ? 'active' : ''}
-          onClick={() => setActiveTab('h2h')}
-        >
-          <Users size={18} />
-          {t('leagues.headToHead')}
-        </button>
-        <button
-          className={activeTab === 'players' ? 'active' : ''}
-          onClick={() => setActiveTab('players')}
-        >
-          <Users size={18} />
-          {t('leagues.players')}
-        </button>
-        {isManager && (
-          <button
-            className={activeTab === 'settings' ? 'active' : ''}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings size={18} />
-            {t('leagues.settings')}
-          </button>
-        )}
-      </div>
-
-      <div className="management-content">
-        {activeTab === 'leaderboard' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ color: 'var(--text-primary)' }}>{t('leagues.leaderboard')}</h2>
-              {isManager && (
-                <button 
-                  className="create-tournament-btn" 
-                  disabled={isRecalculating}
-                  onClick={async () => {
-                    if (isRecalculating) return;
-                    setIsRecalculating(true);
-                    try {
-                      await refreshLeaderboard(currentLeague.id);
-                      invalidateStats();
-                      alert(t('leagues.recalculateSuccess'));
-                    } catch (error) {
-                      console.error('Error refreshing leaderboard:', error);
-                      alert(t('leagues.recalculateFailed'));
-                    } finally {
-                      setIsRecalculating(false);
-                    }
-                  }}
-                  title={t('leagues.recalculate')}
-                >
-                  <TrendingUp size={18} />
-                  {isRecalculating ? t('common.loading') : t('leagues.recalculate')}
-                </button>
-              )}
             </div>
-            {currentLeague.leaderboard && currentLeague.leaderboard.length > 0 ? (
-              <div className="league-leaderboard-wrap" style={{ overflowX: 'auto' }}>
-                <table className="league-leaderboard-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>{t('leagues.player')}</th>
-                      <th className="lb-col-form">{t('leagues.form')}</th>
-                      <th>{t('leagues.points')}</th>
-                      <th className="lb-col-legs">{t('leagues.legs')}</th>
-                      <th className="lb-col-tournaments">{t('tournaments.title')}</th>
-                      <th className="lb-col-best">{t('leagues.best')}</th>
-                      <th className="lb-col-avg">{t('leagues.avgPlacement')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentLeague.leaderboard.map((entry, index) => {
-                      const rank = index + 1;
-                      return (
-                        <tr key={entry.player?.id || index} className={rank <= 3 ? 'lb-top-row' : ''}>
-                          <td>
-                            <span className={`lb-rank${rank <= 3 ? ` rank-${rank}` : ''}`}>{rank}</span>
-                          </td>
-                          <td>{renderPlayerLink(entry.player, 'lb-player-name')}</td>
-                          <td className="lb-col-form">
-                            <div className="form-dots">
-                              {(entry.last5 || []).map((win, i) => (
-                                <span key={i} className={`form-dot ${win ? 'win' : 'loss'}`} />
-                              ))}
-                            </div>
-                          </td>
-                          <td><span className="lb-points">{entry.totalPoints || 0}</span></td>
-                          <td className="lb-col-legs">{entry.legsWon}:{entry.legsLost}</td>
-                          <td className="lb-col-tournaments">{entry.tournamentsPlayed || 0}</td>
-                          <td className="lb-col-best">{entry.bestPlacement || '-'}</td>
-                          <td className="lb-col-avg">{entry.avgPlacement ? entry.avgPlacement.toFixed(1) : '-'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="empty-state">
-                <Trophy size={48} />
-                <p>{t('leagues.noResultsYet')}</p>
-              </div>
-            )}
-
-          </div>
-        )}
-
-        {activeTab === 'statistics' && (
-          <div>
-            <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>{t('leagues.leagueStatistics')}</h2>
-
-            {loadingStats && (
-              <div className="loading-container">
-                <div className="loading-spinner"></div>
-                <p>{t('leagues.loadingStatistics')}</p>
-              </div>
-            )}
-
-            {!loadingStats && leagueStats && (() => {
-              const hasAny = leagueStats.most180s.length > 0 || leagueStats.bestCheckouts.length > 0 || leagueStats.bestMatchAverages.length > 0 || leagueStats.fewestDartsLegs.length > 0;
-              if (!hasAny) {
-                return (
-                  <div className="empty-state">
-                    <BarChart3 size={48} />
-                    <p>{t('leagues.noStatisticsYet')}</p>
-                  </div>
-                );
-              }
-
-              const StatTable = ({ title, icon, color, rows, valueFn, detailFn }) => {
-                if (!rows.length) return null;
-                return (
-                  <div className="league-stat-card">
-                    <div className="league-stat-card-header" style={{ '--stat-accent': color }}>
-                      <span className="league-stat-icon" style={{ background: color }}>{icon}</span>
-                      <h3>{title}</h3>
-                    </div>
-                    <div className="league-stat-table-wrap">
-                      <table className="league-stat-table">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>{t('leagues.statPlayer')}</th>
-                            <th>{t('leagues.statValue')}</th>
-                            <th className="ls-col-details">{t('leagues.statDetails')}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rows.map((row, idx) => (
-                            <tr key={row.player?.id || idx} className={idx < 3 ? 'ls-top-row' : ''}>
-                              <td>
-                                <span className={`lb-rank${idx < 3 ? ` rank-${idx + 1}` : ''}`}>{idx + 1}</span>
-                              </td>
-                              <td>{renderPlayerLink(row.player, 'lb-player-name')}</td>
-                              <td><span className="lb-points" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>{valueFn(row)}</span></td>
-                              <td className="ls-col-details"><span className="ls-detail-text">{detailFn(row)}</span></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              };
-
-              return (
-                <div className="league-stats-grid">
-                  <StatTable
-                    title={t('leagues.most180s')}
-                    icon={<Trophy size={20} />}
-                    color="#f59e0b"
-                    rows={leagueStats.most180s}
-                    valueFn={r => r.count}
-                    detailFn={() => ''}
-                  />
-                  <StatTable
-                    title={t('leagues.bestCheckouts')}
-                    icon={<Target size={20} />}
-                    color="#10b981"
-                    rows={leagueStats.bestCheckouts}
-                    valueFn={r => r.highest}
-                    detailFn={r => `${t('leagues.statVs')} ${r.opponent} · ${r.tournamentName}`}
-                  />
-                  <StatTable
-                    title={t('leagues.bestMatchAverages')}
-                    icon={<Zap size={20} />}
-                    color="#8b5cf6"
-                    rows={leagueStats.bestMatchAverages}
-                    valueFn={r => r.average.toFixed(1)}
-                    detailFn={r => `${t('leagues.statVs')} ${r.opponent} · ${r.tournamentName}`}
-                  />
-                  <StatTable
-                    title={t('leagues.fewestDartsLegs')}
-                    icon={<Hash size={20} />}
-                    color="#ef4444"
-                    rows={leagueStats.fewestDartsLegs}
-                    valueFn={r => `${r.darts} ${t('leagues.statDarts')}`}
-                    detailFn={r => `${t('leagues.statVs')} ${r.opponent} · ${r.tournamentName}`}
-                  />
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {activeTab === 'tournaments' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h2 style={{ color: 'var(--text-primary)' }}>{t('tournaments.title')}</h2>
-              {isManager && (
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button className="create-tournament-btn" onClick={handleOpenLinkTournament} style={{ background: 'var(--accent-secondary)', color: '#fff' }}>
-                    <Link size={18} />
-                    {t('leagues.addExistingTournament') || 'Add Existing'}
-                  </button>
-                  {onCreateTournament && (
-                    <button className="create-tournament-btn" onClick={() => onCreateTournament(currentLeague)}>
-                      <Plus size={18} />
-                      {t('leagues.createTournament')}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Link existing tournament picker */}
-            {isLinkingTournament && (
-              <div style={{
-                marginBottom: '1.5rem',
-                padding: '1rem',
-                background: 'var(--card-bg)',
-                borderRadius: '12px',
-                border: '1px solid var(--border-color)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1rem' }}>
-                    {t('leagues.selectTournamentToLink') || 'Select a tournament to add to this league'}
-                  </h3>
-                  <button
-                    className="action-btn delete"
-                    onClick={closeLinkTournament}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                {loadingUnlinked ? (
-                  <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0' }}>{t('common.loading') || 'Loading...'}</p>
-                ) : unlinkedTournaments.length === 0 ? (
-                  <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0' }}>
-                    {t('leagues.noUnlinkedTournaments') || 'No unlinked tournaments found. All your tournaments are already in a league.'}
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <select
-                      value={selectedTournamentToLink}
-                      onChange={(e) => handleSelectTournamentToLink(e.target.value)}
-                      style={{
-                        flex: 1,
-                        minWidth: '200px',
-                        padding: '0.5rem',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        background: 'var(--input-bg)',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.9rem'
-                      }}
-                    >
-                      <option value="">{t('leagues.chooseTournament') || '-- Choose tournament --'}</option>
-                      {unlinkedTournaments.map(tour => (
-                        <option key={tour.id} value={tour.id}>
-                          {tour.name} ({tour.status}) — {new Date(tour.created_at).toLocaleDateString()}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className="action-btn play"
-                      onClick={handleLinkTournament}
-                      disabled={!isLinkMapComplete || isLinking}
-                      style={{ opacity: isLinkMapComplete && !isLinking ? 1 : 0.5 }}
-                    >
-                      <Check size={16} />
-                    </button>
-                  </div>
-                )}
-                {linkPlayers.length > 0 && (
-                  <div style={{ marginTop: '0.75rem' }}>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: '0 0 0.5rem' }}>
-                      {t('leagues.mapPlayersHint')}
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 0.75rem', alignItems: 'center' }}>
-                      {linkPlayers.map(p => (
-                        <React.Fragment key={p.id}>
-                          <span style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>{p.name}</span>
-                          <select
-                            value={linkPlayerMap[p.id] || ''}
-                            onChange={(e) => setLinkPlayerMap(prev => ({ ...prev, [p.id]: e.target.value }))}
-                            style={{
-                              padding: '0.4rem',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              background: 'var(--input-bg)',
-                              color: linkPlayerMap[p.id] ? 'var(--text-primary)' : 'var(--accent-secondary)',
-                              fontSize: '0.9rem'
-                            }}
-                          >
-                            <option value="">{t('leagues.chooseMember')}</option>
-                            <option value="new">{t('leagues.newMember')}</option>
-                            {(currentLeague.members || []).map(m => m.player).filter(Boolean).map(m => (
-                              <option key={m.id} value={m.id}>{m.name}</option>
-                            ))}
-                          </select>
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {currentLeague.tournaments && currentLeague.tournaments.length > 0 ? (
-              <div className="tournaments-grid">
-                {currentLeague.tournaments.map(tournament => (
-                  <div key={tournament.id} className="tournament-card" style={{ position: 'relative' }}>
-                    <div onClick={() => onSelectTournament && onSelectTournament(tournament)} style={{ cursor: 'pointer' }}>
-                      <div className="card-header">
-                        <div className="tournament-info">
-                          <h3>{tournament.name}</h3>
-                          <span className={`status-badge ${tournament.status}`}>
-                            {tournamentStatusLabel(tournament.status, t)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="tournament-stats">
-                        <div className="stat">
-                          <Calendar size={16} />
-                          <span>{new Date(tournament.created_at).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                    {isManager && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleUnlinkTournament(tournament.id); }}
-                        disabled={isLinking}
-                        title={t('leagues.unlinkTournament') || 'Remove from league'}
-                        style={{
-                          position: 'absolute',
-                          top: '0.5rem',
-                          right: '0.5rem',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--text-secondary)',
-                          padding: '0.25rem',
-                          borderRadius: '6px',
-                          transition: 'color 0.2s, background 0.2s'
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-danger)'; e.currentTarget.style.background = 'var(--card-bg)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'none'; }}
-                      >
-                        <Unlink size={16} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <Trophy size={48} />
-                <p>{t('leagues.noTournamentsYet')}</p>
-                {isManager && (
-                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <button className="create-first-btn" onClick={handleOpenLinkTournament}>
-                      <Link size={20} />
-                      {t('leagues.addExistingTournament') || 'Add Existing'}
-                    </button>
-                    {onCreateTournament && (
-                      <button className="create-first-btn" onClick={() => onCreateTournament(currentLeague)}>
-                        <Plus size={20} />
-                        {t('leagues.createTournament')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'h2h' && (
-          <div>
-            <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>{t('leagues.headToHead')}</h2>
-            {currentLeague.leaderboard && currentLeague.leaderboard.length >= 2 ? (
-              <HeadToHead
-                leagueId={currentLeague.id}
-                players={currentLeague.leaderboard.map(e => e.player).filter(Boolean)}
-              />
-            ) : (
-              <div className="empty-state">
-                <Users size={48} />
-                <p>{t('leagues.noResultsYet')}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'players' && (
-          <div>
-            {/* Player Self-Registration (non-managers) */}
-            {user && !isManager && (
-              <div className="self-register-section">
-                {myMembership ? (
-                  <div className="registration-status-badge approved">
-                    <CheckCircle size={16} />
-                    {t('leagues.youAreMember')}
-                  </div>
-                ) : (
-                  <>
-                    {showNameEditor && (
-                      <div className="self-register-name">
-                        <p>{t('registration.nameRequiredHint')}</p>
-                        <DisplayNameEditor
-                          currentName=""
-                          onSaved={(newName) => handleSelfRegisterLeague(newName)}
-                          onCancel={() => setShowNameEditor(false)}
-                        />
-                      </div>
-                    )}
-                    {/* No request yet, or an approved one whose membership was
-                        since removed — either way the user can (re)apply. */}
-                    {(!myLeagueRegistration || myLeagueRegistration.status === 'approved') && !showNameEditor && (
-                      <button
-                        className="self-register-btn"
-                        onClick={() => handleSelfRegisterLeague()}
-                        disabled={registerLoading}
-                      >
-                        <Plus size={20} />
-                        {registerLoading ? t('common.loading') : t('leagues.joinLeague')}
-                      </button>
-                    )}
-                    {myLeagueRegistration?.status === 'pending' && (
-                      <>
-                        <div className="registration-status-badge pending">
-                          <Clock size={16} />
-                          {t('leagues.registrationPending')}
-                        </div>
-                        <p>{t('leagues.registrationSubmitted')}</p>
-                        <button
-                          className="withdraw-registration-btn"
-                          onClick={handleWithdrawLeagueReg}
-                          disabled={registerLoading}
-                        >
-                          <X size={16} />
-                          {t('registration.withdrawRegistration')}
-                        </button>
-                      </>
-                    )}
-                    {myLeagueRegistration?.status === 'rejected' && (
-                      <>
-                        <div className="registration-status-badge rejected">
-                          <XCircle size={16} />
-                          {t('leagues.registrationRejected')}
-                        </div>
-                        <p>{t('registration.registrationRejectedHint')}</p>
-                        {!showNameEditor && (
-                          <button
-                            className="self-register-btn"
-                            onClick={() => handleSelfRegisterLeague()}
-                            disabled={registerLoading}
-                          >
-                            <RotateCcw size={18} />
-                            {registerLoading ? t('common.loading') : t('leagues.applyAgain')}
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-                {registrationError && (
-                  <div className="registration-error">
-                    <AlertCircle size={16} />
-                    {registrationError}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Registration requests (managers) */}
             {isManager && (
-              <div className="pending-requests-section">
-                <div className="requests-header">
-                  <h3>{t('leagues.pendingRequests')}</h3>
-                  {leagueRegistrations.filter(r => r.status === 'pending').length > 0 && (
-                    <span className="requests-count">
-                      {leagueRegistrations.filter(r => r.status === 'pending').length} {t('registration.statusPending')}
-                    </span>
-                  )}
-                </div>
-                {registrationError && (
-                  <div className="registration-error">
-                    <AlertCircle size={16} />
-                    {registrationError}
-                  </div>
-                )}
-                {leagueRegistrations.length === 0 ? (
-                  <p className="no-requests">{t('registration.noRequestsPending')}</p>
-                ) : (
-                  leagueRegistrations.map(reg => (
-                    <div key={reg.id} className={`registration-request-card status-${reg.status}`}>
-                      <div className="request-info">
-                        <span className="request-name">{reg.player_name}</span>
-                        <span className="request-date">{new Date(reg.created_at).toLocaleDateString()}</span>
-                      </div>
-                      {reg.status === 'pending' ? (
-                        <div className="request-actions">
-                          <button
-                            className="approve-btn"
-                            onClick={() => handleApproveLeagueReg(reg.id)}
-                            disabled={processingRegId === reg.id}
-                          >
-                            <CheckCircle size={14} /> {t('registration.approve')}
-                          </button>
-                          <button
-                            className="reject-btn"
-                            onClick={() => handleRejectLeagueReg(reg.id)}
-                            disabled={processingRegId === reg.id}
-                          >
-                            <XCircle size={14} /> {t('registration.reject')}
-                          </button>
-                        </div>
-                      ) : (
-                        <span className={`registration-status-badge ${reg.status}`}>
-                          {reg.status === 'approved' ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                          {reg.status === 'approved' ? t('registration.statusApproved') : t('registration.statusRejected')}
-                        </span>
-                      )}
-                    </div>
-                  ))
-                )}
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title={t('leagues.editLeague')} aria-label={t('leagues.editLeague')}>
+                  <Pencil />
+                </Button>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={handleDeleteLeague} title={t('leagues.deleteLeague')} aria-label={t('leagues.deleteLeague')}>
+                  <Trash2 />
+                </Button>
               </div>
             )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ color: 'var(--text-primary)' }}>{t('leagues.players')}</h2>
-              {isManager && (
-                <>
-                  {!isAddingPlayer ? (
-                    <button className="create-tournament-btn" onClick={() => setIsAddingPlayer(true)}>
-                      <Plus size={18} />
-                      {t('leagues.addPlayer')}
-                    </button>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: '280px' }}>
-                      <div className="add-mode-toggle">
-                        <button className={addMode === 'name' ? 'active' : ''} onClick={() => setAddMode('name')}>
-                          {t('userSearch.addByName')}
-                        </button>
-                        <button className={addMode === 'users' ? 'active' : ''} onClick={() => setAddMode('users')}>
-                          {t('userSearch.addFromUsers')}
-                        </button>
-                      </div>
-                      {addMode === 'name' ? (
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <input
-                            type="text"
-                            value={newPlayerName}
-                            onChange={(e) => setNewPlayerName(e.target.value)}
-                            placeholder={t('leagues.playerName')}
-                            style={{
-                              padding: '0.5rem',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              background: 'var(--input-bg)',
-                              color: 'var(--text-primary)',
-                              flex: 1
-                            }}
-                            onKeyPress={(e) => e.key === 'Enter' && handleAddPlayer()}
-                          />
-                          <button className="action-btn play" onClick={handleAddPlayer} disabled={isAddingMember || !newPlayerName.trim()}>
-                            <Check size={16} />
-                          </button>
-                        </div>
-                      ) : (
-                        <UserSearchPicker onSelect={handleAddUserFromSearch} />
-                      )}
-                      <button className="action-btn delete" onClick={() => {
-                        setIsAddingPlayer(false);
-                        setNewPlayerName('');
-                        setAddMode('name');
-                      }} style={{ alignSelf: 'flex-end' }}>
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            {currentLeague.members && currentLeague.members.length > 0 ? (
-              <div className="groups-grid">
-                {currentLeague.members.map(member => (
-                  <div key={member.player?.id || member.id} className="group-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
-                          {renderPlayerLink(member.player)}
-                          {member.player?.user_id && (
-                            <span className="linked-account-badge" title={t('common.registeredAccount')}>
-                              <BadgeCheck size={15} />
-                            </span>
-                          )}
-                        </h3>
-                        {member.role === 'manager' && (
-                          <span className="status-badge active" style={{ fontSize: '0.75rem' }}>{t('leagues.manager')}</span>
-                        )}
-                      </div>
-                      {isManager && (
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={member.isActive}
-                              disabled={pendingMemberIds.has(member.player?.id)}
-                              onChange={() => handleTogglePlayerActive(member.player.id, member.isActive)}
-                              style={{ cursor: 'pointer' }}
-                            />
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('leagues.active')}</span>
-                          </label>
-                          <button
-                            className="action-btn delete"
-                            onClick={() => handleRemovePlayer(member.player.id)}
-                            disabled={pendingMemberIds.has(member.player?.id)}
-                            title={t('leagues.removePlayer')}
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-state">
-                <Users size={48} />
-                <p>{t('leagues.noPlayersYet')}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'settings' && isManager && (
-          <div>
-            <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>{t('leagues.leagueSettings')}</h2>
-
-            <LeagueManagersPanel
-              leagueId={currentLeague.id}
-              canEdit={!!(isAdmin || currentLeague.createdBy === user?.id)}
-            />
-
-            <ScorersPanel type="league" entityId={currentLeague.id} />
-
-            {/* Scoring Rules Editor */}
-            <div className="group-card" style={{ marginBottom: '1.5rem' }}>
-              <div className="settings-card-header">
-                <h3>{t('leagues.scoringRules')}</h3>
-                <button
-                  className="settings-btn settings-btn--primary"
-                  onClick={handleSaveScoringRules}
-                  disabled={isSavingScoring}
-                >
-                  <Save size={15} />
-                  {isSavingScoring ? t('common.saving') : t('leagues.saveChanges')}
-                </button>
-              </div>
-              
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                {t('leagues.scoringRulesDescription')}
-              </p>
-              
-              {/* Scoring Rules List */}
-              <div className="scoring-rules-list">
-                {scoringRules.map((rule, index) => (
-                  <div key={rule.position} className="scoring-rule-row">
-                    <span className="scoring-rule-label" style={{ fontWeight: rule.position <= 3 ? '600' : '400' }}>
-                      {getPlacementLabel(rule.position)}
-                    </span>
-                    <div className="scoring-rule-controls">
-                      <input
-                        type="number"
-                        min="0"
-                        value={rule.points}
-                        onChange={(e) => handleScoringRuleChange(index, 'points', e.target.value)}
-                        className="scoring-rule-input"
-                      />
-                      <span style={{ color: 'var(--text-secondary)' }}>{t('common.pts')}</span>
-                      {!isFallbackRule(rule) && (
-                        <button
-                          onClick={() => handleRemovePlacement(index)}
-                          className="scoring-rule-remove"
-                          title={t('leagues.removePlacement')}
-                        >
-                          <X size={18} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Points by Playoff Round */}
-              <div style={{
-                padding: '1rem',
-                background: 'var(--bg-tertiary)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)',
-                marginBottom: '1.5rem'
-              }}>
-                <h4 style={{ color: 'var(--text-primary)', margin: '0 0 0.25rem 0' }}>
-                  {t('leagues.roundPointsTitle') || 'Points by Playoff Round'}
-                </h4>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
-                  {t('leagues.roundPointsDescription') || 'Set points for reaching each playoff round'}
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {roundPointsRules.map((rule, index) => {
-                    const roundLabel = rule.round === 32
-                      ? (t('leagues.roundOf32') || 'Round of 32')
-                      : rule.round === 16
-                        ? (t('leagues.roundOf16') || 'Round of 16')
-                        : (t('leagues.quarterfinals') || 'Quarterfinals');
-                    return (
-                      <div key={rule.round} className="round-points-row" style={{
-                        background: rule.enabled ? 'var(--bg-secondary)' : 'transparent',
-                        border: rule.enabled ? '1px solid var(--border-color)' : '1px solid transparent',
-                        opacity: rule.enabled ? 1 : 0.6
-                      }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={rule.enabled}
-                            onChange={(e) => {
-                              const updated = [...roundPointsRules];
-                              updated[index] = { ...updated[index], enabled: e.target.checked };
-                              setRoundPointsRules(updated);
-                            }}
-                          />
-                          <span style={{ color: 'var(--text-primary)', fontWeight: rule.enabled ? '500' : '400' }}>
-                            {roundLabel}
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={rule.points}
-                          disabled={!rule.enabled}
-                          onChange={(e) => {
-                            const updated = [...roundPointsRules];
-                            updated[index] = { ...updated[index], points: parseInt(e.target.value) || 0 };
-                            setRoundPointsRules(updated);
-                          }}
-                          className="scoring-rule-input"
-                          style={{ opacity: rule.enabled ? 1 : 0.4 }}
-                        />
-                        <span style={{ color: 'var(--text-secondary)' }}>{t('common.pts')}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Add New Placement */}
-              <div style={{
-                padding: '1rem',
-                background: 'var(--bg-tertiary)',
-                borderRadius: '8px',
-                border: '1px dashed var(--border-color)'
-              }}>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
-                  {t('leagues.addNewPlacement')}
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <label style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('leagues.position')}</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 6"
-                      value={newPlacement.position}
-                      onChange={(e) => setNewPlacement({ ...newPlacement, position: e.target.value })}
-                      style={{
-                        width: '80px',
-                        padding: '0.5rem',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        background: 'var(--input-bg)',
-                        color: 'var(--text-primary)',
-                        textAlign: 'center'
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <label style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{t('leagues.points')}:</label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="e.g. 2"
-                      value={newPlacement.points}
-                      onChange={(e) => setNewPlacement({ ...newPlacement, points: e.target.value })}
-                      style={{
-                        width: '80px',
-                        padding: '0.5rem',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        background: 'var(--input-bg)',
-                        color: 'var(--text-primary)',
-                        textAlign: 'center'
-                      }}
-                    />
-                  </div>
-                  <button
-                    className="settings-btn settings-btn--primary"
-                    onClick={handleAddPlacement}
-                  >
-                    <Plus size={15} />
-                    {t('common.add')}
-                  </button>
-                </div>
-                <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                  {t('leagues.defaultPlacementTip')}
-                </p>
-              </div>
-            </div>
-            
-            {/* Default Tournament Settings Editor */}
-            <div className="group-card" style={{ marginBottom: '1.5rem' }}>
-              <div className="settings-card-header">
-                <h3>{t('leagues.defaultTournamentSettings')}</h3>
-                <div className="settings-card-actions">
-                  <button
-                    className="settings-btn settings-btn--danger"
-                    onClick={handleResetTournamentDefaults}
-                  >
-                    <RotateCcw size={15} />
-                    {t('leagues.resetDefaults')}
-                  </button>
-                  <button
-                    className="settings-btn settings-btn--primary"
-                    onClick={handleSaveTournamentDefaults}
-                    disabled={isSavingDefaults}
-                  >
-                    <Save size={15} />
-                    {isSavingDefaults ? t('common.saving') : t('leagues.saveChanges')}
-                  </button>
-                </div>
-              </div>
-
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                {t('leagues.defaultTournamentSettingsDescription')}
-              </p>
-
-              {/* Tournament Type */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  {t('leagues.defaultTournamentType')}
-                </label>
-                <div className="radio-group">
-                  <label>
-                    <input
-                      type="radio"
-                      name="defaultTournamentType"
-                      value="groups_with_playoffs"
-                      checked={tournamentDefaults.tournamentType === 'groups_with_playoffs'}
-                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, tournamentType: e.target.value })}
-                    />
-                    {t('registration.tournamentTypeGroupsWithPlayoffs') || 'Group stage with optional playoffs'}
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="defaultTournamentType"
-                      value="playoff_only"
-                      checked={tournamentDefaults.tournamentType === 'playoff_only'}
-                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, tournamentType: e.target.value })}
-                    />
-                    {t('registration.tournamentTypePlayoffOnly') || 'Playoff only (no group stage)'}
-                  </label>
-                </div>
-              </div>
-
-              {/* Match Settings */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  {t('registration.matchSettings')}
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                  <div className="input-group">
-                    <label>{t('leagues.defaultLegsToWin')}</label>
-                    <select
-                      value={tournamentDefaults.legsToWin}
-                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, legsToWin: parseInt(e.target.value) })}
-                      className="legs-selector"
-                    >
-                      <option value={1}>{t('tournaments.firstToLeg', { count: 1 })}</option>
-                      <option value={2}>{t('tournaments.firstToLegs', { count: 2 })}</option>
-                      <option value={3}>{t('tournaments.firstToLegs', { count: 3 })}</option>
-                      <option value={4}>{t('tournaments.firstToLegs', { count: 4 })}</option>
-                      <option value={5}>{t('tournaments.firstToLegs', { count: 5 })}</option>
-                      <option value={7}>{t('tournaments.firstToLegs', { count: 7 })}</option>
-                      <option value={9}>{t('tournaments.firstToLegs', { count: 9 })}</option>
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label>{t('leagues.defaultStartingScore')}</label>
-                    <select
-                      value={tournamentDefaults.startingScore}
-                      onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, startingScore: parseInt(e.target.value) })}
-                    >
-                      <option value={301}>301</option>
-                      <option value={501}>501</option>
-                      <option value={701}>701</option>
-                    </select>
-                  </div>
-                  <div className="input-group">
-                    <label>{t('registration.scoringMode')}</label>
-                    <div className="radio-group" style={{ marginBottom: 0 }}>
-                      <label>
-                        <input
-                          type="radio"
-                          name="defaultScoringModeLeague"
-                          value="dart"
-                          checked={tournamentDefaults.defaultScoringMode !== 'turnTotal'}
-                          onChange={() => setTournamentDefaults(prev => ({ ...prev, defaultScoringMode: 'dart' }))}
-                        />
-                        {t('registration.scoringModeDart')}
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="defaultScoringModeLeague"
-                          value="turnTotal"
-                          checked={tournamentDefaults.defaultScoringMode === 'turnTotal'}
-                          onChange={() => setTournamentDefaults(prev => ({ ...prev, defaultScoringMode: 'turnTotal' }))}
-                        />
-                        {t('registration.scoringModeTurnTotal')}
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                <div className="checkbox-group" style={{ marginTop: '0.75rem' }}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={tournamentDefaults.groupSettings?.autoScorerAssignment === true}
-                      onChange={(e) => setTournamentDefaults({
-                        ...tournamentDefaults,
-                        groupSettings: { ...tournamentDefaults.groupSettings, autoScorerAssignment: e.target.checked }
-                      })}
-                    />
-                    {t('registration.autoScorerAssignment')}
-                  </label>
-                  <p className="add-panel-hint">{t('registration.autoScorerAssignmentHint')}</p>
-                </div>
-              </div>
-
-              {/* Group Settings - only for groups_with_playoffs */}
-              {tournamentDefaults.tournamentType === 'groups_with_playoffs' && (
-                <>
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
-                      {t('leagues.defaultGroupSettings')}
-                    </label>
-                    <div className="radio-group" style={{ marginBottom: '0.75rem' }}>
-                      <label>
-                        <input
-                          type="radio"
-                          name="defaultGroupType"
-                          value="groups"
-                          checked={tournamentDefaults.groupSettings.type === 'groups'}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            groupSettings: { ...tournamentDefaults.groupSettings, type: e.target.value }
-                          })}
-                        />
-                        {t('registration.numberOfGroups')}
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="defaultGroupType"
-                          value="playersPerGroup"
-                          checked={tournamentDefaults.groupSettings.type === 'playersPerGroup'}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            groupSettings: { ...tournamentDefaults.groupSettings, type: e.target.value }
-                          })}
-                        />
-                        {t('registration.playersPerGroup')}
-                      </label>
-                    </div>
-                    <div className="input-group">
-                      <label>
-                        {tournamentDefaults.groupSettings.type === 'groups' ? t('registration.numberOfGroupsLabel') : t('registration.playersPerGroupLabel')}
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max={tournamentDefaults.groupSettings.type === 'groups' ? '16' : '8'}
-                        value={tournamentDefaults.groupSettings.value}
-                        onChange={(e) => setTournamentDefaults({
-                          ...tournamentDefaults,
-                          groupSettings: { ...tournamentDefaults.groupSettings, value: parseInt(e.target.value) || 1 }
-                        })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Standings Criteria Order */}
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
-                      {t('leagues.defaultStandingsCriteria')}
-                    </label>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                      {t('registration.standingsCriteriaOrderDescription') || 'Set the order of criteria for sorting in group standings.'}
-                    </p>
-                    <div className="criteria-order-list">
-                      {tournamentDefaults.standingsCriteriaOrder.map((criterion, index) => {
-                        const criterionLabels = {
-                          matchesWon: t('registration.matchesWon'),
-                          legDifference: t('registration.legDifference'),
-                          average: t('registration.average'),
-                          headToHead: t('registration.headToHead')
-                        };
-                        return (
-                          <div key={criterion} className="criteria-order-item">
-                            <span className="criteria-number" style={{ marginRight: '0.75rem', fontWeight: 'bold', minWidth: '2rem' }}>{index + 1}.</span>
-                            <span className="criteria-label" style={{ flex: 1 }}>{criterionLabels[criterion] || criterion}</span>
-                            <div className="criteria-actions" style={{ display: 'flex', gap: '0.25rem' }}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (index > 0) {
-                                    const newOrder = [...tournamentDefaults.standingsCriteriaOrder];
-                                    [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
-                                    setTournamentDefaults({ ...tournamentDefaults, standingsCriteriaOrder: newOrder });
-                                  }
-                                }}
-                                className={index === 0 ? 'move-btn disabled' : 'move-btn'}
-                                disabled={index === 0}
-                              >
-                                <ChevronUp size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (index < tournamentDefaults.standingsCriteriaOrder.length - 1) {
-                                    const newOrder = [...tournamentDefaults.standingsCriteriaOrder];
-                                    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                                    setTournamentDefaults({ ...tournamentDefaults, standingsCriteriaOrder: newOrder });
-                                  }
-                                }}
-                                className={index === tournamentDefaults.standingsCriteriaOrder.length - 1 ? 'move-btn disabled' : 'move-btn'}
-                                disabled={index === tournamentDefaults.standingsCriteriaOrder.length - 1}
-                              >
-                                <ChevronDown size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Playoff Settings */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  {t('leagues.defaultPlayoffSettings')}
-                </label>
-
-                {tournamentDefaults.tournamentType === 'groups_with_playoffs' && (
-                  <div className="checkbox-group" style={{ marginBottom: '0.75rem' }}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={tournamentDefaults.playoffSettings.enabled}
-                        onChange={(e) => setTournamentDefaults({
-                          ...tournamentDefaults,
-                          playoffSettings: { ...tournamentDefaults.playoffSettings, enabled: e.target.checked }
-                        })}
-                      />
-                      {t('registration.enablePlayoffs')}
-                    </label>
-                  </div>
-                )}
-
-                {tournamentDefaults.playoffSettings.enabled && (
-                  <div className="playoff-options">
-                    {tournamentDefaults.tournamentType === 'groups_with_playoffs' ? (
-                      <>
-                        <div className="radio-section" style={{ marginBottom: '0.75rem' }}>
-                          <label className="radio-section-label">{t('leagues.defaultQualificationMode')}</label>
-                          <div className="radio-group">
-                            <label>
-                              <input
-                                type="radio"
-                                name="defaultQualificationMode"
-                                value="perGroup"
-                                checked={tournamentDefaults.playoffSettings.qualificationMode === 'perGroup'}
-                                onChange={(e) => setTournamentDefaults({
-                                  ...tournamentDefaults,
-                                  playoffSettings: { ...tournamentDefaults.playoffSettings, qualificationMode: e.target.value }
-                                })}
-                              />
-                              {t('registration.qualificationModePerGroup')}
-                            </label>
-                            <label>
-                              <input
-                                type="radio"
-                                name="defaultQualificationMode"
-                                value="totalPlayers"
-                                checked={tournamentDefaults.playoffSettings.qualificationMode === 'totalPlayers'}
-                                onChange={(e) => setTournamentDefaults({
-                                  ...tournamentDefaults,
-                                  playoffSettings: { ...tournamentDefaults.playoffSettings, qualificationMode: e.target.value }
-                                })}
-                              />
-                              {t('registration.qualificationModeTotalPlayers')}
-                            </label>
-                          </div>
-                        </div>
-
-                        {tournamentDefaults.playoffSettings.qualificationMode === 'perGroup' ? (
-                          <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                            <label>{t('leagues.defaultPlayersPerGroup')}</label>
-                            <select
-                              value={tournamentDefaults.playoffSettings.playersPerGroup}
-                              onChange={(e) => setTournamentDefaults({
-                                ...tournamentDefaults,
-                                playoffSettings: { ...tournamentDefaults.playoffSettings, playersPerGroup: parseInt(e.target.value) }
-                              })}
-                            >
-                              {Array.from({ length: 8 }, (_, i) => i + 1).map(num => (
-                                <option key={num} value={num}>{num}</option>
-                              ))}
-                              <option value={9999}>{t('registration.all')}</option>
-                            </select>
-                          </div>
-                        ) : (
-                          <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                            <label>{t('leagues.defaultTotalPlayersToAdvance')}</label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="64"
-                              value={tournamentDefaults.playoffSettings.totalPlayersToAdvance || 8}
-                              onChange={(e) => setTournamentDefaults({
-                                ...tournamentDefaults,
-                                playoffSettings: { ...tournamentDefaults.playoffSettings, totalPlayersToAdvance: parseInt(e.target.value) || 8 }
-                              })}
-                            />
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                        <label>{t('leagues.defaultStartingRoundPlayers')}</label>
-                        <select
-                          value={tournamentDefaults.playoffSettings.startingRoundPlayers}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            playoffSettings: { ...tournamentDefaults.playoffSettings, startingRoundPlayers: parseInt(e.target.value) }
-                          })}
-                        >
-                          <option value={2}>{t('management.final') || 'Final (2 players)'}</option>
-                          <option value={4}>{t('management.semiFinals') || 'Semi-finals (4 players)'}</option>
-                          <option value={8}>{t('management.quarterFinals') || 'Quarter-finals (8 players)'}</option>
-                          <option value={16}>{t('management.top16') || 'Round of 16 (16 players)'}</option>
-                          <option value={32}>{t('management.top32') || 'Round of 32 (32 players)'}</option>
-                        </select>
-                      </div>
-                    )}
-
-                    {/* 3rd Place Match */}
-                    <div className="radio-section" style={{ marginBottom: '0.75rem' }}>
-                      <label className="radio-section-label">{t('leagues.defaultThirdPlaceMatch')}</label>
-                      <div className="radio-group">
-                        <label>
-                          <input
-                            type="radio"
-                            name="defaultThirdPlaceMatch"
-                            value="true"
-                            checked={tournamentDefaults.playoffSettings.thirdPlaceMatch === true}
-                            onChange={() => setTournamentDefaults({
-                              ...tournamentDefaults,
-                              playoffSettings: { ...tournamentDefaults.playoffSettings, thirdPlaceMatch: true }
-                            })}
-                          />
-                          {t('registration.thirdPlaceMatchYes') || 'Yes - Semifinal losers play for 3rd/4th place'}
-                        </label>
-                        <label>
-                          <input
-                            type="radio"
-                            name="defaultThirdPlaceMatch"
-                            value="false"
-                            checked={tournamentDefaults.playoffSettings.thirdPlaceMatch === false}
-                            onChange={() => setTournamentDefaults({
-                              ...tournamentDefaults,
-                              playoffSettings: { ...tournamentDefaults.playoffSettings, thirdPlaceMatch: false }
-                            })}
-                          />
-                          {t('registration.thirdPlaceMatchNo') || 'No - Both semifinal losers share 3rd place'}
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Prepared seeding configs (library) — NOT an .input-group:
-                        that class is a flex row for label+control pairs and its
-                        select styles would leak into the library's own selects */}
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <label style={{ display: 'block', color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
-                        {t('registration.presetLibraryLabel')}
-                      </label>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                        {t('registration.presetLibraryDescription')}
-                      </p>
-                      <SeedingPresetLibrary
-                        presets={tournamentDefaults.playoffSettings.seedingPresets || {}}
-                        onChange={(seedingPresets) => setTournamentDefaults({
-                          ...tournamentDefaults,
-                          playoffSettings: { ...tournamentDefaults.playoffSettings, seedingPresets }
-                        })}
-                      />
-                    </div>
-
-                    {/* Playoff Legs by Round */}
-                    <div className="playoff-legs-settings">
-                      <h5>{t('leagues.defaultPlayoffLegs')}:</h5>
-                      <div className="input-group">
-                        <label>{t('management.top32')}:</label>
-                        <select
-                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[32] || 3}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            playoffSettings: {
-                              ...tournamentDefaults.playoffSettings,
-                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 32: parseInt(e.target.value) }
-                            }
-                          })}
-                        >
-                          {[1,2,3,4,5,6,7].map(v => (
-                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.top16')}:</label>
-                        <select
-                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[16] || 3}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            playoffSettings: {
-                              ...tournamentDefaults.playoffSettings,
-                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 16: parseInt(e.target.value) }
-                            }
-                          })}
-                        >
-                          {[1,2,3,4,5,6,7].map(v => (
-                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.quarterFinals')}:</label>
-                        <select
-                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[8] || 3}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            playoffSettings: {
-                              ...tournamentDefaults.playoffSettings,
-                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 8: parseInt(e.target.value) }
-                            }
-                          })}
-                        >
-                          {[1,2,3,4,5,6,7].map(v => (
-                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.semiFinals')}:</label>
-                        <select
-                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[4] || 3}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            playoffSettings: {
-                              ...tournamentDefaults.playoffSettings,
-                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 4: parseInt(e.target.value) }
-                            }
-                          })}
-                        >
-                          {[1,2,3,4,5,6,7].map(v => (
-                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="input-group">
-                        <label>{t('management.final')}:</label>
-                        <select
-                          value={tournamentDefaults.playoffSettings.legsToWinByRound?.[2] || 3}
-                          onChange={(e) => setTournamentDefaults({
-                            ...tournamentDefaults,
-                            playoffSettings: {
-                              ...tournamentDefaults.playoffSettings,
-                              legsToWinByRound: { ...tournamentDefaults.playoffSettings.legsToWinByRound, 2: parseInt(e.target.value) }
-                            }
-                          })}
-                        >
-                          {[1,2,3,4,5,6,7].map(v => (
-                            <option key={v} value={v}>{v === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: v })}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
       </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
+        <TabsList>
+          <TabsTrigger value="leaderboard"><TrendingUp />{t('leagues.leaderboard')}</TabsTrigger>
+          <TabsTrigger value="tournaments"><Trophy />{t('tournaments.title')}</TabsTrigger>
+          <TabsTrigger value="statistics"><BarChart3 />{t('leagues.statistics')}</TabsTrigger>
+          <TabsTrigger value="h2h"><Users />{t('leagues.headToHead')}</TabsTrigger>
+          <TabsTrigger value="players"><Users />{t('leagues.players')}</TabsTrigger>
+          {isManager && <TabsTrigger value="settings"><Settings />{t('leagues.settings')}</TabsTrigger>}
+        </TabsList>
+
+        <TabsContent value="leaderboard">
+          <LeaderboardTab
+            league={currentLeague}
+            isManager={isManager}
+            isRecalculating={isRecalculating}
+            onRecalculate={handleRecalculate}
+          />
+        </TabsContent>
+
+        <TabsContent value="statistics">
+          <StatisticsTab leagueStats={leagueStats} loadingStats={loadingStats} />
+        </TabsContent>
+
+        <TabsContent value="tournaments">
+          <TournamentsTab
+            league={currentLeague}
+            isManager={isManager}
+            onCreateTournament={onCreateTournament}
+            onSelectTournament={onSelectTournament}
+            isLinkingTournament={isLinkingTournament}
+            loadingUnlinked={loadingUnlinked}
+            unlinkedTournaments={unlinkedTournaments}
+            selectedTournamentToLink={selectedTournamentToLink}
+            linkPlayers={linkPlayers}
+            linkPlayerMap={linkPlayerMap}
+            setLinkPlayerMap={setLinkPlayerMap}
+            isLinkMapComplete={isLinkMapComplete}
+            isLinking={isLinking}
+            onOpenLink={handleOpenLinkTournament}
+            onCloseLink={closeLinkTournament}
+            onSelectTournamentToLink={handleSelectTournamentToLink}
+            onLinkTournament={handleLinkTournament}
+            onUnlinkTournament={handleUnlinkTournament}
+          />
+        </TabsContent>
+
+        <TabsContent value="h2h" className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold tracking-tight">{t('leagues.headToHead')}</h2>
+          {currentLeague.leaderboard && currentLeague.leaderboard.length >= 2 ? (
+            <HeadToHead
+              leagueId={currentLeague.id}
+              players={currentLeague.leaderboard.map(e => e.player).filter(Boolean)}
+            />
+          ) : (
+            <EmptyState icon={Users} title={t('leagues.noResultsYet')} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="players">
+          <PlayersTab
+            league={currentLeague}
+            user={user}
+            isManager={isManager}
+            myMembership={myMembership}
+            showNameEditor={showNameEditor}
+            setShowNameEditor={setShowNameEditor}
+            myLeagueRegistration={myLeagueRegistration}
+            registerLoading={registerLoading}
+            registrationError={registrationError}
+            onSelfRegister={handleSelfRegisterLeague}
+            onWithdrawReg={handleWithdrawLeagueReg}
+            leagueRegistrations={leagueRegistrations}
+            processingRegId={processingRegId}
+            onApproveReg={handleApproveLeagueReg}
+            onRejectReg={handleRejectLeagueReg}
+            isAddingPlayer={isAddingPlayer}
+            setIsAddingPlayer={setIsAddingPlayer}
+            addMode={addMode}
+            setAddMode={setAddMode}
+            newPlayerName={newPlayerName}
+            setNewPlayerName={setNewPlayerName}
+            isAddingMember={isAddingMember}
+            onAddPlayer={handleAddPlayer}
+            onAddUserFromSearch={handleAddUserFromSearch}
+            pendingMemberIds={pendingMemberIds}
+            onToggleActive={handleTogglePlayerActive}
+            onRemovePlayer={handleRemovePlayer}
+          />
+        </TabsContent>
+
+        {isManager && (
+          <TabsContent value="settings">
+            <SettingsTab
+              league={currentLeague}
+              canEditManagers={!!(isAdmin || currentLeague.createdBy === user?.id)}
+              scoringRules={scoringRules}
+              onScoringRuleChange={handleScoringRuleChange}
+              isFallbackRule={isFallbackRule}
+              onRemovePlacement={handleRemovePlacement}
+              roundPointsRules={roundPointsRules}
+              setRoundPointsRules={setRoundPointsRules}
+              newPlacement={newPlacement}
+              setNewPlacement={setNewPlacement}
+              onAddPlacement={handleAddPlacement}
+              isSavingScoring={isSavingScoring}
+              onSaveScoringRules={handleSaveScoringRules}
+              tournamentDefaults={tournamentDefaults}
+              setTournamentDefaults={setTournamentDefaults}
+              isSavingDefaults={isSavingDefaults}
+              onSaveDefaults={handleSaveTournamentDefaults}
+              onResetDefaults={handleResetTournamentDefaults}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
-

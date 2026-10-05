@@ -1,8 +1,10 @@
 /* global process */
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // Build identity shown in Device Settings ("which version are you on?").
@@ -15,12 +17,16 @@ const buildSha = (() => {
 
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_SHA__: JSON.stringify(buildSha),
   },
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       // 'prompt': a new service worker WAITS until the app tells it to take over
       // (see OfflineContext), so an update can never reload the page mid-match.

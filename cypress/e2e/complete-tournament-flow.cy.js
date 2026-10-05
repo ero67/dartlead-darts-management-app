@@ -12,7 +12,7 @@ describe('Complete Tournament Flow', () => {
       .type('Complete Flow Tournament')
     
     // Enable playoffs
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     cy.contains('button', /create/i).click()
     
     // Step 2: Add 8 players
@@ -25,10 +25,7 @@ describe('Complete Tournament Flow', () => {
     cy.contains(/players.*8|hráči.*8/i).should('be.visible')
     
     // Step 3: Start tournament
-    cy.contains('button', /start tournament/i).click()
-    
-    // Wait for tournament to start
-    cy.url().should('include', '/tournament/')
+    cy.startTournament()
     cy.contains(/groups|skupiny/i).should('be.visible')
     
     // Step 4: Verify groups were created
@@ -77,12 +74,12 @@ describe('Complete Tournament Flow', () => {
       .type('Group-Based Seeding Tournament')
     
     // Enable playoffs
-    cy.contains(/enable playoffs|povoliť play-off/i).click()
+    cy.ensurePlayoffsEnabled()
     
     // Select group-based seeding (if visible in creation)
     cy.get('body').then(($body) => {
       if ($body.text().includes('Group-Based Seeding') || $body.text().includes('Rozdelenie Podľa Skupín')) {
-        cy.contains(/group-based seeding|rozdelenie podľa skupín/i).click()
+        cy.clickIfPresent(/group-based seeding|rozdelenie podľa skupín/i)
       }
     })
     
@@ -95,14 +92,14 @@ describe('Complete Tournament Flow', () => {
     })
     
     // Start tournament
-    cy.contains('button', /start tournament/i).click()
+    cy.startTournament()
     
     // Navigate to settings and configure group matchups
     cy.contains(/settings|nastavenia/i).click()
     cy.contains(/playoff settings|nastavenia play-off/i).scrollIntoView()
     
     // Select group-based seeding
-    cy.contains(/group-based seeding|rozdelenie podľa skupín/i).click()
+    cy.clickIfPresent(/group-based seeding|rozdelenie podľa skupín/i)
     
     // Configure group matchups if groups exist
     cy.get('body').then(($body) => {

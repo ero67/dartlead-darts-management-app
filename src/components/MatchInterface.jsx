@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Target, CheckCircle, Eye } from 'lucide-react';
+import { ArrowLeft, Target, Eye } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -16,10 +16,23 @@ import { TurnTotalKeypad } from './scoring/TurnTotalKeypad';
 import { parseTurnTotal } from '../lib/turnTotalInput';
 import { CheckoutDialog } from './scoring/CheckoutDialog';
 import { hapticTap, hapticBust, hapticLegWon, hapticMatchWon } from '../lib/haptics';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { LoadingState } from './shared/LoadingState';
+import { Scoreboard } from './match/Scoreboard';
+import { StarterDialog, ViewOnlyDialog, BullupDialog } from './match/MatchDialogs';
+import { MatchCompleteCard } from './match/MatchCompleteCard';
 
 // When both players have thrown this many visits in a single leg, the leg has run
 // too long and the app offers to decide it by a bull-up. See awardLegByBullup.
 const BULLUP_VISIT_THRESHOLD = 15;
+
+// Remove 'S' prefix for single hits, keep D and T prefixes
+const getDisplayLabel = (label) => {
+  if (!label) return '';
+  return label.startsWith('S') ? label.slice(1) : label;
+};
 
 // Thin wrapper: the null-check must not sit above hook calls (rules of hooks —
 // the fiber would render 0 hooks first, then all of them once the match
@@ -31,11 +44,8 @@ export function MatchInterface({ match, onMatchComplete, onBack }) {
 
   if (!match) {
     return (
-      <div className="match-interface">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>{t('common.loading')}</p>
-        </div>
+      <div className="flex flex-1 flex-col justify-center bg-background text-foreground">
+        <LoadingState text={t('common.loading')} />
       </div>
     );
   }
@@ -456,7 +466,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
               setShowMatchStarter(false);
               return;
             }
-          } catch (e) {
+          } catch {
             // ignore parse errors, fall through to reset
           }
         }
@@ -655,10 +665,6 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     }
   }, [match?.id, currentLeg, currentPlayer, matchStarter, legScores, currentTurn, turnHistory, matchComplete, inputMode, scoringMode, showMatchStarter]);
 
-  const players = [
-    match.player1 || { id: 'player1', name: 'Player 1' },
-    match.player2 || { id: 'player2', name: 'Player 2' }
-  ];
   const currentPlayerData = currentPlayer !== null && currentPlayer !== undefined 
     ? legScores[`player${currentPlayer + 1}`] 
     : null;
@@ -1909,12 +1915,6 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
   // Get the last turn's throws for a player
   const getLastTurnThrows = (playerIndex) => {
-    const getDisplayLabel = (label) => {
-      if (!label) return '';
-      // Remove 'S' prefix for single hits, keep D and T prefixes
-      return label.startsWith('S') ? label.slice(1) : label;
-    };
-
     // First check if it's the current player's turn - show current turn throws
     if (currentPlayer === playerIndex && currentTurn.scores.length > 0) {
       return currentTurn.scores.map(s => getDisplayLabel(s.label)).filter(Boolean);
@@ -1931,93 +1931,64 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   };
 
   if (matchComplete) {
+    const winnerName = (completedWinnerId
+      ? completedWinnerId === match.player1?.id
+      : legScores.player1.legs > legScores.player2.legs)
+      ? (match.player1?.name || t('match.player1')) : (match.player2?.name || t('match.player2'));
     return (
-      <div className="match-complete">
-        <div className="complete-header">
-          <CheckCircle size={48} className="success-icon" />
-          <h2>{t('match.matchComplete')}</h2>
-        </div>
-        <div className="final-result">
-          <div className="winner">
-            {t('match.winner')}: {(completedWinnerId
-              ? completedWinnerId === match.player1?.id
-              : legScores.player1.legs > legScores.player2.legs)
-              ? (match.player1?.name || t('match.player1')) : (match.player2?.name || t('match.player2'))}
-          </div>
-          <div className="final-score">
-            {legScores.player1.legs} - {legScores.player2.legs}
-          </div>
-        </div>
-        <button className="back-btn" onClick={onBack}>
-          <ArrowLeft size={20} />
-          {t('match.backToTournament')}
-        </button>
-      </div>
+      <MatchCompleteCard
+        winnerName={winnerName}
+        player1Legs={legScores.player1.legs}
+        player2Legs={legScores.player2.legs}
+        onBack={onBack}
+      />
     );
   }
 
+  const playerNames = [match.player1?.name || t('match.player1'), match.player2?.name || t('match.player2')];
+
   if (showMatchStarter) {
-    if (isViewOnly) {
-      // Non-logged-in users cannot start matches - show view-only message
-      return (
-        <div className="leg-starter-dialog">
-          <div className="dialog-content">
-            <h2>{t('match.viewOnlyMode')}</h2>
-            <p>{isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyStartDescription')}</p>
-            <button className="back-btn" onClick={onBack}>
-              <ArrowLeft size={20} />
-              {t('match.backToTournament')}
-            </button>
-          </div>
-        </div>
-      );
-    }
     return (
-      <div className="leg-starter-dialog">
-        <div className="dialog-content">
-          <h2>{t('match.whoStarts')}</h2>
-          <div className="input-mode-selector" style={{ marginTop: '0.75rem' }}>
-            <button
-              className={`mode-btn ${scoringMode === 'dart' ? 'active' : ''}`}
-              onClick={() => setScoringMode('dart')}
-              type="button"
-            >
-              {t('registration.scoringModeDart')}
-            </button>
-            <button
-              className={`mode-btn ${scoringMode === 'turnTotal' ? 'active' : ''}`}
-              onClick={() => setScoringMode('turnTotal')}
-              type="button"
-            >
-              {t('registration.scoringModeTurnTotal')}
-            </button>
-          </div>
-          <div className="player-options">
-            <button 
-              className="player-option"
-              onClick={() => selectMatchStarter(0)}
-            >
-              <div className="player-name">{match.player1?.name || t('match.player1')}</div>
-              <div className="player-legs">{legScores.player1.legs} {t('match.legs')}</div>
-            </button>
-            <button 
-              className="player-option"
-              onClick={() => selectMatchStarter(1)}
-            >
-              <div className="player-name">{match.player2?.name || t('match.player2')}</div>
-              <div className="player-legs">{legScores.player2.legs} {t('match.legs')}</div>
-            </button>
-          </div>
-        </div>
+      <div className="flex flex-1 flex-col bg-background text-foreground">
+        {isViewOnly ? (
+          // Non-logged-in users cannot start matches - show view-only message
+          <ViewOnlyDialog
+            description={isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyStartDescription')}
+            onBack={onBack}
+          />
+        ) : (
+          <StarterDialog
+            players={[
+              { name: playerNames[0], legs: legScores.player1.legs },
+              { name: playerNames[1], legs: legScores.player2.legs }
+            ]}
+            scoringMode={scoringMode}
+            onScoringModeChange={setScoringMode}
+            onSelect={selectMatchStarter}
+          />
+        )}
       </div>
     );
   }
 
   const player1LastThrows = getLastTurnThrows(0);
   const player2LastThrows = getLastTurnThrows(1);
+  const scoreboardPlayers = ['player1', 'player2'].map((key, idx) => {
+    const score = safeScore(legScores[key].currentScore, matchSettings.startingScore);
+    return {
+      name: playerNames[idx],
+      legs: legScores[key].legs,
+      score,
+      checkout: checkoutData[String(score)] || null,
+      throws: idx === 0 ? player1LastThrows : player2LastThrows,
+      average: getAverage(key).toFixed(1),
+      legDarts: legScores[key].legDarts
+    };
+  });
+  const metaTitle = [match.groupName, `${t('match.leg')} ${currentLeg}`].filter(Boolean).join(' · ');
 
   return (
-    <div className="match-interface mobile-optimized">
+    <div className="flex flex-1 flex-col bg-background text-foreground">
       <CheckoutDialog
         pending={pendingCheckout}
         onChange={setPendingCheckout}
@@ -2028,189 +1999,88 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         }}
       />
 
-      {showBullup && (
-        <div className="leg-starter-dialog checkout-modal">
-          <div className="dialog-content checkout-modal-content">
-            <h2>{t('match.bullup.title')}</h2>
-            <p style={{ marginTop: '0.5rem' }}>{t('match.bullup.prompt')}</p>
-            <div className="checkout-btn-row">
-              <button
-                type="button"
-                className="create-tournament-btn"
-                onClick={() => awardLegByBullup(0)}
-              >
-                {match.player1?.name || t('match.player1')}
-              </button>
-              <button
-                type="button"
-                className="create-tournament-btn"
-                onClick={() => awardLegByBullup(1)}
-              >
-                {match.player2?.name || t('match.player2')}
-              </button>
-            </div>
-            <div className="checkout-btn-row" style={{ marginTop: '0.75rem' }}>
-              <button
-                type="button"
-                className="mode-btn checkout-cancel-btn"
-                onClick={() => setShowBullup(false)}
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
-          </div>
+      <BullupDialog
+        open={showBullup}
+        onOpenChange={(open) => { if (!open) setShowBullup(false); }}
+        players={[{ name: playerNames[0] }, { name: playerNames[1] }]}
+        onPick={awardLegByBullup}
+      />
+
+      <header className="flex h-14 shrink-0 items-center justify-between gap-2 px-2">
+        <Button variant="ghost" size="sm" className="min-h-11 text-muted-foreground" onClick={onBack}>
+          <ArrowLeft />
+          {t('common.back')}
+        </Button>
+        <div className="flex min-w-0 flex-col items-center text-center">
+          <span className="truncate text-sm font-medium">{metaTitle}</span>
+          <span className="text-xs text-muted-foreground">
+            {t(matchSettings.legsToWin === 1 ? 'tournaments.firstToLeg' : 'tournaments.firstToLegs', { count: matchSettings.legsToWin })}
+          </span>
         </div>
-      )}
-
-      {/* Scores, last throws and averages. Grouped so the landscape
-          layout can put them beside the keypad instead of above it. */}
-      <div className="match-info-panel">
-        <div className="match-scoreboard match-scoreboard--compact">
-          <div className={`player-score player1 ${currentPlayer === 0 ? 'active-player' : ''} ${bustingPlayer === 0 ? 'bust' : ''}`}>
-            <div className="player-header">
-              <div className="player-name">{match.player1?.name || t('match.player1')}</div>
-              <div className="legs-won">{legScores.player1.legs}</div>
-            </div>
-            <div className="current-score">{safeScore(legScores.player1.currentScore, matchSettings.startingScore)}</div>
-            {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))] && (
-              <div className="checkout-suggestion">
-                {checkoutData[String(safeScore(legScores.player1.currentScore, matchSettings.startingScore))].join(' → ')}
-              </div>
-            )}
-            {player1LastThrows.length > 0 && (
-              <div className="last-throws">
-                {player1LastThrows.map((throwLabel, idx) => (
-                  <span key={idx} className="throw-label">{throwLabel}</span>
-                ))}
-              </div>
-            )}
-            <div className="player-stats-row">
-              <span>{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
-              <span>{t('match.darts')}: {legScores.player1.legDarts}</span>
-            </div>
-          </div>
-
-          <div className="vs-divider mobile-hidden">
-            <span>{t('match.leg')} {currentLeg}</span>
-            <span className="match-settings-text">{t(matchSettings.legsToWin === 1 ? 'tournaments.firstToLeg' : 'tournaments.firstToLegs', { count: matchSettings.legsToWin })}</span>
-          </div>
-
-          <div className={`player-score player2 ${currentPlayer === 1 ? 'active-player' : ''} ${bustingPlayer === 1 ? 'bust' : ''}`}>
-            <div className="player-header">
-              <div className="player-name">{match.player2?.name || t('match.player2')}</div>
-              <div className="legs-won">{legScores.player2.legs}</div>
-            </div>
-            <div className="current-score">{safeScore(legScores.player2.currentScore, matchSettings.startingScore)}</div>
-            {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))] && (
-              <div className="checkout-suggestion">
-                {checkoutData[String(safeScore(legScores.player2.currentScore, matchSettings.startingScore))].join(' → ')}
-              </div>
-            )}
-            {player2LastThrows.length > 0 && (
-              <div className="last-throws">
-                {player2LastThrows.map((throwLabel, idx) => (
-                  <span key={idx} className="throw-label">{throwLabel}</span>
-                ))}
-              </div>
-            )}
-            <div className="player-stats-row">
-              <span>{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
-              <span>{t('match.darts')}: {legScores.player2.legDarts}</span>
-            </div>
-          </div>
-        </div>
-
-        {!isViewOnly && bothReachedBullupThreshold && !matchComplete && (
-          <div className="bullup-offer">
-            <span className="bullup-offer-text">{t('match.bullup.offer')}</span>
-            <button
-              type="button"
-              className="bullup-offer-btn"
-              onClick={() => setShowBullup(true)}
-            >
-              <Target size={18} />
-              {t('match.bullup.decideButton')}
-            </button>
-          </div>
-        )}
-
-        {/* Stats Section - Individual darts */}
-        <div className="match-stats-section">
-          <div className={`player-stats-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
-            {player1LastThrows.length > 0 && (
-              <div className="last-throws">
-                {player1LastThrows.map((throwLabel, idx) => (
-                  <span key={idx} className="throw-label">{throwLabel}</span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="vs-divider mobile-hidden">
-            <span>{t('common.vs')}</span>
-          </div>
-
-          <div className={`player-stats-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
-            {player2LastThrows.length > 0 && (
-              <div className="last-throws">
-                {player2LastThrows.map((throwLabel, idx) => (
-                  <span key={idx} className="throw-label">{throwLabel}</span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Average and Darts Section */}
-        <div className="match-avg-section">
-          <div className={`player-avg-panel ${currentPlayer === 0 ? 'active-player' : ''}`}>
-            <span className="avg-text">{t('match.average')}: {getAverage('player1').toFixed(1)}</span>
-            <span className="darts-text">{t('match.dartsCount', { count: legScores.player1.legDarts })}</span>
-          </div>
-
-          <div className="vs-divider mobile-hidden">
-            <span>{t('common.vs')}</span>
-          </div>
-
-          <div className={`player-avg-panel ${currentPlayer === 1 ? 'active-player' : ''}`}>
-            <span className="avg-text">{t('match.average')}: {getAverage('player2').toFixed(1)}</span>
-            <span className="darts-text">{t('match.dartsCount', { count: legScores.player2.legDarts })}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="dart-board">
         {isViewOnly ? (
-          <div className="view-only-message">
-            <Eye size={48} />
-            <h3>{t('match.viewOnlyMode')}</h3>
-            <p>{isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyScoreDescription')}</p>
-          </div>
+          <Badge variant="outline"><Eye />{t('match.viewOnlyMode')}</Badge>
         ) : (
-          <>
-            {scoringMode === 'dart' ? (
-              <DartKeypad
-                inputMode={inputMode}
-                onInputModeChange={setInputMode}
-                onDart={addScore}
-                onUndo={removeLastDart}
-                dartsInVisit={currentTurn.darts}
-                canUndo={!((currentTurn.scores.length === 0 && turnHistory.length === 0) || isRemovingDart)}
-              />
-            ) : (
-              <TurnTotalKeypad
-                value={turnTotalInput}
-                onChange={(next) => { hapticTap(); setTurnTotalInput(next); }}
-                onSubmit={submitTurnTotal}
-                onUndo={undoLastVisit}
-                canUndo={turnHistory.length > 0 && currentTurn.score === 0}
-                useOnScreenKeypad={isOnScreenKeypad}
-              />
-            )}
-          </>
+          <Badge className="bg-destructive text-white">{t('management.live')}</Badge>
         )}
-      </div>
+      </header>
 
+      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 lg:grid lg:grid-cols-[1fr_1.2fr]">
+        {/* Scores, last throws and averages. Grouped so the landscape
+            layout can put them beside the keypad instead of above it. */}
+        <div className="flex flex-col gap-2">
+          <Scoreboard players={scoreboardPlayers} currentPlayer={currentPlayer} bustingPlayer={bustingPlayer} />
+
+          {!isViewOnly && bothReachedBullupThreshold && !matchComplete && (
+            <Alert className="flex flex-wrap items-center gap-2">
+              <Target />
+              <AlertDescription className="flex-1">{t('match.bullup.offer')}</AlertDescription>
+              <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={() => setShowBullup(true)}>
+                <Target />
+                {t('match.bullup.decideButton')}
+              </Button>
+            </Alert>
+          )}
+
+          {!isViewOnly && scoringMode === 'dart' && (
+            <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
+              {[0, 1, 2].map((idx) => (
+                <div key={idx} className="flex h-10 items-center justify-center rounded-md border bg-muted/40 text-lg tabular-nums">
+                  {getDisplayLabel(currentTurn.scores[idx]?.label)}
+                </div>
+              ))}
+              <div className="min-w-12 text-right text-xl font-semibold tabular-nums">{currentTurn.score}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
+          {isViewOnly ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+              <Eye className="size-10 text-muted-foreground" />
+              <h3 className="text-lg font-semibold">{t('match.viewOnlyMode')}</h3>
+              <p className="text-sm text-muted-foreground">{isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyScoreDescription')}</p>
+            </div>
+          ) : scoringMode === 'dart' ? (
+            <DartKeypad
+              inputMode={inputMode}
+              onInputModeChange={setInputMode}
+              onDart={addScore}
+              onUndo={removeLastDart}
+              dartsInVisit={currentTurn.darts}
+              canUndo={!((currentTurn.scores.length === 0 && turnHistory.length === 0) || isRemovingDart)}
+            />
+          ) : (
+            <TurnTotalKeypad
+              value={turnTotalInput}
+              onChange={(next) => { hapticTap(); setTurnTotalInput(next); }}
+              onSubmit={submitTurnTotal}
+              onUndo={undoLastVisit}
+              canUndo={turnHistory.length > 0 && currentTurn.score === 0}
+              useOnScreenKeypad={isOnScreenKeypad}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
