@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Trophy, Users, Target, LogOut, User, Moon, Sun, Shield, Crown, Badge as BadgeIcon, Monitor, Globe, ChevronsUpDown, Check } from 'lucide-react';
+import { Menu, Home, Trophy, Users, Target, LogOut, User, Moon, Sun, Shield, Crown, Badge as BadgeIcon, Monitor, Globe, ChevronsUpDown, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useAdmin } from '../contexts/AdminContext';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
@@ -12,12 +12,35 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DeviceSettings } from './DeviceSettings';
 import logoIcon from '../assets/logo-icon.png';
 import { getUserDisplayName, getUserInitials } from '../utils/userDisplayName';
+
+// Phone/tablet drawer rows: bigger text, icons and touch targets. Desktop
+// (lg+) keeps the compact sidebar.
+const DRAWER_ROW = 'max-lg:h-11 max-lg:gap-3 max-lg:text-base max-lg:[&>svg]:size-5';
+
+// Top bar below 1024px. A labelled, full-size menu button: the bare 28px
+// panel icon was too small for players to find the menu at all.
+export function MobileHeader() {
+  const { toggleSidebar, openMobile } = useSidebar();
+  const { t } = useLanguage();
+  return (
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/95 px-2 backdrop-blur lg:hidden">
+      <Button variant="outline" className="h-11 gap-2 px-3 text-base" onClick={toggleSidebar} aria-expanded={openMobile}>
+        <Menu className="size-6" />
+        {t('navigation.menu')}
+      </Button>
+      <img src={logoIcon} alt="" className="size-8 rounded-lg object-cover" />
+      <span className="text-lg font-semibold">DartLead</span>
+    </header>
+  );
+}
 
 export function Navigation({ currentView, onViewChange, tournament }) {
   const { user, signOut } = useAuth();
@@ -102,7 +125,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
                   const active = currentView === item.id;
                   return (
                     <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton isActive={active} tooltip={item.label} onClick={() => go(item.id)}>
+                      <SidebarMenuButton isActive={active} tooltip={item.label} onClick={() => go(item.id)} className={DRAWER_ROW}>
                         <Icon />
                         <span>{item.label}</span>
                       </SidebarMenuButton>
@@ -118,7 +141,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={t('deviceSettings.title')} onClick={openDeviceSettings}>
+            <SidebarMenuButton tooltip={t('deviceSettings.title')} onClick={openDeviceSettings} className={DRAWER_ROW}>
               <Monitor />
               <span>{t('deviceSettings.title')}</span>
             </SidebarMenuButton>
@@ -128,7 +151,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton tooltip={LANGUAGES.find(l => l.code === language)?.name}>
+                <SidebarMenuButton tooltip={LANGUAGES.find(l => l.code === language)?.name} className={DRAWER_ROW}>
                   <Globe />
                   <span>{LANGUAGES.find(l => l.code === language)?.name}</span>
                 </SidebarMenuButton>
@@ -145,14 +168,14 @@ export function Navigation({ currentView, onViewChange, tournament }) {
           </SidebarMenuItem>
 
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={isDarkMode ? t('navigation.lightMode') : t('navigation.darkMode')} onClick={toggleTheme}>
+            <SidebarMenuButton tooltip={isDarkMode ? t('navigation.lightMode') : t('navigation.darkMode')} onClick={toggleTheme} className={DRAWER_ROW}>
               {isDarkMode ? <Sun /> : <Moon />}
               <span>{isDarkMode ? t('navigation.lightMode') : t('navigation.darkMode')}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
 
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip={t('navigation.privacy')} isActive={currentView === '/privacy'} onClick={() => go('/privacy')} className="text-muted-foreground">
+            <SidebarMenuButton tooltip={t('navigation.privacy')} isActive={currentView === '/privacy'} onClick={() => go('/privacy')} className={cn('text-muted-foreground', DRAWER_ROW)}>
               <Shield />
               <span>{t('navigation.privacy')}</span>
             </SidebarMenuButton>
@@ -194,7 +217,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
               <SidebarMenuButton
                 tooltip={t('navigation.login')}
                 onClick={() => go('/login')}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                className={cn('bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground', DRAWER_ROW)}
               >
                 <User />
                 <span>{t('navigation.login')}</span>

@@ -25,7 +25,8 @@
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode",
     "myProfile": "My Profile",
-    "practice": "Practice"
+    "practice": "Practice",
+    "menu": "Menu"
   },
   "dashboard": {
     "title": "Dashboard",
