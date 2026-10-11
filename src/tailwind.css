@@ -8,6 +8,10 @@
 /* ThemeContext toggles .dark-mode on <html>; reuse it instead of shadcn's .dark */
 @custom-variant dark (&:is(.dark-mode *));
 
+/* Short viewports (phones, landscape tablets): the scoring screen trims its
+   chrome so the whole keypad fits without scrolling. */
+@custom-variant short (@media (max-height: 700px));
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

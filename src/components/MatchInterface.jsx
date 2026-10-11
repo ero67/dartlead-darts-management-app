@@ -1987,8 +1987,10 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   });
   const metaTitle = [match.groupName, `${t('match.leg')} ${currentLeg}`].filter(Boolean).join(' · ');
 
+  // Fixed to the viewport (minus the mobile app header below lg and the safe
+  // areas) so the keypad, Double/Triple included, never scrolls out of reach.
   return (
-    <div className="flex flex-1 flex-col bg-background text-foreground">
+    <div className="flex h-[calc(100dvh-3.5rem-var(--safe-area-inset-top,0px)-var(--safe-area-inset-bottom,0px))] flex-col overflow-hidden bg-background text-foreground lg:h-[calc(100dvh-var(--safe-area-inset-top,0px)-var(--safe-area-inset-bottom,0px))]">
       <CheckoutDialog
         pending={pendingCheckout}
         onChange={setPendingCheckout}
@@ -2006,7 +2008,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         onPick={awardLegByBullup}
       />
 
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 px-2">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-2 px-2 short:h-11">
         <Button variant="ghost" size="sm" className="min-h-11 text-muted-foreground" onClick={onBack}>
           <ArrowLeft />
           {t('common.back')}
@@ -2024,10 +2026,10 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 lg:grid lg:grid-cols-[1fr_1.2fr]">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 short:pb-2 landscape:grid landscape:grid-cols-[1fr_1.2fr] landscape:grid-rows-[minmax(0,1fr)]">
         {/* Scores, last throws and averages. Grouped so the landscape
             layout can put them beside the keypad instead of above it. */}
-        <div className="flex flex-col gap-2">
+        <div className="flex shrink-0 flex-col gap-2 landscape:min-h-0 landscape:overflow-y-auto">
           <Scoreboard players={scoreboardPlayers} currentPlayer={currentPlayer} bustingPlayer={bustingPlayer} />
 
           {!isViewOnly && bothReachedBullupThreshold && !matchComplete && (
@@ -2044,7 +2046,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           {!isViewOnly && scoringMode === 'dart' && (
             <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
               {[0, 1, 2].map((idx) => (
-                <div key={idx} className="flex h-10 items-center justify-center rounded-md border bg-muted/40 text-lg tabular-nums">
+                <div key={idx} className="flex h-10 items-center justify-center rounded-md border bg-muted/40 text-lg tabular-nums short:h-8">
                   {getDisplayLabel(currentTurn.scores[idx]?.label)}
                 </div>
               ))}

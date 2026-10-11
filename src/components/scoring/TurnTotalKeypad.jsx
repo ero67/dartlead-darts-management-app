@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-const KEY = 'flex min-h-12 items-center justify-center rounded-lg border bg-card text-xl font-semibold tabular-nums transition-colors disabled:pointer-events-none disabled:opacity-40';
+const KEY = 'flex min-h-12 short:min-h-7 items-center justify-center rounded-lg border bg-card text-xl font-semibold tabular-nums transition-colors disabled:pointer-events-none disabled:opacity-40';
 
 // 3-dart total entry: big readout, undo, and either an on-screen keypad or a
 // text field for keyboards. Presentational; the caller owns the input string.
@@ -40,7 +40,7 @@ export function TurnTotalKeypad({
 
   const okButton = (
     <Button
-      className="col-span-3 h-14 w-full flex-col gap-0 text-lg"
+      className="col-span-3 h-14 w-full flex-col gap-0 text-lg short:h-10"
       onClick={submit}
       disabled={disabled || isInvalid}
       type="button"
@@ -58,7 +58,7 @@ export function TurnTotalKeypad({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 text-foreground">
-      <div className="flex flex-col gap-1 rounded-lg border bg-card px-4 py-3">
+      <div className="flex flex-col gap-1 rounded-lg border bg-card px-4 py-3 short:py-1">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('match.turnTotalLabel')}</span>
           {/* Undo lives up here, away from OK: it used to sit right
@@ -76,10 +76,10 @@ export function TurnTotalKeypad({
             {t('match.undoLastVisit')}
           </Button>
         </div>
-        <div className={cn('text-5xl font-semibold tracking-tight tabular-nums', isInvalid && 'text-destructive', !value && 'text-muted-foreground')}>
+        <div className={cn('text-5xl font-semibold tracking-tight tabular-nums short:text-3xl', isInvalid && 'text-destructive', !value && 'text-muted-foreground')}>
           {value || '0'}
         </div>
-        <div className={cn('text-xs', isInvalid ? 'text-destructive' : 'text-muted-foreground')}>
+        <div className={cn('text-xs', isInvalid ? 'text-destructive' : 'text-muted-foreground short:hidden')}>
           {isInvalid
             ? t('match.turnTotalInvalid')
             : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}

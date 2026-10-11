@@ -573,15 +573,15 @@ export function PracticeX01() {
           const stats = computeStats(p);
           const labels = lastVisitLabels(p);
           return (
-            <div key={i} className={cn('flex flex-col items-center gap-1 rounded-lg border bg-muted/40 p-3', isTurn && 'ring-1 ring-primary border-primary')}>
+            <div key={i} className={cn('flex flex-col items-center gap-1 rounded-lg border bg-muted/40 p-3', isTurn && 'border-primary bg-primary text-primary-foreground shadow-md [&_[data-variant=outline]]:border-current/40 [&_[data-variant=outline]]:text-inherit')}>
               <div className="flex w-full items-center justify-between gap-2">
                 <span className="truncate text-sm font-semibold">{playerName(i)}</span>
                 <Badge variant="secondary" className="tabular-nums">{session.legsWon[i]}</Badge>
               </div>
               <div className="text-5xl font-semibold leading-none tracking-tight tabular-nums sm:text-6xl">{isTurn ? remaining : p.current.remaining}</div>
               <PracticeLastThrows labels={labels} className="min-h-7" />
-              <div className="text-xs text-muted-foreground">{t('practice.stats.average')} <b className="font-semibold text-foreground tabular-nums">{stats.average.toFixed(1)}</b></div>
-              {isTurn && <Badge className="mt-1">{t('practice.match.toThrow', { name: playerName(i) })}</Badge>}
+              <div className={cn('text-xs', isTurn ? 'opacity-85' : 'text-muted-foreground')}>{t('practice.stats.average')} <b className={cn('font-semibold tabular-nums', !isTurn && 'text-foreground')}>{stats.average.toFixed(1)}</b></div>
+              {isTurn && <Badge variant="secondary" className="mt-1">{t('practice.match.toThrow', { name: playerName(i) })}</Badge>}
             </div>
           );
         })}
