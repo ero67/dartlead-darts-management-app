@@ -32,7 +32,7 @@ export function DartKeypad({
           <button
             key={number}
             type="button"
-            className={cn(KEY, 'h-full', number === 25 ? 'border-primary/40 bg-primary/10 text-primary' : modeClass)}
+            className={cn(KEY, 'h-full min-h-8', number === 25 ? 'border-primary/40 bg-primary/10 text-primary' : modeClass)}
             onClick={() => onDart(number)}
             disabled={disabled || dartsInVisit >= 3 || (number === 25 && inputMode === 'triple')}
           >

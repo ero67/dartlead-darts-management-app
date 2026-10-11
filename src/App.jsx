@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingState } from './components/shared/LoadingState';
@@ -16,7 +16,7 @@ import { AdminProvider, useAdmin } from './contexts/AdminContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { OfflineProvider } from './contexts/OfflineContext';
-import { Navigation } from './components/Navigation';
+import { Navigation, MobileHeader } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { TournamentsList } from './components/TournamentsList';
 import { TournamentCreation } from './components/TournamentCreation';
@@ -514,10 +514,7 @@ function AppContent() {
 
       <SidebarInset className="min-w-0">
       {/* Mobile header: the sidebar is a drawer below 1024px */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur lg:hidden">
-        <SidebarTrigger />
-        <span className="text-sm font-semibold">DartLead</span>
-      </header>
+      <MobileHeader />
 
       <main className="flex min-w-0 flex-1 flex-col">
         <Routes>

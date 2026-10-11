@@ -2746,17 +2746,16 @@ export const matchService = {
         .single();
       if (fetchError) throw fetchError;
 
-      let patchedResult = null;
-      if (current?.result) {
-        const parsed = typeof current.result === 'string' ? JSON.parse(current.result) : current.result;
-        patchedResult = {
-          ...parsed,
-          winner: matchResult.winner,
-          player1Legs: matchResult.player1Legs,
-          player2Legs: matchResult.player2Legs,
-          manuallyCorrected: true
-        };
-      }
+      // A result entered for a match nobody scored gets a minimal JSONB too,
+      // so the row stays the source of truth over the bracket entry.
+      const parsed = typeof current?.result === 'string' ? JSON.parse(current.result) : current?.result;
+      const patchedResult = {
+        ...(parsed || {}),
+        winner: matchResult.winner,
+        player1Legs: matchResult.player1Legs,
+        player2Legs: matchResult.player2Legs,
+        manuallyCorrected: true
+      };
 
       const updateData = {
         status: 'completed',

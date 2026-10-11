@@ -76,7 +76,11 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                             return (
                               <TableRow
                                 key={standing.player.id}
-                                className={cn(isEliminated && 'text-muted-foreground', isCutLine && 'border-b-2 border-dashed border-primary')}
+                                className={cn(
+                                  isQualify && 'bg-primary/10 shadow-[inset_3px_0_0_var(--primary)] hover:bg-primary/15',
+                                  isEliminated && 'text-muted-foreground',
+                                  isCutLine && 'border-b-2 border-dashed border-primary'
+                                )}
                               >
                                 <TableCell className="tabular-nums">
                                   {isQualify ? <Badge className="size-6 justify-center rounded-full p-0">{rank}</Badge> : rank}

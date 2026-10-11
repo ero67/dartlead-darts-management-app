@@ -1740,36 +1740,38 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
       if (ctx) {
         // Sync the bracket JSONB: mark the entry pending and clear the slots
-        // its winner/loser already occupied downstream.
-        const playoffs = structuredClone(tournament.playoffs);
+        // its winner/loser already occupied downstream. Re-read it first —
+        // this page's copy can miss results other boards saved meanwhile.
+        // ponytail: still a client read-modify-write; move into an RPC like
+        // complete_playoff_match if resets ever race with live boards.
+        const { data: fresh, error: freshError } = await supabase
+          .from('tournaments').select('playoffs').eq('id', tournament.id).single();
+        if (freshError) throw freshError;
+        const playoffs = structuredClone(fresh.playoffs);
         const c = getBracketContext(playoffs.rounds, match.id);
         c.entry.status = 'pending';
         c.entry.result = null;
-        const downstreamRowIds = [];
+        const downstreamSlots = [];
         if (c.nextMatch) {
           if (c.isFirstOfPair) c.nextMatch.player1 = null; else c.nextMatch.player2 = null;
           c.nextMatch.status = 'pending';
           c.nextMatch.result = null;
-          downstreamRowIds.push(c.nextMatch.id);
+          downstreamSlots.push({ id: c.nextMatch.id, column: c.isFirstOfPair ? 'player1_id' : 'player2_id' });
         }
         if (c.thirdPlaceMatch) {
           if (c.bracketIndex === 0) c.thirdPlaceMatch.player1 = null; else c.thirdPlaceMatch.player2 = null;
           c.thirdPlaceMatch.status = 'pending';
           c.thirdPlaceMatch.result = null;
-          downstreamRowIds.push(c.thirdPlaceMatch.id);
+          downstreamSlots.push({ id: c.thirdPlaceMatch.id, column: c.bracketIndex === 0 ? 'player1_id' : 'player2_id' });
         }
 
-        // Downstream DB rows (pending by the guard above) still carry the old
-        // players — delete them so the UI falls back to the cleared bracket.
-        const existingDownstream = downstreamRowIds.filter(id =>
-          tournament?.playoffMatches?.some(m => m.id === id)
-        );
-        if (existingDownstream.length > 0) {
-          const { error: delError } = await supabase
-            .from('matches')
-            .delete()
-            .in('id', existingDownstream);
-          if (delError) throw delError;
+        // Downstream DB rows (pending by the guard above): clear only the slot
+        // this match fed. Deleting the row also dropped the other feeder's
+        // player, and the final then could not be started.
+        for (const { id, column } of downstreamSlots) {
+          const { error: slotError } = await supabase
+            .from('matches').update({ [column]: null }).eq('id', id).eq('status', 'pending');
+          if (slotError) throw slotError;
         }
 
         await tournamentService.updateTournamentPlayoffs(tournament.id, playoffs);
@@ -1812,47 +1814,22 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       });
 
       if (ctx) {
-        // Sync the bracket JSONB: patch the entry's result and re-propagate
-        // winner/loser into the downstream slots.
-        const playoffs = structuredClone(tournament.playoffs);
-        const c = getBracketContext(playoffs.rounds, match.id);
-        c.entry.status = 'completed';
-        c.entry.result = {
-          ...(c.entry.result || {}),
+        // Advance the bracket the same way a scored match does: the RPC locks
+        // the tournament, writes only the slots this match owns and creates
+        // the next-round row with both players. Patching our own copy of the
+        // JSONB here used to overwrite results other boards had saved and
+        // left the final's row without the other semifinal winner.
+        await tournamentService.completePlayoffMatch(tournament.id, match.id, {
+          ...(match.result || {}),
           winner: winnerId,
           player1Legs: score1,
           player2Legs: score2,
+          player1Id: match.player1?.id,
+          player2Id: match.player2?.id,
+          player1Name: match.player1?.name,
+          player2Name: match.player2?.name,
           manuallyCorrected: true
-        };
-
-        const winnerPlayer = c.entry.player1?.id === winnerId ? c.entry.player1 : c.entry.player2;
-        const loserPlayer = c.entry.player1?.id === winnerId ? c.entry.player2 : c.entry.player1;
-
-        const rowUpdates = [];
-        if (c.nextMatch && winnerPlayer) {
-          if (c.isFirstOfPair) c.nextMatch.player1 = winnerPlayer; else c.nextMatch.player2 = winnerPlayer;
-          rowUpdates.push({
-            id: c.nextMatch.id,
-            [c.isFirstOfPair ? 'player1_id' : 'player2_id']: winnerPlayer.id
-          });
-        }
-        if (c.thirdPlaceMatch && loserPlayer) {
-          if (c.bracketIndex === 0) c.thirdPlaceMatch.player1 = loserPlayer; else c.thirdPlaceMatch.player2 = loserPlayer;
-          rowUpdates.push({
-            id: c.thirdPlaceMatch.id,
-            [c.bracketIndex === 0 ? 'player1_id' : 'player2_id']: loserPlayer.id
-          });
-        }
-
-        // Keep existing downstream DB rows (pending by the guard) in step
-        for (const { id, ...fields } of rowUpdates) {
-          if (tournament?.playoffMatches?.some(m => m.id === id)) {
-            const { error: rowError } = await supabase.from('matches').update(fields).eq('id', id);
-            if (rowError) throw rowError;
-          }
-        }
-
-        await tournamentService.updateTournamentPlayoffs(tournament.id, playoffs);
+        });
       }
 
       await getTournament(tournament.id);

@@ -2,19 +2,27 @@ import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Medal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Slot geometry at scale 1, in px. MATCH_H matches the rendered card
+// (two rows + gap + padding, all em-based), so boxes centre on their slot.
+const MATCH_H = 58;
+const GAP = 16;
+const ROUND_W = 200;
+
 // Player row inside a match box: winner bold, loser muted, empty slot "TBD".
 const playerRowClass = (isWinner, isLoser, isTbd) =>
   cn(
-    'truncate rounded-md bg-muted/60 px-[0.5em] py-[0.3em] text-center text-[0.75em] leading-tight',
+    'flex items-center justify-between gap-[0.5em] rounded-md bg-muted/60 px-[0.5em] py-[0.3em] text-[0.75em] leading-tight',
     isWinner && 'font-semibold ring-1 ring-primary',
     isLoser && 'text-muted-foreground',
     isTbd && 'italic text-muted-foreground'
   );
 
-// `scale` enlarges the layout geometry (the TV display passes 1.6); card sizes
-// are em-based off the root font-size so they grow with it, and connectors are
-// measured from the DOM so they follow.
-export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 }) {
+// `scale` enlarges the layout geometry (the TV display fits it to the screen);
+// card sizes are em-based off the root font-size so they grow with it, and
+// connectors are measured from the DOM so they follow.
+// `liveScores` (optional) maps a match id to { player1Legs, player2Legs } for
+// matches being played right now.
+export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, liveScores = {} }) {
   const matchRefs = useRef({});
   const containerRef = useRef(null);
   const [connections, setConnections] = useState([]);
@@ -50,9 +58,9 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 })
 
   // Calculate bracket structure with positions
   const bracketStructure = useMemo(() => {
-    const matchHeight = 45 * scale; // Match card height
-    const spacing = 30 * scale; // Much more spacing to prevent overlap
-    const roundWidth = 200 * scale; // Wider to accommodate connections
+    const matchHeight = MATCH_H * scale;
+    const spacing = GAP * scale;
+    const roundWidth = ROUND_W * scale;
 
     const structure = [];
 
@@ -211,28 +219,42 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 })
 
   const maxMatches = Math.max(...rounds.map(r => r.matches.filter(m => !m.isThirdPlaceMatch).length));
   // Same geometry as the position calc above, so the container fits the scaled cards.
-  const matchHeight = 45 * scale;
-  const spacing = 30 * scale;
+  const matchHeight = MATCH_H * scale;
+  const spacing = GAP * scale;
   const totalHeight = (maxMatches * matchHeight) + ((maxMatches - 1) * spacing);
-  const roundWidth = 200 * scale;
+  const roundWidth = ROUND_W * scale;
   const totalWidth = rounds.length * roundWidth;
 
   const renderMatchBox = (matchData, winner, { key, className, ...rest } = {}) => {
     const isCompleted = matchData.status === 'completed';
-    const player1Winner = winner?.id === matchData.player1?.id;
-    const player2Winner = winner?.id === matchData.player2?.id;
+    const isLive = matchData.status === 'in_progress';
+    const player1Winner = !!winner && winner.id === matchData.player1?.id;
+    const player2Winner = !!winner && winner.id === matchData.player2?.id;
+    // Legs: final result once completed, running score while live.
+    const legs = isCompleted ? matchData.result : isLive ? liveScores[matchData.id] : null;
+    const renderRow = (player, legCount, isWinner) => (
+      <div className={playerRowClass(isWinner, isCompleted && !isWinner, !player)}>
+        <span className="truncate">{player?.name || 'TBD'}</span>
+        {legCount != null && <span className="shrink-0 font-semibold tabular-nums">{legCount}</span>}
+      </div>
+    );
     return (
       <div
         key={key}
         {...rest}
-        className={cn('z-[2] flex w-[9em] flex-col gap-[0.2em] rounded-lg border bg-card p-[0.3em] text-card-foreground shadow-xs', className)}
+        className={cn(
+          'z-[2] flex w-[10em] flex-col gap-[0.2em] rounded-lg border bg-card p-[0.3em] text-card-foreground shadow-xs',
+          isLive && 'border-destructive',
+          className
+        )}
       >
-        <div className={playerRowClass(player1Winner, isCompleted && !player1Winner, !matchData.player1)}>
-          {matchData.player1?.name || 'TBD'}
-        </div>
-        <div className={playerRowClass(player2Winner, isCompleted && !player2Winner, !matchData.player2)}>
-          {matchData.player2?.name || 'TBD'}
-        </div>
+        {isLive && (
+          <span className="absolute -top-[0.6em] right-[0.5em] rounded-full bg-destructive px-[0.5em] text-[0.55em] font-semibold uppercase leading-[1.6] tracking-wider text-white">
+            Live
+          </span>
+        )}
+        {renderRow(matchData.player1, legs?.player1Legs, player1Winner)}
+        {renderRow(matchData.player2, legs?.player2Legs, player2Winner)}
       </div>
     );
   };
@@ -256,7 +278,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 })
                     }
                   },
                   className: 'absolute',
-                  style: { top: `${y - 22.5 * scale}px` },
+                  style: { top: `${y - matchHeight / 2}px` },
                   'data-match-x': x,
                   'data-match-y': y,
                   'data-match-index': matchIndex,
@@ -310,7 +332,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1 })
               <Medal className="size-[1.25em] text-amber-700" />
               3rd Place Match
             </h4>
-            {renderMatchBox(matchData, winner, { className: 'relative w-[11em]' })}
+            {renderMatchBox(matchData, winner, { className: 'relative' })}
           </div>
         );
       })()}
