@@ -208,7 +208,11 @@ export function PlayoffsTab(props) {
 
       <div ref={bracketRef} className="bg-background">
         {bracketViewMode === 'compact' ? (
-          <BracketVisualization rounds={mergeBracketRounds(rounds, playoffMatches, tournament.players)} playoffMatches={playoffMatches} />
+          <BracketVisualization
+            rounds={mergeBracketRounds(rounds, playoffMatches, tournament.players)}
+            playoffMatches={playoffMatches}
+            liveScores={Object.fromEntries([...liveInfoById].map(([id, l]) => [id, { player1Legs: l.player1_legs ?? 0, player2Legs: l.player2_legs ?? 0 }]))}
+          />
         ) : (
           <div className="flex gap-6 overflow-x-auto pb-4">
             {rounds.map((round, index) => {
@@ -236,6 +240,7 @@ export function PlayoffsTab(props) {
                       const isLive = isMatchActuallyLive(match.id);
                       const isLiveHere = isMatchInLocalStorage(match.id);
                       const hasBothPlayers = !!(match.player1 && match.player2);
+                      const hasRow = match !== bracketMatch;
                       const isByeSlot = match.status === 'pending' && ((match.player1 && !match.player2) || (!match.player1 && match.player2));
                       const live = liveInfoById.get(match.id);
                       const buildMatchData = (kind) => {
@@ -285,17 +290,21 @@ export function PlayoffsTab(props) {
                                   <BarChart3 />
                                 </Button>
                               )}
-                              {canManage && user && match.status !== 'pending' && (
+                              {/* Pending with both players: enter the result
+                                  (or a walkover) without scoring it. */}
+                              {canManage && user && (match.status !== 'pending' || (hasBothPlayers && hasRow && !isLive)) && (
                                 <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={() => card.handleAdminResetMatch(match)}
-                                    title={t('manager.resetMatchToPending')}
-                                    aria-label={t('manager.resetMatchToPending')}
-                                  >
-                                    <RotateCcw />
-                                  </Button>
+                                  {match.status !== 'pending' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      onClick={() => card.handleAdminResetMatch(match)}
+                                      title={t('manager.resetMatchToPending')}
+                                      aria-label={t('manager.resetMatchToPending')}
+                                    >
+                                      <RotateCcw />
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="icon-sm"
