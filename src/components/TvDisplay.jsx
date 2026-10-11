@@ -24,9 +24,13 @@ import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView
 //   /tv/:id                 rotate through every available view
 //   /tv/:id?view=standings  pin one view (live | standings | bracket)
 //   /tv/:id?rotate=20       seconds per view (default 12)
-//   keys: ← → switch view (pauses rotation), space pause/resume, F fullscreen
+//   keys: ← → switch view (holds it for a minute), space pause/resume, F fullscreen
 
 const DEFAULT_ROTATE_SECONDS = 12;
+// Picking a view by hand holds it this long, then rotation resumes on its own:
+// a wall screen nobody touches again must never stay stuck on one view.
+const MANUAL_HOLD_MS = 60000;
+const MAX_BRACKET_SCALE = 1.6;
 const POLL_MS = 30000;
 
 const fmtClock = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -70,8 +74,11 @@ export function TvDisplay() {
   const [error, setError] = useState('');
   const [viewIndex, setViewIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [holdUntil, setHoldUntil] = useState(0);
   const [now, setNow] = useState(new Date());
+  const [bracketScale, setBracketScale] = useState(MAX_BRACKET_SCALE);
   const rootRef = useRef(null);
+  const bracketBoxRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -121,37 +128,6 @@ export function TvDisplay() {
     return () => clearInterval(tick);
   }, []);
 
-  // Which views make sense for this tournament right now.
-  const views = useMemo(() => {
-    if (!tournament) return ['live'];
-    const list = ['live'];
-    const hasGroups = tournament.tournamentType !== 'playoff_only' && (tournament.groups || []).length > 0;
-    const rounds = tournament.playoffs?.rounds || [];
-    const hasBracket = rounds.some((r) => (r.matches || []).some((m) => m.player1 || m.player2));
-    if (hasGroups) list.push('standings');
-    if (hasBracket) list.push('bracket');
-    return list;
-  }, [tournament]);
-
-  const activeView = pinnedView && views.includes(pinnedView) ? pinnedView : views[viewIndex % views.length];
-
-  useEffect(() => {
-    if (pinnedView || paused || views.length < 2) return undefined;
-    const rot = setInterval(() => setViewIndex((i) => (i + 1) % views.length), rotateMs);
-    return () => clearInterval(rot);
-  }, [pinnedView, paused, views.length, rotateMs]);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'ArrowRight') { setViewIndex((i) => (i + 1) % views.length); setPaused(true); }
-      else if (e.key === 'ArrowLeft') { setViewIndex((i) => (i - 1 + views.length) % views.length); setPaused(true); }
-      else if (e.key === ' ') { e.preventDefault(); setPaused((p) => !p); }
-      else if (e.key.toLowerCase() === 'f') toggleFullscreen();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [views.length]);
-
   const toggleFullscreen = () => {
     const el = rootRef.current || document.documentElement;
     if (document.fullscreenElement) document.exitFullscreen?.();
@@ -170,6 +146,45 @@ export function TvDisplay() {
     [tournament, playoffRows]
   );
 
+  // Which views make sense for this tournament right now. The bracket counts
+  // once any slot has a player, in the JSONB or in the playoff match rows.
+  const views = useMemo(() => {
+    if (!tournament) return ['live'];
+    const list = ['live'];
+    const hasGroups = tournament.tournamentType !== 'playoff_only' && (tournament.groups || []).length > 0;
+    const hasBracket = bracketRounds.some((r) => r.matches.some((m) => m.player1 || m.player2));
+    if (hasGroups) list.push('standings');
+    if (hasBracket) list.push('bracket');
+    return list;
+  }, [tournament, bracketRounds]);
+
+  const activeView = pinnedView && views.includes(pinnedView) ? pinnedView : views[viewIndex % views.length];
+
+  // One timer per shown view: the next view comes after rotateMs, or after the
+  // manual hold ran out.
+  useEffect(() => {
+    if (pinnedView || paused || views.length < 2) return undefined;
+    const delay = Math.max(rotateMs, holdUntil - Date.now());
+    const timer = setTimeout(() => setViewIndex((i) => (i + 1) % views.length), delay);
+    return () => clearTimeout(timer);
+  }, [pinnedView, paused, views.length, rotateMs, viewIndex, holdUntil]);
+
+  const showView = useCallback((index) => {
+    setViewIndex((index + views.length) % views.length);
+    setHoldUntil(Date.now() + MANUAL_HOLD_MS);
+  }, [views.length]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight') showView(viewIndex + 1);
+      else if (e.key === 'ArrowLeft') showView(viewIndex - 1);
+      else if (e.key === ' ') { e.preventDefault(); setPaused((p) => !p); }
+      else if (e.key.toLowerCase() === 'f') toggleFullscreen();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showView, viewIndex]);
+
   const upNext = useMemo(() => {
     if (!tournament) return [];
     const liveIds = new Set(liveMatches.map((m) => m.id));
@@ -186,6 +201,40 @@ export function TvDisplay() {
   }, [tournament, liveMatches, bracketRounds]);
 
   const qualifiersPerGroup = tournament?.playoffSettings?.enabled ? Number(tournament.playoffSettings.qualifiersPerGroup || tournament.playoffSettings.playersPerGroup || 0) : 0;
+
+  const liveScores = useMemo(
+    () => Object.fromEntries(liveMatches.map((m) => [m.id, { player1Legs: m.player1_legs ?? 0, player2Legs: m.player2_legs ?? 0 }])),
+    [liveMatches]
+  );
+
+  // A wall screen cannot scroll: shrink the bracket until every round fits the
+  // view. Sizes scale linearly with `scale`, so one measurement gives the
+  // factor. Only where the view has a fixed height (lg+); phones scroll.
+  useEffect(() => {
+    const box = bracketBoxRef.current;
+    if (!box) return undefined;
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const bracket = box.firstElementChild;
+        const columns = bracket?.firstElementChild;
+        if (!bracket || !columns || !box.clientHeight || !window.matchMedia('(min-width: 1024px)').matches) return;
+        setBracketScale((s) => {
+          const k = Math.min(box.clientWidth / columns.scrollWidth, box.clientHeight / bracket.scrollHeight);
+          // Shrink on any overflow, grow only with real room; the 3% margin
+          // absorbs the paddings that do not scale, so it settles in one step.
+          if (k >= 1 && k <= 1.05) return s;
+          const next = Math.min(MAX_BRACKET_SCALE, s * k * 0.97);
+          return Math.abs(next - s) > 0.01 ? next : s;
+        });
+      });
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(box);
+    if (box.firstElementChild) observer.observe(box.firstElementChild);
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
+  }, [bracketRounds, views]);
 
   // ---- render -------------------------------------------------------------
   const renderPlayerRow = (name, legs, score, isThrowing) => (
@@ -287,12 +336,9 @@ export function TvDisplay() {
                     const diff = (s.legsWon || 0) - (s.legsLost || 0);
                     const qualifies = qualifiersPerGroup > 0 && i < qualifiersPerGroup;
                     return (
-                      <TableRow key={s.player.id}>
+                      <TableRow key={s.player.id} className={cn(qualifies && 'bg-primary/15 shadow-[inset_4px_0_0_var(--primary)] hover:bg-primary/15')}>
                         <TableCell className={cn('font-semibold tabular-nums text-muted-foreground', qualifies && 'text-primary')}>{i + 1}</TableCell>
-                        <TableCell className="max-w-[40vw] truncate font-semibold">
-                          {s.player.name}
-                          {qualifies && <span className="ml-2 inline-block size-1.5 rounded-full bg-primary align-middle" />}
-                        </TableCell>
+                        <TableCell className="max-w-[40vw] truncate font-semibold">{s.player.name}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.matchesPlayed}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.matchesWon}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.legsWon}:{s.legsLost}</TableCell>
@@ -311,8 +357,8 @@ export function TvDisplay() {
   );
 
   const renderBracket = () => (
-    <div className="h-full overflow-auto">
-      <BracketVisualization rounds={bracketRounds} playoffMatches={playoffRows} scale={1.6} />
+    <div className="h-full overflow-auto" ref={bracketBoxRef}>
+      <BracketVisualization rounds={bracketRounds} playoffMatches={playoffRows} scale={bracketScale} liveScores={liveScores} />
     </div>
   );
 
@@ -328,7 +374,8 @@ export function TvDisplay() {
         </div>
         <Tabs
           value={activeView}
-          onValueChange={(v) => { setViewIndex(views.indexOf(v)); setPaused(true); }}
+          onValueChange={(v) => showView(views.indexOf(v))}
+          activationMode="manual"
           className="order-3 w-full items-center lg:order-none lg:w-auto"
           aria-label={t('tv.views')}
         >
