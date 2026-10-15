@@ -237,16 +237,19 @@ export function TvDisplay() {
   }, [bracketRounds, views]);
 
   // ---- render -------------------------------------------------------------
+  // More than four boards don't fit two-up on a 1080p screen: go three-up and smaller.
+  const isCompact = boards.length > 4;
   const renderPlayerRow = (name, legs, score, isThrowing) => (
     <div
       className={cn(
-        'grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-6 rounded-md border-l-4 border-transparent px-4 py-2',
+        'grid grid-cols-[minmax(0,1fr)_auto_auto] items-center rounded-md border-l-4 border-transparent px-4',
+        isCompact ? 'gap-4 py-1' : 'gap-6 py-2',
         isThrowing && 'border-primary bg-muted/40'
       )}
     >
-      <span className="truncate text-3xl font-semibold">{name}</span>
-      <span className="min-w-[2.5em] rounded-full bg-muted px-3 py-1 text-center text-xl font-semibold tabular-nums text-muted-foreground">{legs}</span>
-      <span className="min-w-[3ch] text-right text-8xl font-semibold leading-none tracking-tight tabular-nums">{score}</span>
+      <span className={cn('truncate font-semibold', isCompact ? 'text-2xl' : 'text-3xl')}>{name}</span>
+      <span className="min-w-[2.5em] rounded-full bg-muted px-3 py-1 text-center font-display text-2xl font-semibold text-muted-foreground">{legs}</span>
+      <span className={cn('min-w-[3ch] text-right font-display font-semibold leading-none', isCompact ? 'text-7xl' : 'text-8xl')}>{score}</span>
     </div>
   );
 
@@ -259,7 +262,7 @@ export function TvDisplay() {
         {boards.length === 0 ? (
           <EmptyState icon={Target} title={t('tv.noLiveMatches')} />
         ) : (
-          <div className={cn('grid gap-4', boards.length > 1 && 'xl:grid-cols-2')}>
+          <div className={cn('grid gap-4', boards.length > 1 && 'xl:grid-cols-2', isCompact && 'xl:grid-cols-3')}>
             {boards.map((m) => {
               const p1 = m.player1?.name || '—';
               const p2 = m.player2?.name || '—';
@@ -337,7 +340,7 @@ export function TvDisplay() {
                     const qualifies = qualifiersPerGroup > 0 && i < qualifiersPerGroup;
                     return (
                       <TableRow key={s.player.id} className={cn(qualifies && 'bg-primary/15 shadow-[inset_4px_0_0_var(--primary)] hover:bg-primary/15')}>
-                        <TableCell className={cn('font-semibold tabular-nums text-muted-foreground', qualifies && 'text-primary')}>{i + 1}</TableCell>
+                        <TableCell className={cn('font-display text-xl font-semibold text-muted-foreground', qualifies && 'text-primary')}>{i + 1}</TableCell>
                         <TableCell className="max-w-[40vw] truncate font-semibold">{s.player.name}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.matchesPlayed}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.matchesWon}</TableCell>
@@ -386,7 +389,7 @@ export function TvDisplay() {
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-semibold tabular-nums text-muted-foreground">{fmtClock(now)}</span>
+          <span className="font-display text-3xl font-semibold text-muted-foreground">{fmtClock(now)}</span>
           {!pinnedView && views.length > 1 && (
             <Button variant="ghost" size="icon-lg" onClick={() => setPaused((p) => !p)} title={paused ? t('tv.resume') : t('tv.pause')} aria-label={paused ? t('tv.resume') : t('tv.pause')}>
               {paused ? <Play className="size-5" /> : <Pause className="size-5" />}

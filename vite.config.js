@@ -60,7 +60,7 @@ export default defineConfig({
         skipWaiting: false,
         clientsClaim: false,
         // Precache the app shell so it loads/reloads with no network
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // The landing-page logos are ~2.7MB combined and not needed for the
         // scoring/management flow — keep them out of the install so the SW
         // installs fast on poor WiFi (they still load normally when online).

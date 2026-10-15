@@ -235,7 +235,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
     const renderRow = (player, legCount, isWinner) => (
       <div className={playerRowClass(isWinner, isCompleted && !isWinner, !player)}>
         <span className="truncate">{player?.name || 'TBD'}</span>
-        {legCount != null && <span className="shrink-0 font-semibold tabular-nums">{legCount}</span>}
+        {legCount != null && <span className="shrink-0 font-display text-lg font-semibold leading-none">{legCount}</span>}
       </div>
     );
     return (

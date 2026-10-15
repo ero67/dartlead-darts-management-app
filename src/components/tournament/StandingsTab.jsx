@@ -83,7 +83,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                                 )}
                               >
                                 <TableCell className="tabular-nums">
-                                  {isQualify ? <Badge className="size-6 justify-center rounded-full p-0">{rank}</Badge> : rank}
+                                  {isQualify ? <Badge className="size-6 justify-center rounded-full p-0 font-display text-sm">{rank}</Badge> : rank}
                                 </TableCell>
                                 <TableCell className="font-medium">{renderPlayerLink(standing.player)}</TableCell>
                                 <TableCell className={num}>{standing.matchesPlayed}</TableCell>
@@ -94,7 +94,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                                   {legDiff > 0 ? '+' : ''}{legDiff}
                                 </TableCell>
                                 <TableCell className={num}>{standing.average.toFixed(1)}</TableCell>
-                                <TableCell className={cn(num, 'font-semibold')}>{standing.points}</TableCell>
+                                <TableCell className={cn(num, 'font-display text-lg font-semibold')}>{standing.points}</TableCell>
                               </TableRow>
                             );
                           })}

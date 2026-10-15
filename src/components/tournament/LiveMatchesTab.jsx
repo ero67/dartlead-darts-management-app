@@ -17,7 +17,7 @@ function LivePlayerRow({ name, legs, score, isActive, t }) {
       </div>
       <div className="flex shrink-0 items-center gap-3">
         <Badge variant="secondary" className="tabular-nums">{legs}</Badge>
-        <span className="min-w-[3ch] text-right text-5xl font-semibold tracking-tight tabular-nums">{score}</span>
+        <span className="min-w-[3ch] text-right font-display text-5xl font-semibold tabular-nums">{score}</span>
       </div>
     </div>
   );

@@ -7,12 +7,12 @@ import { useLeague } from '../contexts/LeagueContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
 import { EmptyState } from './shared/EmptyState';
-import { isTournamentRunning, tournamentStatusClass } from '../utils/tournamentStatus';
+import { PhaseBar } from './shared/DartsAccents';
+import { isTournamentRunning, tournamentStatusClass, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
 
@@ -53,13 +53,6 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         return new Date(b.updatedAt) - new Date(a.updatedAt);
     }
   });
-
-  const getTournamentProgress = (tournament) => {
-    // Counts come from the lightweight summary (getTournamentsSummary).
-    const totalMatches = tournament.totalMatches ?? 0;
-    const completedMatches = tournament.completedMatches ?? 0;
-    return totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0;
-  };
 
   const handleDelete = async (tournament) => {
     if (!(await confirmDialog(t('management.confirmDeleteTournament', { name: tournament.name }), { destructive: true }))) return;
@@ -115,7 +108,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
       {sortedTournaments.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {sortedTournaments.map(tournament => {
-            const progress = getTournamentProgress(tournament);
+            const phase = getTournamentPhase(tournament);
             const hasActiveMatches = (tournament.pendingMatches ?? 0) > 0;
             const isOwner = isMine(tournament);
             const linkedLeague = tournament.leagueId ? leagues.find(l => l.id === tournament.leagueId) : null;
@@ -183,10 +176,12 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                   </div>
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{t('tournaments.progress')}</span>
-                      <span className="tabular-nums">{Math.round(progress)}%</span>
+                      <span>{tournamentPhaseLabel(phase, t)}</span>
+                      {tournament.status !== 'open_for_registration' && (
+                        <span className="tabular-nums">{phase.percent}%</span>
+                      )}
                     </div>
-                    <Progress value={progress} />
+                    <PhaseBar {...phase} />
                   </div>
                 </CardContent>
 

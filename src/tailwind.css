@@ -45,6 +45,7 @@
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.627 0.194 149.214);
+  --live: oklch(0.628 0.2 25); /* dartboard red: live, bust, trebles */
 }
 
 .dark-mode {
@@ -79,6 +80,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.527 0.154 150.069);
+  --live: oklch(0.66 0.2 25);
 }
 
 @theme inline {
@@ -117,6 +119,38 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-live: var(--live);
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  /* Scoreboard numerals: scores, KPIs, legs, ranks. Never body text. */
+  --font-display: 'Barlow Condensed', 'Geist Variable', ui-sans-serif, sans-serif;
+}
+
+@theme {
+  --animate-live-pulse: live-pulse 1.6s ease-in-out infinite;
+  @keyframes live-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--live) 55%, transparent); }
+    50% { box-shadow: 0 0 0 4px transparent; }
+  }
+}
+
+@layer components {
+  /* Dartboard motif (BoardMotif): wedges in currentColor plus the red/green
+     treble and double rings. Size, position and opacity come from utilities. */
+  .board-motif {
+    position: absolute;
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    pointer-events: none;
+    background: repeating-conic-gradient(from -9deg, currentColor 0 18deg, transparent 18deg 36deg);
+  }
+  .board-motif::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: repeating-conic-gradient(from -9deg, var(--live) 0 18deg, var(--primary) 18deg 36deg);
+    mask: radial-gradient(circle, transparent 0 55%, #000 55.5% 61%, transparent 61.5% 93%, #000 93.5% 99%, transparent 99.5%);
+  }
 }
 
 @layer base {

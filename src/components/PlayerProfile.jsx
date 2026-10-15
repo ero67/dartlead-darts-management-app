@@ -335,7 +335,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
                     )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end">
-                    <span className="text-lg font-semibold tabular-nums">{match.legsFor}:{match.legsAgainst}</span>
+                    <span className="font-display text-xl font-semibold">{match.legsFor}:{match.legsAgainst}</span>
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {match.average ? match.average.toFixed(2) : '—'} {t('playerProfile.avgShort')}
                     </span>

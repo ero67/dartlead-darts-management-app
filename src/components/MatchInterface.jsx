@@ -2030,7 +2030,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         {/* Scores, last throws and averages. Grouped so the landscape
             layout can put them beside the keypad instead of above it. */}
         <div className="flex shrink-0 flex-col gap-2 landscape:min-h-0 landscape:overflow-y-auto">
-          <Scoreboard players={scoreboardPlayers} currentPlayer={currentPlayer} bustingPlayer={bustingPlayer} />
+          <Scoreboard players={scoreboardPlayers} currentPlayer={currentPlayer} bustingPlayer={bustingPlayer} legsToWin={matchSettings.legsToWin} />
 
           {!isViewOnly && bothReachedBullupThreshold && !matchComplete && (
             <Alert className="flex flex-wrap items-center gap-2">
@@ -2046,11 +2046,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
           {!isViewOnly && scoringMode === 'dart' && (
             <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
               {[0, 1, 2].map((idx) => (
-                <div key={idx} className="flex h-10 items-center justify-center rounded-md border bg-muted/40 text-lg tabular-nums short:h-8">
+                <div key={idx} className="flex h-10 items-center justify-center rounded-md border bg-muted/40 font-display text-xl font-semibold short:h-8">
                   {getDisplayLabel(currentTurn.scores[idx]?.label)}
                 </div>
               ))}
-              <div className="min-w-12 text-right text-xl font-semibold tabular-nums">{currentTurn.score}</div>
+              <div className="min-w-12 text-right font-display text-3xl font-semibold leading-none">{currentTurn.score}</div>
             </div>
           )}
         </div>
@@ -2079,6 +2079,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
               onUndo={undoLastVisit}
               canUndo={turnHistory.length > 0 && currentTurn.score === 0}
               useOnScreenKeypad={isOnScreenKeypad}
+              showQuickScores
             />
           )}
         </div>

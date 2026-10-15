@@ -4,7 +4,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { DART_NUMBERS } from '../../lib/x01Engine';
 import { cn } from '@/lib/utils';
 
-const KEY = 'flex min-h-12 items-center justify-center rounded-lg border bg-card text-xl font-semibold tabular-nums transition-colors disabled:pointer-events-none disabled:opacity-40';
+const KEY = 'flex min-h-12 items-center justify-center rounded-lg border bg-card font-display text-2xl font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40';
 
 // Dart-by-dart keypad: 1–20, bull, miss, with double/triple toggles and undo.
 // Presentational only; the caller owns the scoring rules. Shared by the
@@ -43,7 +43,7 @@ export function DartKeypad({
       <div className="grid grid-cols-2 gap-1">
         <button
           type="button"
-          className={cn(KEY, 'text-lg', inputMode === 'double' && 'border-primary bg-primary text-primary-foreground')}
+          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'double' && 'border-primary bg-primary text-primary-foreground')}
           aria-pressed={inputMode === 'double'}
           onClick={() => toggleMode('double')}
         >
@@ -51,7 +51,7 @@ export function DartKeypad({
         </button>
         <button
           type="button"
-          className={cn(KEY, 'text-lg', inputMode === 'triple' && 'border-primary bg-primary text-primary-foreground')}
+          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'triple' && 'border-primary bg-primary text-primary-foreground')}
           aria-pressed={inputMode === 'triple'}
           onClick={() => toggleMode('triple')}
         >
@@ -60,7 +60,7 @@ export function DartKeypad({
       </div>
       <button
         type="button"
-        className={cn(KEY, 'min-h-11 gap-2 border-destructive/30 bg-destructive/10 text-base text-destructive')}
+        className={cn(KEY, 'min-h-11 gap-2 font-sans font-medium border-destructive/30 bg-destructive/10 text-base text-destructive')}
         onClick={onUndo}
         disabled={disabled || !canUndo}
       >

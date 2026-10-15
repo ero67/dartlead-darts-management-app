@@ -61,7 +61,7 @@ export function CorrectResultDialog({ match, onSave, onCancel, t }) {
                 <Button type="button" variant="outline" size="icon" aria-label={`${names[i]} −1`} onClick={() => setLeg(i, legs[i] - 1)} disabled={legs[i] === 0}>
                   <Minus />
                 </Button>
-                <span className="w-14 text-center text-5xl font-semibold tracking-tight tabular-nums">{legs[i]}</span>
+                <span className="w-14 text-center font-display text-5xl font-semibold tabular-nums">{legs[i]}</span>
                 <Button type="button" variant="outline" size="icon" aria-label={`${names[i]} +1`} onClick={() => setLeg(i, legs[i] + 1)}>
                   <Plus />
                 </Button>
