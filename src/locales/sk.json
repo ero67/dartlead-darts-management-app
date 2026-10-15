@@ -60,7 +60,16 @@
     "practiceTitle": "Tréning zadarmo",
     "practiceDesc": "Sólo X01 s priemermi, úspešnosťou checkoutov a históriou na tomto zariadení.",
     "practiceCta": "Začať trénovať",
-    "continueSession": "Pokračovať v tréningu"
+    "continueSession": "Pokračovať v tréningu",
+    "liveNow": "Práve sa hrá",
+    "liveMatchesShort": "naživo",
+    "phaseRegistration": "Registrácia",
+    "following": "Sleduješ",
+    "yourMatch": "Tvoj zápas",
+    "yourLeaguePosition": "Tvoja pozícia v lige",
+    "behindLeader": "{{count}} za hráčom {{name}}",
+    "thisWeek": "{{count}} tento týždeň",
+    "lastOne": "Posledná {{date}}"
   },
   "tournaments": {
     "title": "Turnaje",
@@ -552,7 +561,10 @@
       "messagePlaceholder": "Opíšte svoje potreby",
       "submit": "Kontaktujte nás na"
     },
-    "ctaPractice": "Vyskúšať tréning"
+    "ctaPractice": "Vyskúšať tréning",
+    "preview": {
+      "tournamentName": "Piatkový Open"
+    }
   },
   "auth": {
     "setNewPasswordTitle": "Nastavte si nové heslo",
@@ -886,7 +898,15 @@
     "5thPlace": "5. miesto",
     "defaultSixthPlus": "Ostatní (6. miesto a nižšie)",
     "pleaseEnterLeagueName": "Zadajte názov ligy",
-    "failedToCreateLeague": "Nepodarilo sa vytvoriť ligu"
+    "failedToCreateLeague": "Nepodarilo sa vytvoriť ligu",
+    "seasonRounds": "Kolá sezóny",
+    "roundNumber": "{{number}}. kolo",
+    "averageByRound": "Turnajový priemer podľa kôl",
+    "topThree": "najlepší traja",
+    "swapPlayers": "Vymeniť hráčov",
+    "leagueRank": "{{rank}}. v lige",
+    "matchesWon": "Vyhrané zápasy",
+    "everyMeeting": "Všetky vzájomné zápasy v sezóne"
   },
   "playerProfile": {
     "title": "Profil hráča",
@@ -988,7 +1008,9 @@
     "loadError": "Nepodarilo sa načítať zapisovateľov",
     "addError": "Nepodarilo sa pridať zapisovateľa",
     "removeError": "Nepodarilo sa odstrániť zapisovateľa",
-    "managerNote": "Ako organizátor môžete zápasy vždy počítať aj sami."
+    "managerNote": "Ako organizátor môžete zápasy vždy počítať aj sami.",
+    "fromLeague": "Z ligy",
+    "fromLeagueHint": "Pridané v nastaveniach ligy; odstrániť sa dá tam."
   },
   "account": {
     "title": "Účet",
@@ -1084,19 +1106,23 @@
     "games": {
       "x01": {
         "title": "X01",
-        "desc": "501, 301 alebo vlastný štart. Hraj legy proti terču a sleduj svoj priemer."
+        "desc": "501, 301 alebo vlastný štart. Hraj legy proti terču a sleduj svoj priemer.",
+        "short": "X01"
       },
       "checkout": {
         "title": "Tréning checkoutov",
-        "desc": "Náhodné zakončenia od 2 do 170. Úspešnosť podľa čísla."
+        "desc": "Náhodné zakončenia od 2 do 170. Úspešnosť podľa čísla.",
+        "short": "CO"
       },
       "oneTwentyOne": {
         "title": "121",
-        "desc": "Zakonči 121 na deväť šípok a posuň sa vyššie."
+        "desc": "Zakonči 121 na deväť šípok a posuň sa vyššie.",
+        "short": "121"
       },
       "aroundTheClock": {
         "title": "Okolo terča",
-        "desc": "1 až 20 a potom bull. Počet šípok a čas do konca."
+        "desc": "1 až 20 a potom bull. Počet šípok a čas do konca.",
+        "short": "ATC"
       }
     },
     "setup": {
@@ -1124,7 +1150,10 @@
     "bot": {
       "name": "Bot úroveň {{level}}",
       "levelHint": "Úroveň {{level}} hádže priemer okolo {{average}} na 3 šípky.",
-      "skip": "Ťuknutím preskočíte"
+      "skip": "Ťuknutím preskočíte",
+      "aboutAverage": "priemer okolo {{average}}",
+      "easier": "Ľahší bot",
+      "harder": "Ťažší bot"
     },
     "match": {
       "vs": "vs",
@@ -1178,7 +1207,16 @@
       "clearAll": "Vymazať históriu",
       "confirmClear": "Vymazať všetky tréningy z tohto zariadenia?",
       "delete": "Vymazať",
-      "confirmClearCloud": "Vymazať všetky tréningy z tohto zariadenia aj z účtu?"
+      "confirmClearCloud": "Vymazať všetky tréningy z tohto zariadenia aj z účtu?",
+      "today": "Dnes",
+      "yesterday": "Včera",
+      "last30": "Posledných 30 dní",
+      "duration": "Trvanie",
+      "sessionCountOne": "{{count}} tréning",
+      "sessionCountFew": "{{count}} tréningy",
+      "sessionCountMany": "{{count}} tréningov",
+      "showMore": "Zobraziť staršie ({{count}})",
+      "showFewer": "Zobraziť menej"
     },
     "noStats": "—",
     "legWonOne": "Leg dokončený na {{count}} šípku",
@@ -1223,7 +1261,8 @@
       },
       "lastAttempt": "Naposledy: {{target}}",
       "dialogHit": "Počíta sa ako zakončenie",
-      "dialogBust": "Bez double — pokus neúspešný"
+      "dialogBust": "Bez double — pokus neúspešný",
+      "lastAttemptLabel": "Posledný pokus"
     },
     "oneTwentyOne": {
       "rules": "Zakonči cieľ do troch náhodov (deväť šípok). Ak sa podarí, cieľ sa zvýši o jeden; ak nie, klesne o jeden — nikdy nie pod štartovací cieľ.",
@@ -1284,7 +1323,8 @@
         "avgDartsPerTarget": "Šípok na číslo",
         "firstDartHits": "Trafené prvou šípkou",
         "hardest": "Najťažšie čísla"
-      }
+      },
+      "hitCount": "{{hit}} / {{total}} trafených"
     },
     "bests": {
       "title": "Osobné rekordy",
@@ -1309,6 +1349,18 @@
       "retry": "Synchronizovať",
       "note": "Tréningy sa ukladajú do tvojho účtu aj na toto zariadenie.",
       "deleteFailed": "Nepodarilo sa vymazať z účtu. Skús to znova, keď budeš online."
+    },
+    "startGame": "Začni hru",
+    "discarded": "Tréning zahodený. Do histórie sa neuložil.",
+    "startedAt": "Začiatok {{time}}",
+    "summary": {
+      "matchWon": "Zápas vyhraný",
+      "matchLost": "Zápas prehraný",
+      "highScores": "Vysoké hody",
+      "legWon": "Vyhraný",
+      "legLost": "Prehraný",
+      "out": "zakončenie {{score}}",
+      "left": "zostalo {{score}}"
     }
   }
 }

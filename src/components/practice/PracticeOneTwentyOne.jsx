@@ -6,16 +6,18 @@ import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
 import {
   PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeSetup, PracticeField, PracticeOptionCards,
-  PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeCheckoutHint, PracticeLastThrows, PracticeKeypad
+  PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeCheckoutHint, PracticeKeypad,
+  PracticeStrip
 } from './PracticeShared';
+import { stripWindow } from './practiceView';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { dartFromInput, liveRemaining, lastVisitLabels, canUndo as x01CanUndo } from '../../lib/x01Engine';
+import { dartFromInput, liveRemaining, displayLabel, canUndo as x01CanUndo } from '../../lib/x01Engine';
 import {
   createOneTwentyOne, applyDart, applyVisitTotal, undo, canUndo, computeStats, visitsLeft,
   ROUND_OPTIONS, MIN_TARGET, MAX_TARGET
 } from '../../lib/oneTwentyOne';
-import { describeSession, pluralSuffix } from '../../lib/practiceGames';
+import { describeSession, formatDuration, pluralSuffix } from '../../lib/practiceGames';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
@@ -25,6 +27,7 @@ import checkoutData from '../../data/checkouts.json';
 const GAME = 'oneTwentyOne';
 const FLASH_MS = 900;
 const START_OPTIONS = [61, 81, 101, 121];
+const VISITS = 3;
 const DEFAULT_SETTINGS = { startTarget: 121, roundsTarget: 10, scoringMode: 'dart', onFail: 'down' };
 
 const sanitize = (saved) => {
@@ -39,6 +42,29 @@ const sanitize = (saved) => {
     scoringMode: saved.scoringMode === 'turnTotal' ? 'turnTotal' : 'dart',
     onFail: saved.onFail === 'stay' ? 'stay' : 'down'
   };
+};
+
+// The nine darts of the round as three groups of pips (one pip per visit in
+// 3-dart-total mode): thrown darts show their label, slots lost to a bust or
+// a checkout show a dash, the next dart is outlined.
+const dartPips = (round, scoringMode) => {
+  const perVisit = scoringMode === 'dart' ? 3 : 1;
+  const done = round.current.visits.map(v => {
+    const labels = v.dartsList.map(d => displayLabel(d.label));
+    while (labels.length < perVisit) labels.push('–');
+    return labels.map(label => ({ label, tone: label === '–' ? 'empty' : 'muted' }));
+  });
+  const live = round.current.visit.darts.map(d => ({ label: displayLabel(d.label), tone: 'muted' }));
+  const groups = [...done];
+  if (groups.length < VISITS) groups.push(live);
+  while (groups.length < VISITS) groups.push([]);
+  let isNextMarked = false;
+  return groups.map(group => Array.from({ length: perVisit }, (_, k) => {
+    if (group[k]) return group[k];
+    const tone = isNextMarked ? 'empty' : 'current';
+    isNextMarked = true;
+    return { label: '', tone };
+  }));
 };
 
 export function PracticeOneTwentyOne() {
@@ -115,9 +141,10 @@ export function PracticeOneTwentyOne() {
     return (
       <PracticeSummary
         subtitle={`${t('practice.games.oneTwentyOne.title')} · ${summary.settings.startTarget} → ${s.finalTarget}`}
+        meta={formatDuration(summary.startedAt, summary.finishedAt)}
         cards={[
           [t('practice.oneTwentyOne.stats.highestSuccess'), s.highestSuccess ?? t('practice.noStats')],
-          [t('practice.oneTwentyOne.stats.successRate'), s.successPercent === null ? t('practice.noStats') : `${s.successPercent.toFixed(0)}% (${s.successes}/${s.rounds})`],
+          [t('practice.oneTwentyOne.stats.successRate'), s.successPercent === null ? t('practice.noStats') : `${s.successPercent.toFixed(0)}%`, `${s.successes}/${s.rounds}`],
           [t('practice.oneTwentyOne.stats.finalTarget'), s.finalTarget],
           [t('practice.oneTwentyOne.stats.bestStreak'), s.bestStreak],
           [t('practice.oneTwentyOne.stats.avgDartsPerSuccess'), s.avgDartsPerSuccess ?? t('practice.noStats')],
@@ -207,43 +234,62 @@ export function PracticeOneTwentyOne() {
   const remaining = liveRemaining(session.round);
   const left = visitsLeft(session);
   const roundNumber = session.rounds.length + 1;
-  const labels = lastVisitLabels(session.round);
   const suggestion = session.round.current.visit.darts.length === 0 ? checkoutData[String(remaining)] : null;
+  const lastRound = session.rounds.at(-1);
+  const roundText = session.settings.roundsTarget === null
+    ? t('practice.oneTwentyOne.round', { current: roundNumber })
+    : t('practice.oneTwentyOne.roundOf', { current: roundNumber, total: session.settings.roundsTarget });
   const boardFlash = flash?.type === 'success'
     ? { tone: 'good', text: t('practice.oneTwentyOne.success', { target: flash.target }) }
     : flash?.type === 'fail'
       ? { tone: 'bad', text: t('practice.oneTwentyOne.fail', { target: flash.target }) }
       : flash?.type === 'bust' ? { tone: 'bad', text: t('practice.bust') } : null;
 
+  // One cell per round (a window of ten when the session is longer).
+  const { start: from, end: to } = stripWindow(session.rounds.length, session.settings.roundsTarget);
+  const roundCells = Array.from({ length: to - from }, (_, k) => {
+    const i = from + k;
+    const r = session.rounds[i];
+    if (r) return { label: r.target, tone: r.success ? 'good' : 'muted' };
+    return i === session.rounds.length ? { label: session.target, tone: 'current' } : { label: '', tone: 'empty' };
+  });
+
   return (
     <PracticePlay
       onFinish={handleFinishEarly}
-      meta={
-        <>
-          <span>
-            {session.settings.roundsTarget === null
-              ? t('practice.oneTwentyOne.round', { current: roundNumber })
-              : t('practice.oneTwentyOne.roundOf', { current: roundNumber, total: session.settings.roundsTarget })}
-          </span>
-          <span>{t('practice.oneTwentyOne.stats.successes')} <b>{stats.successes}/{stats.rounds}</b></span>
-        </>
-      }
+      title={`${t('practice.games.oneTwentyOne.title')} · ${roundText}`}
+      subtitle={<>{t('practice.oneTwentyOne.stats.successes')} <b>{stats.successes}/{stats.rounds}</b></>}
     >
       <CheckoutDialog pending={pendingCheckout} onChange={setPendingCheckout} onCancel={() => setPendingCheckout(null)} onConfirm={handleConfirmCheckout} />
 
       <PracticeBoard flash={boardFlash}>
-        <PracticeBoardLabel>
-          {t('practice.checkout.target')} {session.target}
-          {remaining !== session.target && ` · ${t('practice.remaining')}`}
-        </PracticeBoardLabel>
-        <PracticeBoardValue>{remaining}</PracticeBoardValue>
-        <PracticeCheckoutHint>{suggestion ? suggestion.join(' → ') : ''}</PracticeCheckoutHint>
-        <PracticeLastThrows labels={labels} />
-        <div className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
-          {[0, 1, 2].map(i => <span key={i} className={cn('size-3 rounded-full border-2 border-primary', i < 3 - left && 'bg-primary')} />)}
-          <span className="ml-1.5">{t(`practice.oneTwentyOne.visitsLeft${pluralSuffix(left)}`, { count: left })}</span>
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex flex-col">
+            <PracticeBoardLabel>{t('practice.checkout.target')}</PracticeBoardLabel>
+            <PracticeBoardValue className="text-6xl text-muted-foreground">{session.target}</PracticeBoardValue>
+          </div>
+          <div className="flex flex-col items-end">
+            <PracticeBoardLabel className="text-muted-foreground">{t('practice.remaining')}</PracticeBoardLabel>
+            <PracticeBoardValue>{remaining}</PracticeBoardValue>
+          </div>
         </div>
+        <div className="flex items-center justify-between gap-2">
+          <PracticeCheckoutHint route={suggestion} />
+          <span className="shrink-0 text-xs text-muted-foreground">{t(`practice.oneTwentyOne.visitsLeft${pluralSuffix(left)}`, { count: left })}</span>
+        </div>
+        <div className="flex gap-2.5">
+          {dartPips(session.round, session.settings.scoringMode).map((group, i) => (
+            <PracticeStrip key={i} cells={group} className="flex-1 px-0" />
+          ))}
+        </div>
+        {lastRound && (
+          <div className={cn('flex h-9 items-center justify-center rounded-lg border font-display text-lg font-bold tracking-wide', lastRound.success ? 'border-primary/40 bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+            {t(lastRound.success ? 'practice.oneTwentyOne.success' : 'practice.oneTwentyOne.fail', { target: session.target })}
+          </div>
+        )}
       </PracticeBoard>
+
+      <PracticeStrip cells={roundCells} label={roundText} />
 
       <PracticeKeypad>
         {session.settings.scoringMode === 'dart' ? (

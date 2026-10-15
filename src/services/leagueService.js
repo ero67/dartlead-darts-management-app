@@ -1,6 +1,20 @@
 import { supabase, generateId } from '../lib/supabase.js';
 import { isValidLegDartCount } from '../utils/dartStats.js';
 
+// Checkout like "T20+T20+D20" (or a plain number) -> points scored.
+const getCheckoutValue = (checkout) => {
+  if (typeof checkout === 'number') return checkout;
+  if (typeof checkout !== 'string') return 0;
+  return checkout.split('+').reduce((total, raw) => {
+    const part = raw.trim();
+    if (part.startsWith('T')) return total + parseInt(part.substring(1)) * 3;
+    if (part.startsWith('D')) return total + parseInt(part.substring(1)) * 2;
+    if (part.startsWith('S')) return total + parseInt(part.substring(1));
+    const n = parseInt(part);
+    return isNaN(n) ? total : total + n;
+  }, 0);
+};
+
 export const leagueService = {
   // Create a new league
   async createLeague(leagueData) {
@@ -1597,13 +1611,15 @@ export const leagueService = {
       // 1. Get all completed tournaments in the league
       const { data: tournaments, error } = await supabase
         .from('tournaments')
-        .select('id, name')
+        .select('id, name, created_at')
         .eq('league_id', leagueId)
         .eq('status', 'completed')
-        .eq('deleted', false);
+        .eq('deleted', false)
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
-      if (!tournaments?.length) return { most180s: [], bestCheckouts: [], bestMatchAverages: [], fewestDartsLegs: [] };
+      const empty = { most180s: [], bestCheckouts: [], bestMatchAverages: [], fewestDartsLegs: [], averageByRound: { rounds: [], series: [] } };
+      if (!tournaments?.length) return empty;
 
       // 2+3. All completed matches with results, in ONE query. This previously
       // fetched the full nested tournament tree per tournament (a season league
@@ -1645,34 +1661,27 @@ export const leagueService = {
         })
         .filter(m => m.result);
 
-      // 4. Helper – parse checkout string to numeric value
-      const getCheckoutValue = (checkout) => {
-        if (typeof checkout === 'number') return checkout;
-        if (typeof checkout === 'string') {
-          const parts = checkout.split('+').map(p => p.trim());
-          let total = 0;
-          parts.forEach(part => {
-            part = part.trim();
-            if (part.startsWith('T')) total += parseInt(part.substring(1)) * 3;
-            else if (part.startsWith('D')) total += parseInt(part.substring(1)) * 2;
-            else if (part.startsWith('S')) total += parseInt(part.substring(1));
-            else { const n = parseInt(part); if (!isNaN(n)) total += n; }
-          });
-          return total;
-        }
-        return 0;
-      };
-
       // 5. Aggregate stats
       // Maps: playerId → accumulated data
       const player180s = new Map();          // { player, count }
       const playerCheckouts = new Map();     // { player, highest, raw, tournamentName }
       const playerMatchAvg = new Map();      // { player, average, opponent, tournamentName }
       const playerBestLeg = new Map();       // { player, darts, opponent, tournamentName }
+      const playerRoundTotals = new Map();   // { player, byTournament: Map(tournamentId → { score, darts }) }
 
-      const processPlayerStats = (player, stats, opponent, tournamentName, startingScore) => {
+      const processPlayerStats = (player, stats, opponent, tournamentName, startingScore, tournamentId) => {
         if (!player?.id || !stats) return;
         const pid = player.id;
+
+        // ── Score/darts per tournament (average-by-round chart) ──
+        if (stats.totalDarts > 0) {
+          const totals = playerRoundTotals.get(pid) || { player, byTournament: new Map() };
+          const round = totals.byTournament.get(tournamentId) || { score: 0, darts: 0 };
+          round.score += stats.totalScore || 0;
+          round.darts += stats.totalDarts;
+          totals.byTournament.set(tournamentId, round);
+          playerRoundTotals.set(pid, totals);
+        }
 
         // ── 180s (cumulative) ──
         const count180 = Number(stats.oneEighties || 0);
@@ -1738,8 +1747,8 @@ export const leagueService = {
       };
 
       allMatches.forEach(match => {
-        processPlayerStats(match.player1, match.result?.player1Stats, match.player2, match.tournamentName, match.startingScore);
-        processPlayerStats(match.player2, match.result?.player2Stats, match.player1, match.tournamentName, match.startingScore);
+        processPlayerStats(match.player1, match.result?.player1Stats, match.player2, match.tournamentName, match.startingScore, match.tournament_id);
+        processPlayerStats(match.player2, match.result?.player2Stats, match.player1, match.tournamentName, match.startingScore, match.tournament_id);
       });
 
       // 6. Sort and return top 10 for each category
@@ -1749,14 +1758,105 @@ export const leagueService = {
         return arr.slice(0, 10);
       };
 
+      // Chart: the three players with the best overall league average, with
+      // their 3-dart average in each completed tournament (null = didn't play).
+      const avg = ({ score, darts }) => (score / darts) * 3;
+      const series = Array.from(playerRoundTotals.values())
+        .map(({ player, byTournament }) => {
+          const sum = Array.from(byTournament.values()).reduce((acc, r) => ({ score: acc.score + r.score, darts: acc.darts + r.darts }), { score: 0, darts: 0 });
+          return { player, overall: avg(sum), values: tournaments.map(t => (byTournament.has(t.id) ? avg(byTournament.get(t.id)) : null)) };
+        })
+        .sort((a, b) => b.overall - a.overall)
+        .slice(0, 3);
+
       return {
         most180s: toSortedArray(player180s, e => e.count),
         bestCheckouts: toSortedArray(playerCheckouts, e => e.highest),
         bestMatchAverages: toSortedArray(playerMatchAvg, e => e.average),
         fewestDartsLegs: toSortedArray(playerBestLeg, e => e.darts, true),
+        averageByRound: { rounds: tournaments.map(t => ({ id: t.id, name: t.name })), series },
       };
     } catch (error) {
       console.error('Error fetching league statistics:', error);
+      throw error;
+    }
+  },
+
+  // Everything the Head to Head tab shows for two league players: the
+  // aggregate record plus every completed meeting, oldest first.
+  async getHeadToHead(leagueId, player1Id, player2Id) {
+    try {
+      const { data: tournaments, error: tournamentsError } = await supabase
+        .from('tournaments')
+        .select('id, name, created_at')
+        .eq('league_id', leagueId)
+        .eq('deleted', false);
+      if (tournamentsError) throw tournamentsError;
+      if (!tournaments?.length) return null;
+      const tournamentById = new Map(tournaments.map(t => [t.id, t]));
+
+      const { data: matches, error } = await supabase
+        .from('matches')
+        .select('id, tournament_id, player1_id, player2_id, winner_id, player1_legs, player2_legs, result, is_playoff, playoff_round, completed_at')
+        .in('tournament_id', tournaments.map(t => t.id))
+        .eq('status', 'completed')
+        .or(`and(player1_id.eq.${player1Id},player2_id.eq.${player2Id}),and(player1_id.eq.${player2Id},player2_id.eq.${player1Id})`);
+      if (error) throw error;
+
+      const side = (totals, stats) => {
+        if (!stats) return;
+        totals.score += stats.totalScore || 0;
+        totals.darts += stats.totalDarts || 0;
+        totals.oneEighties += Number(stats.oneEighties || 0);
+        (stats.checkouts || []).forEach(co => { totals.highestCheckout = Math.max(totals.highestCheckout, getCheckoutValue(co.checkout)); });
+      };
+      const p1 = { wins: 0, legs: 0, score: 0, darts: 0, oneEighties: 0, highestCheckout: 0 };
+      const p2 = { wins: 0, legs: 0, score: 0, darts: 0, oneEighties: 0, highestCheckout: 0 };
+      const matchAvg = (stats) => (stats?.totalDarts > 0 ? (stats.totalScore / stats.totalDarts) * 3 : null);
+
+      const meetings = (matches || []).map(m => {
+        let result = m.result;
+        if (typeof result === 'string') {
+          try { result = JSON.parse(result); } catch { result = null; }
+        }
+        const isP1First = m.player1_id === player1Id;
+        const p1Stats = isP1First ? result?.player1Stats : result?.player2Stats;
+        const p2Stats = isP1First ? result?.player2Stats : result?.player1Stats;
+        const p1Legs = (isP1First ? m.player1_legs : m.player2_legs) || 0;
+        const p2Legs = (isP1First ? m.player2_legs : m.player1_legs) || 0;
+        if (m.winner_id === player1Id) p1.wins++;
+        else if (m.winner_id === player2Id) p2.wins++;
+        p1.legs += p1Legs;
+        p2.legs += p2Legs;
+        side(p1, p1Stats);
+        side(p2, p2Stats);
+        const tournament = tournamentById.get(m.tournament_id);
+        return {
+          id: m.id,
+          tournamentName: tournament?.name || '',
+          isPlayoff: !!m.is_playoff,
+          playoffRound: m.playoff_round,
+          playedAt: m.completed_at || tournament?.created_at || '',
+          winnerId: m.winner_id,
+          p1Legs,
+          p2Legs,
+          p1Avg: matchAvg(p1Stats),
+          p2Avg: matchAvg(p2Stats)
+        };
+      }).sort((a, b) => a.playedAt.localeCompare(b.playedAt));
+
+      const overall = (p) => (p.darts > 0 ? (p.score / p.darts) * 3 : 0);
+      return {
+        matches: meetings.length,
+        p1Wins: p1.wins, p2Wins: p2.wins,
+        p1Legs: p1.legs, p2Legs: p2.legs,
+        p1Avg: overall(p1), p2Avg: overall(p2),
+        p1OneEighties: p1.oneEighties, p2OneEighties: p2.oneEighties,
+        p1HighestCheckout: p1.highestCheckout, p2HighestCheckout: p2.highestCheckout,
+        meetings
+      };
+    } catch (error) {
+      console.error('Error loading head to head:', error);
       throw error;
     }
   },

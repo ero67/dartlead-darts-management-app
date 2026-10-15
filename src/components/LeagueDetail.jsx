@@ -7,6 +7,7 @@ import { useAdmin } from '../contexts/AdminContext';
 import { leagueService } from '../services/leagueService';
 import { HeadToHead } from './HeadToHead';
 import { StatusBadge } from './shared/StatusBadge';
+import { BoardMotif } from './shared/DartsAccents';
 import { EmptyState } from './shared/EmptyState';
 import { LeaderboardTab } from './league/LeaderboardTab';
 import { TournamentsTab } from './league/TournamentsTab';
@@ -631,8 +632,9 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
-      <div className="flex flex-col gap-3">
+    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-hidden p-4 text-foreground md:p-8">
+      <BoardMotif />
+      <div className="relative flex flex-col gap-3">
         <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
           <ArrowLeft />
           {t('leagues.backToLeagues')}
@@ -750,7 +752,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
           {currentLeague.leaderboard && currentLeague.leaderboard.length >= 2 ? (
             <HeadToHead
               leagueId={currentLeague.id}
-              players={currentLeague.leaderboard.map(e => e.player).filter(Boolean)}
+              players={currentLeague.leaderboard.map((e, i) => e.player && { ...e.player, rank: i + 1 }).filter(Boolean)}
             />
           ) : (
             <EmptyState icon={Users} title={t('leagues.noResultsYet')} />
