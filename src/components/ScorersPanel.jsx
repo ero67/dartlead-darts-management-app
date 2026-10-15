@@ -5,6 +5,7 @@ import { UserSearchPicker } from './UserSearchPicker';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from './shared/EmptyState';
@@ -135,6 +136,9 @@ export function ScorersPanel({ type, entityId, onScorersChange }) {
                     {scorer.fullName && <div className="truncate text-xs text-muted-foreground">{scorer.email}</div>}
                   </div>
                 </div>
+                {scorer.source === 'league' ? (
+                  <Badge variant="secondary" title={t('scorers.fromLeagueHint')}>{t('scorers.fromLeague')}</Badge>
+                ) : (
                 <Button
                   type="button"
                   variant="ghost"
@@ -145,6 +149,7 @@ export function ScorersPanel({ type, entityId, onScorersChange }) {
                 >
                   <X />
                 </Button>
+                )}
               </li>
             ))}
           </ul>
