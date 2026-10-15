@@ -7,7 +7,7 @@ import { ExportMenu } from '../ExportMenu';
 import { EmptyState } from '../shared/EmptyState';
 import { cn } from '@/lib/utils';
 
-export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, standingsRef, renderPlayerLink, t }) {
+export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, renderPlayerLink, t }) {
   const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
   const num = 'text-right tabular-nums';
 
@@ -30,11 +30,11 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
               </span>
             </div>
           )}
-          <ExportMenu tournament={tournament} imageTarget={standingsRef} imageSuffix="standings" />
+          <ExportMenu tournament={tournament} imageSuffix="standings" />
         </div>
       </div>
 
-      <div ref={standingsRef} className="bg-background">
+      <div>
         {uniqueGroups && uniqueGroups.length > 0 ? (
           <div className="grid gap-4 lg:grid-cols-2">
             {uniqueGroups.map(group => {

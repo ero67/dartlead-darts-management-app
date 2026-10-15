@@ -94,9 +94,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   
   const [activeTab, setActiveTab] = useState(() => getInitialTab());
   const [showEditSettings, setShowEditSettings] = useState(false);
-  // Targets for "share as image" (ExportMenu)
-  const standingsRef = useRef(null);
-  const bracketRef = useRef(null);
   const [editingMatch, setEditingMatch] = useState(null); // Match being edited
   const [correctingMatch, setCorrectingMatch] = useState(null); // Match whose result is being corrected
   const [liveMatches, setLiveMatches] = useState([]);
@@ -2342,7 +2339,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             tournament={tournament}
             uniqueGroups={uniqueGroups}
             defaultQualifierIdSet={defaultQualifierIdSet}
-            standingsRef={standingsRef}
             renderPlayerLink={renderPlayerLink}
             t={t}
           />
@@ -2354,7 +2350,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             isGroupStageComplete={isGroupStageComplete}
             bracketViewMode={bracketViewMode}
             setBracketViewMode={setBracketViewMode}
-            bracketRef={bracketRef}
             handleResetPlayoffs={handleResetPlayoffs}
             getRoundSize={getRoundSize}
             getPlayoffLegsToWin={getPlayoffLegsToWin}

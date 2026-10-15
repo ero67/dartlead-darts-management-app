@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Share2, Image as ImageIcon, FileSpreadsheet, Loader } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { deliverFile, elementToPngBlob, buildStandingsCsv, buildResultsCsv, csvBlob, exportFileName } from '../lib/exportShare';
+import { deliverFile, buildStandingsCsv, buildResultsCsv, csvBlob, exportFileName } from '../lib/exportShare';
+import { tournamentToPngBlob, imageLabels } from '../lib/tournamentImage';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-// "Share / export" dropdown for a tournament view. `imageTarget` is a ref to the
-// DOM node to render as an image; the CSV items work from tournament data.
-export function ExportMenu({ tournament, imageTarget, imageSuffix = 'standings', items = ['image', 'standings', 'results'] }) {
+// "Share / export" dropdown for a tournament view. The image is drawn from
+// tournament data (standings + bracket on one poster); the CSV items too.
+export function ExportMenu({ tournament, imageSuffix = 'standings', items = ['image', 'standings', 'results'] }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
@@ -28,10 +29,7 @@ export function ExportMenu({ tournament, imageTarget, imageSuffix = 'standings',
   };
 
   const shareImage = () => run('image', async () => {
-    const el = imageTarget?.current;
-    if (!el) throw new Error('no target');
-    const isDark = document.documentElement.classList.contains('dark-mode');
-    const blob = await elementToPngBlob(el, { backgroundColor: isDark ? '#09090b' : '#ffffff' });
+    const blob = await tournamentToPngBlob(tournament, imageLabels(t));
     await deliverFile({ blob, filename: exportFileName(tournament.name, imageSuffix, 'png'), title: tournament.name, text: `${tournament.name} · dartlead.app` });
   });
 

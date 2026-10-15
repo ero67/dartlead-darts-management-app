@@ -1,9 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { toPng } from 'html-to-image';
 
-// Getting a file out of the app — an image of the standings/bracket or a CSV.
+// Getting a file out of the app — a PNG (see tournamentImage.js) or a CSV.
 //
 // Browser: the Web Share API with files where it exists (Android Chrome,
 // Safari), otherwise a plain download. Capacitor shell: the WebView can
@@ -14,12 +13,6 @@ import { toPng } from 'html-to-image';
 const safeName = (s) => String(s || 'export').replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'export';
 
 export const exportFileName = (tournamentName, suffix, ext) => `${safeName(tournamentName)}-${suffix}.${ext}`;
-
-export async function elementToPngBlob(element, { backgroundColor, pixelRatio = 2, padding = '1rem' } = {}) {
-  const dataUrl = await toPng(element, { backgroundColor, pixelRatio, style: { padding }, cacheBust: true });
-  const res = await fetch(dataUrl);
-  return res.blob();
-}
 
 const blobToBase64 = (blob) => new Promise((resolve, reject) => {
   const reader = new FileReader();

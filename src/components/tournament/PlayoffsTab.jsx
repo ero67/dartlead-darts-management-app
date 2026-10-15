@@ -127,7 +127,7 @@ function PlayoffPlayerName({ name, isTbd, t }) {
 // `card` is the same callback bundle MatchesTab receives (see there).
 export function PlayoffsTab(props) {
   const {
-    tournament, isGroupStageComplete, bracketViewMode, setBracketViewMode, bracketRef, handleResetPlayoffs,
+    tournament, isGroupStageComplete, bracketViewMode, setBracketViewMode, handleResetPlayoffs,
     getRoundSize, getPlayoffLegsToWin, setEditingMatch, handleAdvanceBye, playoffScorerByMatch, card, t
   } = props;
   const { user, canManage, isMatchActuallyLive, isMatchInLocalStorage, getMatchStatusText, liveInfoById } = card;
@@ -189,7 +189,7 @@ export function PlayoffsTab(props) {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <ExportMenu tournament={tournament} imageTarget={bracketRef} imageSuffix="bracket" items={['image', 'results']} />
+          <ExportMenu tournament={tournament} imageSuffix="bracket" items={['image', 'results']} />
           {canManage && (
             <Button
               type="button"
@@ -206,7 +206,7 @@ export function PlayoffsTab(props) {
         </div>
       </div>
 
-      <div ref={bracketRef} className="bg-background">
+      <div>
         {bracketViewMode === 'compact' ? (
           <BracketVisualization
             rounds={mergeBracketRounds(rounds, playoffMatches, tournament.players)}

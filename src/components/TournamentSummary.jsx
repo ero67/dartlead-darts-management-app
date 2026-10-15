@@ -1,11 +1,12 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Trophy, Target, Zap, Award, Hash, Download, Loader, Medal } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { deliverFile, elementToPngBlob, exportFileName } from '../lib/exportShare';
+import { deliverFile, exportFileName } from '../lib/exportShare';
+import { tournamentToPngBlob, imageLabels } from '../lib/tournamentImage';
 import { isValidLegDartCount } from '../utils/dartStats';
 import logo from '../assets/logo.png';
 
@@ -24,15 +25,15 @@ const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).filter(Bo
  */
 export function TournamentSummary({ tournament }) {
   const { t } = useLanguage();
-  const summaryRef = useRef(null);
   const [exporting, setExporting] = useState(false);
 
   const handleExportImage = async () => {
-    if (!summaryRef.current) return;
     setExporting(true);
     try {
       // Share sheet on Android / mobile browsers, download elsewhere.
-      const blob = await elementToPngBlob(summaryRef.current, { backgroundColor: '#1e293b', padding: '1.5rem' });
+      const blob = await tournamentToPngBlob(tournament, imageLabels(t), {
+        awards: awards.map((a) => ({ label: a.label, value: a.value, players: a.players.map((p) => p.name || '?') }))
+      });
       await deliverFile({
         blob,
         filename: exportFileName(tournament.name, 'summary', 'png'),
@@ -402,8 +403,7 @@ export function TournamentSummary({ tournament }) {
         </Button>
       </div>
 
-      {/* Captured by the image export — needs its own opaque background. */}
-      <div className="flex flex-col gap-6 rounded-xl bg-background" ref={summaryRef}>
+      <div className="flex flex-col gap-6 rounded-xl bg-background">
         <Card>
           <CardHeader className="flex items-center gap-4">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -471,7 +471,7 @@ export function TournamentSummary({ tournament }) {
                         </span>
                       ))}
                     </span>
-                    <span className="text-2xl font-semibold tracking-tight tabular-nums">{award.value}</span>
+                    <span className="font-display text-3xl font-semibold">{award.value}</span>
                     {award.subtitle && <span className="text-xs text-muted-foreground">{award.subtitle}</span>}
                   </div>
                 </Card>
@@ -484,7 +484,7 @@ export function TournamentSummary({ tournament }) {
           <p className="text-sm text-muted-foreground">{t('summary.noAwardsAvailable') || 'No statistics available for awards.'}</p>
         )}
 
-        {/* Bottom branding (kept inside the captured node so exports carry it) */}
+        {/* Bottom branding */}
         <Card className="py-4">
           <CardFooter className="justify-center">{branding}</CardFooter>
         </Card>
