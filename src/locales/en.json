@@ -132,7 +132,9 @@
     "live": "Live",
     "leg": "Leg",
     "firstTo": "First to",
-    "vs": "vs"
+    "vs": "vs",
+    "legWon": "Leg won",
+    "bust": "Bust"
   },
   "match": {
     "backToTournament": "Back to Tournament",

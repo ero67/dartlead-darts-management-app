@@ -132,7 +132,9 @@
     "live": "Live",
     "leg": "Leg",
     "firstTo": "Prvý do",
-    "vs": "vs"
+    "vs": "vs",
+    "legWon": "Vyhral leg",
+    "bust": "Bust"
   },
   "match": {
     "backToTournament": "Späť na Turnaj",
