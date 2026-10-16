@@ -580,7 +580,6 @@
     "resetLinkInvalid": "This password reset link is invalid or has expired. Request a new one from the login page.",
     "backToLogin": "Back to login",
     "appTitle": "Darts Tournament Manager",
-    "signInAsAdmin": "Administrator/Scorer Login",
     "continueInterruptedMatches": "Continue interrupted matches",
     "adminControlsForCorrections": "Admin controls for corrections",
     "tournamentManagement": "Tournament management",
@@ -612,7 +611,9 @@
     "onlyManagersCreateLeagues": "Only managers and administrators can create leagues.",
     "contactAdminForManager": "Please contact an administrator to request manager permissions.",
     "adminOnlyPage": "You must be an administrator to access this page.",
-    "managerOnlyPage": "You must be a manager or administrator to access this page."
+    "managerOnlyPage": "You must be a manager or administrator to access this page.",
+    "orWithEmail": "or sign in with email",
+    "signInSubtitle": "Sign in to save your practice progress and follow your tournaments and leagues."
   },
   "common": {
     "save": "Save",
@@ -1147,7 +1148,21 @@
       "starter": "Who starts",
       "you": "You",
       "subtitle": "Legs against the board, or against a second player or a bot.",
-      "opponentHint": "Solo, someone else on this device, or a bot."
+      "opponentHint": "Solo, someone else on this device, or a bot.",
+      "starterBullup": "Bull-up",
+      "newGame": "New game",
+      "vsBoard": "You vs the board",
+      "doubleOut": "Double out",
+      "soloPractice": "Solo practice",
+      "bullupDecides": "Bull-up decides",
+      "youThrowFirst": "You throw first",
+      "throwsFirst": "{{name}} throws first",
+      "firstToHint": "Legs needed to win the match",
+      "legsHint": "The session ends after these legs",
+      "legsUnlimitedHint": "Play until you stop",
+      "fewerLegs": "Fewer legs",
+      "moreLegs": "More legs",
+      "preview": "Game preview"
     },
     "bot": {
       "name": "Bot level {{level}}",
@@ -1167,7 +1182,8 @@
       "youWon": "You won {{for}}:{{against}}",
       "opponentWon": "{{name}} won {{for}}:{{against}}",
       "abandoned": "Match not finished ({{for}}:{{against}})",
-      "opponentAverage": "{{name}}: {{average}} avg"
+      "opponentAverage": "{{name}}: {{average}} avg",
+      "legWonByBullup": "{{name}} wins the leg on the bull-up"
     },
     "legOf": "Leg {{current}} / {{total}}",
     "leg": "Leg {{current}}",
@@ -1362,7 +1378,8 @@
       "legWon": "Won",
       "legLost": "Lost",
       "out": "out {{score}}",
-      "left": "left {{score}}"
+      "left": "left {{score}}",
+      "byBullup": "won on the bull-up"
     }
   }
 }

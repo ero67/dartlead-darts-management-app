@@ -10,7 +10,7 @@
 // Undo is snapshot-based at match level (the per-player undo stacks are kept
 // empty so snapshots stay small).
 
-import { createSoloX01, applyDart, applyVisitTotal, abandonLeg, computeStats } from './x01Engine.js';
+import { createSoloX01, applyDart, applyVisitTotal, abandonLeg, awardLegByBullup, computeStats } from './x01Engine.js';
 
 export const MATCH_LEG_OPTIONS = [1, 2, 3, 4, 5, 7, 10];
 const UNDO_LIMIT = 300;
@@ -20,13 +20,17 @@ const stripStack = (playerState) => ({ ...playerState, undoStack: [] });
 // players: [{ id, name, kind: 'human' | 'bot', level? }, { ... }]
 // `seed` drives a bot opponent's throws (see botPlayer.js). It is part of the
 // state, so undo snapshots restore it and a replayed bot visit is identical.
+// `starter` is a player index, or 'bullup' when the players decide at the
+// bull once the match is open: the state then waits (starterPending) for
+// matchSetStarter before anyone throws.
 export const createX01Match = ({ startingScore = 501, legsTarget = 3, scoringMode = 'dart', players, starter = 0, seed = 0 }) => ({
   kind: 'match',
   settings: { startingScore, legsTarget, scoringMode, players, starter },
   seed,
   players: players.map(() => stripStack(createSoloX01({ startingScore, legsTarget: null, scoringMode }))),
-  turn: starter,
-  legStarter: starter,
+  starterPending: starter === 'bullup',
+  turn: starter === 'bullup' ? 0 : starter,
+  legStarter: starter === 'bullup' ? 0 : starter,
   legNumber: 1,
   legsWon: players.map(() => 0),
   legLog: [],
@@ -64,30 +68,43 @@ const settle = (state, playerState, outcome) => {
   }
 
   // checkout: leg over
-  const legsWon = state.legsWon.map((n, i) => (i === turn ? n + 1 : n));
-  const wonLeg = playerState.legs[playerState.legs.length - 1];
   const closed = players.map((p, i) => (i === turn ? p : stripStack(abandonLeg(p))));
+  return closeLeg({ ...state, undoStack }, closed, turn, { byBullup: false });
+};
+
+// Leg over for `winner`: count it, log it, hand the next leg to the other
+// starter, or finish the match. `players` already have the leg closed.
+const closeLeg = (state, players, winner, { byBullup }) => {
+  const legsWon = state.legsWon.map((n, i) => (i === winner ? n + 1 : n));
+  const wonLeg = players[winner].legs[players[winner].legs.length - 1];
   const legLog = [...state.legLog, {
     leg: state.legNumber,
-    winner: turn,
+    winner,
     starter: state.legStarter,
     darts: wonLeg?.darts ?? null,
-    checkout: wonLeg?.checkout ?? null
+    checkout: byBullup ? null : (wonLeg?.checkout ?? null),
+    byBullup
   }];
-  const finished = legsWon[turn] >= state.settings.legsTarget;
+  const finished = legsWon[winner] >= state.settings.legsTarget;
   const nextStarter = (state.legStarter + 1) % players.length;
   return {
     ...state,
-    players: closed,
+    players,
     legsWon,
     legLog,
-    winner: finished ? turn : null,
+    winner: finished ? winner : null,
     finishedAt: finished ? Date.now() : null,
     legStarter: finished ? state.legStarter : nextStarter,
-    turn: finished ? turn : nextStarter,
-    legNumber: finished ? state.legNumber : state.legNumber + 1,
-    undoStack
+    turn: finished ? winner : nextStarter,
+    legNumber: finished ? state.legNumber : state.legNumber + 1
   };
+};
+
+// The leg ran too long and was decided at the bull: `winner` takes it with
+// no checkout recorded; both players' darts so far still count.
+export const matchAwardLegByBullup = (state, winner) => {
+  const players = state.players.map((p, i) => stripStack(i === winner ? awardLegByBullup(p) : abandonLeg(p)));
+  return closeLeg({ ...state, undoStack: pushUndo(state) }, players, winner, { byBullup: true });
 };
 
 export const matchApplyDart = (state, dart) => {
@@ -121,7 +138,24 @@ export const matchApplySequence = (state, darts, seed) => {
   return { states, final };
 };
 
-export const isBotTurn = (state) => isMatch(state) && !state.finishedAt && state.settings.players[state.turn]?.kind === 'bot';
+export const isBotTurn = (state) => isMatch(state) && !state.finishedAt && !state.starterPending && state.settings.players[state.turn]?.kind === 'bot';
+
+// Who won the bull-up throws first. Only meaningful before the first dart.
+export const matchSetStarter = (state, starter) => ({
+  ...state,
+  settings: { ...state.settings, starter },
+  starterPending: false,
+  turn: starter,
+  legStarter: starter
+});
+
+// The starter dialog also lets players switch dart-by-dart / turn total; the
+// engine only stores the mode, the keypad reads it.
+export const matchSetScoringMode = (state, scoringMode) => ({
+  ...state,
+  settings: { ...state.settings, scoringMode },
+  players: state.players.map((p) => ({ ...p, settings: { ...p.settings, scoringMode } }))
+});
 
 export const matchCanUndo = (state) => state.undoStack.length > 0;
 

@@ -1,13 +1,10 @@
-import React, { useId } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Flag, Play, RotateCcw, Settings2, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Flag, Minus, Play, Plus, RotateCcw, Settings2, X } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatTile } from '../shared/StatTile';
 import { BoardMotif, CheckoutRoute } from '../shared/DartsAccents';
 import { cn } from '@/lib/utils';
@@ -34,7 +31,7 @@ export function PracticeScreenHeader({ title, description, children }) {
         <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={() => navigate('/practice')}>
           <ArrowLeft /> {t('practice.backToPractice')}
         </Button>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        {title && <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
       {children}
@@ -45,54 +42,51 @@ export function PracticeScreenHeader({ title, description, children }) {
 // Setup screen shell: the settings card every game shows before the first
 // dart. `children` are PracticeField sections; `recap` is the one-line
 // read-back of the current settings shown above the start button.
-export function PracticeSetup({ title, subtitle, recap, children, note, onStart }) {
+export function PracticeSetup({ title, subtitle, preview, recap, children, note, onStart }) {
   const { t } = useLanguage();
-  const sections = React.Children.toArray(children);
+  const sections = React.Children.toArray(children).filter(Boolean);
   return (
-    <Card className="mx-auto w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {subtitle && <CardDescription>{subtitle}</CardDescription>}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
-        {sections.map((section, i) => (
-          <React.Fragment key={section.key ?? i}>
-            {i > 0 && <Separator />}
-            {section}
-          </React.Fragment>
-        ))}
-        {note && <p className="text-xs text-muted-foreground">{note}</p>}
-      </CardContent>
-      <CardFooter className="flex-col items-stretch gap-3">
-        {recap && <p className="text-center text-sm text-muted-foreground">{recap}</p>}
-        <Button size="lg" className="h-14 w-full font-display text-2xl font-bold tracking-wide" onClick={onStart}>
-          <Play /> {t('practice.start')}
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
+      {preview}
+      {/* One card, one row per setting, divided like a settings list. */}
+      <Card className="gap-0 py-0">
+        {title && (
+          <CardHeader className="border-b px-4 py-4 [.border-b]:pb-4">
+            <CardTitle>{title}</CardTitle>
+            {subtitle && <CardDescription>{subtitle}</CardDescription>}
+          </CardHeader>
+        )}
+        <CardContent className="flex flex-col px-0">
+          {sections.map((section, i) => (
+            <div key={section.key ?? i} className={cn('px-4 py-3', i > 0 && 'border-t')}>{section}</div>
+          ))}
+          {note && <p className="border-t px-4 py-3 text-xs text-muted-foreground">{note}</p>}
+        </CardContent>
+      </Card>
+      {/* Start stays in reach on a phone while the settings scroll. */}
+      <div className="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t bg-background/95 px-4 pt-3 pb-4 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        {recap && <p className="text-center text-xs text-muted-foreground">{recap}</p>}
+        <Button size="lg" className="h-13 w-full font-display text-2xl font-bold tracking-wide shadow-[0_8px_24px_-10px] shadow-primary/60" onClick={onStart}>
+          <Play className="fill-current" /> {t('practice.start')}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 // One settings section inside PracticeSetup: icon box, label, hint and the
 // current value as a badge, then the controls.
-export function PracticeField({ icon: Icon, label, hint, value, children }) {
+export function PracticeField({ label, hint, aside, children }) {
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-start gap-3">
-        {Icon && (
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Icon className="size-4" />
-          </span>
-        )}
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="text-sm font-medium">{label}</span>
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col">
+          <span className="text-sm font-semibold">{label}</span>
           {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
         </div>
-        {value !== null && value !== undefined && value !== '' && (
-          <Badge variant="secondary" className="max-w-[45%] truncate tabular-nums">{value}</Badge>
-        )}
+        {aside}
       </div>
-      <div className="flex flex-col gap-3">{children}</div>
+      {children && <div className="flex flex-col gap-2">{children}</div>}
     </section>
   );
 }
@@ -101,49 +95,67 @@ export function PracticeField({ icon: Icon, label, hint, value, children }) {
 // explanation each. Option values are compared as strings (Radix radios
 // only carry strings) and mapped back to the original value.
 export function PracticeOptionCards({ options, value, onChange }) {
-  const id = useId();
+  // Same segmented control as every other setting; the chosen option explains itself below.
+  const selected = options.find(o => o.value === value);
   return (
-    <RadioGroup
-      value={String(value)}
-      onValueChange={(next) => onChange(options.find(o => String(o.value) === next)?.value)}
-      className="grid gap-2 sm:grid-cols-2"
-    >
-      {options.map((option) => {
-        const itemId = `${id}-${String(option.value)}`;
-        return (
-          <Label
-            key={String(option.value)}
-            htmlFor={itemId}
-            className="flex cursor-pointer items-start gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-accent has-data-[state=checked]:border-primary has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary"
-          >
-            <RadioGroupItem value={String(option.value)} id={itemId} className="mt-0.5" />
-            <span className="flex flex-col gap-1">
-              <span className="text-sm font-medium leading-none">{option.label}</span>
-              {option.hint && <span className="text-xs font-normal text-muted-foreground">{option.hint}</span>}
-            </span>
-          </Label>
-        );
-      })}
-    </RadioGroup>
+    <div className="flex flex-col gap-2">
+      <PracticeChips
+        options={options.map(o => o.value)}
+        value={value}
+        numeric={false}
+        onChange={onChange}
+        render={(v) => options.find(o => o.value === v)?.label}
+      />
+      {selected?.hint && <p className="text-xs text-muted-foreground">{selected.hint}</p>}
+    </div>
   );
 }
 
 // Chip row for a setting with a small fixed set of values.
-export function PracticeChips({ options, value, onChange, render }) {
+export function PracticeChips({ options, value, onChange, render, numeric, columns }) {
+  // Numbers read as scoreboard figures; `numeric` overrides (bool or per option).
+  const isNumeric = (option) => (typeof numeric === 'function'
+    ? numeric(option)
+    : numeric ?? (!render && typeof option === 'number'));
   return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((option) => (
-        <Button
-          key={String(option)}
-          type="button"
-          variant={value === option ? 'default' : 'outline'}
-          aria-pressed={value === option}
-          className="min-h-11 rounded-full px-4 tabular-nums"
-          onClick={() => onChange(option)}
-        >
-          {render ? render(option) : option}
-        </Button>
-      ))}
+    <div
+      role="group"
+      className="grid gap-0.5 rounded-lg bg-muted p-[3px]"
+      style={{ gridTemplateColumns: `repeat(${columns ?? Math.min(options.length, 5)}, minmax(0, 1fr))` }}
+    >
+      {options.map((option) => {
+        const isOn = value === option;
+        return (
+          <button
+            key={String(option)}
+            type="button"
+            aria-pressed={isOn}
+            onClick={() => onChange(option)}
+            className={cn(
+              'flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-md px-1 text-[13px] font-semibold text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-4 [&_svg]:shrink-0',
+              isOn && 'bg-background text-foreground shadow-sm ring-1 ring-black/5 dark:bg-input/60 dark:ring-white/5',
+              isNumeric(option) && 'font-display text-xl tabular-nums'
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-1.5 truncate">{render ? render(option) : option}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// − value + in the same track as the segmented control.
+export function PracticeStepper({ value, label, decrementLabel, incrementLabel, onDecrement, onIncrement, canDecrement = true, canIncrement = true }) {
+  return (
+    <div role="group" aria-label={label} className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-[3px]">
+      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label={decrementLabel} disabled={!canDecrement} onClick={onDecrement}>
+        <Minus />
+      </Button>
+      <span aria-live="polite" className="min-w-10 text-center font-display text-2xl font-semibold tabular-nums">{value}</span>
+      <Button type="button" variant="ghost" size="icon" className="size-11" aria-label={incrementLabel} disabled={!canIncrement} onClick={onIncrement}>
+        <Plus />
+      </Button>
     </div>
   );
 }

@@ -218,6 +218,32 @@ export const abandonLeg = (state) => {
   };
 };
 
+// Leg decided by a bull-up (closest to bull) after it ran too long: the darts
+// thrown still count for averages, but there is no checkout, so the leg stays
+// out of checkout %, best leg and highest checkout (see computeStats).
+export const awardLegByBullup = (state) => {
+  const { current } = state;
+  const visits = current.visit.darts.length > 0
+    ? [...current.visits, {
+        score: 0, darts: current.visit.darts.length, startRemaining: current.remaining,
+        isBust: false, isCheckout: false, isPartial: true, dartsList: current.visit.darts
+      }]
+    : current.visits;
+  const wonLeg = {
+    startRemaining: current.startRemaining,
+    visits,
+    darts: visits.reduce((sum, v) => sum + v.darts, 0),
+    checkout: 0,
+    byBullup: true
+  };
+  return {
+    ...state,
+    legs: [...state.legs, wonLeg],
+    current: newLeg(state.settings.startingScore),
+    undoStack: pushUndo(state)
+  };
+};
+
 export const canUndo = (state) => state.undoStack.length > 0;
 
 export const undo = (state) => {
@@ -246,6 +272,8 @@ export const computeStats = (state) => {
   // Legs lost to an opponent (abandonLeg) count for darts and averages but
   // are not checkouts, best legs or won legs.
   const completedLegs = state.legs.filter(leg => !leg.lost);
+  // Won by a checkout (a bull-up leg is won but has no finish).
+  const checkoutLegs = completedLegs.filter(leg => !leg.byBullup);
   const legsForVisits = [...state.legs, state.current];
   const allVisits = legsForVisits.flatMap(l => l.visits);
 
@@ -271,11 +299,11 @@ export const computeStats = (state) => {
 
   // A checkout attempt is a visit started on a finishable score.
   const checkoutAttempts = allVisits.filter(v => isFinishable(v.startRemaining)).length;
-  const checkoutsHit = completedLegs.length;
+  const checkoutsHit = checkoutLegs.length;
   const checkoutPercent = checkoutAttempts > 0 ? (checkoutsHit / checkoutAttempts) * 100 : null;
 
-  const bestLegDarts = completedLegs.reduce((best, leg) => (best === null || leg.darts < best ? leg.darts : best), null);
-  const highestCheckout = completedLegs.reduce((max, leg) => Math.max(max, leg.checkout), 0);
+  const bestLegDarts = checkoutLegs.reduce((best, leg) => (best === null || leg.darts < best ? leg.darts : best), null);
+  const highestCheckout = checkoutLegs.reduce((max, leg) => Math.max(max, leg.checkout), 0);
   const busts = allVisits.filter(v => v.isBust).length;
 
   return {

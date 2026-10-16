@@ -580,7 +580,6 @@
     "resetLinkInvalid": "Tento odkaz na obnovenie hesla je neplatný alebo vypršal. Vyžiadajte si nový na prihlasovacej stránke.",
     "backToLogin": "Späť na prihlásenie",
     "appTitle": "Správca Šípkových Turnajov",
-    "signInAsAdmin": "Prihlásenie ako administrátor/zapisovateľ turnaja",
     "continueInterruptedMatches": "Pokračovať v prerušených zápasoch",
     "adminControlsForCorrections": "Admin ovládanie pre opravy",
     "tournamentManagement": "Správa turnajov",
@@ -612,7 +611,9 @@
     "onlyManagersCreateLeagues": "Ligy môžu vytvárať iba manažéri a administrátori.",
     "contactAdminForManager": "Ak chcete získať oprávnenia manažéra, kontaktujte administrátora.",
     "adminOnlyPage": "Na prístup k tejto stránke musíte byť administrátor.",
-    "managerOnlyPage": "Na prístup k tejto stránke musíte byť manažér alebo administrátor."
+    "managerOnlyPage": "Na prístup k tejto stránke musíte byť manažér alebo administrátor.",
+    "orWithEmail": "alebo prihlásenie e-mailom",
+    "signInSubtitle": "Prihlás sa a ukladaj si tréningový progres a sleduj svoje turnaje a ligy."
   },
   "common": {
     "save": "Uložiť",
@@ -1147,7 +1148,21 @@
       "starter": "Kto začína",
       "you": "Vy",
       "subtitle": "Legy proti terču, proti druhému hráčovi alebo proti botovi.",
-      "opponentHint": "Sám, druhý hráč na tomto zariadení, alebo bot."
+      "opponentHint": "Sám, druhý hráč na tomto zariadení, alebo bot.",
+      "starterBullup": "Bull-up",
+      "newGame": "Nová hra",
+      "vsBoard": "Ty proti terču",
+      "doubleOut": "Double out",
+      "soloPractice": "Sólo tréning",
+      "bullupDecides": "Rozhodne bull-up",
+      "youThrowFirst": "Začínaš ty",
+      "throwsFirst": "Začína {{name}}",
+      "firstToHint": "Počet legov potrebných na výhru",
+      "legsHint": "Tréning skončí po týchto legoch",
+      "legsUnlimitedHint": "Hráš, kým neskončíš",
+      "fewerLegs": "Menej legov",
+      "moreLegs": "Viac legov",
+      "preview": "Náhľad hry"
     },
     "bot": {
       "name": "Bot úroveň {{level}}",
@@ -1167,7 +1182,8 @@
       "youWon": "Vyhrali ste {{for}}:{{against}}",
       "opponentWon": "{{name}} vyhráva {{for}}:{{against}}",
       "abandoned": "Zápas nedohraný ({{for}}:{{against}})",
-      "opponentAverage": "{{name}}: priemer {{average}}"
+      "opponentAverage": "{{name}}: priemer {{average}}",
+      "legWonByBullup": "{{name}} vyhráva leg hodom na bull"
     },
     "legOf": "Leg {{current}} / {{total}}",
     "leg": "Leg {{current}}",
@@ -1362,7 +1378,8 @@
       "legWon": "Vyhraný",
       "legLost": "Prehraný",
       "out": "zakončenie {{score}}",
-      "left": "zostalo {{score}}"
+      "left": "zostalo {{score}}",
+      "byBullup": "rozhodnuté na bull"
     }
   }
 }
