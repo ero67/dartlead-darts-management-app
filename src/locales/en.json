@@ -1145,10 +1145,11 @@
       "opponentBot": "Bot",
       "opponentName": "Second player's name",
       "firstTo": "First to",
-      "starter": "Who starts (bull-up)",
+      "starter": "Who starts",
       "you": "You",
       "subtitle": "Legs against the board, or against a second player or a bot.",
-      "opponentHint": "Solo, someone else on this device, or a bot."
+      "opponentHint": "Solo, someone else on this device, or a bot.",
+      "starterBullup": "Bull-up"
     },
     "bot": {
       "name": "Bot level {{level}}",

@@ -1145,10 +1145,11 @@
       "opponentBot": "Bot",
       "opponentName": "Meno druhého hráča",
       "firstTo": "Hrá sa na",
-      "starter": "Kto začína (bull-up)",
+      "starter": "Kto začína",
       "you": "Vy",
       "subtitle": "Legy proti terču, proti druhému hráčovi alebo proti botovi.",
-      "opponentHint": "Sám, druhý hráč na tomto zariadení, alebo bot."
+      "opponentHint": "Sám, druhý hráč na tomto zariadení, alebo bot.",
+      "starterBullup": "Bull-up"
     },
     "bot": {
       "name": "Bot úroveň {{level}}",

@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { DartKeypad } from '../scoring/DartKeypad';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
-import { BullupDialog } from '../match/MatchDialogs';
+import { BullupDialog, StarterDialog } from '../match/MatchDialogs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,7 @@ import {
 } from '../../lib/x01Engine';
 import {
   createX01Match, matchApplyDart, matchApplyVisitTotal, matchUndoHuman, matchCanUndo,
-  matchApplySequence, matchAwardLegByBullup, isBotTurn, currentPlayerState, computeMatchStats, isMatch, MATCH_LEG_OPTIONS
+  matchApplySequence, matchAwardLegByBullup, matchSetStarter, matchSetScoringMode, isBotTurn, currentPlayerState, computeMatchStats, isMatch, MATCH_LEG_OPTIONS
 } from '../../lib/x01Match';
 import { BOT_LEVELS, getBotLevel, botThrow, newSeed } from '../../lib/botPlayer';
 import {
@@ -40,7 +40,7 @@ import checkoutData from '../../data/checkouts.json';
 
 const GAME = 'x01';
 const LEG_OPTIONS = [1, 2, 3, 4, 5, 10, null];
-const DEFAULT_SETTINGS = { startingScore: 501, legsTarget: 3, scoringMode: 'dart', opponent: null, starter: 0 };
+const DEFAULT_SETTINGS = { startingScore: 501, legsTarget: 3, scoringMode: 'dart', opponent: null, starter: 'bullup' };
 const FLASH_MS = 900;
 const BOT_DART_MS = 700;
 const OPPONENT_NAME_MAX = 30;
@@ -60,7 +60,8 @@ const sanitizeSettings = (saved) => {
     ? saved.legsTarget : DEFAULT_SETTINGS.legsTarget;
   // A match is always "first to N": no unlimited legs against an opponent.
   if (opponent && !MATCH_LEG_OPTIONS.includes(legsTarget)) legsTarget = DEFAULT_SETTINGS.legsTarget;
-  const starter = saved.starter === 1 ? 1 : 0;
+  // 0 / 1 = a fixed starter, 'bullup' = decide at the bull when the match opens.
+  const starter = saved.starter === 1 ? 1 : saved.starter === 0 ? 0 : 'bullup';
   return { startingScore, legsTarget, scoringMode, opponent, starter };
 };
 
@@ -193,6 +194,21 @@ export function PracticeX01() {
   const legVisits = (p) => p.current.visits.length;
   const bothReachedBullupThreshold = !!(session && isMatch(session) && !session.finishedAt
     && session.players.every((p) => legVisits(p) >= BULLUP_VISIT_THRESHOLD));
+
+  // Bull-up before the first dart: whoever won it starts (StarterDialog).
+  const handleStarterPick = (starter) => {
+    if (!session || !isMatch(session)) return;
+    setSession(matchSetStarter(session, starter));
+  };
+  const handleStarterScoringMode = (scoringMode) => {
+    if (!session || !isMatch(session)) return;
+    setSession(matchSetScoringMode(session, scoringMode));
+    setSettings((prev) => {
+      const next = { ...prev, scoringMode };
+      saveGameSettings(GAME, next);
+      return next;
+    });
+  };
 
   const handleBullupPick = (winner) => {
     if (!session || !isMatch(session)) return;
@@ -599,13 +615,13 @@ export function PracticeX01() {
             <PracticeField
               icon={Flag}
               label={t('practice.setup.starter')}
-              value={settings.starter === 0 ? myName : opponentName}
+              value={settings.starter === 'bullup' ? t('practice.setup.starterBullup') : settings.starter === 0 ? myName : opponentName}
             >
               <PracticeChips
-                options={[0, 1]}
+                options={['bullup', 0, 1]}
                 value={settings.starter}
                 onChange={(starter) => setSettings(s => ({ ...s, starter }))}
-                render={(i) => (i === 0 ? myName : opponentName)}
+                render={(i) => (i === 'bullup' ? t('practice.setup.starterBullup') : i === 0 ? myName : opponentName)}
               />
             </PracticeField>
           )}
@@ -734,6 +750,14 @@ export function PracticeX01() {
         onConfirm={handleConfirmCheckout}
       />
 
+      {isMatch(session) && session.starterPending && (
+        <StarterDialog
+          players={session.players.map((_, i) => ({ name: playerName(i), legs: session.legsWon[i] }))}
+          scoringMode={session.settings.scoringMode}
+          onScoringModeChange={handleStarterScoringMode}
+          onSelect={handleStarterPick}
+        />
+      )}
       {isMatch(session) && (
         <BullupDialog
           open={showBullup}

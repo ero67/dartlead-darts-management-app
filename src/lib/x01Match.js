@@ -20,13 +20,17 @@ const stripStack = (playerState) => ({ ...playerState, undoStack: [] });
 // players: [{ id, name, kind: 'human' | 'bot', level? }, { ... }]
 // `seed` drives a bot opponent's throws (see botPlayer.js). It is part of the
 // state, so undo snapshots restore it and a replayed bot visit is identical.
+// `starter` is a player index, or 'bullup' when the players decide at the
+// bull once the match is open: the state then waits (starterPending) for
+// matchSetStarter before anyone throws.
 export const createX01Match = ({ startingScore = 501, legsTarget = 3, scoringMode = 'dart', players, starter = 0, seed = 0 }) => ({
   kind: 'match',
   settings: { startingScore, legsTarget, scoringMode, players, starter },
   seed,
   players: players.map(() => stripStack(createSoloX01({ startingScore, legsTarget: null, scoringMode }))),
-  turn: starter,
-  legStarter: starter,
+  starterPending: starter === 'bullup',
+  turn: starter === 'bullup' ? 0 : starter,
+  legStarter: starter === 'bullup' ? 0 : starter,
   legNumber: 1,
   legsWon: players.map(() => 0),
   legLog: [],
@@ -134,7 +138,24 @@ export const matchApplySequence = (state, darts, seed) => {
   return { states, final };
 };
 
-export const isBotTurn = (state) => isMatch(state) && !state.finishedAt && state.settings.players[state.turn]?.kind === 'bot';
+export const isBotTurn = (state) => isMatch(state) && !state.finishedAt && !state.starterPending && state.settings.players[state.turn]?.kind === 'bot';
+
+// Who won the bull-up throws first. Only meaningful before the first dart.
+export const matchSetStarter = (state, starter) => ({
+  ...state,
+  settings: { ...state.settings, starter },
+  starterPending: false,
+  turn: starter,
+  legStarter: starter
+});
+
+// The starter dialog also lets players switch dart-by-dart / turn total; the
+// engine only stores the mode, the keypad reads it.
+export const matchSetScoringMode = (state, scoringMode) => ({
+  ...state,
+  settings: { ...state.settings, scoringMode },
+  players: state.players.map((p) => ({ ...p, settings: { ...p.settings, scoringMode } }))
+});
 
 export const matchCanUndo = (state) => state.undoStack.length > 0;
 
