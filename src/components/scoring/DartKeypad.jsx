@@ -22,8 +22,10 @@ export function DartKeypad({
   const { t } = useLanguage();
 
   const toggleMode = (mode) => onInputModeChange(inputMode === mode ? 'single' : mode);
-  // Numbers take the tint of the live modifier so a pending Double/Triple is visible on every key.
-  const modeClass = inputMode === 'single' ? '' : 'border-primary/40 bg-primary/10';
+  // Numbers take the tint of the live modifier so a pending Double/Triple is
+  // visible on every key: green for doubles, red for trebles, the same code
+  // as the checkout route chips. Singles stay plain.
+  const modeClass = { double: 'border-primary/40 bg-primary/10', triple: 'border-live/40 bg-live/10' }[inputMode] || '';
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1 p-1 text-foreground">
@@ -51,7 +53,7 @@ export function DartKeypad({
         </button>
         <button
           type="button"
-          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'triple' && 'border-primary bg-primary text-primary-foreground')}
+          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'triple' && 'border-live bg-live text-white')}
           aria-pressed={inputMode === 'triple'}
           onClick={() => toggleMode('triple')}
         >
