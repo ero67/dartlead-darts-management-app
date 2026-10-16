@@ -1719,7 +1719,9 @@ export const tournamentService = {
       return (data || []).map(row => ({
         userId: row.user_id,
         email: row.email,
-        fullName: row.full_name
+        fullName: row.full_name,
+        // 'league' = inherited from the league's scorer list (read-only here)
+        source: row.source || 'tournament'
       }));
     } catch (error) {
       console.error('Error listing tournament scorers:', error);

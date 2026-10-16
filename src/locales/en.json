@@ -60,7 +60,16 @@
     "practiceTitle": "Free practice",
     "practiceDesc": "Solo X01 with averages, checkout rate and history on this device.",
     "practiceCta": "Start practicing",
-    "continueSession": "Continue session"
+    "continueSession": "Continue session",
+    "liveNow": "Live now",
+    "liveMatchesShort": "live",
+    "phaseRegistration": "Registration",
+    "following": "Following",
+    "yourMatch": "Your match",
+    "yourLeaguePosition": "Your league position",
+    "behindLeader": "{{count}} behind {{name}}",
+    "thisWeek": "{{count}} this week",
+    "lastOne": "Last one {{date}}"
   },
   "tournaments": {
     "title": "Tournaments",
@@ -123,7 +132,9 @@
     "live": "Live",
     "leg": "Leg",
     "firstTo": "First to",
-    "vs": "vs"
+    "vs": "vs",
+    "legWon": "Leg won",
+    "bust": "Bust"
   },
   "match": {
     "backToTournament": "Back to Tournament",
@@ -552,7 +563,10 @@
       "messagePlaceholder": "Tell us about your needs",
       "submit": "Contact us at"
     },
-    "ctaPractice": "Try practice mode"
+    "ctaPractice": "Try practice mode",
+    "preview": {
+      "tournamentName": "Friday Night Open"
+    }
   },
   "auth": {
     "setNewPasswordTitle": "Set a new password",
@@ -886,7 +900,15 @@
     "5thPlace": "5th Place",
     "defaultSixthPlus": "Default (6th+)",
     "pleaseEnterLeagueName": "Please enter a league name",
-    "failedToCreateLeague": "Failed to create league"
+    "failedToCreateLeague": "Failed to create league",
+    "seasonRounds": "Season rounds",
+    "roundNumber": "Round {{number}}",
+    "averageByRound": "Tournament average by round",
+    "topThree": "top three",
+    "swapPlayers": "Swap players",
+    "leagueRank": "League #{{rank}}",
+    "matchesWon": "Matches won",
+    "everyMeeting": "Every meeting this season"
   },
   "playerProfile": {
     "title": "Player Profile",
@@ -988,7 +1010,9 @@
     "loadError": "Failed to load scorers",
     "addError": "Failed to add scorer",
     "removeError": "Failed to remove scorer",
-    "managerNote": "As the manager you can always count matches yourself."
+    "managerNote": "As the manager you can always count matches yourself.",
+    "fromLeague": "From league",
+    "fromLeagueHint": "Added in the league settings; remove it there."
   },
   "account": {
     "title": "Account",
@@ -1084,19 +1108,23 @@
     "games": {
       "x01": {
         "title": "X01",
-        "desc": "501, 301 or a custom start. Play legs against the board and track your average."
+        "desc": "501, 301 or a custom start. Play legs against the board and track your average.",
+        "short": "X01"
       },
       "checkout": {
         "title": "Checkout trainer",
-        "desc": "Random finishes from 2 to 170. Hit rate per number."
+        "desc": "Random finishes from 2 to 170. Hit rate per number.",
+        "short": "CO"
       },
       "oneTwentyOne": {
         "title": "121",
-        "desc": "Finish 121 in nine darts and move up when you do."
+        "desc": "Finish 121 in nine darts and move up when you do.",
+        "short": "121"
       },
       "aroundTheClock": {
         "title": "Around the Clock",
-        "desc": "1 to 20, then bull. Darts and time to finish."
+        "desc": "1 to 20, then bull. Darts and time to finish.",
+        "short": "ATC"
       }
     },
     "setup": {
@@ -1124,7 +1152,10 @@
     "bot": {
       "name": "Bot level {{level}}",
       "levelHint": "Level {{level}} throws around a {{average}} three-dart average.",
-      "skip": "Tap to skip"
+      "skip": "Tap to skip",
+      "aboutAverage": "about {{average}} average",
+      "easier": "Easier bot",
+      "harder": "Harder bot"
     },
     "match": {
       "vs": "vs",
@@ -1178,7 +1209,16 @@
       "clearAll": "Clear history",
       "confirmClear": "Delete all practice sessions from this device?",
       "delete": "Delete",
-      "confirmClearCloud": "Delete all practice sessions from this device and your account?"
+      "confirmClearCloud": "Delete all practice sessions from this device and your account?",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last30": "Last 30 days",
+      "duration": "Duration",
+      "sessionCountOne": "{{count}} session",
+      "sessionCountFew": "{{count}} sessions",
+      "sessionCountMany": "{{count}} sessions",
+      "showMore": "Show {{count}} older sessions",
+      "showFewer": "Show fewer"
     },
     "noStats": "—",
     "legWonOne": "Leg won in {{count}} dart",
@@ -1223,7 +1263,8 @@
       },
       "lastAttempt": "Last: {{target}}",
       "dialogHit": "Counts as a finish",
-      "dialogBust": "No double — attempt missed"
+      "dialogBust": "No double — attempt missed",
+      "lastAttemptLabel": "Last attempt"
     },
     "oneTwentyOne": {
       "rules": "Check out the target within three visits (nine darts). Make it and the target goes up by one; miss and it drops by one — never below the target you started on.",
@@ -1284,7 +1325,8 @@
         "avgDartsPerTarget": "Darts per number",
         "firstDartHits": "First-dart hits",
         "hardest": "Hardest numbers"
-      }
+      },
+      "hitCount": "{{hit}} / {{total}} hit"
     },
     "bests": {
       "title": "Personal bests",
@@ -1309,6 +1351,18 @@
       "retry": "Sync now",
       "note": "Sessions are saved to your account and this device.",
       "deleteFailed": "Could not delete from your account. Try again when online."
+    },
+    "startGame": "Start a game",
+    "discarded": "Session discarded. It was not saved to your history.",
+    "startedAt": "Started {{time}}",
+    "summary": {
+      "matchWon": "Match won",
+      "matchLost": "Match lost",
+      "highScores": "High scores",
+      "legWon": "Won",
+      "legLost": "Lost",
+      "out": "out {{score}}",
+      "left": "left {{score}}"
     }
   }
 }

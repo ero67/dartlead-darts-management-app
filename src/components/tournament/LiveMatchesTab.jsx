@@ -1,12 +1,31 @@
 import React from 'react';
-import { Activity, Play, Star, Target } from 'lucide-react';
+import { Activity, Check, Play, Star, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '../shared/EmptyState';
+import { useLastVisits } from '@/hooks/useLastVisits';
 import { cn } from '@/lib/utils';
 
-function LivePlayerRow({ name, legs, score, isActive, t }) {
+// What the player just threw, shown for a few seconds (see useLastVisits).
+export function LastVisitChip({ visit, t, className }) {
+  if (!visit) return null;
+  return (
+    <span
+      key={visit.at}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-display font-semibold tabular-nums animate-in fade-in zoom-in-95 duration-300',
+        visit.kind === 'bust' ? 'bg-live/15 text-live' : 'bg-primary/15 text-primary',
+        className
+      )}
+    >
+      {visit.kind === 'leg' && <Check className="size-[0.8em]" aria-label={t('liveMatches.legWon')} />}
+      {visit.kind === 'bust' ? t('liveMatches.bust') : visit.value}
+    </span>
+  );
+}
+
+function LivePlayerRow({ name, legs, score, isActive, visit, t }) {
   return (
     <div className={cn('flex items-center justify-between gap-3 rounded-lg px-3 py-2', isActive && 'bg-primary/10')}>
       <div className="flex min-w-0 items-center gap-2">
@@ -16,8 +35,9 @@ function LivePlayerRow({ name, legs, score, isActive, t }) {
         <span className="truncate text-lg font-medium">{name}</span>
       </div>
       <div className="flex shrink-0 items-center gap-3">
+        <LastVisitChip visit={visit} t={t} className="text-xl" />
         <Badge variant="secondary" className="tabular-nums">{legs}</Badge>
-        <span className="min-w-[3ch] text-right text-5xl font-semibold tracking-tight tabular-nums">{score}</span>
+        <span className="min-w-[3ch] text-right font-display text-5xl font-semibold tabular-nums">{score}</span>
       </div>
     </div>
   );
@@ -25,6 +45,7 @@ function LivePlayerRow({ name, legs, score, isActive, t }) {
 
 // `liveMatches` is already filtered to this tournament and sorted (favorites first).
 export function LiveMatchesTab({ liveMatches, favoriteMatchIds, toggleFavoriteMatch, t }) {
+  const lastVisits = useLastVisits(liveMatches);
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
@@ -80,6 +101,7 @@ export function LiveMatchesTab({ liveMatches, favoriteMatchIds, toggleFavoriteMa
                     legs={match.player1_legs || 0}
                     score={match.player1_current_score || 501}
                     isActive={match.current_player === 0}
+                    visit={lastVisits[match.id]?.player === 0 ? lastVisits[match.id] : null}
                     t={t}
                   />
                   <LivePlayerRow
@@ -87,6 +109,7 @@ export function LiveMatchesTab({ liveMatches, favoriteMatchIds, toggleFavoriteMa
                     legs={match.player2_legs || 0}
                     score={match.player2_current_score || 501}
                     isActive={match.current_player === 1}
+                    visit={lastVisits[match.id]?.player === 1 ? lastVisits[match.id] : null}
                     t={t}
                   />
                 </div>

@@ -24,7 +24,7 @@ export function CheckoutDialog({ pending, onChange, onConfirm, onCancel, doubleO
       <DialogContent className="text-foreground sm:max-w-md" showCloseButton={false}>
         <DialogHeader className="flex-row items-center justify-between text-left">
           <DialogTitle>{t('match.checkout.title')}</DialogTitle>
-          <span className="text-3xl font-semibold tracking-tight tabular-nums">{pending.total}</span>
+          <span className="font-display text-3xl font-semibold tabular-nums">{pending.total}</span>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
@@ -43,7 +43,7 @@ export function CheckoutDialog({ pending, onChange, onConfirm, onCancel, doubleO
                 value={String(n)}
                 className="h-14 w-full flex-col gap-0 rounded-lg data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
               >
-                <span className="text-xl font-semibold tabular-nums">{n}</span>
+                <span className="font-display text-2xl font-semibold">{n}</span>
                 <span className="text-xs opacity-80">{t(n === 1 ? 'match.checkout.dartUnitOne' : 'match.checkout.dartUnitMany')}</span>
               </ToggleGroupItem>
             ))}

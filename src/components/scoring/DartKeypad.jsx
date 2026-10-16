@@ -4,7 +4,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { DART_NUMBERS } from '../../lib/x01Engine';
 import { cn } from '@/lib/utils';
 
-const KEY = 'flex min-h-12 items-center justify-center rounded-lg border bg-card text-xl font-semibold tabular-nums transition-colors disabled:pointer-events-none disabled:opacity-40';
+const KEY = 'flex min-h-12 items-center justify-center rounded-lg border bg-card font-display text-2xl font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40';
 
 // Dart-by-dart keypad: 1–20, bull, miss, with double/triple toggles and undo.
 // Presentational only; the caller owns the scoring rules. Shared by the
@@ -22,8 +22,10 @@ export function DartKeypad({
   const { t } = useLanguage();
 
   const toggleMode = (mode) => onInputModeChange(inputMode === mode ? 'single' : mode);
-  // Numbers take the tint of the live modifier so a pending Double/Triple is visible on every key.
-  const modeClass = inputMode === 'single' ? '' : 'border-primary/40 bg-primary/10';
+  // Numbers take the tint of the live modifier so a pending Double/Triple is
+  // visible on every key: green for doubles, red for trebles, the same code
+  // as the checkout route chips. Singles stay plain.
+  const modeClass = { double: 'border-primary/40 bg-primary/10', triple: 'border-live/40 bg-live/10' }[inputMode] || '';
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1 p-1 text-foreground">
@@ -43,7 +45,7 @@ export function DartKeypad({
       <div className="grid grid-cols-2 gap-1">
         <button
           type="button"
-          className={cn(KEY, 'text-lg', inputMode === 'double' && 'border-primary bg-primary text-primary-foreground')}
+          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'double' && 'border-primary bg-primary text-primary-foreground')}
           aria-pressed={inputMode === 'double'}
           onClick={() => toggleMode('double')}
         >
@@ -51,7 +53,7 @@ export function DartKeypad({
         </button>
         <button
           type="button"
-          className={cn(KEY, 'text-lg', inputMode === 'triple' && 'border-primary bg-primary text-primary-foreground')}
+          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'triple' && 'border-live bg-live text-white')}
           aria-pressed={inputMode === 'triple'}
           onClick={() => toggleMode('triple')}
         >
@@ -60,7 +62,7 @@ export function DartKeypad({
       </div>
       <button
         type="button"
-        className={cn(KEY, 'min-h-11 gap-2 border-destructive/30 bg-destructive/10 text-base text-destructive')}
+        className={cn(KEY, 'min-h-11 gap-2 font-sans font-medium border-destructive/30 bg-destructive/10 text-base text-destructive')}
         onClick={onUndo}
         disabled={disabled || !canUndo}
       >

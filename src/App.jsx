@@ -513,8 +513,9 @@ function AppContent() {
       />
 
       <SidebarInset className="min-w-0">
-      {/* Mobile header: the sidebar is a drawer below 1024px */}
-      <MobileHeader />
+      {/* Mobile header: the sidebar is a drawer below 1024px. The scoring
+          screen has its own header with a Back button and needs the height. */}
+      {!location.pathname.startsWith('/match/') && <MobileHeader />}
 
       <main className="flex min-w-0 flex-1 flex-col">
         <Routes>

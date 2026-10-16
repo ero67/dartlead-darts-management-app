@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckCircle, Flag, Keyboard, Target, Trophy, Users } from 'lucide-react';
+import { CheckCircle, Flag, Keyboard, Minus, Plus, Target, Trophy, Users } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { DartKeypad } from '../scoring/DartKeypad';
@@ -8,16 +8,17 @@ import { CheckoutDialog } from '../scoring/CheckoutDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { StatTile } from '../shared/StatTile';
+import { FormDots, LegPips } from '../shared/DartsAccents';
 import {
   PracticeScreenHeader, PracticeSetup, PracticeField, PracticeOptionCards, PracticeChips,
-  PracticeSummaryHeader, PracticeSummaryActions, PracticePlay, PracticeBoard, PracticeBoardLabel,
-  PracticeBoardValue, PracticeCheckoutHint, PracticeLastThrows, PracticeBoardStats, PracticeKeypad
+  PracticeSummaryBar, PracticeSummaryHeader, PracticeSummaryActions, PracticeStatGrid, PracticeBandRow,
+  PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeCheckoutHint,
+  PracticeLastThrows, PracticeBoardStats, PracticeKeypad
 } from './PracticeShared';
 import { cn } from '@/lib/utils';
 import {
   createSoloX01, applyDart, applyVisitTotal, undo, canUndo, dartFromInput,
-  liveRemaining, lastVisitLabels, computeStats, STARTING_SCORES
+  liveRemaining, lastVisitLabels, displayLabel, computeStats, STARTING_SCORES
 } from '../../lib/x01Engine';
 import {
   createX01Match, matchApplyDart, matchApplyVisitTotal, matchUndoHuman, matchCanUndo,
@@ -28,7 +29,7 @@ import {
   loadActiveSession, saveActiveSession, clearActiveSession, appendHistory,
   newSessionId, loadGameSettings, saveGameSettings
 } from '../../lib/practiceStorage';
-import { describeSession, formatDuration, pluralSuffix } from '../../lib/practiceGames';
+import { describeSession, formatDuration, formatSessionDate, pluralSuffix } from '../../lib/practiceGames';
 import { getUserDisplayName } from '../../utils/userDisplayName';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
@@ -65,7 +66,7 @@ const sanitizeSettings = (saved) => {
 // device. setup → play → summary. The session in progress is persisted on
 // every change so leaving the screen (or a crash) never loses a leg.
 export function PracticeX01() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const isOnScreenKeypad = useOnScreenKeypad();
 
@@ -75,6 +76,9 @@ export function PracticeX01() {
   });
   const [settings, setSettings] = useState(() => sanitizeSettings(session?.settings || loadGameSettings(GAME)));
   const [summary, setSummary] = useState(null);
+  // The finished state behind `summary`: the leg-by-leg table reads it. Not
+  // persisted, so it is only there right after the session ends.
+  const [finalState, setFinalState] = useState(null);
   const [inputMode, setInputMode] = useState('single');
   const [turnTotalInput, setTurnTotalInput] = useState('');
   const [pendingCheckout, setPendingCheckout] = useState(null);
@@ -155,6 +159,7 @@ export function PracticeX01() {
     clearActiveSession();
     hapticMatchWon();
     setSummary(entry);
+    setFinalState(state);
     setSession(null);
   };
 
@@ -313,50 +318,105 @@ export function PracticeX01() {
 
   const canUndoNow = session ? (isMatch(session) ? matchCanUndo(session) : canUndo(session)) : false;
 
+  // Leg-by-leg rows for the summary, from the device owner's leg records
+  // (in a match every leg leaves one record per player, so they line up).
+  const legTable = (state) => {
+    if (!state) return [];
+    const scoreOf = (leg) => leg.visits.reduce((sum, v) => sum + v.score, 0);
+    const row = (leg, n, won) => {
+      const scored = scoreOf(leg);
+      const lastDart = leg.visits.at(-1)?.dartsList?.at(-1);
+      const out = `${t('practice.summary.out', { score: leg.checkout })}${lastDart && !lastDart.isTurnTotal ? ` · ${displayLabel(lastDart.label)}` : ''}`;
+      return {
+        n,
+        won,
+        darts: leg.darts || null,
+        average: leg.darts ? ((scored / leg.darts) * 3).toFixed(1) : null,
+        note: won ? out : t('practice.summary.left', { score: leg.startRemaining - scored })
+      };
+    };
+    if (isMatch(state)) {
+      return state.legLog.map((log, i) => {
+        const leg = state.players[0].legs[i];
+        return leg ? row(leg, log.leg, log.winner === 0) : { n: log.leg, won: log.winner === 0, darts: null, average: null, note: '' };
+      });
+    }
+    return state.legs.map((leg, i) => row(leg, i + 1, !leg.lost));
+  };
+
   // ---- Summary -------------------------------------------------------------
   if (summary) {
     const s = summary.stats;
-    const pct = (v) => (v === null || v === undefined ? t('practice.noStats') : `${v.toFixed(0)}%`);
-    const cards = [
-      [t('practice.stats.average'), s.average.toFixed(1)],
-      [t('practice.stats.firstNine'), s.firstNineAverage.toFixed(1)],
-      [t('practice.stats.checkout'), `${pct(s.checkoutPercent)} (${s.checkoutsHit}/${s.checkoutAttempts})`],
-      [t('practice.stats.legs'), s.legs],
-      [t('practice.stats.darts'), s.totalDarts],
-      [t('practice.stats.bestLeg'), s.bestLegDarts ?? t('practice.noStats')],
-      [t('practice.stats.highestCheckout'), s.highestCheckout || t('practice.noStats')],
-      [t('practice.stats.highestVisit'), s.highestVisit || t('practice.noStats')],
-      [t('practice.stats.oneEighties'), s.oneEighties],
-      [t('practice.stats.oneForties'), s.oneForties],
-      [t('practice.stats.tons'), s.tons],
-      [t('practice.stats.busts'), s.busts]
-    ];
+    const dash = t('practice.noStats');
+    const pct = (v) => (v === null || v === undefined ? dash : `${v.toFixed(0)}%`);
     const duration = formatDuration(summary.startedAt, summary.finishedAt);
     const opponent = summary.settings.opponent;
+    const legsTarget = summary.settings.legsTarget;
     const resultText = !opponent
-      ? t('practice.sessionComplete')
+      ? `${t(`practice.legCount${s.legs === 1 ? 'One' : 'Many'}`, { count: s.legs })} · ${s.average.toFixed(1)} ${t('practice.stats.average')}`
       : s.won === true
         ? t('practice.match.youWon', { for: s.legsFor, against: s.legsAgainst })
         : s.won === false
           ? t('practice.match.opponentWon', { name: opponent.name, for: s.legsFor, against: s.legsAgainst })
           : t('practice.match.abandoned', { for: s.legsFor, against: s.legsAgainst });
+    const eyebrow = opponent && s.won === true ? t('practice.summary.matchWon')
+      : opponent && s.won === false ? t('practice.summary.matchLost')
+        : t('practice.sessionComplete');
+    const legsText = legsTarget === null
+      ? t('practice.setup.unlimited')
+      : opponent ? `${t('practice.setup.firstTo')} ${legsTarget}` : t(`practice.legCount${legsTarget === 1 ? 'One' : 'Many'}`, { count: legsTarget });
+    const legRows = legTable(finalState);
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
-        <PracticeSummaryHeader icon={opponent ? Trophy : CheckCircle} title={resultText}>
-          <p className="text-sm text-muted-foreground">
-            {summary.settings.startingScore}
-            {opponent && ` · ${t('practice.match.vs')} ${opponent.name}`}
-            {duration && ` · ${duration}`}
-          </p>
-          {opponent && s.opponent?.stats && (
-            <p className="text-sm text-muted-foreground">
-              {t('practice.match.opponentAverage', { name: opponent.name, average: (s.opponent.stats.average ?? 0).toFixed(1) })}
-            </p>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-3 text-foreground md:p-8">
+        <PracticeSummaryBar subtitle={`${t('practice.games.x01.title')} · ${formatSessionDate(summary.finishedAt, language)}${duration ? ` · ${duration}` : ''}`} />
+        <PracticeSummaryHeader
+          icon={opponent ? Trophy : CheckCircle}
+          eyebrow={eyebrow}
+          title={resultText}
+          meta={`${opponent ? `${t('practice.match.vs')} ${opponent.name} · ` : ''}${summary.settings.startingScore} · ${legsText}`}
+          aside={opponent && legsTarget && (
+            <LegPips won={s.legsFor} total={legsTarget} label={`${s.legsFor} ${t('match.legs')}`} className="text-primary" />
           )}
+        >
+          {opponent && s.opponent?.stats && t('practice.match.opponentAverage', { name: opponent.name, average: (s.opponent.stats.average ?? 0).toFixed(1) })}
         </PracticeSummaryHeader>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map(([label, value]) => <StatTile key={label} label={label} value={value} />)}
-        </div>
+        <PracticeStatGrid
+          cards={[
+            [t('practice.stats.average'), s.average.toFixed(1), t(`practice.stats.darts${pluralSuffix(s.totalDarts)}`, { count: s.totalDarts })],
+            [t('practice.stats.firstNine'), s.firstNineAverage.toFixed(1), s.bestLegDarts ? `${t('practice.stats.bestLeg')} ${t(`practice.stats.darts${pluralSuffix(s.bestLegDarts)}`, { count: s.bestLegDarts })}` : undefined],
+            [t('practice.stats.checkout'), pct(s.checkoutPercent), `${s.checkoutsHit}/${s.checkoutAttempts}`]
+          ]}
+        />
+        <PracticeBandRow
+          label={t('practice.summary.highScores')}
+          bands={[[t('practice.stats.oneEighties'), s.oneEighties], [t('practice.stats.oneForties'), s.oneForties], [t('practice.stats.tons'), s.tons]]}
+        />
+        <PracticeStatGrid
+          cards={[
+            [t('practice.stats.highestCheckout'), s.highestCheckout || dash],
+            [t('practice.stats.highestVisit'), s.highestVisit || dash],
+            [t('practice.stats.busts'), s.busts]
+          ]}
+        />
+        {legRows.length > 0 && (
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <div className="grid grid-cols-[2.5rem_1fr_3.5rem_3.5rem] gap-2 border-b px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span>{t('match.leg')}</span><span>{t('practice.match.result')}</span><span className="text-right">{t('practice.stats.darts')}</span><span className="text-right">{t('match.average')}</span>
+            </div>
+            {legRows.map((leg) => (
+              <div key={leg.n} className="grid grid-cols-[2.5rem_1fr_3.5rem_3.5rem] items-center gap-2 border-b px-3 py-2 text-sm last:border-b-0">
+                <span className="font-display text-xl font-bold text-muted-foreground tabular-nums">{leg.n}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <FormDots results={[leg.won]} />
+                  <span className={cn('font-medium', leg.won && 'text-primary')}>{t(leg.won ? 'practice.summary.legWon' : 'practice.summary.legLost')}</span>
+                  <span className="truncate text-xs text-muted-foreground">{leg.note}</span>
+                </span>
+                <span className="text-right tabular-nums">{leg.darts ?? dash}</span>
+                <span className="text-right text-muted-foreground tabular-nums">{leg.average ?? dash}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <PracticeSummaryActions onPlayAgain={handleStart} onChangeSettings={() => setSummary(null)} />
       </div>
     );
@@ -372,6 +432,10 @@ export function PracticeX01() {
       opponent,
       legsTarget: opponent && !MATCH_LEG_OPTIONS.includes(s.legsTarget) ? DEFAULT_SETTINGS.legsTarget : s.legsTarget
     }));
+    const setBotLevel = (level) => {
+      if (!BOT_LEVELS.some(l => l.level === level)) return;
+      setSettings(s => ({ ...s, opponent: { kind: 'bot', level } }));
+    };
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
         <PracticeScreenHeader title={t('practice.games.x01.title')} description={t('practice.games.x01.desc')} />
@@ -450,19 +514,31 @@ export function PracticeX01() {
               </Button>
             </div>
             {settings.opponent?.kind === 'bot' && (
-              <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 rounded-xl border border-primary/40 bg-gradient-to-b from-primary/10 to-card p-3">
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.easier')} disabled={settings.opponent.level <= BOT_LEVELS[0].level} onClick={() => setBotLevel(settings.opponent.level - 1)}>
+                    <Minus />
+                  </Button>
+                  <div aria-live="polite" className="flex flex-1 flex-col items-center leading-tight">
+                    <span className="font-display text-3xl font-bold">{t('practice.bot.name', { level: settings.opponent.level })}</span>
+                    <span className="text-xs text-primary">{t('practice.bot.aboutAverage', { average: getBotLevel(settings.opponent.level).average })}</span>
+                  </div>
+                  <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.harder')} disabled={settings.opponent.level >= BOT_LEVELS.at(-1).level} onClick={() => setBotLevel(settings.opponent.level + 1)}>
+                    <Plus />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-8 gap-1">
                   {BOT_LEVELS.map(l => (
-                    <Button
+                    <button
                       key={l.level}
                       type="button"
-                      variant={settings.opponent.level === l.level ? 'default' : 'outline'}
+                      aria-label={`${t('practice.bot.name', { level: l.level })} · ~${l.average}`}
                       aria-pressed={settings.opponent.level === l.level}
-                      className="h-auto min-h-11 min-w-14 flex-col gap-0 rounded-full px-3 py-1.5 leading-tight tabular-nums"
-                      onClick={() => setSettings(s => ({ ...s, opponent: { kind: 'bot', level: l.level } }))}
+                      className="flex min-h-11 items-center"
+                      onClick={() => setBotLevel(l.level)}
                     >
-                      {l.level}<small className="text-[0.7rem] font-medium opacity-75">~{l.average}</small>
-                    </Button>
+                      <span className={cn('h-2 w-full rounded-full', l.level <= settings.opponent.level ? 'bg-primary' : 'bg-muted')} />
+                    </button>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -545,15 +621,19 @@ export function PracticeX01() {
     const labels = lastVisitLabels(session);
     return (
       <PracticeBoard flash={boardFlash}>
-        <PracticeBoardLabel>{t('practice.remaining')}</PracticeBoardLabel>
-        <PracticeBoardValue>{remaining}</PracticeBoardValue>
-        <PracticeCheckoutHint>{suggestion ? suggestion.join(' → ') : ''}</PracticeCheckoutHint>
-        <PracticeLastThrows labels={labels} />
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex flex-col">
+            <PracticeBoardLabel>{t('practice.remaining')}</PracticeBoardLabel>
+            <PracticeBoardValue>{remaining}</PracticeBoardValue>
+          </div>
+          <PracticeLastThrows labels={labels} className="max-w-[45%] justify-end" />
+        </div>
+        <PracticeCheckoutHint route={suggestion} />
         <PracticeBoardStats
           items={[
-            [t('practice.thisLeg'), t(`practice.stats.darts${pluralSuffix(legDarts)}`, { count: legDarts })],
+            [t('practice.thisLeg'), legDarts],
             [t('practice.stats.legs'), session.legs.length],
-            ...(stats.checkoutPercent !== null ? [[t('practice.stats.checkout'), `${stats.checkoutPercent.toFixed(0)}%`]] : [])
+            [t('practice.stats.checkout'), stats.checkoutPercent === null ? t('practice.noStats') : `${stats.checkoutPercent.toFixed(0)}%`]
           ]}
         />
       </PracticeBoard>
@@ -578,7 +658,7 @@ export function PracticeX01() {
                 <span className="truncate text-sm font-semibold">{playerName(i)}</span>
                 <Badge variant="secondary" className="tabular-nums">{session.legsWon[i]}</Badge>
               </div>
-              <div className="text-5xl font-semibold leading-none tracking-tight tabular-nums sm:text-6xl">{isTurn ? remaining : p.current.remaining}</div>
+              <div className="font-display text-5xl font-semibold leading-none tabular-nums sm:text-6xl">{isTurn ? remaining : p.current.remaining}</div>
               <PracticeLastThrows labels={labels} className="min-h-7" />
               <div className={cn('text-xs', isTurn ? 'opacity-85' : 'text-muted-foreground')}>{t('practice.stats.average')} <b className={cn('font-semibold tabular-nums', !isTurn && 'text-foreground')}>{stats.average.toFixed(1)}</b></div>
               {isTurn && <Badge variant="secondary" className="mt-1">{t('practice.match.toThrow', { name: playerName(i) })}</Badge>}
@@ -586,8 +666,8 @@ export function PracticeX01() {
           );
         })}
       </div>
-      <PracticeCheckoutHint>
-        {botBusy ? <span className="text-sm font-medium text-muted-foreground">{t('practice.bot.skip')}</span> : (suggestion ? suggestion.join(' → ') : '')}
+      <PracticeCheckoutHint route={botBusy ? null : suggestion} className="justify-center">
+        {botBusy && <span className="text-sm font-medium text-muted-foreground">{t('practice.bot.skip')}</span>}
       </PracticeCheckoutHint>
     </PracticeBoard>
   );
@@ -601,14 +681,10 @@ export function PracticeX01() {
   return (
     <PracticePlay
       onFinish={handleFinishEarly}
-      meta={
-        <>
-          <span>{metaLeg}</span>
-          {isMatch(session)
-            ? <span>{t('practice.match.toThrow', { name: playerName(session.turn) })}</span>
-            : <span>{t('practice.stats.average')} <b>{computeStats(session).average.toFixed(1)}</b></span>}
-        </>
-      }
+      title={`${t('practice.games.x01.title')} · ${metaLeg}`}
+      subtitle={isMatch(session)
+        ? t('practice.match.toThrow', { name: playerName(session.turn) })
+        : <>{t('practice.stats.average')} <b>{computeStats(session).average.toFixed(1)}</b></>}
     >
       <CheckoutDialog
         pending={pendingCheckout}
@@ -638,6 +714,7 @@ export function PracticeX01() {
             onUndo={handleUndo}
             canUndo={canUndoNow && !botBusy}
             useOnScreenKeypad={isOnScreenKeypad}
+            showQuickScores
             disabled={flash !== null || botBusy}
           />
         )}

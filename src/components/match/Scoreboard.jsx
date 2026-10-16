@@ -1,11 +1,12 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Badge } from '@/components/ui/badge';
+import { CheckoutRoute, LegPips } from '../shared/DartsAccents';
 import { cn } from '@/lib/utils';
 
 // One player's column on the live scoreboard: name, legs, the big remaining
 // score, checkout suggestion, the darts of the last visit and the stats line.
-function PlayerColumn({ player, isActive, isBusting }) {
+function PlayerColumn({ player, isActive, isBusting, legsToWin }) {
   const { t } = useLanguage();
   return (
     <div
@@ -18,11 +19,19 @@ function PlayerColumn({ player, isActive, isBusting }) {
     >
       <div className="flex items-center justify-between gap-2">
         <span className="truncate text-sm font-medium">{player.name}</span>
-        <Badge variant="secondary" className="tabular-nums">{player.legs}</Badge>
+        <LegPips
+          won={player.legs}
+          total={legsToWin}
+          label={`${player.legs} ${t('match.legs')}`}
+          className={isActive || isBusting ? undefined : 'text-primary'}
+        />
       </div>
-      <div className="text-6xl font-semibold leading-none tracking-tight tabular-nums short:text-5xl">{player.score}</div>
+      <div className="font-display text-7xl font-semibold leading-[0.85] short:text-6xl">{player.score}</div>
       {player.checkout && (
-        <Badge className="max-w-full truncate bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200 tabular-nums">{player.checkout.join(' → ')}</Badge>
+        <CheckoutRoute
+          route={player.checkout}
+          chipClassName={isActive || isBusting ? 'bg-black/15 text-inherit dark:bg-black/25 dark:text-inherit' : undefined}
+        />
       )}
       {player.throws.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -41,11 +50,11 @@ function PlayerColumn({ player, isActive, isBusting }) {
 // Two equal columns, phone-first. `players` is [{ name, legs, score, checkout,
 // throws, average, legDarts }, ...]; the active column is filled with the
 // primary colour, the busting one flashes red (timing owned by the caller).
-export function Scoreboard({ players, currentPlayer, bustingPlayer }) {
+export function Scoreboard({ players, currentPlayer, bustingPlayer, legsToWin }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {players.map((player, idx) => (
-        <PlayerColumn key={idx} player={player} isActive={currentPlayer === idx} isBusting={bustingPlayer === idx} />
+        <PlayerColumn key={idx} player={player} legsToWin={legsToWin} isActive={currentPlayer === idx} isBusting={bustingPlayer === idx} />
       ))}
     </div>
   );

@@ -4,9 +4,86 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { EmptyState } from '../shared/EmptyState';
+import { LiveDot } from '../shared/DartsAccents';
 import { cn } from '@/lib/utils';
 
-export function GroupsTab({ tournament, uniqueGroups, getFavoriteGroups, isGroupFavorite, toggleFavoriteGroup, renderPlayerLink, t }) {
+// One cell of the round-robin grid, read from the row player's side:
+// legs for/against, whether they won, or live/pending.
+function resultCell(match, rowPlayerId, liveInfoById) {
+  if (!match) return null;
+  const isRowP1 = match.player1?.id === rowPlayerId;
+  if (match.status === 'completed' && match.result) {
+    const own = isRowP1 ? match.result.player1Legs : match.result.player2Legs;
+    const other = isRowP1 ? match.result.player2Legs : match.result.player1Legs;
+    return { state: match.result.winner === rowPlayerId ? 'won' : 'lost', text: `${own ?? 0}–${other ?? 0}` };
+  }
+  if (match.status === 'in_progress') {
+    const live = liveInfoById?.get(match.id);
+    const own = isRowP1 ? live?.player1_legs : live?.player2_legs;
+    const other = isRowP1 ? live?.player2_legs : live?.player1_legs;
+    return { state: 'live', text: live ? `${own ?? 0}–${other ?? 0}` : '' };
+  }
+  return { state: 'pending', text: '–' };
+}
+
+const CELL_CLASS = {
+  won: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
+  lost: 'bg-muted text-muted-foreground',
+  live: 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-200',
+  pending: 'text-muted-foreground/60'
+};
+
+// Players x players grid of results. Rows and columns are numbered so two
+// players with the same initials never get confused.
+function RoundRobinGrid({ group, liveInfoById, renderPlayerLink, t }) {
+  const players = group.players || [];
+  const findMatch = (a, b) => (group.matches || []).find(m =>
+    (m.player1?.id === a && m.player2?.id === b) || (m.player1?.id === b && m.player2?.id === a));
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-separate border-spacing-1 text-sm">
+        <thead>
+          <tr>
+            <th scope="col" className="sr-only">{t('management.player')}</th>
+            {players.map((p, j) => (
+              <th key={p.id} scope="col" className="min-w-10 text-center text-xs font-medium text-muted-foreground" title={p.name}>{j + 1}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {players.map((rowPlayer, i) => (
+            <tr key={rowPlayer.id}>
+              <th scope="row" className="pr-2 text-left font-normal">
+                <div className="flex max-w-40 items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+                  {renderPlayerLink(rowPlayer, 'truncate')}
+                </div>
+              </th>
+              {players.map((colPlayer, j) => {
+                if (i === j) {
+                  return <td key={colPlayer.id} aria-hidden="true" className="h-8 rounded-md bg-[repeating-linear-gradient(135deg,var(--muted)_0_4px,transparent_4px_8px)]" />;
+                }
+                const cell = resultCell(findMatch(rowPlayer.id, colPlayer.id), rowPlayer.id, liveInfoById);
+                return (
+                  <td
+                    key={colPlayer.id}
+                    title={`${rowPlayer.name} – ${colPlayer.name}`}
+                    className={cn('relative h-8 rounded-md text-center font-display text-base font-semibold leading-none', CELL_CLASS[cell?.state || 'pending'])}
+                  >
+                    {cell?.text ?? '–'}
+                    {cell?.state === 'live' && <LiveDot className="absolute top-1 right-1" />}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function GroupsTab({ tournament, uniqueGroups, getFavoriteGroups, isGroupFavorite, toggleFavoriteGroup, renderPlayerLink, liveInfoById, t }) {
   const favoriteGroupIds = getFavoriteGroups(tournament.id);
   const hasFavorites = favoriteGroupIds.length > 0;
 
@@ -55,13 +132,7 @@ export function GroupsTab({ tournament, uniqueGroups, getFavoriteGroups, isGroup
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ul className="flex flex-col divide-y text-sm">
-                    {group.players.map(player => (
-                      <li key={player.id} className="py-1.5">
-                        {renderPlayerLink(player)}
-                      </li>
-                    ))}
-                  </ul>
+                  <RoundRobinGrid group={group} liveInfoById={liveInfoById} renderPlayerLink={renderPlayerLink} t={t} />
                 </CardContent>
                 <CardFooter className="text-xs text-muted-foreground tabular-nums">
                   {group.matches.length} {t('common.matches')} · {completedCount} {t('management.completed')}

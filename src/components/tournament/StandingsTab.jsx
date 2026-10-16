@@ -7,7 +7,7 @@ import { ExportMenu } from '../ExportMenu';
 import { EmptyState } from '../shared/EmptyState';
 import { cn } from '@/lib/utils';
 
-export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, standingsRef, renderPlayerLink, t }) {
+export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, renderPlayerLink, t }) {
   const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
   const num = 'text-right tabular-nums';
 
@@ -30,11 +30,11 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
               </span>
             </div>
           )}
-          <ExportMenu tournament={tournament} imageTarget={standingsRef} imageSuffix="standings" />
+          <ExportMenu tournament={tournament} imageSuffix="standings" />
         </div>
       </div>
 
-      <div ref={standingsRef} className="bg-background">
+      <div>
         {uniqueGroups && uniqueGroups.length > 0 ? (
           <div className="grid gap-4 lg:grid-cols-2">
             {uniqueGroups.map(group => {
@@ -83,7 +83,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                                 )}
                               >
                                 <TableCell className="tabular-nums">
-                                  {isQualify ? <Badge className="size-6 justify-center rounded-full p-0">{rank}</Badge> : rank}
+                                  {isQualify ? <Badge className="size-6 justify-center rounded-full p-0 font-display text-sm">{rank}</Badge> : rank}
                                 </TableCell>
                                 <TableCell className="font-medium">{renderPlayerLink(standing.player)}</TableCell>
                                 <TableCell className={num}>{standing.matchesPlayed}</TableCell>
@@ -94,7 +94,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                                   {legDiff > 0 ? '+' : ''}{legDiff}
                                 </TableCell>
                                 <TableCell className={num}>{standing.average.toFixed(1)}</TableCell>
-                                <TableCell className={cn(num, 'font-semibold')}>{standing.points}</TableCell>
+                                <TableCell className={cn(num, 'font-display text-lg font-semibold')}>{standing.points}</TableCell>
                               </TableRow>
                             );
                           })}

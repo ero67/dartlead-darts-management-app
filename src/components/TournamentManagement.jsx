@@ -15,6 +15,8 @@ import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { StatusBadge } from './shared/StatusBadge';
+import { BoardMotif, LiveDot, PhaseBar } from './shared/DartsAccents';
+import { isTournamentRunning, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
 import { LoadingState } from './shared/LoadingState';
 import { GroupsTab } from './tournament/GroupsTab';
 import { MatchesTab } from './tournament/MatchesTab';
@@ -94,9 +96,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   
   const [activeTab, setActiveTab] = useState(() => getInitialTab());
   const [showEditSettings, setShowEditSettings] = useState(false);
-  // Targets for "share as image" (ExportMenu)
-  const standingsRef = useRef(null);
-  const bracketRef = useRef(null);
   const [editingMatch, setEditingMatch] = useState(null); // Match being edited
   const [correctingMatch, setCorrectingMatch] = useState(null); // Match whose result is being corrected
   const [liveMatches, setLiveMatches] = useState([]);
@@ -2182,6 +2181,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
   const isPlayoffOnly = tournament.tournamentType === 'playoff_only';
   const playerCount = tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0;
+  const tournamentPhase = getTournamentPhase(tournament);
   const overview = [
     `${playerCount} ${t('common.players')}`,
     `${uniqueGroups?.length || 0} ${t('common.groups')}`,
@@ -2192,8 +2192,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   ].filter(Boolean);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
-      <div className="flex flex-col gap-4">
+    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-hidden p-4 text-foreground md:p-8">
+      <BoardMotif />
+      <div className="relative flex flex-col gap-4">
         <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
           <ArrowLeft />
           {t('common.backToDashboard')}
@@ -2210,6 +2211,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               )}
             </div>
             <p className="text-sm text-muted-foreground tabular-nums">{overview.join(' · ')}</p>
+            {isTournamentRunning(tournament.status) && (
+              <div className="mt-2 flex max-w-md items-center gap-3">
+                <PhaseBar {...tournamentPhase} className="flex-1" />
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {tournamentPhaseLabel(tournamentPhase, t)} · {tournamentPhase.percent}%
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <RefreshButton />
@@ -2266,7 +2275,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           )}
           <TabsTrigger value="statistics">{t('management.statistics')}</TabsTrigger>
           <TabsTrigger value="liveMatches">
-            <Activity />
+            {filteredLiveMatches.length > 0 ? <LiveDot /> : <Activity />}
             {t('management.liveMatches')}
             {filteredLiveMatches.length > 0 && (
               <Badge variant="destructive" className="h-5 min-w-5 px-1 tabular-nums">{filteredLiveMatches.length}</Badge>
@@ -2319,6 +2328,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             isGroupFavorite={isGroupFavorite}
             toggleFavoriteGroup={toggleFavoriteGroup}
             renderPlayerLink={renderPlayerLink}
+            liveInfoById={liveInfoById}
             t={t}
           />
         )}
@@ -2342,7 +2352,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             tournament={tournament}
             uniqueGroups={uniqueGroups}
             defaultQualifierIdSet={defaultQualifierIdSet}
-            standingsRef={standingsRef}
             renderPlayerLink={renderPlayerLink}
             t={t}
           />
@@ -2354,7 +2363,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             isGroupStageComplete={isGroupStageComplete}
             bracketViewMode={bracketViewMode}
             setBracketViewMode={setBracketViewMode}
-            bracketRef={bracketRef}
             handleResetPlayoffs={handleResetPlayoffs}
             getRoundSize={getRoundSize}
             getPlayoffLegsToWin={getPlayoffLegsToWin}

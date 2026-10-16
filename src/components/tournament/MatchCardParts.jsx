@@ -33,7 +33,7 @@ export function PlayerScoreRow({ name, score, isWinner, isLoser, hint }) {
         {name}
         {hint}
       </span>
-      <span className={cn('text-base font-semibold tabular-nums', isLoser && 'text-muted-foreground')}>
+      <span className={cn('font-display text-xl font-semibold leading-none', isLoser && 'text-muted-foreground')}>
         {score ?? '–'}
       </span>
     </div>

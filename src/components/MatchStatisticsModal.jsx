@@ -191,7 +191,7 @@ export function MatchStatisticsModal({ match, onClose }) {
             <span className={cn('truncate text-base font-semibold', !p1Won && 'text-muted-foreground')}>{p1}</span>
             {p1Won && <Badge variant="outline" className={WINNER_BADGE}>{t('matchStats.winner')}</Badge>}
           </div>
-          <div className="flex items-baseline gap-2 text-4xl font-semibold tracking-tight tabular-nums">
+          <div className="flex items-baseline gap-2 font-display text-4xl font-semibold tabular-nums">
             <span className={cn(!p1Won && 'text-muted-foreground')}>{num(r.player1Legs)}</span>
             <span className="text-muted-foreground">:</span>
             <span className={cn(!p2Won && 'text-muted-foreground')}>{num(r.player2Legs)}</span>

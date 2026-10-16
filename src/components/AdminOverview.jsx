@@ -140,7 +140,7 @@ export function AdminOverview({ onOpenBilling }) {
                     <a.icon className="size-4" />
                   </div>
                   <CardTitle className="flex-1 text-sm">{a.title}</CardTitle>
-                  <span className="text-xl font-semibold tabular-nums">{a.items.length}</span>
+                  <span className="font-display text-2xl font-semibold">{a.items.length}</span>
                 </CardHeader>
                 <CardContent className="px-4">
                   <ul className="flex flex-col gap-1.5 text-sm">

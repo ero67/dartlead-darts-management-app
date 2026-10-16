@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '../shared/EmptyState';
 
 const initials = (name) => (name || '')
@@ -22,7 +22,8 @@ export function RegistrationRequests({ registrations, error, linkCopied, onCopyL
 
   return (
     <Card>
-      <CardHeader>
+      {/* Wraps instead of using CardAction: the card sits in a narrow side column */}
+      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2">
           <UserCheck className="size-4" />
           {t('registration.registrationRequests')}
@@ -30,12 +31,10 @@ export function RegistrationRequests({ registrations, error, linkCopied, onCopyL
             <Badge variant="secondary" className="tabular-nums">{pendingCount} {t('registration.statusPending')}</Badge>
           )}
         </CardTitle>
-        <CardAction>
-          <Button variant="outline" size="sm" onClick={onCopyLink} title={t('registration.copyLinkHint')}>
-            {linkCopied ? <Check /> : <Copy />}
-            {linkCopied ? t('registration.linkCopied') : t('registration.copyRegistrationLink')}
-          </Button>
-        </CardAction>
+        <Button variant="outline" size="sm" onClick={onCopyLink} title={t('registration.copyLinkHint')}>
+          {linkCopied ? <Check /> : <Copy />}
+          {linkCopied ? t('registration.linkCopied') : t('registration.copyRegistrationLink')}
+        </Button>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {error && (

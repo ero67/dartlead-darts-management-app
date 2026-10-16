@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-const KEY = 'flex min-h-12 short:min-h-7 items-center justify-center rounded-lg border bg-card text-xl font-semibold tabular-nums transition-colors disabled:pointer-events-none disabled:opacity-40';
+const KEY = 'flex min-h-12 short:min-h-7 items-center justify-center rounded-lg border bg-card font-display text-2xl font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40';
+
+// Visit totals that come up all the time; one tap fills the readout.
+const QUICK_SCORES = [26, 41, 45, 60, 81, 85, 100, 140, 180];
 
 // 3-dart total entry: big readout, undo, and either an on-screen keypad or a
 // text field for keyboards. Presentational; the caller owns the input string.
@@ -17,6 +20,7 @@ export function TurnTotalKeypad({
   onUndo,
   canUndo = true,
   useOnScreenKeypad = true,
+  showQuickScores = false,
   disabled = false
 }) {
   const { t } = useLanguage();
@@ -51,7 +55,7 @@ export function TurnTotalKeypad({
   );
 
   const clearButton = (
-    <button className={cn(KEY, 'text-base text-muted-foreground')} onClick={clear} type="button" disabled={disabled || !value}>
+    <button className={cn(KEY, 'font-sans text-base font-medium text-muted-foreground')} onClick={clear} type="button" disabled={disabled || !value}>
       {t('match.clear')}
     </button>
   );
@@ -76,7 +80,7 @@ export function TurnTotalKeypad({
             {t('match.undoLastVisit')}
           </Button>
         </div>
-        <div className={cn('text-5xl font-semibold tracking-tight tabular-nums short:text-3xl', isInvalid && 'text-destructive', !value && 'text-muted-foreground')}>
+        <div className={cn('font-display text-5xl font-semibold tabular-nums short:text-3xl', isInvalid && 'text-destructive', !value && 'text-muted-foreground')}>
           {value || '0'}
         </div>
         <div className={cn('text-xs', isInvalid ? 'text-destructive' : 'text-muted-foreground short:hidden')}>
@@ -85,6 +89,21 @@ export function TurnTotalKeypad({
             : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
         </div>
       </div>
+      {useOnScreenKeypad && showQuickScores && (
+        <div className="flex shrink-0 gap-1 overflow-x-auto [scrollbar-width:none] short:hidden [&::-webkit-scrollbar]:hidden">
+          {QUICK_SCORES.map(n => (
+            <button
+              key={n}
+              type="button"
+              className="h-9 shrink-0 rounded-md border px-3 font-display text-lg font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+              onClick={() => onChange(String(n))}
+              disabled={disabled}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      )}
       {useOnScreenKeypad ? (
         <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-1">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (

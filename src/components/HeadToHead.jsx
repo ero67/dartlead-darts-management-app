@@ -1,163 +1,166 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Loader } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { ArrowLeftRight, Loader } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { leagueService } from '../services/leagueService';
+import { cn } from '@/lib/utils';
 
 // shadcn Select items need a non-empty value; '' (nobody picked) maps to this.
 const NONE = '__none';
+
+const initials = (name = '') => name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+
+// Mirrored bar: left share in primary, right share in amber (the two sides' colours throughout).
+function StatBar({ label, left, right, format = (v) => v }) {
+  const isLeftAhead = left >= right;
+  const isRightAhead = right >= left;
+  return (
+    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_3.5rem] items-center gap-3">
+      <span className={cn('font-display text-2xl font-bold tabular-nums', !isLeftAhead && 'text-muted-foreground')}>{format(left)}</span>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-center text-[11px] uppercase tracking-widest text-muted-foreground">{label}</span>
+        <div className="flex h-2 gap-1">
+          <span className="rounded-full bg-primary" style={{ flex: Math.max(left, 0.1) }} />
+          <span className="rounded-full bg-amber-500" style={{ flex: Math.max(right, 0.1) }} />
+        </div>
+      </div>
+      <span className={cn('text-right font-display text-2xl font-bold tabular-nums', !isRightAhead && 'text-muted-foreground')}>{format(right)}</span>
+    </div>
+  );
+}
 
 export function HeadToHead({ leagueId, players }) {
   const { t } = useLanguage();
   const [player1Id, setPlayer1Id] = useState('');
   const [player2Id, setPlayer2Id] = useState('');
   const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!player1Id || !player2Id || player1Id === player2Id) {
       setStats(null);
       return;
     }
-    loadH2H();
-  }, [player1Id, player2Id]);
+    let isCurrent = true;
+    setIsLoading(true);
+    leagueService.getHeadToHead(leagueId, player1Id, player2Id)
+      .then(data => { if (isCurrent) setStats(data || { matches: 0 }); })
+      .catch(() => { if (isCurrent) setStats(null); })
+      .finally(() => { if (isCurrent) setIsLoading(false); });
+    return () => { isCurrent = false; };
+  }, [leagueId, player1Id, player2Id]);
 
-  const loadH2H = async () => {
-    setLoading(true);
-    try {
-      const { data: leagueTournaments } = await supabase
-        .from('tournaments')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('deleted', false);
-
-      const tIds = (leagueTournaments || []).map(t => t.id);
-      if (tIds.length === 0) { setStats(null); setLoading(false); return; }
-
-      const { data: matches } = await supabase
-        .from('matches')
-        .select('player1_id, player2_id, winner_id, player1_legs, player2_legs, result')
-        .in('tournament_id', tIds)
-        .eq('status', 'completed')
-        .or(`and(player1_id.eq.${player1Id},player2_id.eq.${player2Id}),and(player1_id.eq.${player2Id},player2_id.eq.${player1Id})`);
-
-      if (!matches || matches.length === 0) {
-        setStats({ matches: 0 });
-        setLoading(false);
-        return;
-      }
-
-      let p1Wins = 0, p2Wins = 0, p1Legs = 0, p2Legs = 0;
-      let p1TotalScore = 0, p1TotalDarts = 0, p2TotalScore = 0, p2TotalDarts = 0;
-
-      matches.forEach(m => {
-        if (m.winner_id === player1Id) p1Wins++;
-        else if (m.winner_id === player2Id) p2Wins++;
-
-        if (m.player1_id === player1Id) {
-          p1Legs += m.player1_legs || 0;
-          p2Legs += m.player2_legs || 0;
-        } else {
-          p1Legs += m.player2_legs || 0;
-          p2Legs += m.player1_legs || 0;
-        }
-
-        if (m.result) {
-          const p1Stats = m.player1_id === player1Id ? m.result.player1Stats : m.result.player2Stats;
-          const p2Stats = m.player1_id === player1Id ? m.result.player2Stats : m.result.player1Stats;
-          if (p1Stats) { p1TotalScore += p1Stats.totalScore || 0; p1TotalDarts += p1Stats.totalDarts || 0; }
-          if (p2Stats) { p2TotalScore += p2Stats.totalScore || 0; p2TotalDarts += p2Stats.totalDarts || 0; }
-        }
-      });
-
-      setStats({
-        matches: matches.length,
-        p1Wins,
-        p2Wins,
-        p1Legs,
-        p2Legs,
-        p1Avg: p1TotalDarts > 0 ? (p1TotalScore / p1TotalDarts) * 3 : 0,
-        p2Avg: p2TotalDarts > 0 ? (p2TotalScore / p2TotalDarts) * 3 : 0
-      });
-    } catch (error) {
-      console.error('Error loading H2H:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleSwap = () => {
+    setPlayer1Id(player2Id);
+    setPlayer2Id(player1Id);
   };
 
-  const p1Name = players.find(p => p.id === player1Id)?.name || '';
-  const p2Name = players.find(p => p.id === player2Id)?.name || '';
+  const player1 = players.find(p => p.id === player1Id);
+  const player2 = players.find(p => p.id === player2Id);
+  const oneDecimal = (v) => (v == null ? '–' : v.toFixed(1));
+  const stageLabel = (m) => (m.isPlayoff ? t('management.playoffs') : t('management.groups'));
 
-  const renderPlayerSelect = (value, onChange) => (
-    <Select value={value || NONE} onValueChange={(v) => onChange(v === NONE ? '' : v)}>
-      <SelectTrigger className="w-full min-w-0 flex-1" aria-label={t('leagues.selectPlayer')}>
-        <SelectValue placeholder={t('leagues.selectPlayer')} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>{t('leagues.selectPlayer')}</SelectItem>
-        {players.map(p => (
-          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+  const renderPlayerSelect = (id, value, onChange, label) => (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={id} className="text-xs text-muted-foreground">{label}</Label>
+      <Select value={value || NONE} onValueChange={(v) => onChange(v === NONE ? '' : v)}>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder={t('leagues.selectPlayer')} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NONE}>{t('leagues.selectPlayer')}</SelectItem>
+          {players.map(p => (
+            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const renderSide = (player, isRight) => (
+    <div className={cn('flex min-w-0 items-center gap-3', isRight && 'flex-row-reverse text-right')}>
+      <span className={cn('hidden size-14 shrink-0 place-items-center rounded-full text-lg font-bold sm:grid', isRight ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-primary/20 text-primary')}>
+        {initials(player?.name)}
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-display text-xl font-bold leading-none sm:text-3xl">{player?.name}</span>
+        {player?.rank && <span className="text-xs text-muted-foreground sm:text-sm">{t('leagues.leagueRank', { rank: player.rank })}</span>}
+      </span>
+    </div>
   );
 
   return (
-    <Card className="text-card-foreground">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="size-4 text-muted-foreground" />
-          {t('leagues.headToHead')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {renderPlayerSelect(player1Id, setPlayer1Id)}
-          <span className="px-1 text-xs font-medium uppercase text-muted-foreground">{t('leagues.statVs')}</span>
-          {renderPlayerSelect(player2Id, setPlayer2Id)}
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2 sm:gap-3">
+        {renderPlayerSelect('h2h-player', player1Id, setPlayer1Id, t('leagues.player'))}
+        <Button variant="outline" size="icon" onClick={handleSwap} aria-label={t('leagues.swapPlayers')} title={t('leagues.swapPlayers')}>
+          <ArrowLeftRight />
+        </Button>
+        {renderPlayerSelect('h2h-opponent', player2Id, setPlayer2Id, t('management.opponent'))}
+      </div>
+
+      {isLoading && (
+        <div className="flex justify-center py-6 text-muted-foreground">
+          <Loader className="size-4 animate-spin" />
         </div>
+      )}
 
-        {loading && (
-          <div className="flex justify-center py-4 text-muted-foreground">
-            <Loader className="size-4 animate-spin" />
-          </div>
-        )}
+      {stats && !isLoading && stats.matches === 0 && (
+        <p className="py-4 text-center text-sm text-muted-foreground">{t('leagues.noH2HMatches')}</p>
+      )}
 
-        {stats && !loading && stats.matches === 0 && (
-          <p className="py-2 text-center text-sm text-muted-foreground">{t('leagues.noH2HMatches')}</p>
-        )}
-
-        {stats && !loading && stats.matches > 0 && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-              <div className={cn('flex flex-col gap-1', stats.p1Wins <= stats.p2Wins && 'text-muted-foreground')}>
-                <span className="truncate text-sm font-medium">{p1Name}</span>
-                <span className="text-4xl font-semibold tracking-tight tabular-nums">{stats.p1Wins}</span>
+      {stats && !isLoading && stats.matches > 0 && (
+        <>
+          <Card className="gap-6 bg-gradient-to-r from-primary/10 via-card via-40% to-amber-500/10 px-4 py-6 sm:px-8">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
+              {renderSide(player1, false)}
+              <div className="flex flex-col items-center leading-none">
+                <span className="font-display text-5xl font-bold tabular-nums sm:text-7xl">
+                  {stats.p1Wins}<span className="text-muted-foreground/40"> – </span>{stats.p2Wins}
+                </span>
+                <span className="mt-1 text-[11px] uppercase tracking-widest text-muted-foreground">{t('leagues.matchesWon')}</span>
               </div>
-              <span className="text-center text-xs text-muted-foreground">
-                {t(stats.matches === 1 ? 'common.matchCountOne' : stats.matches < 5 ? 'common.matchCountFew' : 'common.matchCountMany', { count: stats.matches })}
-              </span>
-              <div className={cn('flex flex-col items-end gap-1 text-right', stats.p2Wins <= stats.p1Wins && 'text-muted-foreground')}>
-                <span className="truncate text-sm font-medium">{p2Name}</span>
-                <span className="text-4xl font-semibold tracking-tight tabular-nums">{stats.p2Wins}</span>
-              </div>
+              {renderSide(player2, true)}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3 text-sm">
-                <span className="text-muted-foreground">{t('leagues.legsRecord')}</span>
-                <strong className="tabular-nums">{stats.p1Legs} : {stats.p2Legs}</strong>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3 text-sm">
-                <span className="text-muted-foreground">{t('leagues.avgAgainst')}</span>
-                <strong className="tabular-nums">{stats.p1Avg.toFixed(1)} : {stats.p2Avg.toFixed(1)}</strong>
-              </div>
+            <div className="flex flex-col gap-3.5">
+              <StatBar label={t('management.legsWon')} left={stats.p1Legs} right={stats.p2Legs} />
+              <StatBar label={t('leagues.avgAgainst')} left={stats.p1Avg} right={stats.p2Avg} format={oneDecimal} />
+              <StatBar label={t('practice.stats.oneEighties')} left={stats.p1OneEighties} right={stats.p2OneEighties} />
+              <StatBar label={t('playerProfile.highestCheckout')} left={stats.p1HighestCheckout} right={stats.p2HighestCheckout} />
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </Card>
+
+          <Card className="gap-0 overflow-hidden py-0">
+            <h3 className="border-b px-4 py-3.5 text-[15px] font-semibold">{t('leagues.everyMeeting')}</h3>
+            {stats.meetings.map(m => {
+              const isP1Win = m.winnerId === player1Id;
+              const isP2Win = m.winnerId === player2Id;
+              return (
+                <div key={m.id} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 border-b px-4 py-2.5 last:border-b-0 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_minmax(0,1fr)]">
+                  <span className="col-span-3 flex min-w-0 flex-col leading-tight sm:col-span-1">
+                    <span className="truncate font-medium">{m.tournamentName}</span>
+                    <span className="text-xs text-muted-foreground">{stageLabel(m)}</span>
+                  </span>
+                  <span className="text-right text-xs text-muted-foreground sm:text-sm">
+                    {t('playerProfile.avgShort')} <b className="text-foreground tabular-nums">{oneDecimal(m.p1Avg)}</b>
+                  </span>
+                  <span className="flex justify-center gap-1.5 font-display text-2xl font-bold tabular-nums">
+                    <span className={cn(isP1Win ? 'text-primary' : 'text-muted-foreground')}>{m.p1Legs}</span>
+                    <span className="text-muted-foreground/40">:</span>
+                    <span className={cn(isP2Win ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>{m.p2Legs}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground sm:text-sm">
+                    {t('playerProfile.avgShort')} <b className="text-foreground tabular-nums">{oneDecimal(m.p2Avg)}</b>
+                  </span>
+                </div>
+              );
+            })}
+          </Card>
+        </>
+      )}
+    </div>
   );
 }

@@ -75,7 +75,7 @@ All user-facing strings go through `t()` from `useLanguage()`. Translations live
 
 ### Styling
 
-Tailwind v4 + shadcn/ui (New York style, zinc, green primary). The only stylesheet is `src/tailwind.css` (tokens, base layer); primitives live in `src/components/ui/`, app-level building blocks (StatusBadge, EmptyState, StatTile, LoadingState) in `src/components/shared/`. Dark mode is the `.dark-mode` class on `<html>` (the `dark:` variant is bound to it). Board screens (match scoring, practice play, TV) force dark via a nested `dark-mode` root. Sidebar becomes a drawer below 1024px. After `npx shadcn@latest add X`, fix the generated `from "cn"` imports to `@/lib/utils` and remove the stray `cn` package it installs.
+Tailwind v4 + shadcn/ui (New York style, zinc, green primary). The only stylesheet is `src/tailwind.css` (tokens, base layer); primitives live in `src/components/ui/`, app-level building blocks (StatusBadge, EmptyState, StatTile, LoadingState) in `src/components/shared/`. Dark mode is the `.dark-mode` class on `<html>` (the `dark:` variant is bound to it). Only the TV display forces dark via a nested `dark-mode` root; scoring and practice screens follow the theme. Sidebar becomes a drawer below 1024px. After `npx shadcn@latest add X`, fix the generated `from "cn"` imports to `@/lib/utils` and remove the stray `cn` package it installs.
 
 ## Code Conventions
 

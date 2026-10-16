@@ -15,7 +15,7 @@ export function MatchCompleteCard({ winnerName, player1Legs, player2Legs, onBack
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{t('match.matchComplete')}</h1>
         <p className="text-sm text-muted-foreground">{t('match.winner')}: {winnerName}</p>
-        <div className="text-5xl font-semibold tracking-tight tabular-nums">{player1Legs} - {player2Legs}</div>
+        <div className="font-display text-5xl font-semibold tabular-nums">{player1Legs} - {player2Legs}</div>
         <Button size="lg" className="w-full" onClick={onBack}>
           <ArrowLeft />
           {t('match.backToTournament')}

@@ -6,18 +6,19 @@ import { CheckoutDialog } from '../scoring/CheckoutDialog';
 import {
   PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeHardestList,
   PracticeSetup, PracticeField, PracticePlay, PracticeBoard, PracticeBoardLabel,
-  PracticeBoardValue, PracticeCheckoutHint, PracticeBoardStats, PracticeKeypad
+  PracticeBoardValue, PracticeCheckoutHint, PracticeBoardStats, PracticeKeypad, PracticeStrip
 } from './PracticeShared';
-import { Badge } from '@/components/ui/badge';
+import { stripWindow } from './practiceView';
 import {
   createCheckoutTrainer, applyVisitTotal, undo, canUndo, liveRemaining, computeStats,
   CHECKOUT_RANGES, ATTEMPT_OPTIONS
 } from '../../lib/checkoutTrainer';
-import { describeSession, pluralSuffix } from '../../lib/practiceGames';
+import { describeSession, formatDuration, pluralSuffix } from '../../lib/practiceGames';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
 import { hapticTap, hapticBust, hapticLegWon } from '../../lib/haptics';
+import { cn } from '@/lib/utils';
 import checkoutData from '../../data/checkouts.json';
 
 const GAME = 'checkout';
@@ -99,6 +100,9 @@ export function PracticeCheckout() {
   };
 
   const rangeLabel = (s) => (s.range === 'doubles' ? t('practice.checkout.ranges.doubles') : `${s.min}–${s.max}`);
+  const outcomeLabel = (a) => (a.hit
+    ? t(`practice.checkout.hit${pluralSuffix(a.dartsUsed)}`, { count: a.dartsUsed })
+    : a.bust ? t('practice.bust') : t('practice.checkout.miss'));
 
   if (summary) {
     const s = summary.stats;
@@ -106,8 +110,9 @@ export function PracticeCheckout() {
     return (
       <PracticeSummary
         subtitle={`${t('practice.games.checkout.title')} · ${rangeLabel(summary.settings)}`}
+        meta={formatDuration(summary.startedAt, summary.finishedAt)}
         cards={[
-          [t('practice.checkout.stats.hitRate'), `${pct(s.hitPercent)} (${s.hits}/${s.attempts})`],
+          [t('practice.checkout.stats.hitRate'), pct(s.hitPercent), `${s.hits}/${s.attempts}`],
           [t('practice.checkout.stats.avgDartsPerHit'), s.avgDartsPerHit ?? t('practice.noStats')],
           [t('practice.checkout.stats.bestStreak'), s.bestStreak],
           [t('practice.stats.darts'), s.totalDarts],
@@ -177,25 +182,29 @@ export function PracticeCheckout() {
   const attemptNumber = session.attempts.length + 1;
   const suggestion = checkoutData[String(remaining)];
   const lastAttempt = session.attempts.at(-1);
+  const attemptText = session.settings.attemptsTarget === null
+    ? t('practice.checkout.attempt', { current: attemptNumber })
+    : t('practice.checkout.attemptOf', { current: attemptNumber, total: session.settings.attemptsTarget });
   const boardFlash = flash?.type === 'hit'
     ? { tone: 'good', text: t(`practice.checkout.hit${pluralSuffix(flash.darts)}`, { count: flash.darts }) }
     : flash?.type === 'miss'
       ? { tone: 'bad', text: t('practice.checkout.miss') }
       : flash?.type === 'bust' ? { tone: 'bad', text: t('practice.bust') } : null;
 
+  // One dot per attempt (a window of ten when the session is longer).
+  const { start: from, end: to } = stripWindow(session.attempts.length, session.settings.attemptsTarget);
+  const dots = Array.from({ length: to - from }, (_, k) => {
+    const i = from + k;
+    const a = session.attempts[i];
+    const tone = a ? (a.hit ? 'good' : a.bust ? 'bad' : 'muted') : i === session.attempts.length ? 'current' : 'empty';
+    return { label: i + 1, tone, title: a ? `${a.target}: ${outcomeLabel(a)}` : undefined };
+  });
+
   return (
     <PracticePlay
       onFinish={handleFinishEarly}
-      meta={
-        <>
-          <span>
-            {session.settings.attemptsTarget === null
-              ? t('practice.checkout.attempt', { current: attemptNumber })
-              : t('practice.checkout.attemptOf', { current: attemptNumber, total: session.settings.attemptsTarget })}
-          </span>
-          <span>{t('practice.checkout.stats.hitRate')} <b>{stats.hitPercent === null ? t('practice.noStats') : `${stats.hitPercent.toFixed(0)}%`}</b></span>
-        </>
-      }
+      title={`${t('practice.games.checkout.title')} · ${attemptText}`}
+      subtitle={<>{t('practice.checkout.stats.hitRate')} <b>{stats.hitPercent === null ? t('practice.noStats') : `${stats.hitPercent.toFixed(0)}%`}</b></>}
     >
       <CheckoutDialog
         pending={pendingCheckout}
@@ -207,27 +216,35 @@ export function PracticeCheckout() {
       />
 
       <PracticeBoard flash={boardFlash}>
-        <PracticeBoardLabel>
-          {t('practice.checkout.target')} {session.current.target}
-          {remaining !== session.current.target && ` · ${t('practice.remaining')}`}
-        </PracticeBoardLabel>
-        <PracticeBoardValue>{remaining}</PracticeBoardValue>
-        <PracticeCheckoutHint>{suggestion ? suggestion.join(' → ') : ''}</PracticeCheckoutHint>
-        <div className="flex min-h-8 justify-center">
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex flex-col">
+            <PracticeBoardLabel>
+              {t('practice.checkout.target')} {session.current.target}
+              {remaining !== session.current.target && ` · ${t('practice.remaining')}`}
+            </PracticeBoardLabel>
+            <PracticeBoardValue>{remaining}</PracticeBoardValue>
+          </div>
           {lastAttempt && (
-            <Badge variant="outline" className="px-2.5 py-1 text-sm font-normal text-muted-foreground">
-              {t('practice.checkout.lastAttempt', { target: lastAttempt.target })} {lastAttempt.hit ? '✓' : '✗'}
-            </Badge>
+            <div className="flex flex-col items-end text-right">
+              <PracticeBoardLabel className="text-muted-foreground">{t('practice.checkout.lastAttemptLabel')}</PracticeBoardLabel>
+              <span className="font-display text-4xl font-bold leading-none text-muted-foreground tabular-nums">{lastAttempt.target}</span>
+              <span className={cn('mt-1 text-xs font-semibold', lastAttempt.hit ? 'text-primary' : lastAttempt.bust ? 'text-live' : 'text-muted-foreground')}>
+                {outcomeLabel(lastAttempt)}
+              </span>
+            </div>
           )}
         </div>
+        <PracticeCheckoutHint route={suggestion} />
         <PracticeBoardStats
           items={[
-            [t('practice.checkout.stats.hits'), `${stats.hits}/${stats.attempts}`],
-            [t('practice.checkout.stats.avgDartsPerHit'), stats.avgDartsPerHit ?? t('practice.noStats')],
-            [t('practice.checkout.stats.bestStreak'), stats.bestStreak]
+            [t('practice.checkout.stats.hits'), `${stats.hits}/${stats.attempts}`, 'text-primary'],
+            [t('practice.stats.darts'), stats.totalDarts],
+            [t('practice.stats.busts'), stats.busts, stats.busts > 0 && 'text-live']
           ]}
         />
       </PracticeBoard>
+
+      <PracticeStrip round cells={dots} label={attemptText} />
 
       <PracticeKeypad>
         <TurnTotalKeypad
