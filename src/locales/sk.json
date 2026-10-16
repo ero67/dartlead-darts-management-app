@@ -1145,7 +1145,7 @@
       "opponentBot": "Bot",
       "opponentName": "Meno druhého hráča",
       "firstTo": "Hrá sa na",
-      "starter": "Kto začína",
+      "starter": "Kto začína (bull-up)",
       "you": "Vy",
       "subtitle": "Legy proti terču, proti druhému hráčovi alebo proti botovi.",
       "opponentHint": "Sám, druhý hráč na tomto zariadení, alebo bot."
@@ -1168,7 +1168,8 @@
       "youWon": "Vyhrali ste {{for}}:{{against}}",
       "opponentWon": "{{name}} vyhráva {{for}}:{{against}}",
       "abandoned": "Zápas nedohraný ({{for}}:{{against}})",
-      "opponentAverage": "{{name}}: priemer {{average}}"
+      "opponentAverage": "{{name}}: priemer {{average}}",
+      "legWonByBullup": "{{name}} vyhráva leg hodom na bull"
     },
     "legOf": "Leg {{current}} / {{total}}",
     "leg": "Leg {{current}}",
@@ -1363,7 +1364,8 @@
       "legWon": "Vyhraný",
       "legLost": "Prehraný",
       "out": "zakončenie {{score}}",
-      "left": "zostalo {{score}}"
+      "left": "zostalo {{score}}",
+      "byBullup": "rozhodnuté na bull"
     }
   }
 }

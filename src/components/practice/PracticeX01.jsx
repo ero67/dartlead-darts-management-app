@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { DartKeypad } from '../scoring/DartKeypad';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
 import { CheckoutDialog } from '../scoring/CheckoutDialog';
+import { BullupDialog } from '../match/MatchDialogs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +24,7 @@ import {
 } from '../../lib/x01Engine';
 import {
   createX01Match, matchApplyDart, matchApplyVisitTotal, matchUndoHuman, matchCanUndo,
-  matchApplySequence, isBotTurn, currentPlayerState, computeMatchStats, isMatch, MATCH_LEG_OPTIONS
+  matchApplySequence, matchAwardLegByBullup, isBotTurn, currentPlayerState, computeMatchStats, isMatch, MATCH_LEG_OPTIONS
 } from '../../lib/x01Match';
 import { BOT_LEVELS, getBotLevel, botThrow, newSeed } from '../../lib/botPlayer';
 import {
@@ -82,7 +84,8 @@ export function PracticeX01() {
   const [inputMode, setInputMode] = useState('single');
   const [turnTotalInput, setTurnTotalInput] = useState('');
   const [pendingCheckout, setPendingCheckout] = useState(null);
-  const [flash, setFlash] = useState(null); // { type: 'bust' } | { type: 'legWon', darts, by }
+  const [flash, setFlash] = useState(null); // { type: 'bust' } | { type: 'legWon', darts, by, byBullup }
+  const [showBullup, setShowBullup] = useState(false); // over-long leg: decide it at the bull
   const flashTimer = useRef(null);
   // Bot visit in flight: timers animating the darts and the state to commit
   const botTimers = useRef([]);
@@ -182,6 +185,28 @@ export function PracticeX01() {
       return;
     }
     setSession(state);
+  };
+
+  // Same rule as the tournament scorer: once both players have thrown 15
+  // visits in a leg, offer to decide it at the bull. No checkout is recorded.
+  const BULLUP_VISIT_THRESHOLD = 15;
+  const legVisits = (p) => p.current.visits.length;
+  const bothReachedBullupThreshold = !!(session && isMatch(session) && !session.finishedAt
+    && session.players.every((p) => legVisits(p) >= BULLUP_VISIT_THRESHOLD));
+
+  const handleBullupPick = (winner) => {
+    if (!session || !isMatch(session)) return;
+    setShowBullup(false);
+    clearBotTimers();
+    const next = matchAwardLegByBullup(session, winner);
+    hapticLegWon();
+    showFlash({ type: 'legWon', by: winner, byBullup: true });
+    if (next.finishedAt) {
+      setSession(next);
+      setTimeout(() => finishSession(next), FLASH_MS);
+      return;
+    }
+    setSession(next);
   };
 
   const handleStart = () => {
@@ -332,7 +357,7 @@ export function PracticeX01() {
         won,
         darts: leg.darts || null,
         average: leg.darts ? ((scored / leg.darts) * 3).toFixed(1) : null,
-        note: won ? out : t('practice.summary.left', { score: leg.startRemaining - scored })
+        note: leg.byBullup ? t('practice.summary.byBullup') : won ? out : t('practice.summary.left', { score: leg.startRemaining - scored })
       };
     };
     if (isMatch(state)) {
@@ -608,6 +633,7 @@ export function PracticeX01() {
   const remaining = liveRemaining(throwerState);
   const suggestion = throwerState.current.visit.darts.length === 0 ? checkoutData[String(remaining)] : null;
   const legWonText = (f) => {
+    if (f.byBullup) return t('practice.match.legWonByBullup', { name: playerName(f.by) });
     if (f.by === undefined) return t(`practice.legWon${pluralSuffix(f.darts)}`, { count: f.darts });
     return t(`practice.match.legWonBy${pluralSuffix(f.darts)}`, { name: playerName(f.by), count: f.darts });
   };
@@ -652,6 +678,7 @@ export function PracticeX01() {
           const isTurn = i === session.turn;
           const stats = computeStats(p);
           const labels = lastVisitLabels(p);
+          const legDarts = p.current.visits.reduce((sum, v) => sum + v.darts, 0) + p.current.visit.darts.length;
           return (
             <div key={i} className={cn('flex flex-col items-center gap-1 rounded-lg border bg-muted/40 p-3', isTurn && 'border-primary bg-primary text-primary-foreground shadow-md [&_[data-variant=outline]]:border-current/40 [&_[data-variant=outline]]:text-inherit')}>
               <div className="flex w-full items-center justify-between gap-2">
@@ -660,7 +687,11 @@ export function PracticeX01() {
               </div>
               <div className="font-display text-5xl font-semibold leading-none tabular-nums sm:text-6xl">{isTurn ? remaining : p.current.remaining}</div>
               <PracticeLastThrows labels={labels} className="min-h-7" />
-              <div className={cn('text-xs', isTurn ? 'opacity-85' : 'text-muted-foreground')}>{t('practice.stats.average')} <b className={cn('font-semibold tabular-nums', !isTurn && 'text-foreground')}>{stats.average.toFixed(1)}</b></div>
+              <div className={cn('text-xs tabular-nums', isTurn ? 'opacity-85' : 'text-muted-foreground')}>
+                {t('practice.stats.average')} <b className={cn('font-semibold', !isTurn && 'text-foreground')}>{stats.average.toFixed(1)}</b>
+                {' · '}
+                {t('practice.thisLeg')} <b className={cn('font-semibold', !isTurn && 'text-foreground')}>{t(`practice.stats.darts${pluralSuffix(legDarts)}`, { count: legDarts })}</b>
+              </div>
               {isTurn && <Badge variant="secondary" className="mt-1">{t('practice.match.toThrow', { name: playerName(i) })}</Badge>}
             </div>
           );
@@ -669,6 +700,16 @@ export function PracticeX01() {
       <PracticeCheckoutHint route={botBusy ? null : suggestion} className="justify-center">
         {botBusy && <span className="text-sm font-medium text-muted-foreground">{t('practice.bot.skip')}</span>}
       </PracticeCheckoutHint>
+      {bothReachedBullupThreshold && !flash && (
+        <Alert className="flex flex-wrap items-center gap-2">
+          <Target />
+          <AlertDescription className="flex-1">{t('match.bullup.offer')}</AlertDescription>
+          <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={(e) => { e.stopPropagation(); setShowBullup(true); }}>
+            <Target />
+            {t('match.bullup.decideButton')}
+          </Button>
+        </Alert>
+      )}
     </PracticeBoard>
   );
 
@@ -692,6 +733,15 @@ export function PracticeX01() {
         onCancel={() => setPendingCheckout(null)}
         onConfirm={handleConfirmCheckout}
       />
+
+      {isMatch(session) && (
+        <BullupDialog
+          open={showBullup}
+          onOpenChange={(open) => { if (!open) setShowBullup(false); }}
+          players={session.players.map((_, i) => ({ name: playerName(i) }))}
+          onPick={handleBullupPick}
+        />
+      )}
 
       {isMatch(session) ? renderMatchBoard() : renderSoloBoard()}
 

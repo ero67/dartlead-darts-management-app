@@ -1145,7 +1145,7 @@
       "opponentBot": "Bot",
       "opponentName": "Second player's name",
       "firstTo": "First to",
-      "starter": "Who starts",
+      "starter": "Who starts (bull-up)",
       "you": "You",
       "subtitle": "Legs against the board, or against a second player or a bot.",
       "opponentHint": "Solo, someone else on this device, or a bot."
@@ -1168,7 +1168,8 @@
       "youWon": "You won {{for}}:{{against}}",
       "opponentWon": "{{name}} won {{for}}:{{against}}",
       "abandoned": "Match not finished ({{for}}:{{against}})",
-      "opponentAverage": "{{name}}: {{average}} avg"
+      "opponentAverage": "{{name}}: {{average}} avg",
+      "legWonByBullup": "{{name}} wins the leg on the bull-up"
     },
     "legOf": "Leg {{current}} / {{total}}",
     "leg": "Leg {{current}}",
@@ -1363,7 +1364,8 @@
       "legWon": "Won",
       "legLost": "Lost",
       "out": "out {{score}}",
-      "left": "left {{score}}"
+      "left": "left {{score}}",
+      "byBullup": "won on the bull-up"
     }
   }
 }

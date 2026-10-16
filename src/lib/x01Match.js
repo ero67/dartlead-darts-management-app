@@ -10,7 +10,7 @@
 // Undo is snapshot-based at match level (the per-player undo stacks are kept
 // empty so snapshots stay small).
 
-import { createSoloX01, applyDart, applyVisitTotal, abandonLeg, computeStats } from './x01Engine.js';
+import { createSoloX01, applyDart, applyVisitTotal, abandonLeg, awardLegByBullup, computeStats } from './x01Engine.js';
 
 export const MATCH_LEG_OPTIONS = [1, 2, 3, 4, 5, 7, 10];
 const UNDO_LIMIT = 300;
@@ -64,30 +64,43 @@ const settle = (state, playerState, outcome) => {
   }
 
   // checkout: leg over
-  const legsWon = state.legsWon.map((n, i) => (i === turn ? n + 1 : n));
-  const wonLeg = playerState.legs[playerState.legs.length - 1];
   const closed = players.map((p, i) => (i === turn ? p : stripStack(abandonLeg(p))));
+  return closeLeg({ ...state, undoStack }, closed, turn, { byBullup: false });
+};
+
+// Leg over for `winner`: count it, log it, hand the next leg to the other
+// starter, or finish the match. `players` already have the leg closed.
+const closeLeg = (state, players, winner, { byBullup }) => {
+  const legsWon = state.legsWon.map((n, i) => (i === winner ? n + 1 : n));
+  const wonLeg = players[winner].legs[players[winner].legs.length - 1];
   const legLog = [...state.legLog, {
     leg: state.legNumber,
-    winner: turn,
+    winner,
     starter: state.legStarter,
     darts: wonLeg?.darts ?? null,
-    checkout: wonLeg?.checkout ?? null
+    checkout: byBullup ? null : (wonLeg?.checkout ?? null),
+    byBullup
   }];
-  const finished = legsWon[turn] >= state.settings.legsTarget;
+  const finished = legsWon[winner] >= state.settings.legsTarget;
   const nextStarter = (state.legStarter + 1) % players.length;
   return {
     ...state,
-    players: closed,
+    players,
     legsWon,
     legLog,
-    winner: finished ? turn : null,
+    winner: finished ? winner : null,
     finishedAt: finished ? Date.now() : null,
     legStarter: finished ? state.legStarter : nextStarter,
-    turn: finished ? turn : nextStarter,
-    legNumber: finished ? state.legNumber : state.legNumber + 1,
-    undoStack
+    turn: finished ? winner : nextStarter,
+    legNumber: finished ? state.legNumber : state.legNumber + 1
   };
+};
+
+// The leg ran too long and was decided at the bull: `winner` takes it with
+// no checkout recorded; both players' darts so far still count.
+export const matchAwardLegByBullup = (state, winner) => {
+  const players = state.players.map((p, i) => stripStack(i === winner ? awardLegByBullup(p) : abandonLeg(p)));
+  return closeLeg({ ...state, undoStack: pushUndo(state) }, players, winner, { byBullup: true });
 };
 
 export const matchApplyDart = (state, dart) => {
