@@ -153,6 +153,7 @@ export function PracticeCheckout() {
           >
             <PracticeChips
               options={RANGE_KEYS}
+              columns={2}
               value={settings.range}
               onChange={(range) => setSettings(s => ({ ...rangeToSettings(range), attemptsTarget: s.attemptsTarget }))}
               render={(range) => `${t(`practice.checkout.ranges.${range}`)}${range === 'doubles' ? '' : ` ${CHECKOUT_RANGES[range].min}–${CHECKOUT_RANGES[range].max}`}`}

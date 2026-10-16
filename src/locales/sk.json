@@ -1149,7 +1149,20 @@
       "you": "Vy",
       "subtitle": "Legy proti terču, proti druhému hráčovi alebo proti botovi.",
       "opponentHint": "Sám, druhý hráč na tomto zariadení, alebo bot.",
-      "starterBullup": "Bull-up"
+      "starterBullup": "Bull-up",
+      "newGame": "Nová hra",
+      "vsBoard": "Ty proti terču",
+      "doubleOut": "Double out",
+      "soloPractice": "Sólo tréning",
+      "bullupDecides": "Rozhodne bull-up",
+      "youThrowFirst": "Začínaš ty",
+      "throwsFirst": "Začína {{name}}",
+      "firstToHint": "Počet legov potrebných na výhru",
+      "legsHint": "Tréning skončí po týchto legoch",
+      "legsUnlimitedHint": "Hráš, kým neskončíš",
+      "fewerLegs": "Menej legov",
+      "moreLegs": "Viac legov",
+      "preview": "Náhľad hry"
     },
     "bot": {
       "name": "Bot úroveň {{level}}",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckCircle, Flag, Keyboard, Minus, Plus, Target, Trophy, Users } from 'lucide-react';
+import { Bot, CheckCircle, Flag, Keyboard, Minus, Plus, Target, Trophy, User, Users } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { DartKeypad } from '../scoring/DartKeypad';
@@ -10,9 +10,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { FormDots, LegPips } from '../shared/DartsAccents';
+import { BoardMotif, FormDots, LegPips } from '../shared/DartsAccents';
 import {
-  PracticeScreenHeader, PracticeSetup, PracticeField, PracticeOptionCards, PracticeChips,
+  PracticeScreenHeader, PracticeSetup, PracticeField, PracticeChips, PracticeStepper,
   PracticeSummaryBar, PracticeSummaryHeader, PracticeSummaryActions, PracticeStatGrid, PracticeBandRow,
   PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeCheckoutHint,
   PracticeLastThrows, PracticeBoardStats, PracticeKeypad
@@ -31,7 +31,7 @@ import {
   loadActiveSession, saveActiveSession, clearActiveSession, appendHistory,
   newSessionId, loadGameSettings, saveGameSettings
 } from '../../lib/practiceStorage';
-import { describeSession, formatDuration, formatSessionDate, pluralSuffix } from '../../lib/practiceGames';
+import { formatDuration, formatSessionDate, pluralSuffix } from '../../lib/practiceGames';
 import { getUserDisplayName } from '../../utils/userDisplayName';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
@@ -78,6 +78,8 @@ export function PracticeX01() {
     return active?.game === GAME ? active.state : null;
   });
   const [settings, setSettings] = useState(() => sanitizeSettings(session?.settings || loadGameSettings(GAME)));
+  // "Custom" picked on the starting-score control: shows the number field.
+  const [isCustomScore, setIsCustomScore] = useState(() => !STARTING_SCORES.includes(settings.startingScore));
   const [summary, setSummary] = useState(null);
   // The finished state behind `summary`: the leg-by-leg table reads it. Not
   // persisted, so it is only there right after the session ends.
@@ -465,103 +467,145 @@ export function PracticeX01() {
 
   // ---- Setup ---------------------------------------------------------------
   if (!session) {
-    const isPreset = STARTING_SCORES.includes(settings.startingScore);
     const hasOpponent = settings.opponent !== null;
+    const opponentKind = settings.opponent?.kind || 'solo';
     const legOptions = hasOpponent ? MATCH_LEG_OPTIONS : LEG_OPTIONS;
+    const legIndex = Math.max(0, legOptions.indexOf(settings.legsTarget));
     const setOpponent = (opponent) => setSettings(s => ({
       ...s,
       opponent,
       legsTarget: opponent && !MATCH_LEG_OPTIONS.includes(s.legsTarget) ? DEFAULT_SETTINGS.legsTarget : s.legsTarget
     }));
+    const pickOpponent = (kind) => setOpponent(
+      kind === 'solo' ? null
+        : kind === 'human' ? { kind: 'human', name: settings.opponent?.name || '' }
+          : { kind: 'bot', level: settings.opponent?.level || 4 }
+    );
     const setBotLevel = (level) => {
       if (!BOT_LEVELS.some(l => l.level === level)) return;
       setSettings(s => ({ ...s, opponent: { kind: 'bot', level } }));
     };
+    const stepLegs = (delta) => setSettings(s => ({
+      ...s,
+      legsTarget: legOptions[Math.min(legOptions.length - 1, Math.max(0, legIndex + delta))]
+    }));
+    const legsText = hasOpponent
+      ? `${t('practice.setup.firstTo')} ${settings.legsTarget}`
+      : settings.legsTarget === null
+        ? t('practice.setup.unlimited')
+        : t(settings.legsTarget === 1 ? 'practice.legCountOne' : 'practice.legCountMany', { count: settings.legsTarget });
+    const starterChip = !hasOpponent ? t('practice.setup.soloPractice')
+      : settings.starter === 'bullup' ? t('practice.setup.bullupDecides')
+        : settings.starter === 0 ? t('practice.setup.youThrowFirst')
+          : t('practice.setup.throwsFirst', { name: opponentName });
+    const pips = settings.legsTarget !== null && settings.legsTarget <= 9 && (
+      <LegPips won={0} total={settings.legsTarget} label={legsText} />
+    );
+    const previewSide = (name, alignEnd) => (
+      <div className={cn('flex min-w-0 flex-col gap-1.5', alignEnd ? 'items-end' : 'items-start')}>
+        <span className="max-w-full truncate text-sm font-semibold">{name}</span>
+        <span className="font-display text-[54px] font-semibold leading-[0.82] tabular-nums">{settings.startingScore}</span>
+        {pips}
+      </div>
+    );
+
+    // The game as it is set up right now: who, from what, how many legs.
+    const preview = (
+      <section aria-label={t('practice.setup.preview')} className="relative overflow-hidden rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+        <BoardMotif className="-right-24 -top-28 w-56 opacity-[0.08] dark:opacity-[0.12]" />
+        <div className="relative flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
+              {t('practice.games.x01.title')} · {t('practice.setup.newGame')}
+            </h1>
+            <Badge variant="secondary" className="max-w-[60%] gap-1.5 truncate">
+              {hasOpponent && settings.starter === 'bullup' ? <Target /> : <Flag />}
+              <span className="truncate">{starterChip}</span>
+            </Badge>
+          </div>
+          {hasOpponent ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2.5">
+              {previewSide(myName, false)}
+              <span className="pb-5 text-xs font-semibold text-muted-foreground">{t('practice.match.vs')}</span>
+              {previewSide(opponentName, true)}
+            </div>
+          ) : (
+            <div className="flex items-end justify-between gap-3">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-semibold">{t('practice.setup.vsBoard')}</span>
+                <span className="font-display text-[54px] font-semibold leading-[0.82] tabular-nums">{settings.startingScore}</span>
+              </div>
+              <div className="pb-1">
+                {settings.legsTarget === null
+                  ? <span className="text-xs text-muted-foreground">{t('practice.setup.unlimited')}</span>
+                  : pips}
+              </div>
+            </div>
+          )}
+          <p className="flex flex-wrap gap-x-3.5 gap-y-0.5 text-xs text-muted-foreground">
+            <span>{t('practice.setup.doubleOut')}</span>
+            <span>{legsText}</span>
+            <span>{t(settings.scoringMode === 'turnTotal' ? 'practice.setup.scoringTurnTotal' : 'practice.setup.scoringDart')}</span>
+          </p>
+        </div>
+      </section>
+    );
+
     return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 text-foreground md:p-8">
-        <PracticeScreenHeader title={t('practice.games.x01.title')} description={t('practice.games.x01.desc')} />
-        <PracticeSetup
-          title={t('practice.setup.title')}
-          subtitle={t('practice.setup.subtitle')}
-          recap={describeSession({ game: GAME, settings }, t)}
-          onStart={handleStart}
-        >
-          <PracticeField
-            icon={Target}
-            label={t('practice.setup.startingScore')}
-            value={settings.startingScore}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <PracticeChips
-                options={STARTING_SCORES}
-                value={settings.startingScore}
-                onChange={(startingScore) => setSettings(s => ({ ...s, startingScore }))}
-              />
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 p-4 text-foreground md:p-8">
+        <PracticeScreenHeader />
+        <PracticeSetup preview={preview} onStart={handleStart}>
+          <PracticeField label={t('practice.setup.startingScore')}>
+            <PracticeChips
+              options={[...STARTING_SCORES, 'custom']}
+              value={isCustomScore ? 'custom' : settings.startingScore}
+              numeric={(o) => o !== 'custom'}
+              render={(o) => (o === 'custom' ? t('practice.setup.custom') : o)}
+              onChange={(o) => {
+                setIsCustomScore(o === 'custom');
+                if (o !== 'custom') setSettings(s => ({ ...s, startingScore: o }));
+              }}
+            />
+            {isCustomScore && (
               <Input
-                className="h-11 w-28 rounded-full border-dashed text-center font-medium tabular-nums"
+                className="h-11 font-display text-xl tabular-nums"
                 type="number"
                 min="2"
                 max="1001"
                 inputMode="numeric"
-                placeholder={t('practice.setup.custom')}
-                value={isPreset ? '' : settings.startingScore}
+                aria-label={t('practice.setup.custom')}
+                placeholder="2–1001"
+                value={STARTING_SCORES.includes(settings.startingScore) ? '' : settings.startingScore}
                 onChange={(e) => {
                   const n = Number.parseInt(e.target.value, 10);
                   if (Number.isInteger(n) && n >= 2 && n <= 1001) setSettings(s => ({ ...s, startingScore: n }));
                 }}
               />
-            </div>
+            )}
           </PracticeField>
 
-          <PracticeField
-            icon={Users}
-            label={t('practice.setup.opponent')}
-            hint={t('practice.setup.opponentHint')}
-            value={
-              settings.opponent?.kind === 'bot'
-                ? `${t('practice.setup.opponentBot')} ${settings.opponent.level}`
-                : settings.opponent?.kind === 'human'
-                  ? (settings.opponent.name || t('practice.setup.opponentPlayer'))
-                  : t('practice.setup.opponentSolo')
-            }
-          >
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={!hasOpponent ? 'default' : 'outline'}
-                aria-pressed={!hasOpponent}
-                className="min-h-11 rounded-full px-4"
-                onClick={() => setOpponent(null)}
-              >
-                {t('practice.setup.opponentSolo')}
-              </Button>
-              <Button
-                type="button"
-                variant={settings.opponent?.kind === 'human' ? 'default' : 'outline'}
-                aria-pressed={settings.opponent?.kind === 'human'}
-                className="min-h-11 rounded-full px-4"
-                onClick={() => setOpponent({ kind: 'human', name: settings.opponent?.name || '' })}
-              >
-                {t('practice.setup.opponentPlayer')}
-              </Button>
-              <Button
-                type="button"
-                variant={settings.opponent?.kind === 'bot' ? 'default' : 'outline'}
-                aria-pressed={settings.opponent?.kind === 'bot'}
-                className="min-h-11 rounded-full px-4"
-                onClick={() => setOpponent({ kind: 'bot', level: settings.opponent?.level || 4 })}
-              >
-                {t('practice.setup.opponentBot')}
-              </Button>
-            </div>
+          <PracticeField label={t('practice.setup.opponent')}>
+            <PracticeChips
+              options={['solo', 'human', 'bot']}
+              value={opponentKind}
+              onChange={pickOpponent}
+              render={(kind) => (
+                <>
+                  {kind === 'solo' ? <User className="max-sm:hidden" /> : kind === 'human' ? <Users className="max-sm:hidden" /> : <Bot className="max-sm:hidden" />}
+                  <span className="truncate">
+                    {t(kind === 'solo' ? 'practice.setup.opponentSolo' : kind === 'human' ? 'practice.setup.opponentPlayer' : 'practice.setup.opponentBot')}
+                  </span>
+                </>
+              )}
+            />
             {settings.opponent?.kind === 'bot' && (
-              <div className="flex flex-col gap-2 rounded-xl border border-primary/40 bg-gradient-to-b from-primary/10 to-card p-3">
+              <div className="flex flex-col gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 pt-1.5 pb-1">
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.easier')} disabled={settings.opponent.level <= BOT_LEVELS[0].level} onClick={() => setBotLevel(settings.opponent.level - 1)}>
                     <Minus />
                   </Button>
                   <div aria-live="polite" className="flex flex-1 flex-col items-center leading-tight">
-                    <span className="font-display text-3xl font-bold">{t('practice.bot.name', { level: settings.opponent.level })}</span>
+                    <span className="font-display text-2xl font-bold">{t('practice.bot.name', { level: settings.opponent.level })}</span>
                     <span className="text-xs text-primary">{t('practice.bot.aboutAverage', { average: getBotLevel(settings.opponent.level).average })}</span>
                   </div>
                   <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.harder')} disabled={settings.opponent.level >= BOT_LEVELS.at(-1).level} onClick={() => setBotLevel(settings.opponent.level + 1)}>
@@ -575,22 +619,21 @@ export function PracticeX01() {
                       type="button"
                       aria-label={`${t('practice.bot.name', { level: l.level })} · ~${l.average}`}
                       aria-pressed={settings.opponent.level === l.level}
-                      className="flex min-h-11 items-center"
+                      className="flex min-h-8 items-center"
                       onClick={() => setBotLevel(l.level)}
                     >
-                      <span className={cn('h-2 w-full rounded-full', l.level <= settings.opponent.level ? 'bg-primary' : 'bg-muted')} />
+                      <span className={cn('h-1.5 w-full rounded-full', l.level <= settings.opponent.level ? 'bg-primary' : 'bg-border')} />
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {t('practice.bot.levelHint', { level: settings.opponent.level, average: getBotLevel(settings.opponent.level).average })}
-                </p>
               </div>
             )}
             {settings.opponent?.kind === 'human' && (
               <Input
                 type="text"
+                className="h-11"
                 maxLength={OPPONENT_NAME_MAX}
+                aria-label={t('practice.setup.opponentName')}
                 placeholder={t('practice.setup.opponentName')}
                 value={settings.opponent.name}
                 onChange={(e) => setSettings(s => ({ ...s, opponent: { kind: 'human', name: e.target.value } }))}
@@ -599,46 +642,48 @@ export function PracticeX01() {
           </PracticeField>
 
           <PracticeField
-            icon={Trophy}
             label={hasOpponent ? t('practice.setup.firstTo') : t('practice.setup.legs')}
-            value={settings.legsTarget === null ? t('practice.setup.unlimited') : settings.legsTarget}
-          >
-            <PracticeChips
-              options={legOptions}
-              value={settings.legsTarget}
-              onChange={(legsTarget) => setSettings(s => ({ ...s, legsTarget }))}
-              render={(legs) => (legs === null ? t('practice.setup.unlimited') : legs)}
-            />
-          </PracticeField>
+            hint={hasOpponent
+              ? t('practice.setup.firstToHint')
+              : settings.legsTarget === null ? t('practice.setup.legsUnlimitedHint') : t('practice.setup.legsHint')}
+            aside={(
+              <PracticeStepper
+                value={settings.legsTarget === null ? '∞' : settings.legsTarget}
+                label={hasOpponent ? t('practice.setup.firstTo') : t('practice.setup.legs')}
+                decrementLabel={t('practice.setup.fewerLegs')}
+                incrementLabel={t('practice.setup.moreLegs')}
+                canDecrement={legIndex > 0}
+                canIncrement={legIndex < legOptions.length - 1}
+                onDecrement={() => stepLegs(-1)}
+                onIncrement={() => stepLegs(1)}
+              />
+            )}
+          />
 
           {hasOpponent && (
-            <PracticeField
-              icon={Flag}
-              label={t('practice.setup.starter')}
-              value={settings.starter === 'bullup' ? t('practice.setup.starterBullup') : settings.starter === 0 ? myName : opponentName}
-            >
+            <PracticeField label={t('practice.setup.starter')}>
               <PracticeChips
                 options={['bullup', 0, 1]}
                 value={settings.starter}
+                numeric={false}
                 onChange={(starter) => setSettings(s => ({ ...s, starter }))}
-                render={(i) => (i === 'bullup' ? t('practice.setup.starterBullup') : i === 0 ? myName : opponentName)}
+                render={(i) => (i === 'bullup'
+                  ? <><Target /><span className="truncate">{t('practice.setup.starterBullup')}</span></>
+                  : <span className="truncate">{i === 0 ? myName : opponentName}</span>)}
               />
             </PracticeField>
           )}
 
-          <PracticeField
-            icon={Keyboard}
-            label={t('practice.setup.scoringMode')}
-            value={t(settings.scoringMode === 'turnTotal' ? 'practice.setup.scoringTurnTotal' : 'practice.setup.scoringDart')}
-          >
-            <PracticeOptionCards
-              options={[
-                { value: 'dart', label: t('practice.setup.scoringDart'), hint: t('practice.setup.scoringDartHint') },
-                { value: 'turnTotal', label: t('practice.setup.scoringTurnTotal'), hint: t('practice.setup.scoringTurnTotalHint') }
-              ]}
+          <PracticeField label={t('practice.setup.scoringMode')}>
+            <PracticeChips
+              options={['dart', 'turnTotal']}
               value={settings.scoringMode}
               onChange={(scoringMode) => setSettings(s => ({ ...s, scoringMode }))}
+              render={(mode) => t(mode === 'turnTotal' ? 'practice.setup.scoringTurnTotal' : 'practice.setup.scoringDart')}
             />
+            <p className="text-xs text-muted-foreground">
+              {t(settings.scoringMode === 'turnTotal' ? 'practice.setup.scoringTurnTotalHint' : 'practice.setup.scoringDartHint')}
+            </p>
           </PracticeField>
         </PracticeSetup>
       </div>

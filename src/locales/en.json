@@ -1149,7 +1149,20 @@
       "you": "You",
       "subtitle": "Legs against the board, or against a second player or a bot.",
       "opponentHint": "Solo, someone else on this device, or a bot.",
-      "starterBullup": "Bull-up"
+      "starterBullup": "Bull-up",
+      "newGame": "New game",
+      "vsBoard": "You vs the board",
+      "doubleOut": "Double out",
+      "soloPractice": "Solo practice",
+      "bullupDecides": "Bull-up decides",
+      "youThrowFirst": "You throw first",
+      "throwsFirst": "{{name}} throws first",
+      "firstToHint": "Legs needed to win the match",
+      "legsHint": "The session ends after these legs",
+      "legsUnlimitedHint": "Play until you stop",
+      "fewerLegs": "Fewer legs",
+      "moreLegs": "More legs",
+      "preview": "Game preview"
     },
     "bot": {
       "name": "Bot level {{level}}",

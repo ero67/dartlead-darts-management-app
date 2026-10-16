@@ -175,15 +175,16 @@ export function PracticeOneTwentyOne() {
             hint={t('practice.oneTwentyOne.setup.startTargetHint')}
             value={settings.startTarget}
           >
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2">
               <PracticeChips options={START_OPTIONS} value={settings.startTarget} onChange={(startTarget) => setSettings(s => ({ ...s, startTarget }))} />
               <Input
-                className="h-11 w-28 rounded-full border-dashed text-center font-medium tabular-nums"
+                className="h-11 font-display text-xl tabular-nums"
                 type="number"
                 min={MIN_TARGET}
                 max={MAX_TARGET}
                 inputMode="numeric"
                 placeholder={t('practice.setup.custom')}
+                aria-label={t('practice.setup.custom')}
                 value={START_OPTIONS.includes(settings.startTarget) ? '' : settings.startTarget}
                 onChange={(e) => {
                   const n = Number.parseInt(e.target.value, 10);
