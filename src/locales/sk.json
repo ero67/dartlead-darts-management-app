@@ -580,7 +580,6 @@
     "resetLinkInvalid": "Tento odkaz na obnovenie hesla je neplatný alebo vypršal. Vyžiadajte si nový na prihlasovacej stránke.",
     "backToLogin": "Späť na prihlásenie",
     "appTitle": "Správca Šípkových Turnajov",
-    "signInAsAdmin": "Prihlásenie ako administrátor/zapisovateľ turnaja",
     "continueInterruptedMatches": "Pokračovať v prerušených zápasoch",
     "adminControlsForCorrections": "Admin ovládanie pre opravy",
     "tournamentManagement": "Správa turnajov",
@@ -612,7 +611,9 @@
     "onlyManagersCreateLeagues": "Ligy môžu vytvárať iba manažéri a administrátori.",
     "contactAdminForManager": "Ak chcete získať oprávnenia manažéra, kontaktujte administrátora.",
     "adminOnlyPage": "Na prístup k tejto stránke musíte byť administrátor.",
-    "managerOnlyPage": "Na prístup k tejto stránke musíte byť manažér alebo administrátor."
+    "managerOnlyPage": "Na prístup k tejto stránke musíte byť manažér alebo administrátor.",
+    "orWithEmail": "alebo prihlásenie e-mailom",
+    "signInSubtitle": "Prihlás sa a ukladaj si tréningový progres a sleduj svoje turnaje a ligy."
   },
   "common": {
     "save": "Uložiť",
