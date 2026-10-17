@@ -1,9 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Check, CheckCircle2, LogIn, Mail, Shield, Trophy, Activity, BarChart3, Users, Target, LayoutDashboard } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, Mail, Shield, Trophy, Activity, BarChart3, Users, Target } from 'lucide-react';
 import logo from '../assets/logo.png';
-import logoIcon from '../assets/logo-icon.png';
-import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,14 +46,7 @@ function SectionTitle({ id, children }) {
 
 export function LandingPage() {
   const { t } = useLanguage();
-  const { user } = useAuth();
   const navigate = useNavigate();
-
-  const navLinks = [
-    { path: '/practice', label: t('navigation.practice') },
-    { path: '/tournaments', label: t('navigation.tournaments') },
-    { path: '/leagues', label: t('navigation.leagues') },
-  ];
 
   const features = [
     { icon: Trophy, title: t('landing.features.flexibleTitle'), description: t('landing.features.flexibleDesc') },
@@ -77,31 +68,6 @@ export function LandingPage() {
 
   return (
     <div className="flex flex-col text-foreground">
-      <header className="border-b bg-background/85 backdrop-blur lg:sticky lg:top-0 lg:z-10">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8">
-          <a href="/" className="flex items-center gap-2.5" aria-label="DartLead" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-            <img src={logoIcon} alt="" className="size-8 rounded-lg object-cover" />
-            <Wordmark />
-          </a>
-          <nav aria-label={t('navigation.menu')} className="flex flex-wrap items-center gap-1">
-            {navLinks.map(link => (
-              <Button key={link.path} variant="ghost" onClick={() => navigate(link.path)}>{link.label}</Button>
-            ))}
-            {user ? (
-              <Button variant="outline" className="ml-1" onClick={() => navigate('/dashboard')}>
-                <LayoutDashboard />
-                {t('navigation.dashboard')}
-              </Button>
-            ) : (
-              <Button variant="outline" className="ml-1" onClick={() => navigate('/login')}>
-                <LogIn />
-                {t('navigation.login')}
-              </Button>
-            )}
-          </nav>
-        </div>
-      </header>
-
       <section aria-label={t('landing.heroBadge')} className="relative overflow-hidden border-b bg-gradient-to-br from-primary/10 via-background to-background">
         <BoardMotif className="-right-56 -top-32 w-[48rem]" />
         <div className="relative mx-auto grid w-full max-w-7xl items-center gap-12 px-4 py-14 md:px-8 md:py-20 lg:grid-cols-2">
