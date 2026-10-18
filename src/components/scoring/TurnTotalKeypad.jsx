@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+const VOICE_KEY = 'dartlead-voice-scoring';
 const KEY = 'flex min-h-12 short:min-h-7 items-center justify-center rounded-lg border bg-card font-display text-2xl font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40';
 
 // Visit totals that come up all the time; one tap fills the readout.
@@ -28,17 +29,24 @@ export function TurnTotalKeypad({
   const isInvalid = value.length > 0 && parseTurnTotal(value) === null;
   const inputRef = useRef(null);
   const [isVoiceMissed, setIsVoiceMissed] = useState(false);
+  // Hands-free mode sticks across matches on this device.
+  const [isVoiceOn, setIsVoiceOn] = useState(() => localStorage.getItem(VOICE_KEY) === '1');
   const submitRef = useRef(null);
   const voice = useVoiceScore({
     lang: language,
+    enabled: isVoiceOn && !disabled,
     onResult: (result) => {
-      if (!result) { setIsVoiceMissed(true); return; }
       setIsVoiceMissed(false);
       if (result.command === 'submit') submitRef.current?.();
+      else if (result.submit) onSubmit(result.score);
       else onChange(String(result.score));
-    }
+    },
+    onGiveUp: () => { setIsVoiceOn(false); setIsVoiceMissed(true); }
   });
-  const handleVoice = () => { setIsVoiceMissed(false); voice.isListening ? voice.stop() : voice.start(); };
+  const handleVoice = () => {
+    setIsVoiceMissed(false);
+    setIsVoiceOn((on) => { localStorage.setItem(VOICE_KEY, on ? '0' : '1'); return !on; });
+  };
 
   // Keyboard entry: the field is disabled while the other side throws (a bot
   // visit, a bust/leg flash) and a disabled input drops focus. Put the caret
@@ -86,15 +94,14 @@ export function TurnTotalKeypad({
             <Button
               variant="ghost"
               size="sm"
-              className={cn('text-muted-foreground', voice.isListening && 'animate-pulse text-live')}
+              className={cn('text-muted-foreground', isVoiceOn && 'text-foreground', voice.isListening && 'animate-pulse text-live')}
               onClick={handleVoice}
-              disabled={disabled}
               type="button"
-              aria-pressed={voice.isListening}
+              aria-pressed={isVoiceOn}
               title={t('match.voiceScore')}
             >
               <Mic />
-              {voice.isListening ? t('match.voiceListening') : t('match.voiceScore')}
+              {voice.isListening ? t('match.voiceListening') : isVoiceOn ? t('match.voiceOn') : t('match.voiceScore')}
             </Button>
           )}
           <Button

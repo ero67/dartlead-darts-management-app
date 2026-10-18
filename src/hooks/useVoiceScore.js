@@ -4,60 +4,109 @@ import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { parseSpokenScore, speechLocale } from '../lib/voiceScore';
 
 const WebRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+const RESTART_MS = 400;
+const QUICK_END_MS = 1500;
+const MAX_QUICK_ENDS = 5;
 
-// Push-to-talk: tap, say "140" / "stoštyridsať" / "bust" / "ok", it stops by
-// itself. Native shell uses Android's recogniser (the WebView has no Web
-// Speech API); browsers use SpeechRecognition where it exists (Chrome, Edge).
-// onResult gets { score } or { command: 'submit' }; unparsable speech is
-// reported as onResult(null) so the UI can flash "didn't catch that".
-export function useVoiceScore({ lang, onResult }) {
+// Hands-free scoring: while `enabled`, keep a recogniser session open and
+// start a fresh one whenever the device ends it (silence, timeout, error), so
+// the scorer never has to tap for the next visit. Native shell uses Android's
+// recogniser with streaming partial results (the WebView has no Web Speech
+// API); browsers use SpeechRecognition where it exists. onResult gets the
+// parse of every transcript; a submit restarts the session so the next visit
+// begins with an empty transcript. onGiveUp fires after several sessions in a
+// row died at once with nothing heard (no recogniser, mic refused).
+export function useVoiceScore({ lang, enabled, onResult, onGiveUp }) {
   const isNative = Capacitor.isNativePlatform();
   const isSupported = isNative || Boolean(WebRecognition);
   const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef(null);
-  const onResultRef = useRef(onResult);
-  onResultRef.current = onResult;
+  const wantedRef = useRef(false);
+  const webRef = useRef(null);
+  const timerRef = useRef(null);
+  const startedAtRef = useRef(0);
+  const heardRef = useRef(false);
+  const quickEndsRef = useRef(0);
+  const callbacks = useRef({ onResult, onGiveUp });
+  callbacks.current = { onResult, onGiveUp };
+  const startSessionRef = useRef(null); // latest startSession, for the restart timer
+
+  const stopSession = useCallback(() => {
+    clearTimeout(timerRef.current);
+    if (isNative) SpeechRecognition.stop().catch(() => {});
+    else { webRef.current?.abort(); webRef.current = null; }
+    setIsListening(false);
+  }, [isNative]);
+
+  // The session ended (device, error or our restart): run another if wanted.
+  const sessionEnded = useCallback(() => {
+    setIsListening(false);
+    if (!wantedRef.current) return;
+    const quick = !heardRef.current && Date.now() - startedAtRef.current < QUICK_END_MS;
+    quickEndsRef.current = quick ? quickEndsRef.current + 1 : 0;
+    if (quickEndsRef.current >= MAX_QUICK_ENDS) {
+      wantedRef.current = false;
+      callbacks.current.onGiveUp?.();
+      return;
+    }
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => startSessionRef.current?.(), RESTART_MS);
+  }, []);
 
   const deliver = useCallback((matches) => {
+    if (!wantedRef.current) return;
     const hit = matches.map(m => parseSpokenScore(m, lang)).find(Boolean) || null;
-    onResultRef.current?.(hit);
-  }, [lang]);
+    if (!hit) return;
+    heardRef.current = true;
+    callbacks.current.onResult?.(hit);
+    // Transcripts accumulate within a session: start clean after a submit.
+    if (hit.submit || hit.command === 'submit') stopSession();
+  }, [lang, stopSession]);
 
-  const start = useCallback(async () => {
-    if (isListening) return;
+  const startSession = useCallback(async () => {
+    if (!wantedRef.current) return;
+    startedAtRef.current = Date.now();
+    heardRef.current = false;
     if (isNative) {
       try {
-        const { speechRecognition } = await SpeechRecognition.requestPermissions();
-        if (speechRecognition !== 'granted') return;
+        let { speechRecognition } = await SpeechRecognition.checkPermissions();
+        if (speechRecognition !== 'granted') ({ speechRecognition } = await SpeechRecognition.requestPermissions());
+        if (speechRecognition !== 'granted') { wantedRef.current = false; callbacks.current.onGiveUp?.(); return; }
+        await SpeechRecognition.start({ language: speechLocale(lang), maxResults: 3, partialResults: true, popup: false });
         setIsListening(true);
-        const { matches = [] } = await SpeechRecognition.start({ language: speechLocale(lang), maxResults: 3, partialResults: false, popup: false });
-        deliver(matches);
       } catch {
-        // Cancelled or recogniser error: treat as nothing heard.
-      } finally {
-        setIsListening(false);
+        sessionEnded();
       }
       return;
     }
     const recognition = new WebRecognition();
-    recognitionRef.current = recognition;
+    webRef.current = recognition;
     recognition.lang = speechLocale(lang);
     recognition.maxAlternatives = 3;
-    recognition.interimResults = false;
-    recognition.onresult = (e) => deliver(Array.from(e.results[0]).map(r => r.transcript));
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => { setIsListening(false); recognitionRef.current = null; };
-    setIsListening(true);
-    recognition.start();
-  }, [isListening, isNative, lang, deliver]);
+    recognition.interimResults = true;
+    recognition.onresult = (e) => deliver(Array.from(e.results[e.results.length - 1]).map(r => r.transcript));
+    recognition.onend = () => { if (webRef.current === recognition) webRef.current = null; sessionEnded(); };
+    recognition.onerror = () => {};
+    try { recognition.start(); setIsListening(true); } catch { sessionEnded(); }
+  }, [isNative, lang, deliver, sessionEnded]);
+  startSessionRef.current = startSession;
 
-  const stop = useCallback(() => {
-    if (isNative) SpeechRecognition.stop().catch(() => {});
-    else recognitionRef.current?.abort();
-    setIsListening(false);
-  }, [isNative]);
+  // Native events: streamed transcripts and the recogniser's own stop.
+  useEffect(() => {
+    if (!isNative) return undefined;
+    const handles = [
+      SpeechRecognition.addListener('partialResults', ({ matches = [] }) => deliver(matches)),
+      SpeechRecognition.addListener('listeningState', ({ status }) => { if (status === 'stopped') sessionEnded(); })
+    ];
+    return () => { handles.forEach(h => h.then(x => x.remove())); };
+  }, [isNative, deliver, sessionEnded]);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    wantedRef.current = Boolean(enabled && isSupported);
+    quickEndsRef.current = 0;
+    if (wantedRef.current) startSession();
+    else stopSession();
+    return () => { wantedRef.current = false; stopSession(); };
+  }, [enabled, isSupported, startSession, stopSession]);
 
-  return { isSupported, isListening, start, stop };
+  return { isSupported, isListening };
 }

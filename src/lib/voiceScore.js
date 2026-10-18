@@ -1,7 +1,8 @@
 // Turn a speech-recognition transcript into a 3-dart total (0–180) or a
 // command. Recognisers usually emit digits for numbers ("140"); the word
 // tables are the fallback for "one forty", "stoštyridsať", "ton eighty".
-// Returns { score }, { command: 'submit' } or null when nothing parsed.
+// Returns { score, submit? } ("140 ok" submits in one breath), { command: 'submit' }
+// or null when nothing parsed.
 
 const strip = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -32,27 +33,32 @@ const inRange = (n) => (Number.isInteger(n) && n >= 0 && n <= 180 ? { score: n }
 export const parseSpokenScore = (transcript, lang = 'en') => {
   if (!transcript) return null;
   const text = strip(transcript).trim();
+  const submit = SUBMIT.test(text);
 
-  if (SUBMIT.test(text)) return { command: 'submit' };
-  if (ZERO.test(text)) return { score: 0 };
+  // Streaming transcripts accumulate ("60 no 100 ok"), so the last number wins.
+  const digits = text.match(/\d+/g);
+  let parsed = digits ? inRange(Number(digits[digits.length - 1])) : null;
+  if (!parsed && ZERO.test(text)) parsed = { score: 0 };
 
-  const digits = text.match(/\d+/);
-  if (digits) return inRange(Number(digits[0]));
-
-  const table = WORDS[lang] || WORDS.en;
-  const tokens = [];
-  text.replace(patterns[lang] || patterns.en, (w) => { tokens.push(table[w]); return ' '; });
-  if (tokens.length === 0) return null;
-
-  // "one forty" → 140, "one hundred and forty" → 140, "ton eighty" → 180,
-  // "twenty six" → 26, "sto styridsat" → 140.
-  let total = 0;
-  for (const n of tokens) {
-    if (n === 100) total = total > 0 && total < 10 ? total * 100 : total + 100;
-    else if (total > 0 && total < 10 && n >= 10) total = total * 100 + n;
-    else total += n;
+  if (!parsed) {
+    const table = WORDS[lang] || WORDS.en;
+    const tokens = [];
+    text.replace(patterns[lang] || patterns.en, (w) => { tokens.push(table[w]); return ' '; });
+    if (tokens.length > 0) {
+      // "one forty" → 140, "one hundred and forty" → 140, "ton eighty" → 180,
+      // "twenty six" → 26, "sto styridsat" → 140.
+      let total = 0;
+      for (const n of tokens) {
+        if (n === 100) total = total > 0 && total < 10 ? total * 100 : total + 100;
+        else if (total > 0 && total < 10 && n >= 10) total = total * 100 + n;
+        else total += n;
+      }
+      parsed = inRange(total);
+    }
   }
-  return inRange(total);
+
+  if (parsed) return submit ? { ...parsed, submit: true } : parsed;
+  return submit ? { command: 'submit' } : null;
 };
 
 export const speechLocale = (lang) => (lang === 'sk' ? 'sk-SK' : 'en-GB');
