@@ -26,6 +26,7 @@ export function PrivacyPolicy() {
           <li><strong className="font-medium text-foreground">Player data:</strong> the player name shown in tournaments, and the link between that player and your account.</li>
           <li><strong className="font-medium text-foreground">Tournament data:</strong> tournaments, groups, players, matches, scores, and statistics you create or manage.</li>
           <li><strong className="font-medium text-foreground">Device data:</strong> a random device identifier and the optional device name / board number you enter, used to show which board a match is running on; IP address as processed by hosting and database providers. The Android app additionally stores your preferences (theme, language, vibration strength) on the device only.</li>
+          <li><strong className="font-medium text-foreground">Microphone (optional):</strong> if you tap the Voice button while scoring, the spoken score is transcribed by your browser's or device's speech service (on Android, Google's speech recogniser). Only the recognised number is used; no audio is stored by us. The microphone is active only while the button shows &ldquo;Listening&rdquo;.</li>
           <li><strong className="font-medium text-foreground">Usage data:</strong> app interaction events, error logs, and performance metrics to keep the service reliable.</li>
           <li><strong className="font-medium text-foreground">Cookies/local storage:</strong> used for authentication sessions, language/theme preferences, and in-progress match state.</li>
         </ul>

@@ -186,6 +186,9 @@
     "undoLastVisit": "Vrátiť posledný náhod",
     "dartsCount": "{{count}} šípok",
     "okZero": "bez bodov (0)",
+    "voiceScore": "Hlas",
+    "voiceListening": "Počúvam…",
+    "voiceMissed": "Nerozumel som. Povedzte číslo 0–180, „nula“ alebo „OK“.",
     "backspace": "Zmazať poslednú číslicu",
     "notScorerDescription": "Ste prihlásený, ale nie ste priradený ako zapisovateľ tohto turnaja, takže vaše skóre by sa neuložilo. Požiadajte organizátora turnaja, aby vás pridal v záložke Zapisovatelia."
   },

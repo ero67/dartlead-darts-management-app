@@ -186,6 +186,9 @@
     "undoLastVisit": "Undo last visit",
     "dartsCount": "{{count}} darts",
     "okZero": "no score (0)",
+    "voiceScore": "Voice",
+    "voiceListening": "Listening…",
+    "voiceMissed": "Didn’t catch that. Say a number from 0 to 180, \"bust\" or \"OK\".",
     "backspace": "Delete last digit",
     "notScorerDescription": "You are signed in but not assigned as a scorer for this tournament, so your score would not be saved. Ask the tournament manager to add you under Scorers."
   },

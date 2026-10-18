@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
-import { RotateCcw } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Mic, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { normalizeTurnTotalInput, appendTurnTotalDigit, parseTurnTotal } from '../../lib/turnTotalInput';
+import { useVoiceScore } from '../../hooks/useVoiceScore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -23,9 +24,21 @@ export function TurnTotalKeypad({
   showQuickScores = false,
   disabled = false
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isInvalid = value.length > 0 && parseTurnTotal(value) === null;
   const inputRef = useRef(null);
+  const [isVoiceMissed, setIsVoiceMissed] = useState(false);
+  const submitRef = useRef(null);
+  const voice = useVoiceScore({
+    lang: language,
+    onResult: (result) => {
+      if (!result) { setIsVoiceMissed(true); return; }
+      setIsVoiceMissed(false);
+      if (result.command === 'submit') submitRef.current?.();
+      else onChange(String(result.score));
+    }
+  });
+  const handleVoice = () => { setIsVoiceMissed(false); voice.isListening ? voice.stop() : voice.start(); };
 
   // Keyboard entry: the field is disabled while the other side throws (a bot
   // visit, a bust/leg flash) and a disabled input drops focus. Put the caret
@@ -41,6 +54,7 @@ export function TurnTotalKeypad({
     if (disabled || isInvalid) return;
     onSubmit(parseTurnTotal(value));
   };
+  submitRef.current = submit;
 
   const okButton = (
     <Button
@@ -67,6 +81,22 @@ export function TurnTotalKeypad({
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('match.turnTotalLabel')}</span>
           {/* Undo lives up here, away from OK: it used to sit right
               under the big green button and got hit by mistake. */}
+          <span className="flex items-center">
+          {voice.isSupported && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('text-muted-foreground', voice.isListening && 'animate-pulse text-live')}
+              onClick={handleVoice}
+              disabled={disabled}
+              type="button"
+              aria-pressed={voice.isListening}
+              title={t('match.voiceScore')}
+            >
+              <Mic />
+              {voice.isListening ? t('match.voiceListening') : t('match.voiceScore')}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -79,14 +109,17 @@ export function TurnTotalKeypad({
             <RotateCcw />
             {t('match.undoLastVisit')}
           </Button>
+          </span>
         </div>
         <div className={cn('font-display text-5xl font-semibold tabular-nums short:text-3xl', isInvalid && 'text-destructive', !value && 'text-muted-foreground')}>
           {value || '0'}
         </div>
-        <div className={cn('text-xs', isInvalid ? 'text-destructive' : 'text-muted-foreground short:hidden')}>
+        <div className={cn('text-xs', isInvalid || isVoiceMissed ? 'text-destructive' : 'text-muted-foreground short:hidden')}>
           {isInvalid
             ? t('match.turnTotalInvalid')
-            : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
+            : isVoiceMissed
+              ? t('match.voiceMissed')
+              : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
         </div>
       </div>
       {useOnScreenKeypad && showQuickScores && (
