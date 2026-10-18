@@ -347,7 +347,10 @@ export function TvDisplay() {
                     return (
                       <TableRow key={s.player.id} className={cn(qualifies && 'bg-primary/15 shadow-[inset_4px_0_0_var(--primary)] hover:bg-primary/15')}>
                         <TableCell className={cn('font-display text-xl font-semibold text-muted-foreground', qualifies && 'text-primary')}>{i + 1}</TableCell>
-                        <TableCell className="max-w-[40vw] truncate font-semibold">{s.player.name}</TableCell>
+                        {/* The name takes whatever width the stats leave and
+                            truncates; with a fixed max width a long name pushed
+                            the stats out of the card (seen with four groups). */}
+                        <TableCell className="w-full max-w-0 truncate font-semibold">{s.player.name}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.matchesPlayed}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.matchesWon}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.legsWon}:{s.legsLost}</TableCell>

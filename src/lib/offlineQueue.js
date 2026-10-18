@@ -111,6 +111,14 @@ export function hasPending() {
   return readQueue().length > 0;
 }
 
+// Pending writes that change what a tournament refetch would show (results,
+// bracket advances). Live score snapshots are not among them: one stuck on bad
+// WiFi used to block every silent refresh of the tournament for as long as it
+// kept failing.
+export function hasPendingResults() {
+  return readQueue().some(q => q.type !== QUEUE_TYPES.liveSync && q.type !== QUEUE_TYPES.startLiveMatch);
+}
+
 export function getQueueLength() {
   return readQueue().length;
 }
