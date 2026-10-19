@@ -271,6 +271,9 @@ public class VoiceScorePlugin extends Plugin {
         @Override
         public void onBufferReceived(byte[] buffer) {}
 
+        @Override
+        public void onEvent(int eventType, Bundle params) {}
+
         // A one-shot session beeps when it stops listening: mute before that.
         @Override
         public void onEndOfSpeech() {
