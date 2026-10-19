@@ -187,7 +187,6 @@
     "dartsCount": "{{count}} darts",
     "okZero": "no score (0)",
     "voiceScore": "Voice",
-    "voiceListening": "Listening…",
     "voiceOn": "Voice on",
     "voiceEntering": "Entering {{score}}… tap a key or say another number to change it.",
     "voiceMissed": "Voice switched off: no speech recogniser or microphone access.",

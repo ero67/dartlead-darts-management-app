@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 const VOICE_KEY = 'dartlead-voice-scoring';
+const VOICE_DEBUG_KEY = 'dartlead-voice-debug';
 // A heard score sits in the readout this long before it is entered, so a
 // misheard number can be corrected by tapping the keypad or saying another.
 const VOICE_CONFIRM_MS = 1500;
@@ -34,6 +35,8 @@ export function TurnTotalKeypad({
   const [isVoiceMissed, setIsVoiceMissed] = useState(false);
   // Hands-free mode sticks across matches on this device.
   const [isVoiceOn, setIsVoiceOn] = useState(() => localStorage.getItem(VOICE_KEY) === '1');
+  // Long-press the Voice button: a log of recent listens, for field testing.
+  const [isVoiceDebug, setIsVoiceDebug] = useState(() => localStorage.getItem(VOICE_DEBUG_KEY) === '1');
   const submitRef = useRef(null);
   const [pendingScore, setPendingScore] = useState(null);
   const pendingTimer = useRef(null);
@@ -53,6 +56,10 @@ export function TurnTotalKeypad({
     },
     onGiveUp: () => { setIsVoiceOn(false); setIsVoiceMissed(true); }
   });
+  const handleVoiceDebug = (e) => {
+    e.preventDefault();
+    setIsVoiceDebug((on) => { localStorage.setItem(VOICE_DEBUG_KEY, on ? '0' : '1'); return !on; });
+  };
   const handleVoice = () => {
     setIsVoiceMissed(false);
     setIsVoiceOn((on) => { localStorage.setItem(VOICE_KEY, on ? '0' : '1'); return !on; });
@@ -113,14 +120,15 @@ export function TurnTotalKeypad({
             <Button
               variant="ghost"
               size="sm"
-              className={cn('text-muted-foreground', isVoiceOn && 'text-foreground', voice.isListening && 'animate-pulse text-live')}
+              className={cn('text-muted-foreground', isVoiceOn && 'text-foreground', voice.isListening && 'animate-pulse')}
               onClick={handleVoice}
+              onContextMenu={handleVoiceDebug}
               type="button"
               aria-pressed={isVoiceOn}
               title={t('match.voiceScore')}
             >
-              <Mic />
-              {voice.isListening ? t('match.voiceListening') : isVoiceOn ? t('match.voiceOn') : t('match.voiceScore')}
+              <Mic className={cn(voice.isListening && 'text-live')} />
+              {isVoiceOn ? t('match.voiceOn') : t('match.voiceScore')}
             </Button>
           )}
           <Button
@@ -149,6 +157,9 @@ export function TurnTotalKeypad({
                 ? t('match.voiceMissed')
               : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
         </div>
+        {isVoiceDebug && isVoiceOn && voice.log.length > 0 && (
+          <pre className="mt-1 max-h-24 overflow-y-auto font-mono text-[10px] leading-tight text-muted-foreground">{voice.log.join('\n')}</pre>
+        )}
       </div>
       {useOnScreenKeypad && showQuickScores && (
         <div className="flex shrink-0 gap-1 overflow-x-auto [scrollbar-width:none] short:hidden [&::-webkit-scrollbar]:hidden">

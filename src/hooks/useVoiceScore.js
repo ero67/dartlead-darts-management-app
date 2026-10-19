@@ -6,9 +6,16 @@ import { parseSpokenScore, speechLocale } from '../lib/voiceScore';
 const WebRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 const isNative = Capacitor.isNativePlatform();
 const QUICK_MS = 1500;      // a listen shorter than this heard nothing real
-const RESTART_MS = 300;
-const MAX_BACKOFF_MS = 4000;
+// Never start a listen sooner than this after the last one ended or was
+// stopped. Android beeps at every stop; a listen started during that beep
+// hears it, ends at once and beeps again, so short gaps chain into bursts.
+const GAP_MS = 1000;
+const QUICK_GAP_MS = 2500;  // after a listen that died at once
 const MAX_FAILURES = 5;
+const LOG_LINES = 8;
+
+// Module-wide: a turn change ends one effect and starts the next immediately.
+let lastEndAt = 0;
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -56,12 +63,13 @@ const ensurePermission = async () => {
 // Hands-free scoring: while `enabled` and `active` (the keypad accepts
 // input), listen for one phrase at a time and hand every recognised score to
 // onResult. Android's recogniser ends each listen after a pause, so it is
-// started again until the player speaks; listens that die at once back off
-// so a failing recogniser cannot loop. Five failures in a row (no recogniser,
+// started again until the player speaks, always after a pause (GAP_MS) so
+// the stop beep is not heard by the next listen. Five failures in a row (no recogniser,
 // microphone refused) call onGiveUp. Android beeps at every start and stop.
 export function useVoiceScore({ lang, enabled, active, onResult, onGiveUp }) {
   const isSupported = isNative || Boolean(WebRecognition);
   const [isListening, setIsListening] = useState(false);
+  const [log, setLog] = useState([]); // recent listens, for the long-press debug view
   const callbacks = useRef({ onResult, onGiveUp });
   callbacks.current = { onResult, onGiveUp };
 
@@ -75,35 +83,41 @@ export function useVoiceScore({ lang, enabled, active, onResult, onGiveUp }) {
         if (alive) callbacks.current.onGiveUp?.();
         return;
       }
-      setIsListening(true);
       let failures = 0;
-      let quickEnds = 0;
+      let gap = GAP_MS;
       while (alive) {
+        const wait = lastEndAt + gap - Date.now();
+        if (wait > 0) await sleep(wait);
+        if (!alive) return;
+        setIsListening(true);
         const startedAt = Date.now();
         const { matches, error } = isNative ? await listenNative(lang) : await listenWeb(lang, web);
+        lastEndAt = Date.now();
         if (!alive) return;
+        setIsListening(false);
         const hit = matches.map(m => parseSpokenScore(m, lang)).find(Boolean);
+        const took = ((lastEndAt - startedAt) / 1000).toFixed(1);
+        const clock = new Date(startedAt).toTimeString().slice(3, 8);
+        setLog(prev => [`${clock} ${took}s ${matches.length ? `"${matches[0]}"${hit ? '' : ' (no score)'}` : error}`, ...prev].slice(0, LOG_LINES));
         if (hit) callbacks.current.onResult?.(hit);
 
         failures = error === 'denied' ? MAX_FAILURES : error === 'other' ? failures + 1 : 0;
         if (failures >= MAX_FAILURES) {
-          setIsListening(false);
           callbacks.current.onGiveUp?.();
           return;
         }
-        const quick = Date.now() - startedAt < QUICK_MS && !matches.length;
-        quickEnds = quick ? quickEnds + 1 : 0;
-        await sleep(quick ? Math.min(500 * 2 ** (quickEnds - 1), MAX_BACKOFF_MS) : RESTART_MS);
+        gap = lastEndAt - startedAt < QUICK_MS && !matches.length ? QUICK_GAP_MS : GAP_MS;
       }
     })();
 
     return () => {
       alive = false;
+      lastEndAt = Date.now();
       if (isNative) SpeechRecognition.stop().catch(() => {});
       else web.recognition?.abort();
       setIsListening(false);
     };
   }, [enabled, active, isSupported, lang]);
 
-  return { isSupported, isListening };
+  return { isSupported, isListening, log };
 }

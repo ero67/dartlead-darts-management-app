@@ -187,7 +187,6 @@
     "dartsCount": "{{count}} šípok",
     "okZero": "bez bodov (0)",
     "voiceScore": "Hlas",
-    "voiceListening": "Počúvam…",
     "voiceOn": "Hlas zapnutý",
     "voiceEntering": "Zapisujem {{score}}… ťuknite na kláves alebo povedzte iné číslo.",
     "voiceMissed": "Hlas vypnutý: chýba rozpoznávanie reči alebo prístup k mikrofónu.",
