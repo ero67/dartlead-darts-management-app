@@ -834,7 +834,7 @@ export function PracticeX01() {
             canUndo={canUndoNow && !botBusy}
             useOnScreenKeypad={isOnScreenKeypad}
             showQuickScores
-            disabled={flash !== null || botBusy}
+            disabled={flash !== null || botBusy || pendingCheckout !== null}
           />
         )}
       </PracticeKeypad>

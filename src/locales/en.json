@@ -189,7 +189,8 @@
     "voiceScore": "Voice",
     "voiceListening": "Listening…",
     "voiceOn": "Voice on",
-    "voiceMissed": "Didn’t catch that. Say a number from 0 to 180, \"bust\" or \"OK\".",
+    "voiceEntering": "Entering {{score}}… tap a key or say another number to change it.",
+    "voiceMissed": "Voice switched off: no speech recogniser or microphone access.",
     "backspace": "Delete last digit",
     "notScorerDescription": "You are signed in but not assigned as a scorer for this tournament, so your score would not be saved. Ask the tournament manager to add you under Scorers."
   },

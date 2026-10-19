@@ -1,109 +1,109 @@
 import { useState, useRef, useEffect } from 'react';
-import { Capacitor, registerPlugin } from '@capacitor/core';
-import { createSpeechReader, speechLocale } from '../lib/voiceScore';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+import { parseSpokenScore, speechLocale } from '../lib/voiceScore';
 
-// Native side: android/app/src/main/java/com/dartlead/app/VoiceScorePlugin.java
-const VoiceScore = registerPlugin('VoiceScore');
 const WebRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 const isNative = Capacitor.isNativePlatform();
-const RESTART_MS = 250;
-const QUICK_END_MS = 1500;
-const MAX_QUICK_ENDS = 5;
+const QUICK_MS = 1500;      // a listen shorter than this heard nothing real
+const RESTART_MS = 300;
+const MAX_BACKOFF_MS = 4000;
+const MAX_FAILURES = 5;
 
-// Hands-free scoring. While `enabled`, one listening session stays open for
-// the whole game: the native plugin and the browser branch below restart the
-// recogniser themselves when the device ends it, without the UI ever seeing
-// it stop. Speech is applied only while `active` (keypad enabled); during a
-// bot's visit or a bust flash it is heard and dropped, never by closing the
-// microphone. Growing transcripts are read by createSpeechReader.
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// One phrase per listen: { matches, error } with error null | 'silence' |
+// 'denied' | 'other'. Silence is the normal outcome while darts are thrown.
+const listenNative = async (lang) => {
+  try {
+    const { matches = [] } = await SpeechRecognition.start({ language: speechLocale(lang), maxResults: 3, partialResults: false, popup: false });
+    return { matches, error: null };
+  } catch (e) {
+    const message = String(e?.message || e);
+    if (/no match|no speech/i.test(message)) return { matches: [], error: 'silence' };
+    if (/permission/i.test(message)) return { matches: [], error: 'denied' };
+    return { matches: [], error: 'other' };
+  }
+};
+
+const listenWeb = (lang, holder) => new Promise((resolve) => {
+  const recognition = new WebRecognition();
+  holder.recognition = recognition;
+  recognition.lang = speechLocale(lang);
+  recognition.maxAlternatives = 3;
+  recognition.interimResults = false;
+  let matches = [];
+  let error = null;
+  recognition.onresult = (e) => { matches = Array.from(e.results[0]).map(a => a.transcript); };
+  recognition.onerror = (e) => {
+    error = e.error === 'no-speech' || e.error === 'aborted' ? 'silence' : e.error === 'not-allowed' ? 'denied' : 'other';
+  };
+  recognition.onend = () => resolve({ matches, error: matches.length ? null : (error || 'silence') });
+  try { recognition.start(); } catch { resolve({ matches: [], error: 'other' }); }
+});
+
+const ensurePermission = async () => {
+  if (!isNative) return true;
+  try {
+    let { speechRecognition } = await SpeechRecognition.checkPermissions();
+    if (speechRecognition !== 'granted') ({ speechRecognition } = await SpeechRecognition.requestPermissions());
+    return speechRecognition === 'granted';
+  } catch {
+    return false;
+  }
+};
+
+// Hands-free scoring: while `enabled` and `active` (the keypad accepts
+// input), listen for one phrase at a time and hand every recognised score to
+// onResult. Android's recogniser ends each listen after a pause, so it is
+// started again until the player speaks; listens that die at once back off
+// so a failing recogniser cannot loop. Five failures in a row (no recogniser,
+// microphone refused) call onGiveUp. Android beeps at every start and stop.
 export function useVoiceScore({ lang, enabled, active, onResult, onGiveUp }) {
   const isSupported = isNative || Boolean(WebRecognition);
   const [isListening, setIsListening] = useState(false);
-  const readerRef = useRef(null);
-  if (!readerRef.current) readerRef.current = createSpeechReader();
-  const handleSpeechRef = useRef(null);
-  const onGiveUpRef = useRef(onGiveUp);
-  onGiveUpRef.current = onGiveUp;
-
-  handleSpeechRef.current = (type, matches) => {
-    const hit = readerRef.current(type, matches, { lang, active });
-    if (hit) onResult?.(hit);
-  };
+  const callbacks = useRef({ onResult, onGiveUp });
+  callbacks.current = { onResult, onGiveUp };
 
   useEffect(() => {
-    if (!enabled || !isSupported) return undefined;
-    readerRef.current.reset();
-    const deliver = (type, matches) => handleSpeechRef.current(type, matches);
-    const giveUp = () => { setIsListening(false); onGiveUpRef.current?.(); };
+    if (!enabled || !active || !isSupported) return undefined;
+    let alive = true;
+    const web = { recognition: null }; // the browser listen in progress
 
-    if (isNative) {
-      let disposed = false;
-      const handles = [
-        VoiceScore.addListener('speech', ({ type, matches = [] }) => deliver(type, matches)),
-        VoiceScore.addListener('state', ({ listening, error }) => {
-          if (disposed) return;
-          if (error) giveUp();
-          else setIsListening(listening);
-        })
-      ];
-      Promise.all(handles)
-        .then(() => (disposed ? null : VoiceScore.start({ language: speechLocale(lang) })))
-        .catch(() => { if (!disposed) giveUp(); });
-      return () => {
-        disposed = true;
-        handles.forEach(h => h.then(x => x.remove()).catch(() => {}));
-        VoiceScore.stop().catch(() => {});
-        setIsListening(false);
-      };
-    }
-
-    // Browser: continuous mode, restarted whenever the browser ends it.
-    let wanted = true;
-    let recognition = null;
-    let timer = null;
-    let startedAt = 0;
-    let heard = false;
-    let quickEnds = 0;
-    const startWeb = () => {
-      if (!wanted) return;
-      recognition = new WebRecognition();
-      recognition.lang = speechLocale(lang);
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 3;
-      recognition.onresult = (e) => {
-        heard = true;
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const r = e.results[i];
-          deliver(r.isFinal ? 'final' : 'partial', Array.from(r).map(a => a.transcript));
-        }
-      };
-      recognition.onerror = () => {};
-      recognition.onend = () => {
-        if (!wanted) return;
-        const quick = !heard && Date.now() - startedAt < QUICK_END_MS;
-        quickEnds = quick ? quickEnds + 1 : 0;
-        if (quickEnds >= MAX_QUICK_ENDS) { wanted = false; giveUp(); return; }
-        readerRef.current.reset();
-        timer = setTimeout(startWeb, RESTART_MS);
-      };
-      startedAt = Date.now();
-      heard = false;
-      try {
-        recognition.start();
-        setIsListening(true);
-      } catch {
-        recognition.onend();
+    (async () => {
+      if (!(await ensurePermission())) {
+        if (alive) callbacks.current.onGiveUp?.();
+        return;
       }
-    };
-    startWeb();
+      setIsListening(true);
+      let failures = 0;
+      let quickEnds = 0;
+      while (alive) {
+        const startedAt = Date.now();
+        const { matches, error } = isNative ? await listenNative(lang) : await listenWeb(lang, web);
+        if (!alive) return;
+        const hit = matches.map(m => parseSpokenScore(m, lang)).find(Boolean);
+        if (hit) callbacks.current.onResult?.(hit);
+
+        failures = error === 'denied' ? MAX_FAILURES : error === 'other' ? failures + 1 : 0;
+        if (failures >= MAX_FAILURES) {
+          setIsListening(false);
+          callbacks.current.onGiveUp?.();
+          return;
+        }
+        const quick = Date.now() - startedAt < QUICK_MS && !matches.length;
+        quickEnds = quick ? quickEnds + 1 : 0;
+        await sleep(quick ? Math.min(500 * 2 ** (quickEnds - 1), MAX_BACKOFF_MS) : RESTART_MS);
+      }
+    })();
+
     return () => {
-      wanted = false;
-      clearTimeout(timer);
-      recognition?.abort();
+      alive = false;
+      if (isNative) SpeechRecognition.stop().catch(() => {});
+      else web.recognition?.abort();
       setIsListening(false);
     };
-  }, [enabled, isSupported, lang]);
+  }, [enabled, active, isSupported, lang]);
 
   return { isSupported, isListening };
 }
