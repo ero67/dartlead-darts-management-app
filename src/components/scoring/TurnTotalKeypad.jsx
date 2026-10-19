@@ -34,7 +34,8 @@ export function TurnTotalKeypad({
   const submitRef = useRef(null);
   const voice = useVoiceScore({
     lang: language,
-    enabled: isVoiceOn && !disabled,
+    enabled: isVoiceOn,
+    active: !disabled,
     onResult: (result) => {
       setIsVoiceMissed(false);
       if (result.command === 'submit') submitRef.current?.();

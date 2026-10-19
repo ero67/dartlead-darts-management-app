@@ -62,3 +62,28 @@ export const parseSpokenScore = (transcript, lang = 'en') => {
 };
 
 export const speechLocale = (lang) => (lang === 'sk' ? 'sk-SK' : 'en-GB');
+
+const wordsOf = (text) => (text || '').trim().split(/\s+/).filter(Boolean);
+
+// Reads one live transcript stream. A recogniser reports an utterance as it
+// grows ("140" → "140 ok" → "140 ok 60") and then once more as final, so once
+// a submit has been used only the words after it count. Speech while
+// inactive (bot's turn, bust flash) is marked used and dropped. Returns the
+// parse of the new words, or null.
+export const createSpeechReader = () => {
+  let consumed = 0;
+  const read = (type, matches, { lang, active }) => {
+    const count = wordsOf(matches[0]).length;
+    let hit = null;
+    if (!active) {
+      consumed = Math.max(consumed, count);
+    } else if (count > consumed) {
+      hit = matches.map(m => parseSpokenScore(wordsOf(m).slice(consumed).join(' '), lang)).find(Boolean) || null;
+      if (hit && (hit.submit || hit.command === 'submit')) consumed = count;
+    }
+    if (type === 'final') consumed = 0;
+    return hit;
+  };
+  read.reset = () => { consumed = 0; };
+  return read;
+};

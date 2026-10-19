@@ -68,6 +68,11 @@ Only these places branch on it:
   the page background; `.app` pads by the injected `--safe-area-inset-*`.
 - `src/hooks/useKeepScreenAwake.js` — match screen keeps the display on
   (`@capacitor-community/keep-awake`; Screen Wake Lock API in browsers).
+- `src/hooks/useVoiceScore.js` — hands-free 3-dart-total entry. The WebView has
+  no Web Speech API, so the app ships its own plugin,
+  `android/app/src/main/java/com/dartlead/app/VoiceScorePlugin.java`
+  (registered in `MainActivity`): one long segmented session on Android 13+,
+  silent auto-restart elsewhere. Needs `RECORD_AUDIO` (in the manifest).
 - `src/utils/publicUrl.js` — share links and password-reset emails use
   `VITE_PUBLIC_APP_URL` (the website's address) instead of the shell's local
   origin. Put it in `.env.production.local` next to the Supabase variables.
