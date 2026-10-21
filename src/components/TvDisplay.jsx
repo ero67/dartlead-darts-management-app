@@ -16,6 +16,8 @@ import { EmptyState } from './shared/EmptyState';
 import { StatusBadge } from './shared/StatusBadge';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
 import { matchWinProbability } from '../lib/winProbability';
+import { liveMatchChance } from '../lib/legChance';
+import checkoutData from '../data/checkouts.json';
 import { LastVisitChip } from './tournament/LiveMatchesTab';
 import { useLastVisits } from '@/hooks/useLastVisits';
 import { usePlayerStrengths } from '@/hooks/usePlayerStrengths';
@@ -314,7 +316,15 @@ export function TvDisplay() {
                   <CardContent className="flex flex-col gap-1 px-4">
                     {renderPlayerRow(p1, m.player1_legs ?? 0, m.player1_current_score ?? m.starting_score ?? 501, turn === 0, lastVisits[m.id]?.player === 0 ? lastVisits[m.id] : null)}
                     {renderPlayerRow(p2, m.player2_legs ?? 0, m.player2_current_score ?? m.starting_score ?? 501, turn === 1, lastVisits[m.id]?.player === 1 ? lastVisits[m.id] : null)}
-                    {renderWinChance(winChance(m, m.player1_legs ?? 0, m.player2_legs ?? 0))}
+                    {renderWinChance(liveMatchChance({
+                      strengths: [avgById[m.player1?.id], avgById[m.player2?.id]],
+                      legsToWin: m.legs_to_win || 3,
+                      legs: [m.player1_legs ?? 0, m.player2_legs ?? 0],
+                      remaining: [m.player1_current_score ?? m.starting_score ?? 501, m.player2_current_score ?? m.starting_score ?? 501],
+                      thrower: m.current_player,
+                      startingScore: m.starting_score ?? 501,
+                      checkouts: checkoutData
+                    }))}
                   </CardContent>
                 </Card>
               );
