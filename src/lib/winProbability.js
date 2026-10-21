@@ -50,3 +50,13 @@ export const playerStrength = (history, { halfLife = HALF_LIFE, priorDarts = PRI
   });
   return darts > 0 ? (score / darts) * 3 : null;
 };
+
+// The strength after each of the last `count` matches, oldest first, from a
+// newest-first history: the form-rating trend on the player profile.
+export const strengthHistory = (history, count) => {
+  const points = [];
+  for (let i = Math.min(count, history.length) - 1; i >= 0; i--) {
+    points.push({ at: history[i].at || null, strength: playerStrength(history.slice(i)) });
+  }
+  return points;
+};

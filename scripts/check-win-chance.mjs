@@ -66,3 +66,12 @@ const { formatChance } = await import('../src/utils/upsets.js');
 assert.equal(formatChance(0.001), '<1%');
 assert.equal(formatChance(0.234), '23%');
 console.log('format checks ok');
+
+// Form trend: oldest first, ends on the current strength.
+const { strengthHistory } = await import('../src/lib/winProbability.js');
+const hist = [{ score: 1000, darts: 50, at: 'c' }, { score: 800, darts: 50, at: 'b' }, { score: 600, darts: 50, at: 'a' }];
+const trend = strengthHistory(hist, 5);
+assert.deepEqual(trend.map(p => p.at), ['a', 'b', 'c']);
+assert.equal(trend.at(-1).strength, playerStrength(hist));
+assert.ok(trend[0].strength < trend.at(-1).strength, 'improving form trends up');
+console.log('form trend checks ok');

@@ -915,6 +915,10 @@
     "everyMeeting": "Všetky vzájomné zápasy v sezóne"
   },
   "playerProfile": {
+    "formRating": "Forma",
+    "formChange": "{{delta}} za posledných {{count}} zápasov",
+    "formTrend": "Posledných {{count}} zápasov",
+    "formHint": "Nedávny priemer na 3 šípky, novšie zápasy majú väčšiu váhu. Z neho sa počítajú šance na výhru; pri málo zápasoch sa drží blízko priemeru všetkých hráčov.",
     "title": "Profil hráča",
     "careerStats": "Kariérne štatistiky",
     "tournamentHistory": "História turnajov",

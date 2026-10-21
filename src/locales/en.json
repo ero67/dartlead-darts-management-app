@@ -915,6 +915,10 @@
     "everyMeeting": "Every meeting this season"
   },
   "playerProfile": {
+    "formRating": "Form rating",
+    "formChange": "{{delta}} over the last {{count}} matches",
+    "formTrend": "Last {{count}} matches",
+    "formHint": "Recent 3-dart average, newer matches count more. It drives the win chances and settles toward the field average while there are few matches.",
     "title": "Player Profile",
     "careerStats": "Career Statistics",
     "tournamentHistory": "Tournament History",

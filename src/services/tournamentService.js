@@ -2503,7 +2503,7 @@ export const matchService = {
     // crowd out others' older matches; per-player limits need an RPC.
     let query = supabase
       .from('matches')
-      .select('player1_id, player2_id, s1:result->player1Stats->totalScore, d1:result->player1Stats->totalDarts, s2:result->player2Stats->totalScore, d2:result->player2Stats->totalDarts')
+      .select('player1_id, player2_id, completed_at, s1:result->player1Stats->totalScore, d1:result->player1Stats->totalDarts, s2:result->player2Stats->totalScore, d2:result->player2Stats->totalDarts')
       .eq('status', 'completed')
       .or(`player1_id.in.(${list}),player2_id.in.(${list})`);
     if (before && !Number.isNaN(Date.parse(before))) query = query.lt('completed_at', new Date(before).toISOString());
@@ -2511,13 +2511,13 @@ export const matchService = {
       .order('completed_at', { ascending: false, nullsFirst: false })
       .limit(Math.min(perPlayer * ids.length, 3000));
     if (error) throw error;
-    const add = (id, score, darts) => {
+    const add = (id, score, darts, at) => {
       const list = totals.get(id);
-      if (list && list.length < perPlayer && Number(darts) > 0) list.push({ score: Number(score) || 0, darts: Number(darts) });
+      if (list && list.length < perPlayer && Number(darts) > 0) list.push({ score: Number(score) || 0, darts: Number(darts), at });
     };
     for (const m of data || []) {
-      add(m.player1_id, m.s1, m.d1);
-      add(m.player2_id, m.s2, m.d2);
+      add(m.player1_id, m.s1, m.d1, m.completed_at);
+      add(m.player2_id, m.s2, m.d2, m.completed_at);
     }
     return totals;
   },
