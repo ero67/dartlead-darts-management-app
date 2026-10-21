@@ -494,6 +494,8 @@
     "addScorers": "Add scorers"
   },
   "summary": {
+    "biggestUpset": "Biggest upset",
+    "upsetSubtitle": "{{score}} against {{loser}}, chance beforehand",
     "tab": "Summary",
     "title": "Tournament Summary",
     "finalStandings": "Final Standings",
@@ -1043,6 +1045,8 @@
     "noAccessText": "If you no longer have access to your login, send a deletion request from the email address you registered with and we will verify and delete the account."
   },
   "tv": {
+    "upsetOfTheNight": "Upset of the night",
+    "upsetChance": "{{pct}} chance beforehand",
     "liveBoards": "Live boards",
     "board": "Board",
     "leg": "Leg",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Maximize2, Pause, Play, Trophy, Target, Clock } from 'lucide-react';
+import { Maximize2, Pause, Play, Trophy, Target, Clock, Flame } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -17,6 +17,7 @@ import { StatusBadge } from './shared/StatusBadge';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
 import { matchWinProbability } from '../lib/winProbability';
 import { liveMatchChance } from '../lib/legChance';
+import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
 import checkoutData from '../data/checkouts.json';
 import { LastVisitChip } from './tournament/LiveMatchesTab';
 import { useLastVisits } from '@/hooks/useLastVisits';
@@ -199,7 +200,15 @@ export function TvDisplay() {
       + playoffRows.filter((m) => m.status === 'completed').length,
     [tournament, playoffRows]
   );
-  const avgById = usePlayerStrengths((tournament?.players || []).map((p) => p.id), completedCount);
+  const tournamentPlayerIds = useMemo(() => (tournament?.players || []).map((p) => p.id), [tournament?.players]);
+  const avgById = usePlayerStrengths(tournamentPlayerIds, completedCount);
+  // Upset of the night, rated on form from before the first result.
+  const completedMatches = useMemo(
+    () => [...(tournament?.groups || []).flatMap((g) => g.matches || []), ...playoffRows].filter((m) => m.status === 'completed'),
+    [tournament, playoffRows]
+  );
+  const strengthsBefore = usePlayerStrengths(tournamentPlayerIds, 0, firstResultAt(completedMatches));
+  const upset = useMemo(() => biggestUpset(completedMatches, strengthsBefore), [completedMatches, strengthsBefore]);
   const winChance = useCallback(
     (m, legsA = 0, legsB = 0) =>
       matchWinProbability(avgById[m.player1?.id], avgById[m.player2?.id], { legsToWin: m.legs_to_win || m.legsToWin || 3, legsA, legsB }),
@@ -355,6 +364,17 @@ export function TvDisplay() {
             </ul>
           )}
         </CardContent>
+        {upset && (
+          <CardContent className="border-t px-4 pt-4">
+            <span className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              <Flame className="size-4 text-live" />{t('tv.upsetOfTheNight')}
+            </span>
+            <span className="mt-1 block text-lg font-semibold">
+              {upset.winner?.name} <span className="mx-1 font-display tabular-nums">{upset.score}</span> {upset.loser?.name}
+            </span>
+            <span className="text-sm text-muted-foreground">{t('tv.upsetChance', { pct: formatChance(upset.chance) })}</span>
+          </CardContent>
+        )}
       </Card>
     </div>
   );

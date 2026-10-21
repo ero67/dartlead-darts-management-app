@@ -494,6 +494,8 @@
     "addScorers": "Pridať zapisovateľov"
   },
   "summary": {
+    "biggestUpset": "Najväčšie prekvapenie",
+    "upsetSubtitle": "{{score}} proti {{loser}}, šanca pred zápasom",
     "tab": "Súhrn",
     "title": "Súhrn Turnaja",
     "finalStandings": "Konečné Poradie",
@@ -1043,6 +1045,8 @@
     "noAccessText": "Ak už nemáte prístup k svojmu prihláseniu, pošlite žiadosť o zmazanie z e-mailovej adresy, ktorou ste sa registrovali; overíme ju a účet zmažeme."
   },
   "tv": {
+    "upsetOfTheNight": "Prekvapenie večera",
+    "upsetChance": "šanca pred zápasom {{pct}}",
     "liveBoards": "Hrá sa",
     "board": "Terč",
     "leg": "Leg",

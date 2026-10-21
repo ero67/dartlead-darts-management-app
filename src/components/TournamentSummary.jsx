@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Trophy, Target, Zap, Award, Hash, Download, Loader, Medal } from 'lucide-react';
+import { Trophy, Target, Zap, Award, Hash, Download, Loader, Medal, Flame } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { deliverFile, exportFileName } from '../lib/exportShare';
 import { tournamentToPngBlob, imageLabels } from '../lib/tournamentImage';
 import { isValidLegDartCount } from '../utils/dartStats';
 import logo from '../assets/logo.png';
+import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
+import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
 
 const PLACE_MEDAL_CLASS = { 1: 'text-amber-500', 2: 'text-zinc-400', 3: 'text-amber-700' };
 const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
@@ -32,7 +34,7 @@ export function TournamentSummary({ tournament }) {
     try {
       // Share sheet on Android / mobile browsers, download elsewhere.
       const blob = await tournamentToPngBlob(tournament, imageLabels(t), {
-        awards: awards.map((a) => ({ label: a.label, value: a.value, players: a.players.map((p) => p.name || '?') }))
+        awards: allAwards.map((a) => ({ label: a.label, value: a.value, players: a.players.map((p) => p.name || '?') }))
       });
       await deliverFile({
         blob,
@@ -380,6 +382,20 @@ export function TournamentSummary({ tournament }) {
     return awardList;
   }, [allMatches, t]);
 
+  // Biggest upset: the winner with the lowest chance beforehand, rated on
+  // form from before the tournament's first result.
+  const upsetPlayerIds = useMemo(() => (tournament?.players || []).map(p => p.id), [tournament?.players]);
+  const strengthsBefore = usePlayerStrengths(upsetPlayerIds, 0, firstResultAt(allMatches));
+  const upset = biggestUpset(allMatches, strengthsBefore);
+  const allAwards = upset ? [...awards, {
+    key: 'upset',
+    icon: <Flame size={28} />,
+    label: t('summary.biggestUpset'),
+    players: [upset.winner],
+    value: formatChance(upset.chance),
+    subtitle: t('summary.upsetSubtitle', { score: upset.score, loser: upset.loser?.name || '?' })
+  }] : awards;
+
   // ── Render ───────────────────────────────────────────────────────────
   const placeLabel = {
     1: t('summary.firstPlace') || '1st Place',
@@ -453,11 +469,11 @@ export function TournamentSummary({ tournament }) {
         </Card>
 
         {/* Stat Awards */}
-        {awards.length > 0 && (
+        {allAwards.length > 0 && (
           <div className="flex flex-col gap-3">
             <h3 className="text-lg font-semibold tracking-tight">{t('summary.tournamentAwards') || 'Tournament Awards'}</h3>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {awards.map(award => (
+              {allAwards.map(award => (
                 <Card key={award.key} className="flex-row items-start gap-4 px-5 py-5">
                   <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                     {award.icon}
@@ -480,7 +496,7 @@ export function TournamentSummary({ tournament }) {
           </div>
         )}
 
-        {awards.length === 0 && (
+        {allAwards.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('summary.noAwardsAvailable') || 'No statistics available for awards.'}</p>
         )}
 
