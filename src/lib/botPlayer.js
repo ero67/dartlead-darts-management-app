@@ -4,9 +4,7 @@
 // real dartboard and lands with two-dimensional Gaussian scatter, then the
 // landing point is scored by geometry. Difficulty is the scatter radius in
 // millimetres (`sigma`); everything a player would recognise — averages,
-// 180s, missed doubles, the odd bust — falls out of that one number. Doubles
-// get a slightly wider scatter (`doubleFactor`) because real players finish
-// worse than their scoring suggests.
+// 180s, missed doubles, the odd bust — falls out of that one number.
 //
 // Strategy comes in three tiers so weak bots are weak for the right reasons:
 //   naive      scores at whatever its accuracy makes best (T19 / bull rather
@@ -91,18 +89,22 @@ export const throwAt = (label, sigma, seed) => {
 };
 
 // ---- Levels ----------------------------------------------------------------
-// sigma / doubleFactor / scoringTarget are produced by scripts/calibrate-bots.mjs
-// so that a full 501 leg averages `average` (±3) with this strategy tier.
-// Measured checkout rates run from 11% (level 1) to 44% (level 8).
+// sigma / scoringTarget are produced by scripts/calibrate-bots.mjs so that the
+// bot posts `average` (±3) in a match against itself with this strategy tier.
+// That is the number the app shows after a match, not the solo-leg average:
+// legs the bot loses stop before its finishing grind, which is where a bot
+// (like a weak player) loses most of its average. Calibrating on full solo
+// legs made every level display ~6 points above its label, more against a
+// stronger opponent.
 export const BOT_LEVELS = [
-  { level: 1, average: 35, tier: 'naive', sigma: 20.4, doubleFactor: 1.3, scoringTarget: 'T19' },
-  { level: 2, average: 42, tier: 'naive', sigma: 17.2, doubleFactor: 1.3, scoringTarget: 'T19' },
-  { level: 3, average: 50, tier: 'naive', sigma: 14.6, doubleFactor: 1.25, scoringTarget: 'T20' },
-  { level: 4, average: 58, tier: 'chart', sigma: 13.3, doubleFactor: 1.2, scoringTarget: 'T20' },
-  { level: 5, average: 66, tier: 'chart', sigma: 11.4, doubleFactor: 1.2, scoringTarget: 'T20' },
-  { level: 6, average: 75, tier: 'chart', sigma: 9.7, doubleFactor: 1.15, scoringTarget: 'T20' },
-  { level: 7, average: 85, tier: 'optimiser', sigma: 7.3, doubleFactor: 1.15, scoringTarget: 'T20' },
-  { level: 8, average: 95, tier: 'optimiser', sigma: 6.3, doubleFactor: 1.1, scoringTarget: 'T20' }
+  { level: 1, average: 35, tier: 'naive', sigma: 28.5, scoringTarget: 'T19' },
+  { level: 2, average: 42, tier: 'naive', sigma: 22.2, scoringTarget: 'T19' },
+  { level: 3, average: 50, tier: 'naive', sigma: 17.6, scoringTarget: 'T19' },
+  { level: 4, average: 58, tier: 'chart', sigma: 15.2, scoringTarget: 'T20' },
+  { level: 5, average: 66, tier: 'chart', sigma: 13.1, scoringTarget: 'T20' },
+  { level: 6, average: 75, tier: 'chart', sigma: 11.3, scoringTarget: 'T20' },
+  { level: 7, average: 85, tier: 'optimiser', sigma: 8.6, scoringTarget: 'T20' },
+  { level: 8, average: 95, tier: 'optimiser', sigma: 7.3, scoringTarget: 'T20' }
 ];
 
 export const getBotLevel = (level) => BOT_LEVELS.find((l) => l.level === level) || BOT_LEVELS[3];
@@ -111,7 +113,6 @@ export const getBotLevel = (level) => BOT_LEVELS.find((l) => l.level === level) 
 const BOGEY = new Set([169, 168, 166, 165, 163, 162, 159]);
 const isFinishable = (n) => n >= 2 && n <= 170 && !BOGEY.has(n);
 const isDoubleOut = (n) => (n % 2 === 0 && n >= 2 && n <= 40) || n === 50;
-const isDoubleLabel = (label) => label.startsWith('D') || label === 'Bull';
 
 const singleValue = (label) => {
   if (label === '25') return 25;
@@ -193,10 +194,9 @@ const optimiserTarget = (remaining, dartsLeft, level, checkouts, seed) => {
   let bestScore = -Infinity;
   let s = seed;
   for (const label of candidates) {
-    const sigma = level.sigma * (isDoubleLabel(label) ? level.doubleFactor : 1);
     let total = 0;
     for (let i = 0; i < OPTIMISER_SAMPLES; i++) {
-      const r = throwAt(label, sigma, s);
+      const r = throwAt(label, level.sigma, s);
       s = r.seed;
       const after = remaining - r.dart.value;
       if (after === 0) total += r.dart.multiplier === 2 ? 1 : -0.5;
@@ -219,8 +219,7 @@ export const chooseTarget = ({ remaining, dartsLeft, level, checkouts, seed }) =
 // One dart: pick a target, throw at it. Returns { dart, target, seed }.
 export const botThrow = ({ remaining, dartsLeft, level, checkouts, seed }) => {
   const choice = chooseTarget({ remaining, dartsLeft, level, checkouts, seed });
-  const sigma = level.sigma * (isDoubleLabel(choice.label) ? level.doubleFactor : 1);
-  const thrown = throwAt(choice.label, sigma, choice.seed);
+  const thrown = throwAt(choice.label, level.sigma, choice.seed);
   return { dart: thrown.dart, target: choice.label, seed: thrown.seed };
 };
 
@@ -264,4 +263,38 @@ export const simulateLeg = ({ startingScore = 501, level, checkouts, seed }) => 
     remaining -= visitScore;
   }
   return { darts, scored, checkoutAttempts, seed: s, finished: remaining === 0 };
+};
+
+// Simulate a best-of-`legsToWin` match of this level against itself: starters
+// alternate, visits alternate, a leg ends when either side checks out.
+// Returns player A's totals, which is what the app would display after a
+// match (legs A loses are cut short), so it is the calibration target.
+export const simulateMatch = ({ startingScore = 501, legsToWin = 3, level, checkouts, seed }) => {
+  let s = seed;
+  let darts = 0;
+  let scored = 0;
+  let legsWon = 0;
+  let legsLost = 0;
+  let checkoutAttempts = 0;
+  while (legsWon < legsToWin && legsLost < legsToWin) {
+    const remaining = [startingScore, startingScore];
+    let turn = (legsWon + legsLost) % 2;
+    let winner = -1;
+    let guard = 0;
+    while (winner < 0 && guard++ < 400) {
+      if (turn === 0 && isFinishable(remaining[0])) checkoutAttempts++;
+      const v = botVisit({ remaining: remaining[turn], level, checkouts, seed: s });
+      s = v.seed;
+      if (turn === 0) darts += v.darts.length;
+      if (v.outcome !== 'bust') {
+        const visitScore = v.darts.reduce((sum, d) => sum + d.value, 0);
+        remaining[turn] -= visitScore;
+        if (turn === 0) scored += visitScore;
+        if (remaining[turn] === 0) winner = turn;
+      }
+      turn = 1 - turn;
+    }
+    if (winner === 0) legsWon++; else legsLost++;
+  }
+  return { darts, scored, legsWon, legsLost, checkoutAttempts, seed: s };
 };

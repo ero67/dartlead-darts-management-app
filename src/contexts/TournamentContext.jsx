@@ -2,7 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef } from 
 import { tournamentService, matchService } from '../services/tournamentService.js';
 import { leagueService } from '../services/leagueService.js';
 import { supabase } from '../lib/supabase.js';
-import { enqueueWrite, hasPending, QUEUE_TYPES } from '../lib/offlineQueue.js';
+import { enqueueWrite, hasPendingResults, QUEUE_TYPES } from '../lib/offlineQueue.js';
 
 
 const TournamentContext = createContext();
@@ -622,6 +622,7 @@ export function TournamentProvider({ children }) {
   // Silent refresh bookkeeping (see refreshCurrentTournament)
   const refreshSeqRef = useRef(0);
   const completionsInFlightRef = useRef(0);
+  const completionStartedAtRef = useRef(0);
   const leaguePointsInFlightRef = useRef(new Set());
 
   // Keep a ref to the latest state so async callbacks don't use stale closures
@@ -741,6 +742,7 @@ export function TournamentProvider({ children }) {
     // run: the route we navigate back to would otherwise re-fetch a bracket
     // the server has not advanced yet and could apply it after SET_PLAYOFFS.
     completionsInFlightRef.current += 1;
+    completionStartedAtRef.current = Date.now();
 
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       // Known offline – don't even attempt; queue the result so it syncs later.
@@ -859,6 +861,8 @@ export function TournamentProvider({ children }) {
     }, 500); // Allow the COMPLETE_MATCH dispatch to settle before DB side-effects
   };
 
+  const COMPLETION_BLOCKS_REFRESH_MS = 30000;
+
   // Re-fetch the current tournament in the background and swap it into state,
   // without any loading UI. Skipped when it could do harm: offline or with
   // queued writes (the server copy would hide results only this device has),
@@ -871,8 +875,10 @@ export function TournamentProvider({ children }) {
     if (!current?.id || current._summary === true) return false;
     if (expectedId && current.id !== expectedId) return false;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
-    if (hasPending()) return false;
-    if (completionsInFlightRef.current > 0) return false;
+    if (hasPendingResults()) return false;
+    // Time-boxed: a completion whose side-effects hung on bad WiFi used to
+    // block every refresh until the app was restarted.
+    if (completionsInFlightRef.current > 0 && Date.now() - completionStartedAtRef.current < COMPLETION_BLOCKS_REFRESH_MS) return false;
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/match/')) return false;
 
     const seq = ++refreshSeqRef.current;

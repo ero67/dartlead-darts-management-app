@@ -168,8 +168,10 @@ export function PracticeHome() {
         {syncPill}
       </header>
 
+      {/* Stacked on phones: side by side, the KPI and buttons squeezed the
+          title into a one-word-per-line column. */}
       {active && activeGame && (
-        <Card className="relative flex-row flex-wrap items-center justify-between gap-4 overflow-hidden border-primary/40 bg-gradient-to-br from-primary/10 to-card p-5 sm:p-6">
+        <Card className="relative gap-4 overflow-hidden border-primary/40 bg-gradient-to-br from-primary/10 to-card p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-6">
           <BoardMotif className="-right-24 -top-36 w-80" />
           <div className="relative flex min-w-0 flex-1 flex-col gap-1.5">
             <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary">
