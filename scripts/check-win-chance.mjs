@@ -33,3 +33,16 @@ const pos = { ...base, legs: [1, 1], remaining: [140, 96], thrower: 1 };
 assert.equal(liveMatchChance(pos), liveMatchChance(pos));
 
 console.log('win chance checks ok');
+
+// After-match line: replays a stored visit log, refuses partial logs.
+const { winChanceLine } = await import('../src/utils/winChanceLine.js');
+// First to 1 leg from 101: A 60, B 41, A 41 checks out.
+const lineArgs = { strengths: [50, 45], legsToWin: 1, startingScore: 101, checkouts, finalLegs: [1, 0] };
+const line = winChanceLine({ ...lineArgs, visits: [[1, 0, 60], [1, 1, 41], [1, 0, 41]] });
+assert.equal(line.points.length, 4);
+assert.equal(line.points.at(-1).p, 1);
+assert.ok(line.turningPoint && line.turningPoint.index >= 1);
+assert.equal(winChanceLine({ ...lineArgs, visits: [[2, 0, 60]] }), null, 'log starting mid-match');
+assert.equal(winChanceLine({ ...lineArgs, visits: [[1, 0, 60]] }), null, 'log that does not reach the result');
+assert.equal(winChanceLine({ ...lineArgs, strengths: [undefined, 45], visits: [[1, 0, 101]] }), null);
+console.log('win chance line checks ok');

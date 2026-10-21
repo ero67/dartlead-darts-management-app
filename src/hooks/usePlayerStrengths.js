@@ -6,14 +6,15 @@ import { HISTORY_MATCHES, playerStrength } from '../lib/winProbability';
 // field) per player id, from their completed matches anywhere. Players with
 // no completed match get no entry, so no chance is shown for them. Refetches
 // when the set of ids or `refreshKey` changes (e.g. a match completed).
-export function usePlayerStrengths(playerIds, refreshKey = 0) {
+// `before` (a timestamp) rates them as they were before that moment.
+export function usePlayerStrengths(playerIds, refreshKey = 0, before = null) {
   const [strengths, setStrengths] = useState({});
   const key = [...new Set(playerIds.filter(Boolean))].sort().join(',');
 
   useEffect(() => {
     if (!key) return undefined;
     let isCurrent = true;
-    matchService.getRecentMatchTotals(key.split(','), HISTORY_MATCHES)
+    matchService.getRecentMatchTotals(key.split(','), HISTORY_MATCHES, { before })
       .then((totals) => {
         if (!isCurrent) return;
         const next = {};
@@ -22,7 +23,7 @@ export function usePlayerStrengths(playerIds, refreshKey = 0) {
       })
       .catch((err) => console.error('Loading player strengths failed:', err));
     return () => { isCurrent = false; };
-  }, [key, refreshKey]);
+  }, [key, refreshKey, before]);
 
   return strengths;
 }

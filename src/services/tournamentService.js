@@ -421,6 +421,7 @@ export const tournamentService = {
             return {
               ...match,
               legsToWin: match.legs_to_win,
+              completedAt: match.completed_at || null,
               startingScore: match.starting_score,
               player1: match.player1 ? {
                 ...match.player1,
@@ -646,6 +647,7 @@ export const tournamentService = {
                   player2: playerMap.get(match.player2_id) || null,
                   status: match.status,
                   legsToWin: match.legs_to_win,
+                  completedAt: match.completed_at || null,
                   startingScore: match.starting_score,
                   startedByUserId: match.started_by_user_id,
                   result: match.winner_id ? (() => {
@@ -721,6 +723,7 @@ export const tournamentService = {
               player2: playerMap.get(match.player2_id) || null,
               status: match.status,
               legsToWin: match.legs_to_win,
+              completedAt: match.completed_at || null,
               startingScore: match.starting_score,
               startedByUserId: match.started_by_user_id,
               isPlayoff: true,
@@ -891,6 +894,7 @@ export const tournamentService = {
           player2: match.player2 || null,
           status: match.status,
           legsToWin: match.legs_to_win,
+          completedAt: match.completed_at || null,
           startingScore: match.starting_score,
           startedByUserId: match.started_by_user_id,
           isPlayoff: true,
@@ -969,6 +973,7 @@ export const tournamentService = {
                 player2: match.player2 || null,
                 status: match.status,
                 legsToWin: match.legs_to_win,
+                completedAt: match.completed_at || null,
                 startingScore: match.starting_score,
                 startedByUserId: match.started_by_user_id,
                 result: match.winner_id ? (() => {
@@ -2054,7 +2059,7 @@ export const tournamentService = {
         .from('matches')
         .select(`
           id, tournament_id, winner_id, player1_id, player2_id,
-          player1_legs, player2_legs, is_playoff, playoff_round, created_at, updated_at, result,
+          player1_legs, player2_legs, is_playoff, playoff_round, created_at, updated_at, completed_at, legs_to_win, starting_score, result,
           player1:players!matches_player1_id_fkey(id, name),
           player2:players!matches_player2_id_fkey(id, name)
         `)
@@ -2083,7 +2088,10 @@ export const tournamentService = {
           // For the statistics dialog on the profile page
           player1: m.player1 || null,
           player2: m.player2 || null,
-          result: m.result || null
+          result: m.result || null,
+          completedAt: m.completed_at || null,
+          legsToWin: m.legs_to_win || null,
+          startingScore: m.starting_score || null
         };
       });
 
@@ -2486,18 +2494,20 @@ export const matchService = {
   // Recent completed-match totals of these players, newest first, for
   // win-chance strengths (lib/winProbability.js playerStrength): only the
   // score and darts per side, not the result JSON.
-  async getRecentMatchTotals(playerIds, perPlayer) {
+  async getRecentMatchTotals(playerIds, perPlayer, { before = null } = {}) {
     const ids = [...new Set(playerIds)].filter(id => /^[0-9a-f-]{36}$/i.test(id || ''));
     const totals = new Map(ids.map(id => [id, []]));
     if (ids.length === 0) return totals;
     const list = ids.join(',');
     // ponytail: one global newest-first limit, so a very active player can
     // crowd out others' older matches; per-player limits need an RPC.
-    const { data, error } = await supabase
+    let query = supabase
       .from('matches')
       .select('player1_id, player2_id, s1:result->player1Stats->totalScore, d1:result->player1Stats->totalDarts, s2:result->player2Stats->totalScore, d2:result->player2Stats->totalDarts')
       .eq('status', 'completed')
-      .or(`player1_id.in.(${list}),player2_id.in.(${list})`)
+      .or(`player1_id.in.(${list}),player2_id.in.(${list})`);
+    if (before && !Number.isNaN(Date.parse(before))) query = query.lt('completed_at', new Date(before).toISOString());
+    const { data, error } = await query
       .order('completed_at', { ascending: false, nullsFirst: false })
       .limit(Math.min(perPlayer * ids.length, 3000));
     if (error) throw error;
@@ -3010,6 +3020,14 @@ export const matchService = {
           winner: matchResult.winner,
           player1Legs: matchResult.player1Legs,
           player2Legs: matchResult.player2Legs,
+          // Every visit in order, [leg, player 0|1, score applied], for the
+          // win-chance line (utils/winChanceLine.js). Matches scored before
+          // 2026-10 or resumed on another device have none or a partial log.
+          ...(Array.isArray(matchResult.visits) ? {
+            visits: matchResult.visits.filter(v => Array.isArray(v) && v.length === 3
+              && Number.isInteger(v[0]) && v[0] >= 1 && (v[1] === 0 || v[1] === 1)
+              && Number.isInteger(v[2]) && v[2] >= 0 && v[2] <= 180)
+          } : {}),
           player1Stats: {
             totalScore: matchResult.player1Stats?.totalScore || 0,
             totalDarts: matchResult.player1Stats?.totalDarts || 0,

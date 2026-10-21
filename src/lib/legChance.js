@@ -60,7 +60,7 @@ export const legWinChance = ({ remaining, thrower, strengths, checkouts, sims = 
 // Match chance during play: the leg in progress from the scores (the tested
 // leg model while both are still on the starting score, so the starter gets
 // no edge), every later leg from the tested model.
-export const liveMatchChance = ({ strengths, legsToWin, legs, remaining, thrower, startingScore, checkouts }) => {
+export const liveMatchChance = ({ strengths, legsToWin, legs, remaining, thrower, startingScore, checkouts, sims }) => {
   const [sA, sB] = strengths;
   if (!(sA > 0) || !(sB > 0)) return null;
   const needA = legsToWin - legs[0];
@@ -70,6 +70,6 @@ export const liveMatchChance = ({ strengths, legsToWin, legs, remaining, thrower
   const atStart = remaining[0] === startingScore && remaining[1] === startingScore;
   const pNow = atStart || (thrower !== 0 && thrower !== 1)
     ? pLeg
-    : legWinChance({ remaining, thrower, strengths, checkouts });
+    : legWinChance({ remaining, thrower, strengths, checkouts, sims });
   return pNow * chanceToWinFirst(pLeg, needA - 1, needB) + (1 - pNow) * chanceToWinFirst(pLeg, needA, needB - 1);
 };

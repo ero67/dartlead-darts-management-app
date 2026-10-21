@@ -1079,6 +1079,8 @@
     "thirdPlace": "Zápas o 3. miesto"
   },
   "matchStats": {
+    "winChance": "Šanca na výhru",
+    "turningPoint": "Zlom zápasu: {{score}} hráča {{name}} v legu {{leg}} ({{from}} % → {{to}} %)",
     "title": "Štatistika zápasu",
     "average": "Priemer na 3 šípky",
     "legs": "Legy",

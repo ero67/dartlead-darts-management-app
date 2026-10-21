@@ -187,6 +187,24 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     turnStartScore: null // Track score at start of turn for bust restoration
   });
   const [turnHistory, setTurnHistory] = useState(initialState?.turnHistory || []);
+  // Every visit of the match in order, [leg, player, score applied] (0 for a
+  // bust), saved with the result for the win-chance line. Unlike turnHistory
+  // it is not cleared per leg; it mirrors every push and undo of it. A ref
+  // too, because the match can complete inside the visit that ends it.
+  const [visitLog, setVisitLog] = useState(initialState?.visitLog || []);
+  const visitLogRef = useRef(visitLog);
+  const logVisit = (leg, player, score) => {
+    visitLogRef.current = [...visitLogRef.current, [leg, player, score]];
+    setVisitLog(visitLogRef.current);
+  };
+  const unlogVisit = () => {
+    visitLogRef.current = visitLogRef.current.slice(0, -1);
+    setVisitLog(visitLogRef.current);
+  };
+  const resetVisitLog = () => {
+    visitLogRef.current = [];
+    setVisitLog([]);
+  };
   const [matchComplete, setMatchComplete] = useState(initialState?.matchComplete || false);
   const [completedWinnerId, setCompletedWinnerId] = useState(null); // winner per DB row when re-opening a finished match
   const [inputMode, setInputMode] = useState(initialState?.inputMode || 'single');
@@ -482,6 +500,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         });
         setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
         setTurnHistory([]);
+        resetVisitLog();
         setMatchComplete(false);
         setShowMatchStarter(true);
         return;
@@ -656,6 +675,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         legScores,
         currentTurn,
         turnHistory,
+        visitLog,
         matchComplete,
         inputMode,
         scoringMode,
@@ -663,7 +683,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       };
       localStorage.setItem(`match-state-${match.id}`, JSON.stringify(matchState));
     }
-  }, [match?.id, currentLeg, currentPlayer, matchStarter, legScores, currentTurn, turnHistory, matchComplete, inputMode, scoringMode, showMatchStarter]);
+  }, [match?.id, currentLeg, currentPlayer, matchStarter, legScores, currentTurn, turnHistory, visitLog, matchComplete, inputMode, scoringMode, showMatchStarter]);
 
   const currentPlayerData = currentPlayer !== null && currentPlayer !== undefined 
     ? legScores[`player${currentPlayer + 1}`] 
@@ -695,6 +715,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       setLegScores(last.undoState.legScores);
       setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
       setTurnHistory(prev => prev.slice(0, -1));
+      unlogVisit();
       setTimeout(() => {
         updateMatchToDatabase(match.id, {
           currentLeg: last.undoState.currentLeg,
@@ -768,9 +789,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     });
 
     setTurnHistory(prev => prev.slice(0, -1));
+      unlogVisit();
   };
 
   const recordBustTurn = ({ playerIndex, turnData, turnScore = 0, legScoresSnapshot }) => {
+    logVisit(currentLeg, playerIndex, 0);
     setTurnHistory(prev => [...prev, {
       player: playerIndex,
       turn: {
@@ -1234,6 +1257,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         setLegScores(lastTurn.undoState.legScores);
         setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
         setTurnHistory(prev => prev.slice(0, -1));
+      unlogVisit();
         setTimeout(() => {
           updateMatchToDatabase(match.id, {
             currentLeg: lastTurn.undoState.currentLeg,
@@ -1323,6 +1347,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
       // Remove the last turn from history
       setTurnHistory(prev => prev.slice(0, -1));
+      unlogVisit();
       
       // Reset the flag after a short delay
       setTimeout(() => setIsRemovingDart(false), 100);
@@ -1369,6 +1394,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       }));
       // Record the bust in turn history (score 0, darts counted) so undo can
       // revert it — otherwise undo silently targets the opponent's last visit.
+      logVisit(currentLeg, currentPlayer, 0);
       setTurnHistory(prev => [...prev, {
         player: currentPlayer,
         turn: { ...turnData, score: 0, isBust: true, turnStartScore },
@@ -1402,6 +1428,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         // Record the bust in turn history so undo targets THIS visit — without
         // this, undo after a "hit 0 but not on a double" bust (the 3-dart-total
         // mode reaches this branch) silently reverted the opponent's turn.
+        logVisit(currentLeg, currentPlayer, 0);
         setTurnHistory(prev => [...prev, {
           player: currentPlayer,
           turn: { ...turnData, score: 0, isBust: true, turnStartScore },
@@ -1412,6 +1439,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         setCurrentPlayer(prev => prev === 0 ? 1 : 0);
         return;
       }
+      // Logged before the leg/match completes below, so the result has it.
+      logVisit(currentLeg, currentPlayer, turnData.score);
       
 
       // Calculate numeric checkout value (sum of all dart scores in the turn)
@@ -1619,6 +1648,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       setTurnHistory([]);
 
     } else {
+      logVisit(currentLeg, currentPlayer, turnData.score);
       // Update total score and dart count (current score already updated by addScore)
       setLegScores(prev => {
         const updated = {
@@ -1718,6 +1748,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     
     const matchResult = {
       matchId: currentMatch.id,
+      visits: visitLogRef.current,
       groupId: currentMatch.groupId || currentMatch.group?.id,
       winner: winner,
       player1Id: currentMatch.player1?.id,
@@ -1868,6 +1899,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     setCurrentPlayer(playerIndex);
     setShowMatchStarter(false);
     setTurnHistory([]); // Clear turn history when starting a new match
+    resetVisitLog();
     
     // Save match starter to localStorage immediately
     if (match?.id) {
