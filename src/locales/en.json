@@ -1048,6 +1048,10 @@
     "noAccessTitle": "Can't sign in?",
     "noAccessText": "If you no longer have access to your login, send a deletion request from the email address you registered with and we will verify and delete the account."
   },
+  "preMatch": {
+    "lastFive": "Last 5",
+    "headToHead": "Head to head"
+  },
   "tv": {
     "upsetOfTheNight": "Upset of the night",
     "upsetChance": "{{pct}} chance beforehand",

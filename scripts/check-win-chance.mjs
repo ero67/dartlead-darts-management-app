@@ -75,3 +75,14 @@ assert.deepEqual(trend.map(p => p.at), ['a', 'b', 'c']);
 assert.equal(trend.at(-1).strength, playerStrength(hist));
 assert.ok(trend[0].strength < trend.at(-1).strength, 'improving form trends up');
 console.log('form trend checks ok');
+
+// Pre-match facts: last five newest first, head-to-head from A's side.
+const { preMatchFacts } = await import('../src/utils/preMatch.js');
+const facts = preMatchFacts('a', 'b', {
+  a: [{ won: true, opponentId: 'b' }, { won: false, opponentId: 'c' }, { won: false, opponentId: 'b' }, { won: true, opponentId: 'b' }],
+  b: [{ won: false, opponentId: 'a' }]
+});
+assert.deepEqual(facts.form[0], [true, false, false, true]);
+assert.deepEqual(facts.headToHead, [2, 1]);
+assert.deepEqual(preMatchFacts('x', 'y', {}).form, [[], []]);
+console.log('pre-match checks ok');

@@ -21,7 +21,8 @@ import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
 import checkoutData from '../data/checkouts.json';
 import { LastVisitChip } from './tournament/LiveMatchesTab';
 import { useLastVisits } from '@/hooks/useLastVisits';
-import { usePlayerStrengths } from '@/hooks/usePlayerStrengths';
+import { usePlayerHistories, usePlayerStrengths, strengthsOf } from '@/hooks/usePlayerStrengths';
+import { PreMatchCard } from './match/PreMatchCard';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
 // dark high-contrast palette independent of the app theme. Cycles through
@@ -201,7 +202,8 @@ export function TvDisplay() {
     [tournament, playoffRows]
   );
   const tournamentPlayerIds = useMemo(() => (tournament?.players || []).map((p) => p.id), [tournament?.players]);
-  const avgById = usePlayerStrengths(tournamentPlayerIds, completedCount);
+  const histories = usePlayerHistories(tournamentPlayerIds, completedCount);
+  const avgById = useMemo(() => strengthsOf(histories), [histories]);
   // Upset of the night, rated on form from before the first result.
   const completedMatches = useMemo(
     () => [...(tournament?.groups || []).flatMap((g) => g.matches || []), ...playoffRows].filter((m) => m.status === 'completed'),
@@ -222,11 +224,11 @@ export function TvDisplay() {
     // device) or done — never "up next".
     const ready = (m) => m.status === 'pending' && m.player1 && m.player2 && !liveIds.has(m.id);
     const groupQueues = (tournament.groups || []).map((g) =>
-      (g.matches || []).filter(ready).map((m) => ({ id: m.id, label: g.name, p1: m.player1.name, p2: m.player2.name, chance: winChance(m) }))
+      (g.matches || []).filter(ready).map((m) => ({ id: m.id, label: g.name, p1: m.player1.name, p2: m.player2.name, player1: m.player1, player2: m.player2, legsToWin: m.legsToWin || m.legs_to_win || 3, chance: winChance(m) }))
     );
     const playoffItems = upcomingPlayoffMatches(bracketRounds)
       .filter((m) => !liveIds.has(m.id))
-      .map((m) => ({ id: m.id, label: m.roundName, p1: m.player1.name, p2: m.player2.name, chance: winChance(m) }));
+      .map((m) => ({ id: m.id, label: m.roundName, p1: m.player1.name, p2: m.player2.name, player1: m.player1, player2: m.player2, legsToWin: m.legsToWin || m.legs_to_win || 3, chance: winChance(m) }));
     return [...roundRobin(groupQueues), ...playoffItems].slice(0, 8);
   }, [tournament, liveMatches, bracketRounds, winChance]);
 
@@ -352,7 +354,12 @@ export function TvDisplay() {
             <p className="py-6 text-center text-sm text-muted-foreground">{t('tv.nothingQueued')}</p>
           ) : (
             <ul className="flex flex-col divide-y">
-              {upNext.map((m) => (
+              {upNext.map((m, i) => (i === 0 && (avgById[m.player1?.id] || avgById[m.player2?.id]) ? (
+                <li key={m.id} className="flex flex-col gap-2 pb-4 pt-2.5">
+                  <span className="text-xs uppercase tracking-wider text-muted-foreground">{m.label}</span>
+                  <PreMatchCard player1={m.player1} player2={m.player2} legsToWin={m.legsToWin} histories={histories} size="tv" />
+                </li>
+              ) : (
                 <li key={m.id} className="flex flex-col gap-0.5 py-2.5">
                   <span className="text-xs uppercase tracking-wider text-muted-foreground">{m.label}</span>
                   <span className="text-lg font-semibold">{m.p1} <span className="mx-1 font-normal text-muted-foreground">vs</span> {m.p2}</span>
@@ -360,7 +367,7 @@ export function TvDisplay() {
                     <span className="text-xs tabular-nums text-muted-foreground">{Math.round(m.chance * 100)}% · {Math.round((1 - m.chance) * 100)}%</span>
                   )}
                 </li>
-              ))}
+              )))}
             </ul>
           )}
         </CardContent>

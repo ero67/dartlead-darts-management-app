@@ -13,6 +13,7 @@ import { useOnScreenKeypad } from '../hooks/useOnScreenKeypad';
 import { visitCheckoutAttempts } from '../utils/dartStats';
 import { DartKeypad } from './scoring/DartKeypad';
 import { TurnTotalKeypad } from './scoring/TurnTotalKeypad';
+import { PreMatchCard } from './match/PreMatchCard';
 import { parseTurnTotal } from '../lib/turnTotalInput';
 import { CheckoutDialog } from './scoring/CheckoutDialog';
 import { hapticTap, hapticBust, hapticLegWon, hapticMatchWon } from '../lib/haptics';
@@ -1997,7 +1998,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
             scoringMode={scoringMode}
             onScoringModeChange={setScoringMode}
             onSelect={selectMatchStarter}
-          />
+          >
+            <PreMatchCard player1={match?.player1} player2={match?.player2} legsToWin={matchSettings.legsToWin} className="rounded-lg border p-3" />
+          </StarterDialog>
         )}
       </div>
     );

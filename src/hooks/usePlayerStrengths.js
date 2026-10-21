@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { matchService } from '../services/tournamentService';
 import { HISTORY_MATCHES, playerStrength } from '../lib/winProbability';
 
-// Win-chance strength (3-dart average, recency weighted, pulled toward the
-// field) per player id, from their completed matches anywhere. Players with
-// no completed match get no entry, so no chance is shown for them. Refetches
-// when the set of ids or `refreshKey` changes (e.g. a match completed).
-// `before` (a timestamp) rates them as they were before that moment.
-export function usePlayerStrengths(playerIds, refreshKey = 0, before = null) {
-  const [strengths, setStrengths] = useState({});
+// Recent completed matches per player id ({ score, darts, at, won,
+// opponentId }, newest first), from matches anywhere. Players with none get
+// no entry. Refetches when the set of ids or `refreshKey` changes (e.g. a
+// match completed); `before` (a timestamp) gives them as they were then.
+export function usePlayerHistories(playerIds, refreshKey = 0, before = null) {
+  const [histories, setHistories] = useState({});
   const key = [...new Set(playerIds.filter(Boolean))].sort().join(',');
 
   useEffect(() => {
@@ -18,12 +17,22 @@ export function usePlayerStrengths(playerIds, refreshKey = 0, before = null) {
       .then((totals) => {
         if (!isCurrent) return;
         const next = {};
-        totals.forEach((history, id) => { if (history.length) next[id] = playerStrength(history); });
-        setStrengths(next);
+        totals.forEach((history, id) => { if (history.length) next[id] = history; });
+        setHistories(next);
       })
-      .catch((err) => console.error('Loading player strengths failed:', err));
+      .catch((err) => console.error('Loading player histories failed:', err));
     return () => { isCurrent = false; };
   }, [key, refreshKey, before]);
 
-  return strengths;
+  return histories;
+}
+
+export const strengthsOf = (histories) => Object.fromEntries(Object.entries(histories).map(([id, h]) => [id, playerStrength(h)]));
+
+// Win-chance strength (3-dart average, recency weighted, pulled toward the
+// field) per player id; players with no completed match get no entry, so no
+// chance is shown for them.
+export function usePlayerStrengths(playerIds, refreshKey = 0, before = null) {
+  const histories = usePlayerHistories(playerIds, refreshKey, before);
+  return useMemo(() => strengthsOf(histories), [histories]);
 }

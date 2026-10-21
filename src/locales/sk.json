@@ -1048,6 +1048,10 @@
     "noAccessTitle": "Nemôžete sa prihlásiť?",
     "noAccessText": "Ak už nemáte prístup k svojmu prihláseniu, pošlite žiadosť o zmazanie z e-mailovej adresy, ktorou ste sa registrovali; overíme ju a účet zmažeme."
   },
+  "preMatch": {
+    "lastFive": "Posledných 5",
+    "headToHead": "Vzájomne"
+  },
   "tv": {
     "upsetOfTheNight": "Prekvapenie večera",
     "upsetChance": "šanca pred zápasom {{pct}}",
