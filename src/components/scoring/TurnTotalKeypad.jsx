@@ -1,11 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { RotateCcw } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Mic, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { normalizeTurnTotalInput, appendTurnTotalDigit, parseTurnTotal } from '../../lib/turnTotalInput';
+import { useVoiceScore } from '../../hooks/useVoiceScore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+const VOICE_KEY = 'dartlead-voice-scoring';
+const VOICE_DEBUG_KEY = 'dartlead-voice-debug';
+// A heard score sits in the readout this long before it is entered, so a
+// misheard number can be corrected by tapping the keypad or saying another.
+const VOICE_CONFIRM_MS = 1500;
 const KEY = 'flex min-h-12 short:min-h-7 items-center justify-center rounded-lg border bg-card font-display text-2xl font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40';
 
 // Visit totals that come up all the time; one tap fills the readout.
@@ -23,9 +29,41 @@ export function TurnTotalKeypad({
   showQuickScores = false,
   disabled = false
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const isInvalid = value.length > 0 && parseTurnTotal(value) === null;
   const inputRef = useRef(null);
+  const [isVoiceMissed, setIsVoiceMissed] = useState(false);
+  // Hands-free mode sticks across matches on this device.
+  const [isVoiceOn, setIsVoiceOn] = useState(() => localStorage.getItem(VOICE_KEY) === '1');
+  // Long-press the Voice button: a log of recent listens, for field testing.
+  const [isVoiceDebug, setIsVoiceDebug] = useState(() => localStorage.getItem(VOICE_DEBUG_KEY) === '1');
+  const submitRef = useRef(null);
+  const [pendingScore, setPendingScore] = useState(null);
+  const pendingTimer = useRef(null);
+  const cancelPending = () => { clearTimeout(pendingTimer.current); setPendingScore(null); };
+  const voice = useVoiceScore({
+    lang: language,
+    enabled: isVoiceOn,
+    active: !disabled,
+    onResult: (result) => {
+      setIsVoiceMissed(false);
+      if (result.command === 'submit') { submitRef.current?.(); return; }
+      if (result.submit) { cancelPending(); onSubmit(result.score); return; }
+      onChange(String(result.score));
+      setPendingScore(result.score);
+      clearTimeout(pendingTimer.current);
+      pendingTimer.current = setTimeout(() => submitRef.current?.(), VOICE_CONFIRM_MS);
+    },
+    onGiveUp: () => { setIsVoiceOn(false); setIsVoiceMissed(true); }
+  });
+  const handleVoiceDebug = (e) => {
+    e.preventDefault();
+    setIsVoiceDebug((on) => { localStorage.setItem(VOICE_DEBUG_KEY, on ? '0' : '1'); return !on; });
+  };
+  const handleVoice = () => {
+    setIsVoiceMissed(false);
+    setIsVoiceOn((on) => { localStorage.setItem(VOICE_KEY, on ? '0' : '1'); return !on; });
+  };
 
   // Keyboard entry: the field is disabled while the other side throws (a bot
   // visit, a bust/leg flash) and a disabled input drops focus. Put the caret
@@ -34,13 +72,23 @@ export function TurnTotalKeypad({
     if (!useOnScreenKeypad && !disabled) inputRef.current?.focus();
   }, [useOnScreenKeypad, disabled]);
 
-  const append = (digit) => onChange(appendTurnTotalDigit(value, digit));
-  const backspace = () => onChange(value.slice(0, -1));
-  const clear = () => onChange('');
+  // A pending voice score never outlives the turn or the keypad.
+  useEffect(() => {
+    if (disabled) cancelPending();
+  }, [disabled]);
+  useEffect(() => () => clearTimeout(pendingTimer.current), []);
+
+  // Any manual edit takes over from a pending voice score.
+  const edit = (next) => { cancelPending(); onChange(next); };
+  const append = (digit) => edit(appendTurnTotalDigit(value, digit));
+  const backspace = () => edit(value.slice(0, -1));
+  const clear = () => edit('');
   const submit = () => {
+    cancelPending();
     if (disabled || isInvalid) return;
     onSubmit(parseTurnTotal(value));
   };
+  submitRef.current = submit;
 
   const okButton = (
     <Button
@@ -67,6 +115,22 @@ export function TurnTotalKeypad({
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('match.turnTotalLabel')}</span>
           {/* Undo lives up here, away from OK: it used to sit right
               under the big green button and got hit by mistake. */}
+          <span className="flex items-center">
+          {voice.isSupported && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('text-muted-foreground', isVoiceOn && 'text-foreground', voice.isListening && 'animate-pulse')}
+              onClick={handleVoice}
+              onContextMenu={handleVoiceDebug}
+              type="button"
+              aria-pressed={isVoiceOn}
+              title={t('match.voiceScore')}
+            >
+              <Mic className={cn(voice.isListening && 'text-live')} />
+              {isVoiceOn ? t('match.voiceOn') : t('match.voiceScore')}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -79,15 +143,23 @@ export function TurnTotalKeypad({
             <RotateCcw />
             {t('match.undoLastVisit')}
           </Button>
+          </span>
         </div>
         <div className={cn('font-display text-5xl font-semibold tabular-nums short:text-3xl', isInvalid && 'text-destructive', !value && 'text-muted-foreground')}>
           {value || '0'}
         </div>
-        <div className={cn('text-xs', isInvalid ? 'text-destructive' : 'text-muted-foreground short:hidden')}>
+        <div className={cn('text-xs', isInvalid || (isVoiceMissed && pendingScore === null) ? 'text-destructive' : pendingScore !== null ? 'font-medium text-foreground' : 'text-muted-foreground short:hidden')}>
           {isInvalid
             ? t('match.turnTotalInvalid')
-            : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
+            : pendingScore !== null
+              ? t('match.voiceEntering', { score: pendingScore })
+              : isVoiceMissed
+                ? t('match.voiceMissed')
+              : (useOnScreenKeypad ? t('match.turnTotalKeypadHint') : t('match.turnTotalTypeHint'))}
         </div>
+        {isVoiceDebug && isVoiceOn && voice.log.length > 0 && (
+          <pre className="mt-1 max-h-24 overflow-y-auto font-mono text-[10px] leading-tight text-muted-foreground">{voice.log.join('\n')}</pre>
+        )}
       </div>
       {useOnScreenKeypad && showQuickScores && (
         <div className="flex shrink-0 gap-1 overflow-x-auto [scrollbar-width:none] short:hidden [&::-webkit-scrollbar]:hidden">
@@ -96,7 +168,7 @@ export function TurnTotalKeypad({
               key={n}
               type="button"
               className="h-9 shrink-0 rounded-md border px-3 font-display text-lg font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
-              onClick={() => onChange(String(n))}
+              onClick={() => edit(String(n))}
               disabled={disabled}
             >
               {n}
@@ -126,7 +198,7 @@ export function TurnTotalKeypad({
             className="h-12 text-center text-2xl font-semibold tabular-nums md:text-2xl"
             aria-invalid={isInvalid || undefined}
             value={value}
-            onChange={(e) => onChange(normalizeTurnTotalInput(e.target.value))}
+            onChange={(e) => edit(normalizeTurnTotalInput(e.target.value))}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();

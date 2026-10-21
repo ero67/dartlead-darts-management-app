@@ -68,6 +68,10 @@ Only these places branch on it:
   the page background; `.app` pads by the injected `--safe-area-inset-*`.
 - `src/hooks/useKeepScreenAwake.js` — match screen keeps the display on
   (`@capacitor-community/keep-awake`; Screen Wake Lock API in browsers).
+- `src/hooks/useVoiceScore.js` — hands-free 3-dart-total entry. The WebView has
+  no Web Speech API, so the app uses `@capacitor-community/speech-recognition`
+  (it brings the `RECORD_AUDIO` permission). One phrase per listen; Android's
+  recogniser beeps at each start and stop and that cannot be turned off.
 - `src/utils/publicUrl.js` — share links and password-reset emails use
   `VITE_PUBLIC_APP_URL` (the website's address) instead of the shell's local
   origin. Put it in `.env.production.local` next to the Supabase variables.

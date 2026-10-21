@@ -2080,6 +2080,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
               canUndo={turnHistory.length > 0 && currentTurn.score === 0}
               useOnScreenKeypad={isOnScreenKeypad}
               showQuickScores
+              disabled={pendingCheckout !== null}
             />
           )}
         </div>
