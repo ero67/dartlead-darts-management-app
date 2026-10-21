@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { leagueService } from '../services/leagueService';
 import { matchWinProbability } from '../lib/winProbability';
+import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
 import { cn } from '@/lib/utils';
 
 // shadcn Select items need a non-empty value; '' (nobody picked) maps to this.
@@ -63,7 +64,9 @@ export function HeadToHead({ leagueId, players }) {
   const player2 = players.find(p => p.id === player2Id);
   const oneDecimal = (v) => (v == null ? '–' : v.toFixed(1));
   const percent = (v) => `${Math.round(v)}%`;
-  const winChance = stats ? matchWinProbability(stats.p1Avg, stats.p2Avg) : null;
+  // From each player's whole recent form, not just their meetings (often one or two matches).
+  const strengths = usePlayerStrengths([player1Id, player2Id]);
+  const winChance = stats ? matchWinProbability(strengths[player1Id], strengths[player2Id]) : null;
   const stageLabel = (m) => (m.isPlayoff ? t('management.playoffs') : t('management.groups'));
 
   const renderPlayerSelect = (id, value, onChange, label) => (

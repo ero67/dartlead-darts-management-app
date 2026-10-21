@@ -18,6 +18,7 @@ import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView
 import { matchWinProbability } from '../lib/winProbability';
 import { LastVisitChip } from './tournament/LiveMatchesTab';
 import { useLastVisits } from '@/hooks/useLastVisits';
+import { usePlayerStrengths } from '@/hooks/usePlayerStrengths';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
 // dark high-contrast palette independent of the app theme. Cycles through
@@ -189,11 +190,14 @@ export function TvDisplay() {
     return () => window.removeEventListener('keydown', onKey);
   }, [showView, viewIndex]);
 
-  // Tournament averages so far, for the win chances on the boards and the queue.
-  const avgById = useMemo(
-    () => Object.fromEntries((tournament?.groups || []).flatMap((g) => (g.standings || []).map((s) => [s.player?.id, s.average]))),
-    [tournament]
+  // Player strengths from all their matches, for the win chances on the boards
+  // and the queue. Reloaded when a match of this tournament completes.
+  const completedCount = useMemo(
+    () => (tournament?.groups || []).reduce((n, g) => n + (g.matches || []).filter((m) => m.status === 'completed').length, 0)
+      + playoffRows.filter((m) => m.status === 'completed').length,
+    [tournament, playoffRows]
   );
+  const avgById = usePlayerStrengths((tournament?.players || []).map((p) => p.id), completedCount);
   const winChance = useCallback(
     (m, legsA = 0, legsB = 0) =>
       matchWinProbability(avgById[m.player1?.id], avgById[m.player2?.id], { legsToWin: m.legs_to_win || m.legsToWin || 3, legsA, legsB }),

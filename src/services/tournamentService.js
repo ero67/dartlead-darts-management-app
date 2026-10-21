@@ -2483,6 +2483,35 @@ export const tournamentService = {
 
 // Match Operations
 export const matchService = {
+  // Recent completed-match totals of these players, newest first, for
+  // win-chance strengths (lib/winProbability.js playerStrength): only the
+  // score and darts per side, not the result JSON.
+  async getRecentMatchTotals(playerIds, perPlayer) {
+    const ids = [...new Set(playerIds)].filter(id => /^[0-9a-f-]{36}$/i.test(id || ''));
+    const totals = new Map(ids.map(id => [id, []]));
+    if (ids.length === 0) return totals;
+    const list = ids.join(',');
+    // ponytail: one global newest-first limit, so a very active player can
+    // crowd out others' older matches; per-player limits need an RPC.
+    const { data, error } = await supabase
+      .from('matches')
+      .select('player1_id, player2_id, s1:result->player1Stats->totalScore, d1:result->player1Stats->totalDarts, s2:result->player2Stats->totalScore, d2:result->player2Stats->totalDarts')
+      .eq('status', 'completed')
+      .or(`player1_id.in.(${list}),player2_id.in.(${list})`)
+      .order('completed_at', { ascending: false, nullsFirst: false })
+      .limit(Math.min(perPlayer * ids.length, 3000));
+    if (error) throw error;
+    const add = (id, score, darts) => {
+      const list = totals.get(id);
+      if (list && list.length < perPlayer && Number(darts) > 0) list.push({ score: Number(score) || 0, darts: Number(darts) });
+    };
+    for (const m of data || []) {
+      add(m.player1_id, m.s1, m.d1);
+      add(m.player2_id, m.s2, m.d2);
+    }
+    return totals;
+  },
+
   // Update match with user who started it (or create it if it doesn't exist for playoff matches)
   async startMatch(matchId, userId, matchData = null) {
     try {
