@@ -28,7 +28,8 @@ const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
 const COLUMNS = 'id, tournament_id, player1_id, player2_id, legs_to_win, completed_at, created_at, '
   + 's1:result->player1Stats->totalScore, d1:result->player1Stats->totalDarts, '
   + 's2:result->player2Stats->totalScore, d2:result->player2Stats->totalDarts, '
-  + 'l1:result->player1Legs, l2:result->player2Legs';
+  + 'l1:result->player1Legs, l2:result->player2Legs, '
+  + 'a1:result->player1Stats->doubleAttempts, a2:result->player2Stats->doubleAttempts';
 const PAGE = 1000;
 const rows = [];
 for (let from = 0; ; from += PAGE) {
@@ -39,7 +40,7 @@ for (let from = 0; ; from += PAGE) {
   if (data.length < PAGE) break;
 }
 const matches = rows
-  .map(r => ({ ...r, t: Date.parse(r.completed_at || r.created_at), s1: +r.s1, d1: +r.d1, s2: +r.s2, d2: +r.d2, l1: +r.l1 || 0, l2: +r.l2 || 0 }))
+  .map(r => ({ ...r, t: Date.parse(r.completed_at || r.created_at), s1: +r.s1, d1: +r.d1, s2: +r.s2, d2: +r.d2, l1: +r.l1 || 0, l2: +r.l2 || 0, a1: +r.a1 || 0, a2: +r.a2 || 0 }))
   .filter(m => m.player1_id && m.player2_id && m.d1 > 0 && m.d2 > 0 && m.l1 + m.l2 > 0 && Number.isFinite(m.t))
   .sort((a, b) => a.t - b.t);
 const cut = Math.floor(matches.length * 0.75);
@@ -153,3 +154,58 @@ console.log('predicted  actual  matches');
 for (const [, { won, n, sum }] of [...buckets].sort((a, b) => a[0] - b[0])) {
   console.log(`${((sum / n) * 100).toFixed(0).padStart(8)}%  ${((won / n) * 100).toFixed(0).padStart(5)}%  ${String(n).padStart(7)}`);
 }
+
+// Finishing: does a player's checkout rate (legs won per double attempt,
+// recency weighted like the average, shrunk to the field rate) add anything
+// on top of the picked average model? logit p = Δstrength/scale + β·Δlogit(rate)
+// 2026-10-21: no (β = 0 on 312 train matches). Rerun as attempts accumulate.
+const logit = (p) => Math.log(p / (1 - p));
+const finishHist = new Map();
+const finishDiff = [];
+const rateOf = (hist, prior) => {
+  let won = prior * fieldRate, att = prior;
+  hist.forEach((h, i) => { const w = 0.5 ** (i / pick.halfLife); won += w * h.won; att += w * h.att; });
+  return won / att;
+};
+// Only matches where both sides recorded double attempts carry the signal
+// (recorded since mid-September), so the finishing test splits those by time.
+const fIdx = matches.map((m, j) => (m.a1 > 0 && m.a2 > 0 ? j : -1)).filter(j => j >= 0);
+const fCut = Math.floor(fIdx.length * 0.75);
+const fTrain = fIdx.slice(0, fCut), fTest = fIdx.slice(fCut);
+const fieldRate = fTrain.reduce((s, j) => s + matches[j].l1 + matches[j].l2, 0) / fTrain.reduce((s, j) => s + matches[j].a1 + matches[j].a2, 0);
+const FINISH_PRIORS = [10, 25, 50, 100, 200];
+const finishPreds = FINISH_PRIORS.map(() => []);
+for (const m of matches) {
+  const h1 = finishHist.get(m.player1_id) || [], h2 = finishHist.get(m.player2_id) || [];
+  FINISH_PRIORS.forEach((k, i) => finishPreds[i].push(logit(rateOf(h1, k)) - logit(rateOf(h2, k))));
+  for (const [pid, won, att] of [[m.player1_id, m.l1, m.a1], [m.player2_id, m.l2, m.a2]]) {
+    if (att <= 0) continue;
+    if (!finishHist.has(pid)) finishHist.set(pid, []);
+    finishHist.get(pid).unshift({ won, att });
+  }
+}
+const lossWith = (fd, beta, scale, idx) => {
+  let loss = 0, legs = 0;
+  for (const j of idx) {
+    const m = matches[j];
+    const p = clamp(1 / (1 + Math.exp(-(preds[pi][j] / scale + beta * fd[j]))));
+    loss -= m.l1 * Math.log(p) + m.l2 * Math.log(1 - p);
+    legs += m.l1 + m.l2;
+  }
+  return loss / legs;
+};
+let bestF = { train: Infinity };
+let bestNoF = { train: Infinity };
+FINISH_PRIORS.forEach((k, i) => {
+  for (let beta = 0; beta <= 1.5; beta += 0.05)
+    for (let scale = pick.scale - 2; scale <= pick.scale + 3; scale += 0.5) {
+      const tr = lossWith(finishPreds[i], beta, scale, fTrain);
+      if (tr < bestF.train) bestF = { prior: k, beta, scale, train: tr, i };
+      if (beta === 0 && tr < bestNoF.train) bestNoF = { scale, train: tr };
+    }
+});
+const finishTest = lossWith(finishPreds[bestF.i], bestF.beta, bestF.scale, fTest);
+const noFinishTest = lossWith(finishPreds[0], 0, bestNoF.scale, fTest);
+console.log(`\nfinishing: ${fIdx.length} matches with attempts (train ${fTrain.length}, test ${fTest.length}); field checkout rate ${(fieldRate * 100).toFixed(1)}%`);
+console.log(`best on train: prior ${bestF.prior} attempts, beta ${bestF.beta.toFixed(2)}, scale ${bestF.scale}`);
+console.log(`held-out leg log loss ${finishTest.toFixed(4)} with finishing vs ${noFinishTest.toFixed(4)} without (same matches)`);
