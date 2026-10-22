@@ -23,6 +23,9 @@ import { LastVisitChip } from './tournament/LiveMatchesTab';
 import { useLastVisits } from '@/hooks/useLastVisits';
 import { usePlayerHistories, usePlayerStrengths, strengthsOf } from '@/hooks/usePlayerStrengths';
 import { PreMatchCard } from './match/PreMatchCard';
+import { CricketBoard } from './cricket/CricketBoard';
+import { CricketMarksTable } from './cricket/CricketMarksTable';
+import { isCricketGame } from '../lib/cricket';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
 // dark high-contrast palette independent of the app theme. Cycles through
@@ -201,6 +204,8 @@ export function TvDisplay() {
       + playoffRows.filter((m) => m.status === 'completed').length,
     [tournament, playoffRows]
   );
+  // Win chance, form rating and upsets are X01 numbers: none of them for Cricket.
+  const isCricketTournament = isCricketGame(tournament?.gameType);
   const tournamentPlayerIds = useMemo(() => (tournament?.players || []).map((p) => p.id), [tournament?.players]);
   const histories = usePlayerHistories(tournamentPlayerIds, completedCount);
   const avgById = useMemo(() => strengthsOf(histories), [histories]);
@@ -210,11 +215,14 @@ export function TvDisplay() {
     [tournament, playoffRows]
   );
   const strengthsBefore = usePlayerStrengths(tournamentPlayerIds, 0, firstResultAt(completedMatches));
-  const upset = useMemo(() => biggestUpset(completedMatches, strengthsBefore), [completedMatches, strengthsBefore]);
+  const upset = useMemo(
+    () => (isCricketTournament ? null : biggestUpset(completedMatches, strengthsBefore)),
+    [isCricketTournament, completedMatches, strengthsBefore]
+  );
   const winChance = useCallback(
-    (m, legsA = 0, legsB = 0) =>
-      matchWinProbability(avgById[m.player1?.id], avgById[m.player2?.id], { legsToWin: m.legs_to_win || m.legsToWin || 3, legsA, legsB }),
-    [avgById]
+    (m, legsA = 0, legsB = 0) => (isCricketTournament ? null
+      : matchWinProbability(avgById[m.player1?.id], avgById[m.player2?.id], { legsToWin: m.legs_to_win || m.legsToWin || 3, legsA, legsB })),
+    [avgById, isCricketTournament]
   );
 
   const upNext = useMemo(() => {
@@ -301,6 +309,42 @@ export function TvDisplay() {
     </div>
   );
 
+  const renderBoardHeader = (m) => (
+    <CardHeader className="flex items-center justify-between gap-3 px-4">
+      <span className="font-mono text-sm font-semibold uppercase tracking-wider text-primary">
+        {m.live_board_number ? `${t('deviceSettings.board')} ${m.live_board_number}` : (m.live_device_name || t('tv.board'))}
+      </span>
+      <span className="text-sm text-muted-foreground">{t('tv.leg')} {m.current_leg || 1} · {t('management.firstTo')} {m.legs_to_win || 3}</span>
+      <Badge className="bg-destructive text-white">{t('liveMatches.live')}</Badge>
+    </CardHeader>
+  );
+
+  // Cricket: the scoreboard (points, legs, marks); a lone board also gets the
+  // dartboard from the thrower's side with the darts of the visit in progress.
+  const renderCricketBoard = (m, p1, p2) => {
+    const marks = m.live_state?.marks;
+    return (
+      <Card key={m.id} className="gap-3 py-4">
+        {renderBoardHeader(m)}
+        <CardContent className="flex items-center gap-8 px-4">
+          <CricketMarksTable
+            size={boards.length <= 2 ? 'tv' : 'md'}
+            players={[
+              { name: p1, points: m.player1_current_score ?? 0, legs: m.player1_legs ?? 0 },
+              { name: p2, points: m.player2_current_score ?? 0, legs: m.player2_legs ?? 0 }
+            ]}
+            marks={marks}
+            thrower={m.current_player}
+            className="min-w-0 flex-1"
+          />
+          {boards.length === 1 && (
+            <CricketBoard marks={marks} thrower={m.current_player ?? 0} visitDarts={m.live_state?.visit} className="hidden w-[34rem] shrink-0 xl:block" />
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderLive = () => (
     <div className="flex h-full min-h-0 flex-col gap-6 lg:flex-row">
       <section className="flex min-w-0 flex-1 flex-col gap-4">
@@ -315,15 +359,10 @@ export function TvDisplay() {
               const p1 = m.player1?.name || '—';
               const p2 = m.player2?.name || '—';
               const turn = m.current_player;
+              if (isCricketGame(m.game_type)) return renderCricketBoard(m, p1, p2);
               return (
                 <Card key={m.id} className="gap-3 py-4">
-                  <CardHeader className="flex items-center justify-between gap-3 px-4">
-                    <span className="font-mono text-sm font-semibold uppercase tracking-wider text-primary">
-                      {m.live_board_number ? `${t('deviceSettings.board')} ${m.live_board_number}` : (m.live_device_name || t('tv.board'))}
-                    </span>
-                    <span className="text-sm text-muted-foreground">{t('tv.leg')} {m.current_leg || 1} · {t('management.firstTo')} {m.legs_to_win || 3}</span>
-                    <Badge className="bg-destructive text-white">{t('liveMatches.live')}</Badge>
-                  </CardHeader>
+                  {renderBoardHeader(m)}
                   <CardContent className="flex flex-col gap-1 px-4">
                     {renderPlayerRow(p1, m.player1_legs ?? 0, m.player1_current_score ?? m.starting_score ?? 501, turn === 0, lastVisits[m.id]?.player === 0 ? lastVisits[m.id] : null)}
                     {renderPlayerRow(p2, m.player2_legs ?? 0, m.player2_current_score ?? m.starting_score ?? 501, turn === 1, lastVisits[m.id]?.player === 1 ? lastVisits[m.id] : null)}
@@ -357,7 +396,7 @@ export function TvDisplay() {
               {upNext.map((m, i) => (i === 0 && (avgById[m.player1?.id] || avgById[m.player2?.id]) ? (
                 <li key={m.id} className="flex flex-col gap-2 pb-4 pt-2.5">
                   <span className="text-xs uppercase tracking-wider text-muted-foreground">{m.label}</span>
-                  <PreMatchCard player1={m.player1} player2={m.player2} legsToWin={m.legsToWin} histories={histories} size="tv" />
+                  <PreMatchCard player1={m.player1} player2={m.player2} legsToWin={m.legsToWin} gameType={tournament.gameType} histories={histories} size="tv" />
                 </li>
               ) : (
                 <li key={m.id} className="flex flex-col gap-0.5 py-2.5">
@@ -405,7 +444,7 @@ export function TvDisplay() {
                     <TableHead className="text-right text-muted-foreground">{t('management.won')}</TableHead>
                     <TableHead className="text-right text-muted-foreground">{t('management.legsWL')}</TableHead>
                     <TableHead className="text-right text-muted-foreground">{t('management.legsDiff')}</TableHead>
-                    <TableHead className="text-right text-muted-foreground">{t('management.avg')}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{isCricketTournament ? t('common.mpr') : t('management.avg')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -425,7 +464,7 @@ export function TvDisplay() {
                         <TableCell className="text-right tabular-nums">{s.matchesWon}</TableCell>
                         <TableCell className="text-right tabular-nums">{s.legsWon}:{s.legsLost}</TableCell>
                         <TableCell className={cn('text-right tabular-nums', diff >= 0 ? 'text-primary' : 'text-destructive')}>{diff > 0 ? '+' : ''}{diff}</TableCell>
-                        <TableCell className="text-right tabular-nums">{(s.average || 0).toFixed(1)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{(s.average || 0).toFixed(isCricketTournament ? 2 : 1)}</TableCell>
                       </TableRow>
                     );
                   })}

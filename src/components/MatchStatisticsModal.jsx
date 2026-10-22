@@ -11,6 +11,7 @@ import { HIGH_SCORE_BANDS, countHighScores, checkoutRate } from '../utils/dartSt
 import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
 import { winChanceLine } from '../utils/winChanceLine';
 import { WinChanceChart } from './match/WinChanceChart';
+import { isCricketGame } from '../lib/cricket';
 import checkoutData from '../data/checkouts.json';
 
 // Statistics of one completed match: score hero, side-by-side comparison with
@@ -27,6 +28,10 @@ import checkoutData from '../data/checkouts.json';
 // Matches played before visitScores/doubleAttempts existed show "—" for the
 // high-score bands (except 180, which was always counted) and the checkout
 // percentage.
+// Cricket results (gameType 'cricket') instead carry player{1,2}Stats:
+// { darts, marks, mpr, points, bestVisit, fiveMarkVisits, nineMarkVisits,
+//   legs: [{leg, darts, marks, mpr, points, isWin, byBullup}] } and show
+// MPR/marks rows, no win chance and no checkouts.
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const checkoutValues = (stats) => (stats?.checkouts || [])
@@ -34,7 +39,7 @@ const checkoutValues = (stats) => (stats?.checkouts || [])
   .filter((c) => c > 0)
   .sort((a, b) => b - a);
 const bestLegDarts = (stats) => {
-  const wins = (stats?.legs || []).filter((l) => l?.isWin && num(l.darts) > 0).map((l) => num(l.darts));
+  const wins = (stats?.legs || []).filter((l) => l?.isWin && !l.byBullup && num(l.darts) > 0).map((l) => num(l.darts));
   return wins.length ? Math.min(...wins) : null;
 };
 const hasVisitScores = (stats) => Array.isArray(stats?.visitScores) && stats.visitScores.length > 0;
@@ -101,7 +106,8 @@ export function MatchStatisticsModal({ match, onClose }) {
   const p2 = match.player2?.name || t('management.player2');
   const p1Won = r.winner && r.winner === match.player1?.id;
   const p2Won = r.winner && r.winner === match.player2?.id;
-  const hasDetails = (s1.legs?.length || s2.legs?.length || s1.totalDarts || s2.totalDarts) > 0;
+  const isCricket = isCricketGame(match.gameType) || isCricketGame(r.gameType);
+  const hasDetails = (s1.legs?.length || s2.legs?.length || s1.totalDarts || s2.totalDarts || s1.darts || s2.darts) > 0;
 
   const co1 = checkoutValues(s1);
   const co2 = checkoutValues(s2);
@@ -116,7 +122,15 @@ export function MatchStatisticsModal({ match, onClose }) {
     b: bandCount(s2, bands2, band),
     higherBetter: true
   }));
-  const rows = [
+  const rows = isCricket ? [
+    { key: 'mpr', label: t('common.mprLong'), a: num(s1.mpr), b: num(s2.mpr), fmt: (v) => v.toFixed(2), higherBetter: true },
+    { key: 'marks', label: t('common.marks'), a: num(s1.marks), b: num(s2.marks), higherBetter: true },
+    { key: 'points', label: t('common.points'), a: num(s1.points), b: num(s2.points), higherBetter: true },
+    { key: 'bestVisit', label: t('matchStats.bestVisit'), a: num(s1.bestVisit), b: num(s2.bestVisit), higherBetter: true },
+    { key: 'fiveMarkVisits', label: t('matchStats.fiveMarkVisits'), a: num(s1.fiveMarkVisits), b: num(s2.fiveMarkVisits), higherBetter: true },
+    { key: 'bestLeg', label: t('matchStats.bestLeg'), a: bestLegDarts(s1), b: bestLegDarts(s2), higherBetter: false },
+    { key: 'dartsThrown', label: t('matchStats.dartsThrown'), a: num(s1.darts), b: num(s2.darts), neutral: true }
+  ] : [
     { key: 'average', label: t('matchStats.average'), a: num(s1.average), b: num(s2.average), fmt: (v) => v.toFixed(2), higherBetter: true },
     {
       key: 'checkoutPercent',
@@ -204,6 +218,19 @@ export function MatchStatisticsModal({ match, onClose }) {
 
   const legCell = (leg) => {
     if (!leg) return <TableCell className="text-muted-foreground">—</TableCell>;
+    if (isCricket) {
+      return (
+        <TableCell className={cn('whitespace-normal tabular-nums', leg.isWin ? 'font-medium' : 'text-muted-foreground')}>
+          {leg.isWin ? '✓ ' : ''}
+          {num(leg.darts) > 0 ? `${num(leg.darts)} ${t('matchStats.darts').toLowerCase()}` : '—'}
+          {num(leg.darts) > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {' '}· {t('common.marks')} {num(leg.marks)} · {t('common.mpr')} {num(leg.mpr).toFixed(2)} · {t('common.points')} {num(leg.points)}
+            </span>
+          )}
+        </TableCell>
+      );
+    }
     return (
       <TableCell className={cn('whitespace-normal tabular-nums', leg.isWin ? 'font-medium' : 'text-muted-foreground')}>
         {num(leg.darts) > 0 ? `${num(leg.darts)} ${t('matchStats.darts').toLowerCase()}` : '—'}
@@ -261,12 +288,16 @@ export function MatchStatisticsModal({ match, onClose }) {
           <>
             {renderCompare(rows)}
 
-            <WinChanceSection match={match} />
+            {!isCricket && (
+              <>
+                <WinChanceSection match={match} />
 
-            <section className="flex flex-col gap-2">
-              <h4 className="text-sm font-semibold">{t('matchStats.highScores')}</h4>
-              {renderCompare(bandRows)}
-            </section>
+                <section className="flex flex-col gap-2">
+                  <h4 className="text-sm font-semibold">{t('matchStats.highScores')}</h4>
+                  {renderCompare(bandRows)}
+                </section>
+              </>
+            )}
 
             {legs.length > 0 && (
               <section className="flex flex-col gap-2">
@@ -292,7 +323,7 @@ export function MatchStatisticsModal({ match, onClose }) {
               </section>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            {!isCricket && <div className="grid gap-4 sm:grid-cols-2">
               <section className="flex flex-col gap-2">
                 <h4 className="text-sm font-semibold">{t('matchStats.checkoutsOf')} · {p1}</h4>
                 {renderCheckouts(co1, false)}
@@ -301,7 +332,7 @@ export function MatchStatisticsModal({ match, onClose }) {
                 <h4 className="text-sm font-semibold">{t('matchStats.checkoutsOf')} · {p2}</h4>
                 {renderCheckouts(co2, true)}
               </section>
-            </div>
+            </div>}
           </>
         )}
       </DialogContent>

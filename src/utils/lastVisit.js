@@ -7,7 +7,9 @@
 //   score: a normal visit of `value` points
 //   bust:  the turn passed and the score did not move
 //   leg:   the on-throw player won the leg; `value` is the checkout
+// Cricket rows hold points that go up, not a remaining score: never a visit.
 export const snapshotLiveRow = (row) => ({
+  isCricket: row.game_type === 'cricket',
   leg: row.current_leg ?? null,
   player: row.current_player ?? null,
   scores: [row.player1_current_score ?? null, row.player2_current_score ?? null],
@@ -15,7 +17,7 @@ export const snapshotLiveRow = (row) => ({
 });
 
 export function diffVisit(prev, next) {
-  if (!prev || prev.player !== 0 && prev.player !== 1) return null;
+  if (!prev || next.isCricket || prev.player !== 0 && prev.player !== 1) return null;
   const thrower = prev.player;
   if (next.legs[thrower] > prev.legs[thrower]) {
     return { player: thrower, kind: 'leg', value: prev.scores[thrower] };
@@ -43,5 +45,7 @@ if (globalThis.process?.argv?.[1]?.endsWith('lastVisit.js')) {
   console.assert(diffVisit(row(), row({ player1_current_score: 20, current_player: 1 })) === null, 'stale catch-up');
   console.assert(diffVisit(row(), row()) === null, 'no change');
   console.assert(diffVisit(null, row()) === null, 'first sight');
+  const cricket = (o) => row({ game_type: 'cricket', ...o });
+  console.assert(diffVisit(cricket(), cricket({ current_player: 1 })) === null, 'cricket: no-score visit is not a bust');
   console.log('lastVisit self-check passed');
 }

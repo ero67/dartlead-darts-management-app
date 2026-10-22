@@ -34,6 +34,7 @@ import { leagueService } from '../services/leagueService';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { cn } from '@/lib/utils';
+import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
 
@@ -260,6 +261,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
   
   const [tournamentSettings, setTournamentSettings] = useState({
+    gameType: tournament.gameType || 'x01',
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
     defaultScoringMode: tournament.defaultScoringMode || 'dart',
@@ -407,6 +409,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   useEffect(() => {
     if (tournament) {
       setTournamentSettings({
+        gameType: tournament.gameType || 'x01',
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
         defaultScoringMode: tournament.defaultScoringMode || 'dart',
@@ -2188,7 +2191,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     tournament.legsToWin && (tournament.legsToWin === 1
       ? t('tournaments.firstToLeg', { count: 1 })
       : t('tournaments.firstToLegs', { count: tournament.legsToWin })),
-    tournament.startingScore && `${t('tournaments.startingScore')} ${tournament.startingScore}`
+    isCricketGame(tournament.gameType)
+      ? t('common.gameTypeCricket')
+      : tournament.startingScore && `${t('tournaments.startingScore')} ${tournament.startingScore}`
   ].filter(Boolean);
 
   return (

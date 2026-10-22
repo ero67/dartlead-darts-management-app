@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, renderPlayerLink, t }) {
   const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
   const num = 'text-right tabular-nums';
+  const isCricket = tournament?.gameType === 'cricket';
 
   // Highlight the players who actually qualify under the configured mode
   // (per group or best N overall) — not a fixed per-group count.
@@ -62,7 +63,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                             <TableHead className={num} title={t('management.lost')}>{t('management.lost')}</TableHead>
                             <TableHead className={num}>{t('management.legsWL')}</TableHead>
                             <TableHead className={num}>{t('management.legsDiff')}</TableHead>
-                            <TableHead className={num}>{t('management.avg')}</TableHead>
+                            <TableHead className={num}>{isCricket ? t('common.mpr') : t('management.avg')}</TableHead>
                             <TableHead className={num}>{t('management.pts')}</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -93,7 +94,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                                 <TableCell className={cn(num, legDiff >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')}>
                                   {legDiff > 0 ? '+' : ''}{legDiff}
                                 </TableCell>
-                                <TableCell className={num}>{standing.average.toFixed(1)}</TableCell>
+                                <TableCell className={num}>{(standing.average || 0).toFixed(isCricket ? 2 : 1)}</TableCell>
                                 <TableCell className={cn(num, 'font-display text-lg font-semibold')}>{standing.points}</TableCell>
                               </TableRow>
                             );

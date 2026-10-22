@@ -9,6 +9,8 @@ export const biggestUpset = (matches, strengths, maxChance = 0.4) => {
   for (const m of matches) {
     const r = m.result;
     if (m.status !== 'completed' || !r?.winner || !m.player1?.id || !m.player2?.id) continue;
+    // Strengths are X01 averages; they say nothing about a Cricket match.
+    if (m.gameType === 'cricket' || r.gameType === 'cricket') continue;
     const legs = [Number(r.player1Legs) || 0, Number(r.player2Legs) || 0];
     const p1 = matchWinProbability(strengths[m.player1.id], strengths[m.player2.id], { legsToWin: m.legsToWin || Math.max(...legs) });
     if (p1 === null) continue;

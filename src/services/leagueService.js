@@ -1,5 +1,6 @@
 import { supabase, generateId } from '../lib/supabase.js';
 import { isValidLegDartCount } from '../utils/dartStats.js';
+import { isCricketGame } from '../lib/cricket.js';
 
 // Checkout like "T20+T20+D20" (or a plain number) -> points scored.
 const getCheckoutValue = (checkout) => {
@@ -1609,9 +1610,9 @@ export const leagueService = {
   async getLeagueStatistics(leagueId) {
     try {
       // 1. Get all completed tournaments in the league
-      const { data: tournaments, error } = await supabase
+      const { data: allTournaments, error } = await supabase
         .from('tournaments')
-        .select('id, name, created_at')
+        .select('id, name, created_at, game_type')
         .eq('league_id', leagueId)
         .eq('status', 'completed')
         .eq('deleted', false)
@@ -1619,7 +1620,9 @@ export const leagueService = {
 
       if (error) throw error;
       const empty = { most180s: [], bestCheckouts: [], bestMatchAverages: [], fewestDartsLegs: [], averageByRound: { rounds: [], series: [] } };
-      if (!tournaments?.length) return empty;
+      // Every board here is an X01 number, so Cricket tournaments stay out (also of the chart rounds)
+      const tournaments = (allTournaments || []).filter(t => !isCricketGame(t.game_type));
+      if (!tournaments.length) return empty;
 
       // 2+3. All completed matches with results, in ONE query. This previously
       // fetched the full nested tournament tree per tournament (a season league
@@ -1797,7 +1800,7 @@ export const leagueService = {
 
       const { data: matches, error } = await supabase
         .from('matches')
-        .select('id, tournament_id, player1_id, player2_id, winner_id, player1_legs, player2_legs, result, is_playoff, playoff_round, completed_at')
+        .select('id, tournament_id, player1_id, player2_id, winner_id, player1_legs, player2_legs, game_type, result, is_playoff, playoff_round, completed_at')
         .in('tournament_id', tournaments.map(t => t.id))
         .eq('status', 'completed')
         .or(`and(player1_id.eq.${player1Id},player2_id.eq.${player2Id}),and(player1_id.eq.${player2Id},player2_id.eq.${player1Id})`);
@@ -1813,6 +1816,7 @@ export const leagueService = {
       const p1 = { wins: 0, legs: 0, score: 0, darts: 0, oneEighties: 0, highestCheckout: 0 };
       const p2 = { wins: 0, legs: 0, score: 0, darts: 0, oneEighties: 0, highestCheckout: 0 };
       const matchAvg = (stats) => (stats?.totalDarts > 0 ? (stats.totalScore / stats.totalDarts) * 3 : null);
+      const matchMpr = (stats) => (stats?.darts > 0 ? (stats.marks / stats.darts) * 3 : null);
 
       const meetings = (matches || []).map(m => {
         let result = m.result;
@@ -1828,8 +1832,12 @@ export const leagueService = {
         else if (m.winner_id === player2Id) p2.wins++;
         p1.legs += p1Legs;
         p2.legs += p2Legs;
-        side(p1, p1Stats);
-        side(p2, p2Stats);
+        // Wins and legs count every game; score, 180s and checkouts are X01 only
+        const isCricket = isCricketGame(m.game_type);
+        if (!isCricket) {
+          side(p1, p1Stats);
+          side(p2, p2Stats);
+        }
         const tournament = tournamentById.get(m.tournament_id);
         return {
           id: m.id,
@@ -1840,8 +1848,10 @@ export const leagueService = {
           winnerId: m.winner_id,
           p1Legs,
           p2Legs,
-          p1Avg: matchAvg(p1Stats),
-          p2Avg: matchAvg(p2Stats)
+          gameType: m.game_type || 'x01',
+          p1Avg: isCricket ? null : matchAvg(p1Stats),
+          p2Avg: isCricket ? null : matchAvg(p2Stats),
+          ...(isCricket && { p1Mpr: matchMpr(p1Stats), p2Mpr: matchMpr(p2Stats) })
         };
       }).sort((a, b) => a.playedAt.localeCompare(b.playedAt));
 

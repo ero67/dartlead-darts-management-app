@@ -5,12 +5,14 @@ import { usePlayerHistories, strengthsOf } from '../../hooks/usePlayerStrengths'
 import { matchWinProbability } from '../../lib/winProbability';
 import { preMatchFacts } from '../../utils/preMatch';
 import { formatChance } from '../../utils/upsets';
+import { isCricketGame } from '../../lib/cricket';
 
 // Tale of the tape before a match: form rating, last five results,
 // head-to-head and win chance, player 1 left in green, player 2 right in
 // amber. Pass `histories` when the caller already has them (TV); otherwise
 // it loads them itself (match start dialog). `size` "tv" is for the wall.
-export function PreMatchCard({ player1, player2, legsToWin = 3, histories: given, size = 'compact', className }) {
+// Cricket keeps only form and head-to-head: rating and chance are X01 numbers.
+export function PreMatchCard({ player1, player2, legsToWin = 3, gameType, histories: given, size = 'compact', className }) {
   const { t } = useLanguage();
   const loaded = usePlayerHistories(given ? [] : [player1?.id, player2?.id]);
   const histories = given || loaded;
@@ -20,7 +22,8 @@ export function PreMatchCard({ player1, player2, legsToWin = 3, histories: given
   if (!s1 && !s2) return null;
 
   const { form, headToHead } = preMatchFacts(player1?.id, player2?.id, histories);
-  const chance = matchWinProbability(s1, s2, { legsToWin });
+  const isCricket = isCricketGame(gameType);
+  const chance = isCricket ? null : matchWinProbability(s1, s2, { legsToWin });
   const isTv = size === 'tv';
   const value = cn('font-display font-semibold tabular-nums', isTv ? 'text-3xl' : 'text-xl');
 
@@ -52,7 +55,7 @@ export function PreMatchCard({ player1, player2, legsToWin = 3, histories: given
         <span className="text-muted-foreground">vs</span>
         <span className={cn('truncate text-right font-semibold text-amber-600 dark:text-amber-400', isTv ? 'text-2xl' : 'text-base')}>{player2?.name}</span>
       </div>
-      {row(t('playerProfile.formRating'), <span className={value}>{s1 ? s1.toFixed(1) : '–'}</span>, <span className={value}>{s2 ? s2.toFixed(1) : '–'}</span>)}
+      {!isCricket && row(t('playerProfile.formRating'), <span className={value}>{s1 ? s1.toFixed(1) : '–'}</span>, <span className={value}>{s2 ? s2.toFixed(1) : '–'}</span>)}
       {row(t('preMatch.lastFive'), formDots(form[0], false), formDots(form[1], true))}
       {headToHead[0] + headToHead[1] > 0 && row(t('preMatch.headToHead'), <span className={value}>{headToHead[0]}</span>, <span className={value}>{headToHead[1]}</span>)}
       {chance !== null && (

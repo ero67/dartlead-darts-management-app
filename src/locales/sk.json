@@ -491,7 +491,10 @@
     "notScorerHint": "Nie ste priradený ako zapisovateľ tohto turnaja. Požiadajte organizátora turnaja, aby vás pridal v záložke Zapisovatelia, potom môžete počítať zápasy na tomto zariadení.",
     "noScorersTitle": "Zápasy môžete zatiaľ počítať len vy",
     "noScorersText": "Pridajte zapisovateľov, aby hráči mohli počítať zápasy na vlastných zariadeniach. Ostatní si zápas môžu iba prezerať.",
-    "addScorers": "Pridať zapisovateľov"
+    "addScorers": "Pridať zapisovateľov",
+    "bestMpr": "Najlepšie MPR v zápase",
+    "bestVisits": "Najlepšie kolá",
+    "bestVisitMarks": "Najviac"
   },
   "summary": {
     "biggestUpset": "Najväčšie prekvapenie",
@@ -513,7 +516,10 @@
     "fewestDartsLeg": "Najmenej Šípok (Jeden Leg)",
     "poweredBy": "Vytvorené pomocou",
     "exportImage": "Exportovať ako obrázok",
-    "exporting": "Exportujem..."
+    "exporting": "Exportujem...",
+    "bestTournamentMpr": "Najlepšie MPR turnaja",
+    "bestMatchMpr": "Najlepšie MPR v zápase",
+    "bestVisit": "Najlepšie kolo (zásahy)"
   },
   "landing": {
     "heroBadge": "Pre šípkarské ligy a turnaje",
@@ -658,7 +664,14 @@
     "refresh": "Obnoviť",
     "refreshing": "Obnovujem…",
     "pullToRefresh": "Potiahnite nadol pre obnovenie",
-    "releaseToRefresh": "Pustite pre obnovenie"
+    "releaseToRefresh": "Pustite pre obnovenie",
+    "gameType": "Hra",
+    "gameTypeX01": "X01",
+    "gameTypeCricket": "Kriket",
+    "mpr": "MPR",
+    "mprLong": "Zásahy za kolo",
+    "marks": "Zásahy",
+    "points": "Body"
   },
   "deviceSettings": {
     "title": "Nastavenia zariadenia",
@@ -974,7 +987,10 @@
     "winsCountMany": "{{count}} výhier",
     "lossesCountOne": "{{count}} prehra",
     "lossesCountFew": "{{count}} prehry",
-    "lossesCountMany": "{{count}} prehier"
+    "lossesCountMany": "{{count}} prehier",
+    "cricketMpr": "Kriket MPR",
+    "cricketBestMpr": "Najlepšie MPR v kriketovom zápase",
+    "cricketMatches": "Kriketové zápasy"
   },
   "userSearch": {
     "placeholder": "Hľadať podľa mena alebo emailu...",
@@ -1111,7 +1127,9 @@
     "noDetails": "Pre tento zápas neboli zaznamenané podrobné štatistiky.",
     "open": "Štatistika",
     "checkoutPercent": "Úspešnosť zakončenia",
-    "highScores": "Vysoké nahádzania"
+    "highScores": "Vysoké nahádzania",
+    "bestVisit": "Najlepšie kolo (zásahy)",
+    "fiveMarkVisits": "Kolá s 5+ zásahmi"
   },
   "practice": {
     "title": "Tréning",
@@ -1142,6 +1160,11 @@
         "title": "Okolo terča",
         "desc": "1 až 20 a potom bull. Počet šípok a čas do konca.",
         "short": "ATC"
+      },
+      "cricket": {
+        "title": "Kriket",
+        "desc": "Zatvor 15–20 a bull skôr ako súper a boduj na tom, čo nechal otvorené. Proti kamarátovi alebo botovi.",
+        "short": "KR"
       }
     },
     "setup": {
@@ -1370,7 +1393,9 @@
       "bestLeg": "Najlepší leg",
       "bestHitRate": "Najlepšia úspešnosť",
       "fewestDarts": "Najmenej šípok",
-      "fastestTime": "Najrýchlejší čas"
+      "fastestTime": "Najrýchlejší čas",
+      "bestMpr": "Najlepšie MPR",
+      "mostLegs": "Najviac vyhratých legov"
     },
     "sync": {
       "signInTitle": "Nestrať svoju históriu",
@@ -1396,6 +1421,43 @@
       "out": "zakončenie {{score}}",
       "left": "zostalo {{score}}",
       "byBullup": "rozhodnuté na bull"
+    },
+    "cricket": {
+      "rules": "15–20 a bull · 3 zásahy zatvoria · ďalšie bodujú",
+      "aboutMpr": "okolo {{mpr}} MPR",
+      "opponentMpr": "{{name}}: {{mpr}} MPR",
+      "input": "Zadávanie",
+      "inputBoard": "Terč",
+      "inputPad": "Klávesnica",
+      "points": "body {{a}}–{{b}}",
+      "stats": {
+        "bestVisit": "Najlepšie kolo",
+        "fiveMarkVisits": "Kolá s 5+ zásahmi",
+        "nineMarkVisits": "Kolá s 9 zásahmi: {{count}}",
+        "marksDarts": "zásahy {{marks}} · šípky {{darts}}"
+      }
+    }
+  },
+  "cricket": {
+    "board": {
+      "label": "Kriketový terč",
+      "single": "Single {{n}}",
+      "double": "Double {{n}}",
+      "triple": "Triple {{n}}",
+      "outerBull": "Vonkajší bull (25)",
+      "bull": "Bull (50)",
+      "bullShort": "Bull",
+      "miss": "Vedľa"
+    },
+    "pad": {
+      "nextPlayer": "Ďalší hráč"
+    },
+    "match": {
+      "bullupOffer": "Tento leg je príliš dlhý ({{count}}+ kôl pre oboch).",
+      "bullupPrompt": "Obaja hráči hádžu na bull — bližší vyhráva leg. Kto vyhral hod na bull?",
+      "inputBoard": "Terč",
+      "inputPad": "Klávesnica",
+      "inputLabel": "Zadávanie hodov"
     }
   }
 }

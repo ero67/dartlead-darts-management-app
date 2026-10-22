@@ -19,7 +19,7 @@ const SANS = "'Geist Variable', ui-sans-serif, system-ui, sans-serif";
 const DISPLAY = "'Barlow Condensed', 'Geist Variable', ui-sans-serif, sans-serif";
 
 const font = (size, weight = 400, family = SANS) => `${weight} ${size}px ${family}`;
-const fmtAvg = (n) => (Number.isFinite(n) && n > 0 ? n.toFixed(1) : '–');
+const fmtAvg = (n, d = 1) => (Number.isFinite(n) && n > 0 ? n.toFixed(d) : '–');
 
 function truncate(ctx, text, maxWidth) {
   let s = String(text ?? '');
@@ -60,7 +60,7 @@ function drawHeader(ctx, tournament, labels, y) {
   const date = tournament.createdAt ? new Date(tournament.createdAt) : null;
   const meta = [
     date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : null,
-    `${tournament.startingScore || 501} · ${labels.firstTo} ${tournament.legsToWin || 3}`,
+    `${tournament.gameType === 'cricket' ? labels.cricket : tournament.startingScore || 501} · ${labels.firstTo} ${tournament.legsToWin || 3}`,
     tournament.status === 'completed' ? labels.completed : null
   ].filter(Boolean).join('   ·   ');
   text(ctx, meta, PAD, y + 72, { size: 14, color: C.muted });
@@ -126,6 +126,7 @@ function drawStandings(ctx, tournament, labels, y) {
   const perGroup = tournament.playoffSettings?.enabled !== false && tournament.playoffSettings?.qualificationMode !== 'total'
     ? Number(tournament.playoffSettings?.playersPerGroup || 0) : 0;
   // Right-aligned numeric columns, from the right edge inward.
+  const isCricket = tournament.gameType === 'cricket';
   const numCols = [['avg', 58], ['legs', 58], ['lost', 34], ['won', 34], ['played', 34]];
 
   let rowY = y;
@@ -139,7 +140,7 @@ function drawStandings(ctx, tournament, labels, y) {
     let cx = x + gw - 12;
     ctx.font = font(11, 600);
     numCols.forEach(([key, cw]) => {
-      text(ctx, labels[key], cx, rowY + 28, { size: 11, weight: 600, color: C.faint, align: 'right' });
+      text(ctx, key === 'avg' && isCricket ? labels.mpr : labels[key], cx, rowY + 28, { size: 11, weight: 600, color: C.faint, align: 'right' });
       cx -= cw;
     });
     const nameMax = cx - (x + 44);
@@ -153,7 +154,7 @@ function drawStandings(ctx, tournament, labels, y) {
       text(ctx, r + 1, x + 24, ry + 16, { size: 13, weight: 600, color: qualifies ? C.green : C.faint, align: 'center' });
       text(ctx, s.player?.name || '?', x + 44, ry + 16, { size: 14, weight: qualifies ? 600 : 400, max: nameMax });
       let vx = x + gw - 12;
-      const vals = { avg: fmtAvg(s.average), legs: `${s.legsWon || 0}:${s.legsLost || 0}`, lost: s.matchesLost || 0, won: s.matchesWon || 0, played: s.matchesPlayed || 0 };
+      const vals = { avg: fmtAvg(s.average, isCricket ? 2 : 1), legs: `${s.legsWon || 0}:${s.legsLost || 0}`, lost: s.matchesLost || 0, won: s.matchesWon || 0, played: s.matchesPlayed || 0 };
       numCols.forEach(([key, cw]) => {
         text(ctx, vals[key], vx, ry + 16, { size: 13, color: key === 'won' ? C.text : C.muted, align: 'right' });
         vx -= cw;
@@ -225,11 +226,11 @@ function drawAwards(ctx, awards, labels, y) {
 
 export const imageLabels = (t) => ({
   standings: t('management.groupStandings'), playoffs: t('management.playoffs'), awards: t('summary.tournamentAwards'),
-  played: t('management.played'), won: t('management.won'), lost: t('management.lost'), legs: t('management.legs'), avg: t('management.avg'),
+  played: t('management.played'), won: t('management.won'), lost: t('management.lost'), legs: t('management.legs'), avg: t('management.avg'), mpr: t('common.mpr'), cricket: t('common.gameTypeCricket'),
   thirdPlace: t('export.thirdPlace'), firstTo: t('management.firstTo'), completed: t('tournaments.statusCompleted'), poweredBy: t('summary.poweredBy')
 });
 
-// labels: { standings, playoffs, awards, played, won, lost, legs, avg, thirdPlace, firstTo, completed, poweredBy }
+// labels: { standings, playoffs, awards, played, won, lost, legs, avg, mpr, cricket, thirdPlace, firstTo, completed, poweredBy }
 // awards (optional): [{ label, value, players: [name] }]
 export async function tournamentToPngBlob(tournament, labels, { awards = [] } = {}) {
   if (document.fonts?.load) {

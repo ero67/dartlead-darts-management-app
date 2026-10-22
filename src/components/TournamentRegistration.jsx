@@ -48,6 +48,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   const [showGroupsPreview, setShowGroupsPreview] = useState(false);
   const [draftGroups, setDraftGroups] = useState([]);
   const [tournamentSettings, setTournamentSettings] = useState({
+    gameType: tournament.gameType || 'x01',
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
     defaultScoringMode: tournament.defaultScoringMode || 'dart',
@@ -244,6 +245,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   useEffect(() => {
     if (tournament) {
       setTournamentSettings({
+        gameType: tournament.gameType || 'x01',
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
         defaultScoringMode: tournament.defaultScoringMode || 'dart',
@@ -292,7 +294,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
         })()
       });
     }
-  }, [tournament?.id, tournament?.legsToWin, tournament?.startingScore, tournament?.tournamentType, tournament?.groupSettings, tournament?.standingsCriteriaOrder, tournament?.playoffSettings]);
+  }, [tournament?.id, tournament?.gameType, tournament?.legsToWin, tournament?.startingScore, tournament?.tournamentType, tournament?.groupSettings, tournament?.standingsCriteriaOrder, tournament?.playoffSettings]);
 
   const singlePlayerInputRef = useRef(null);
   const refocusAfterAddRef = useRef(false);

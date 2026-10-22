@@ -121,3 +121,51 @@ export const checkoutRate = (playerStats) => {
   if (!Number.isFinite(attempts) || attempts <= 0) return { percent: null, hits, attempts: 0 };
   return { percent: (hits / attempts) * 100, hits, attempts };
 };
+
+/* ---------------------------------------------------------------------------
+   Cricket records (results from the Cricket scorer: player{1,2}Stats =
+   { darts, marks, mpr, points, bestVisit, fiveMarkVisits, nineMarkVisits,
+   legs: [{ leg, darts, marks, mpr, points, isWin, byBullup }] }).
+   --------------------------------------------------------------------------- */
+
+/** Fewest darts that can win a Cricket leg: six trebles plus both bulls. */
+export const MIN_CRICKET_LEG_DARTS = 8;
+
+/**
+ * Per-player Cricket records over a list of matches (incomplete ones skipped).
+ *
+ * @returns {Map} playerId -> { player, darts, marks, bestMatch: {mpr, opponent} | null,
+ *   bestVisit, fiveMarkVisits, nineMarkVisits, bestLeg: {darts, opponent} | null }
+ */
+export const cricketPlayerRecords = (matches) => {
+  const records = new Map();
+  const add = (player, stats, opponent) => {
+    if (!player?.id || !stats) return;
+    let rec = records.get(player.id);
+    if (!rec) {
+      rec = { player, darts: 0, marks: 0, bestMatch: null, bestVisit: 0, fiveMarkVisits: 0, nineMarkVisits: 0, bestLeg: null };
+      records.set(player.id, rec);
+    }
+    const darts = Number(stats.darts) || 0;
+    const marks = Number(stats.marks) || 0;
+    rec.darts += darts;
+    rec.marks += marks;
+    const mpr = darts > 0 ? (marks / darts) * 3 : 0;
+    if (mpr > 0 && (!rec.bestMatch || mpr > rec.bestMatch.mpr)) rec.bestMatch = { mpr, opponent };
+    rec.bestVisit = Math.max(rec.bestVisit, Number(stats.bestVisit) || 0);
+    rec.fiveMarkVisits += Number(stats.fiveMarkVisits) || 0;
+    rec.nineMarkVisits += Number(stats.nineMarkVisits) || 0;
+    for (const leg of stats.legs || []) {
+      const legDarts = Number(leg?.darts) || 0;
+      // Legs awarded by bull-up were never thrown; below the minimum is corrupt.
+      if (!leg?.isWin || leg.byBullup || legDarts < MIN_CRICKET_LEG_DARTS) continue;
+      if (!rec.bestLeg || legDarts < rec.bestLeg.darts) rec.bestLeg = { darts: legDarts, opponent };
+    }
+  };
+  for (const m of matches || []) {
+    if (m?.status !== 'completed' || !m.result) continue;
+    add(m.player1, m.result.player1Stats, m.player2);
+    add(m.player2, m.result.player2Stats, m.player1);
+  }
+  return records;
+};

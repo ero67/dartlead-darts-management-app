@@ -10,11 +10,13 @@ import { Card } from '@/components/ui/card';
 import { BoardMotif, CheckoutRoute, LiveDot } from '../shared/DartsAccents';
 import { PracticeBests } from './PracticeBests';
 import { PracticeGameAbbr } from './PracticeShared';
+import { MarkGlyph } from '../cricket/MarkGlyph';
 import { sessionHeadline } from './practiceView';
 import { PRACTICE_GAMES, describeSession, formatSessionDate, sessionHighlights } from '../../lib/practiceGames';
 import { loadActiveSession, saveActiveSession, clearActiveSession, loadHistory, countPendingSync } from '../../lib/practiceStorage';
 import { practiceService } from '../../services/practiceService';
 import { computeStats } from '../../lib/x01Engine';
+import { mprOf } from '../../lib/cricket';
 import { getUserDisplayName } from '../../utils/userDisplayName';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +46,8 @@ const activeKpi = (active, t) => {
       return [`${s.rounds.filter(r => r.success).length}/${s.rounds.length}`, t('practice.oneTwentyOne.stats.successes')];
     case 'aroundTheClock':
       return [`${s.targetIndex}/${s.targets.length}`, t('practice.aroundTheClock.target')];
+    case 'cricket':
+      return [mprOf(s.totals[0].marks, s.totals[0].darts).toFixed(2), t('common.mpr')];
     default:
       return null;
   }
@@ -91,6 +95,16 @@ const GAME_PREVIEWS = {
         </span>
       ))}
     </div>
+  ),
+  cricket: (
+    <div className="grid w-full grid-cols-7 gap-1 px-3">
+      {[[20, 3], [19, 3], [18, 2], [17, 1], [16, 0], [15, 0], ['B', 1]].map(([n, count]) => (
+        <span key={n} className={cn('flex flex-col items-center gap-1 font-display text-lg font-semibold', count >= 3 ? 'text-primary' : 'text-muted-foreground')}>
+          {n}
+          <MarkGlyph count={count} className={cn('size-6', count < 3 && count > 0 && 'text-foreground')} />
+        </span>
+      ))}
+    </div>
   )
 };
 
@@ -125,7 +139,7 @@ export function PracticeHome() {
 
   const activeGame = active ? PRACTICE_GAMES.find(g => g.id === active.game) : null;
   const kpi = active ? activeKpi(active, t) : null;
-  const isActiveMatch = active?.game === 'x01' && active.state.kind === 'match';
+  const isActiveMatch = (active?.game === 'x01' && active.state.kind === 'match') || active?.game === 'cricket';
 
   const handleDiscard = () => {
     setDiscarded(active);

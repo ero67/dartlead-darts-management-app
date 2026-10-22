@@ -7,13 +7,54 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { cn } from '@/lib/utils';
 import { deliverFile, exportFileName } from '../lib/exportShare';
 import { tournamentToPngBlob, imageLabels } from '../lib/tournamentImage';
-import { isValidLegDartCount } from '../utils/dartStats';
+import { isValidLegDartCount, cricketPlayerRecords } from '../utils/dartStats';
+import { isCricketGame } from '../lib/cricket';
 import logo from '../assets/logo.png';
 import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
 import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
 
 const PLACE_MEDAL_CLASS = { 1: 'text-amber-500', 2: 'text-zinc-400', 3: 'text-amber-700' };
 const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+
+// Find the best value AND all players who share it.
+const findBestWithTies = (map, valueFn, compareFn) => {
+  let bestValue = null;
+  let winners = [];
+  map.forEach(entry => {
+    const val = valueFn(entry);
+    if (val === null || val === undefined) return;
+    if (bestValue === null || compareFn(val, bestValue) > 0) {
+      bestValue = val;
+      winners = [entry];
+    } else if (compareFn(val, bestValue) === 0) {
+      winners.push(entry);
+    }
+  });
+  return { bestValue, winners };
+};
+
+// Cricket awards: best tournament MPR, best match MPR and best visit (marks).
+// Values are rounded before comparing so ties show as ties.
+const cricketAwards = (matches, t) => {
+  const records = cricketPlayerRecords(matches);
+  const round2 = (v) => Math.round(v * 100) / 100;
+  const higher = (a, b) => a - b;
+  const defs = [
+    { key: 'bestMpr', icon: <Target size={28} />, label: t('summary.bestTournamentMpr'), value: (r) => (r.darts > 0 ? round2((r.marks / r.darts) * 3) : null), fmt: (v) => v.toFixed(2) },
+    { key: 'bestMatchMpr', icon: <Zap size={28} />, label: t('summary.bestMatchMpr'), value: (r) => (r.bestMatch ? round2(r.bestMatch.mpr) : null), fmt: (v) => v.toFixed(2), opponent: (r) => r.bestMatch.opponent },
+    { key: 'bestVisit', icon: <Award size={28} />, label: t('summary.bestVisit'), value: (r) => r.bestVisit || null, fmt: String }
+  ];
+  return defs.flatMap(({ key, icon, label, value, fmt, opponent }) => {
+    const { bestValue, winners } = findBestWithTies(records, value, higher);
+    if (bestValue === null) return [];
+    return [{
+      key, icon, label,
+      players: winners.map(w => w.player),
+      value: fmt(bestValue),
+      subtitle: opponent && winners.length === 1 ? `vs ${opponent(winners[0])?.name || '?'}` : null
+    }];
+  });
+};
 
 /**
  * TournamentSummary – shown automatically when a tournament is completed.
@@ -156,8 +197,11 @@ export function TournamentSummary({ tournament }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tournament]);
 
+  const isCricket = isCricketGame(tournament?.gameType);
+
   // ── Compute stat awards (with tie support) ───────────────────────────
   const awards = useMemo(() => {
+    if (isCricket) return cricketAwards(allMatches, t);
     const playerTotalStats = new Map();
     const playerBestAvg = new Map();
     const playerCheckouts = new Map();
@@ -247,23 +291,6 @@ export function TournamentSummary({ tournament }) {
       processPlayerStats(match.player1, match.result?.player1Stats, match.player2);
       processPlayerStats(match.player2, match.result?.player2Stats, match.player1);
     });
-
-    // ── Helper: find the best value AND all players who share it ──────
-    const findBestWithTies = (map, valueFn, compareFn) => {
-      let bestValue = null;
-      let winners = [];
-      map.forEach(entry => {
-        const val = valueFn(entry);
-        if (val === null || val === undefined) return;
-        if (bestValue === null || compareFn(val, bestValue) > 0) {
-          bestValue = val;
-          winners = [entry];
-        } else if (compareFn(val, bestValue) === 0) {
-          winners.push(entry);
-        }
-      });
-      return { bestValue, winners };
-    };
 
     // --- Build award list ---
     const awardList = [];
@@ -380,13 +407,14 @@ export function TournamentSummary({ tournament }) {
     }
 
     return awardList;
-  }, [allMatches, t]);
+  }, [allMatches, isCricket, t]);
 
   // Biggest upset: the winner with the lowest chance beforehand, rated on
   // form from before the tournament's first result.
-  const upsetPlayerIds = useMemo(() => (tournament?.players || []).map(p => p.id), [tournament?.players]);
+  const upsetPlayerIds = useMemo(() => (isCricket ? [] : (tournament?.players || []).map(p => p.id)), [isCricket, tournament?.players]);
   const strengthsBefore = usePlayerStrengths(upsetPlayerIds, 0, firstResultAt(allMatches));
   const upset = biggestUpset(allMatches, strengthsBefore);
+  // biggestUpset skips Cricket matches: X01 strengths say nothing about them.
   const allAwards = upset ? [...awards, {
     key: 'upset',
     icon: <Flame size={28} />,

@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { GAME_TYPES, isCricketGame } from '@/lib/cricket';
 import { cn } from '@/lib/utils';
 
 const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
@@ -61,13 +63,14 @@ export function SettingsTab({
 
   const legsLabel = (n) => (n === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: n }));
   const isGroups = tournamentDefaults.tournamentType === 'groups_with_playoffs';
+  const isCricket = isCricketGame(tournamentDefaults.gameType);
   const playoff = tournamentDefaults.playoffSettings;
   const setPlayoff = (patch) => setTournamentDefaults({ ...tournamentDefaults, playoffSettings: { ...playoff, ...patch } });
   const setGroup = (patch) => setTournamentDefaults({ ...tournamentDefaults, groupSettings: { ...tournamentDefaults.groupSettings, ...patch } });
   const criterionLabels = {
     matchesWon: t('registration.matchesWon'),
     legDifference: t('registration.legDifference'),
-    average: t('registration.average'),
+    average: isCricket ? t('common.mpr') : t('registration.average'),
     headToHead: t('registration.headToHead')
   };
   const moveCriterion = (index, delta) => {
@@ -242,6 +245,28 @@ export function SettingsTab({
           {/* Match Settings */}
           <div className="flex flex-col gap-4">
             <Label>{t('registration.matchSettings')}</Label>
+            <div className="flex flex-col gap-2">
+              <Label className="text-muted-foreground">{t('common.gameType')}</Label>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={tournamentDefaults.gameType || 'x01'}
+                // '' when the active item is tapped again; Cricket is scored dart by dart only
+                onValueChange={(v) => v && setTournamentDefaults(prev => ({
+                  ...prev,
+                  gameType: v,
+                  ...(isCricketGame(v) ? { defaultScoringMode: 'dart' } : {})
+                }))}
+                aria-label={t('common.gameType')}
+                className="justify-start"
+              >
+                {GAME_TYPES.map(g => (
+                  <ToggleGroupItem key={g} value={g} className="min-h-11 px-5">
+                    {isCricketGame(g) ? t('common.gameTypeCricket') : t('common.gameTypeX01')}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="default-legs-to-win" className="text-muted-foreground">{t('leagues.defaultLegsToWin')}</Label>
@@ -256,7 +281,7 @@ export function SettingsTab({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2">
+              {!isCricket && <div className="flex flex-col gap-2">
                 <Label htmlFor="default-starting-score" className="text-muted-foreground">{t('leagues.defaultStartingScore')}</Label>
                 <Select value={String(tournamentDefaults.startingScore)} onValueChange={(v) => setTournamentDefaults({ ...tournamentDefaults, startingScore: parseInt(v) })}>
                   <SelectTrigger id="default-starting-score" className="w-full tabular-nums">
@@ -268,9 +293,9 @@ export function SettingsTab({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
             </div>
-            <div className="flex flex-col gap-2">
+            {!isCricket && <div className="flex flex-col gap-2">
               <Label className="text-muted-foreground">{t('registration.scoringMode')}</Label>
               <RadioGroup
                 value={tournamentDefaults.defaultScoringMode === 'turnTotal' ? 'turnTotal' : 'dart'}
@@ -286,7 +311,7 @@ export function SettingsTab({
                   {t('registration.scoringModeTurnTotal')}
                 </Label>
               </RadioGroup>
-            </div>
+            </div>}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="default-auto-scorer" className="cursor-pointer font-normal">
                 <Checkbox

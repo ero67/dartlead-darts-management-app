@@ -248,6 +248,7 @@ export function PlayoffsTab(props) {
                         const roundSize = getRoundSize(round);
                         const data = {
                           ...match,
+                          gameType: match.gameType || tournament.gameType,
                           legsToWin: getPlayoffLegsToWin(roundSize),
                           startingScore: tournament.startingScore,
                           defaultScoringMode: tournament.defaultScoringMode,

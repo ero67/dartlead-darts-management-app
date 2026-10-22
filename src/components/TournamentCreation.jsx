@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { GAME_TYPES, isCricketGame } from '@/lib/cricket';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -58,6 +60,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     : {};
   
   const [tournamentName, setTournamentName] = useState('');
+  const [gameType, setGameType] = useState(leagueDefaults.gameType || 'x01');
   const [legsToWin, setLegsToWin] = useState(leagueDefaults.legsToWin || 3);
   const [startingScore, setStartingScore] = useState(leagueDefaults.startingScore || 501);
   const [tournamentType, setTournamentType] = useState(leagueDefaults.tournamentType || 'groups_with_playoffs');
@@ -118,6 +121,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     if (currentLeague && leagueId && currentLeague.id === leagueId) {
       const defaults = currentLeague.defaultTournamentSettings;
       if (defaults) {
+        if (defaults.gameType) setGameType(defaults.gameType);
         if (defaults.legsToWin !== undefined) setLegsToWin(defaults.legsToWin);
         if (defaults.startingScore !== undefined) setStartingScore(defaults.startingScore);
         if (defaults.tournamentType !== undefined) setTournamentType(defaults.tournamentType);
@@ -179,12 +183,13 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
       name: tournamentName.trim(),
       players: selectedPlayers.length > 0 ? selectedPlayers : [], // Pre-populate with league members if available
       groups: [], // Groups will be generated when tournament starts
+      gameType,
       legsToWin: legsToWin,
       startingScore: startingScore,
       groupSettings: groupSettings,
       playoffSettings: playoffSettings,
       tournamentType,
-      defaultScoringMode,
+      defaultScoringMode: isCricketGame(gameType) ? 'dart' : defaultScoringMode, // Cricket is scored dart by dart only
       standingsCriteriaOrder: standingsCriteriaOrder,
       playoffs: null, // Playoffs will be created only when user clicks "Start Playoffs"
       leagueId: leagueId || null, // Link to league if created from league
@@ -203,10 +208,11 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
   };
   const yesNo = (v) => (v ? t('common.yes') : t('common.no'));
   const isGroups = tournamentType === 'groups_with_playoffs';
+  const isCricket = isCricketGame(gameType);
   const criterionLabels = {
     matchesWon: t('registration.matchesWon'),
     legDifference: t('registration.legDifference'),
-    average: t('registration.average'),
+    average: isCricket ? t('common.mpr') : t('registration.average'),
     headToHead: t('registration.headToHead')
   };
 
@@ -221,7 +227,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
   const summaryRows = [
     [t('registration.tournamentType') || 'Tournament Type', typeLabel(tournamentType)],
     [t('tournaments.defaultLegsToWin'), legsLabel(legsToWin)],
-    [t('tournaments.startingScore'), startingScore],
+    isCricket ? [t('common.gameType'), t('common.gameTypeCricket')] : [t('tournaments.startingScore'), startingScore],
     ...(isGroups ? [[
       groupSettings.type === 'groups' ? t('registration.numberOfGroups') : t('registration.playersPerGroup'),
       groupSettings.value,
@@ -406,6 +412,24 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
               <CardTitle>{t('registration.matchSettings')}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <Label>{t('common.gameType')}</Label>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  value={gameType}
+                  // ToggleGroup reports '' when the active item is tapped again
+                  onValueChange={(v) => v && setGameType(v)}
+                  aria-label={t('common.gameType')}
+                  className="justify-start"
+                >
+                  {GAME_TYPES.map(g => (
+                    <ToggleGroupItem key={g} value={g} className="min-h-11 px-5">
+                      {g === 'cricket' ? t('common.gameTypeCricket') : t('common.gameTypeX01')}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="legs-to-win">{t('tournaments.defaultLegsToWin')}</Label>
@@ -420,7 +444,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-2">
+                {!isCricket && <div className="flex flex-col gap-2">
                   <Label htmlFor="starting-score">{t('tournaments.startingScore')}</Label>
                   <Select value={String(startingScore)} onValueChange={(v) => setStartingScore(parseInt(v))}>
                     <SelectTrigger id="starting-score" className="w-full tabular-nums">
@@ -432,9 +456,9 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div>}
               </div>
-              <div className="flex flex-col gap-2">
+              {!isCricket && <div className="flex flex-col gap-2">
                 <Label>{t('registration.scoringMode')}</Label>
                 <RadioGroup value={defaultScoringMode} onValueChange={setDefaultScoringMode} className="gap-2">
                   <Label htmlFor="scoring-mode-dart" className={radioRow}>
@@ -446,7 +470,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
                     {t('registration.scoringModeTurnTotal')}
                   </Label>
                 </RadioGroup>
-              </div>
+              </div>}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="auto-scorer-assignment" className="cursor-pointer font-normal">
                   <Checkbox

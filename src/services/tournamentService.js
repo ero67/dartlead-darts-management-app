@@ -1,4 +1,5 @@
 import { supabase, generateId } from '../lib/supabase.js'
+import { isCricketGame } from '../lib/cricket.js'
 
 // Group matches in their intended play order. The DB rows carry match_order
 // (migration 20260910190000); rows from before it fall back to insert order.
@@ -15,10 +16,14 @@ const sortByPlayOrder = (rows) => [...(rows || [])].sort((a, b) => {
 });
 
 // Helper function to calculate group standings
-function calculateGroupStandings(group, criteriaOrder = null) {
+function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') {
   if (!group.players || !group.matches) {
     return [];
   }
+  // Cricket: 'average' is MPR, so the totals add up marks instead of score.
+  const isCricket = isCricketGame(gameType);
+  const scoreKey = isCricket ? 'marks' : 'totalScore';
+  const dartsKey = isCricket ? 'darts' : 'totalDarts';
 
   // Initialize player stats
   const playerStats = new Map();
@@ -77,17 +82,17 @@ function calculateGroupStandings(group, criteriaOrder = null) {
         }
         
         // Accumulate totalScore and totalDarts for cumulative average calculation
-        if (match.result.player1Stats?.totalScore !== undefined) {
-          p1Stats.totalScore += match.result.player1Stats.totalScore || 0;
+        if (match.result.player1Stats?.[scoreKey] !== undefined) {
+          p1Stats.totalScore += match.result.player1Stats[scoreKey] || 0;
         }
-        if (match.result.player1Stats?.totalDarts !== undefined) {
-          p1Stats.dartsThrown += match.result.player1Stats.totalDarts || 0;
+        if (match.result.player1Stats?.[dartsKey] !== undefined) {
+          p1Stats.dartsThrown += match.result.player1Stats[dartsKey] || 0;
         }
-        if (match.result.player2Stats?.totalScore !== undefined) {
-          p2Stats.totalScore += match.result.player2Stats.totalScore || 0;
+        if (match.result.player2Stats?.[scoreKey] !== undefined) {
+          p2Stats.totalScore += match.result.player2Stats[scoreKey] || 0;
         }
-        if (match.result.player2Stats?.totalDarts !== undefined) {
-          p2Stats.dartsThrown += match.result.player2Stats.totalDarts || 0;
+        if (match.result.player2Stats?.[dartsKey] !== undefined) {
+          p2Stats.dartsThrown += match.result.player2Stats[dartsKey] || 0;
         }
       }
     }
@@ -170,6 +175,7 @@ export const tournamentService = {
           name: tournamentData.name,
           legs_to_win: tournamentData.legsToWin || 3,
           starting_score: tournamentData.startingScore || 501,
+          game_type: tournamentData.gameType || 'x01',
           default_scoring_mode: tournamentData.defaultScoringMode || 'dart',
           group_settings: tournamentData.groupSettings ? {
             ...tournamentData.groupSettings,
@@ -395,6 +401,7 @@ export const tournamentService = {
         status: tournament.status,
         legsToWin: tournament.legs_to_win,
         startingScore: tournament.starting_score,
+        gameType: tournament.game_type || 'x01',
         defaultScoringMode: tournament.default_scoring_mode || 'dart',
         groupSettings: groupSettings || {
           type: 'groups',
@@ -423,6 +430,7 @@ export const tournamentService = {
               legsToWin: match.legs_to_win,
               completedAt: match.completed_at || null,
               startingScore: match.starting_score,
+              gameType: match.game_type || tournament.game_type || 'x01',
               player1: match.player1 ? {
                 ...match.player1,
                 id: playerIdMap.get(match.player1.id)
@@ -481,6 +489,7 @@ export const tournamentService = {
           status: row.status,
           legsToWin: row.legs_to_win,
           startingScore: row.starting_score,
+          gameType: row.game_type || 'x01',
           defaultScoringMode: row.default_scoring_mode || 'dart',
           groupSettings: groupSettings || null,
           playoffSettings: row.playoff_settings,
@@ -649,6 +658,7 @@ export const tournamentService = {
                   legsToWin: match.legs_to_win,
                   completedAt: match.completed_at || null,
                   startingScore: match.starting_score,
+                  gameType: match.game_type || tournament.game_type || 'x01',
                   startedByUserId: match.started_by_user_id,
                   result: match.winner_id ? (() => {
                     // If result JSONB exists, use it (it contains full data including checkouts and legAverages)
@@ -706,7 +716,7 @@ export const tournamentService = {
             };
 
             // Calculate standings for this group with tournament criteria order
-            groupWithData.standings = calculateGroupStandings(groupWithData, standingsCriteriaOrder);
+            groupWithData.standings = calculateGroupStandings(groupWithData, standingsCriteriaOrder, tournament.game_type);
 
             return groupWithData;
           })
@@ -725,6 +735,7 @@ export const tournamentService = {
               legsToWin: match.legs_to_win,
               completedAt: match.completed_at || null,
               startingScore: match.starting_score,
+              gameType: match.game_type || tournament.game_type || 'x01',
               startedByUserId: match.started_by_user_id,
               isPlayoff: true,
               playoffRound: match.playoff_round,
@@ -764,6 +775,7 @@ export const tournamentService = {
           status: tournament.status,
           legsToWin: tournament.legs_to_win,
           startingScore: tournament.starting_score,
+          gameType: tournament.game_type || 'x01',
           defaultScoringMode: tournament.default_scoring_mode || 'dart',
           playoffSettings: tournament.playoff_settings,
           playoffs: tournament.playoffs,
@@ -896,6 +908,7 @@ export const tournamentService = {
           legsToWin: match.legs_to_win,
           completedAt: match.completed_at || null,
           startingScore: match.starting_score,
+          gameType: match.game_type || tournament.game_type || 'x01',
           startedByUserId: match.started_by_user_id,
           isPlayoff: true,
           playoffRound: match.playoff_round,
@@ -935,6 +948,7 @@ export const tournamentService = {
           status: tournament.status,
           legsToWin: tournament.legs_to_win,
           startingScore: tournament.starting_score,
+          gameType: tournament.game_type || 'x01',
           defaultScoringMode: tournament.default_scoring_mode || 'dart',
           groupSettings: groupSettings || {
             type: 'groups',
@@ -975,6 +989,7 @@ export const tournamentService = {
                 legsToWin: match.legs_to_win,
                 completedAt: match.completed_at || null,
                 startingScore: match.starting_score,
+                gameType: match.game_type || tournament.game_type || 'x01',
                 startedByUserId: match.started_by_user_id,
                 result: match.winner_id ? (() => {
                   // If result JSONB exists, use it (it contains full data including checkouts and legAverages)
@@ -990,10 +1005,10 @@ export const tournamentService = {
                       }
                     }
                     // Ensure the result has the expected structure
-                    if (parsedResult && parsedResult.player1Stats && !parsedResult.player1Stats.checkouts) {
+                    if (parsedResult && !isCricketGame(parsedResult.gameType) && parsedResult.player1Stats && !parsedResult.player1Stats.checkouts) {
                       console.warn('Match result missing checkouts for player1:', match.id);
                     }
-                    if (parsedResult && parsedResult.player2Stats && !parsedResult.player2Stats.checkouts) {
+                    if (parsedResult && !isCricketGame(parsedResult.gameType) && parsedResult.player2Stats && !parsedResult.player2Stats.checkouts) {
                       console.warn('Match result missing checkouts for player2:', match.id);
                     }
                     // ALWAYS use match.winner_id as the authoritative winner.
@@ -1024,7 +1039,7 @@ export const tournamentService = {
 
           // Calculate standings for this group with tournament criteria order
           const criteriaOrder = groupSettings?.standingsCriteriaOrder || null;
-          groupWithData.standings = calculateGroupStandings(groupWithData, criteriaOrder);
+          groupWithData.standings = calculateGroupStandings(groupWithData, criteriaOrder, tournament.game_type);
 
           return groupWithData;
         })
@@ -1945,19 +1960,21 @@ export const tournamentService = {
       // Win/loss from matches
       const { data: matchesAsP1 } = await supabase
         .from('matches')
-        .select('id, winner_id')
+        .select('id, winner_id, game_type')
         .eq('player1_id', playerId)
         .eq('status', 'completed')
         .in('tournament_id', scopeIds);
       const { data: matchesAsP2 } = await supabase
         .from('matches')
-        .select('id, winner_id')
+        .select('id, winner_id, game_type')
         .eq('player2_id', playerId)
         .eq('status', 'completed')
         .in('tournament_id', scopeIds);
 
       const allMatches = [...(matchesAsP1 || []), ...(matchesAsP2 || [])];
       const allMatchIds = new Set(allMatches.map(m => m.id));
+      // Averages, checkouts and darts are X01 numbers — Cricket matches only count for legs
+      const cricketMatchIds = new Set(allMatches.filter(m => isCricketGame(m.game_type)).map(m => m.id));
 
       // Match stats for career aggregation (no tournament_id column — scope by match)
       const { data: matchStatsRaw } = await supabase
@@ -1976,21 +1993,23 @@ export const tournamentService = {
       let totalLegsWon = 0;
       let totalLegsLost = 0;
       (matchStats || []).forEach(s => {
+        totalLegsWon += s.legs_won || 0;
+        totalLegsLost += s.legs_lost || 0;
+        if (cricketMatchIds.has(s.match_id)) return;
         const avg = parseFloat(s.average) || 0;
         if (avg > bestAverage) bestAverage = avg;
         if ((s.highest_checkout || 0) > highestCheckout) highestCheckout = s.highest_checkout;
         totalDarts += s.total_darts || 0;
         totalScore += s.total_score || 0;
-        totalLegsWon += s.legs_won || 0;
-        totalLegsLost += s.legs_lost || 0;
       });
       const overallAverage = totalDarts > 0 ? (totalScore / totalDarts) * 3 : 0;
 
-      // Count 180s from match results
+      // Count 180s (X01) and Cricket marks from match results
       let total180s = 0;
+      let cricketStats = null;
       const { data: matchesWithResults } = await supabase
         .from('matches')
-        .select('player1_id, player2_id, result')
+        .select('player1_id, player2_id, game_type, result')
         .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
         .eq('status', 'completed')
         .in('tournament_id', scopeIds)
@@ -1998,9 +2017,24 @@ export const tournamentService = {
 
       (matchesWithResults || []).forEach(m => {
         if (!m.result) return;
-        const stats = m.player1_id === playerId ? m.result.player1Stats : m.result.player2Stats;
-        if (stats?.oneEighties) total180s += stats.oneEighties;
+        const isPlayer1 = m.player1_id === playerId;
+        const stats = isPlayer1 ? m.result.player1Stats : m.result.player2Stats;
+        if (!isCricketGame(m.game_type)) {
+          if (stats?.oneEighties) total180s += stats.oneEighties;
+          return;
+        }
+        cricketStats = cricketStats || { matches: 0, legsWon: 0, legsLost: 0, marks: 0, darts: 0, bestMpr: 0 };
+        cricketStats.matches++;
+        cricketStats.legsWon += (isPlayer1 ? m.result.player1Legs : m.result.player2Legs) || 0;
+        cricketStats.legsLost += (isPlayer1 ? m.result.player2Legs : m.result.player1Legs) || 0;
+        cricketStats.marks += stats?.marks || 0;
+        cricketStats.darts += stats?.darts || 0;
+        if (stats?.darts > 0) cricketStats.bestMpr = Math.max(cricketStats.bestMpr, (stats.marks / stats.darts) * 3);
       });
+      if (cricketStats) {
+        const { marks, darts, ...rest } = cricketStats;
+        cricketStats = { ...rest, mpr: darts > 0 ? (marks / darts) * 3 : 0 };
+      }
 
       // Placements, derived from the knockout bracket of every tournament the
       // player took part in. The final is the highest playoff_round with
@@ -2059,7 +2093,7 @@ export const tournamentService = {
         .from('matches')
         .select(`
           id, tournament_id, winner_id, player1_id, player2_id,
-          player1_legs, player2_legs, is_playoff, playoff_round, created_at, updated_at, completed_at, legs_to_win, starting_score, result,
+          player1_legs, player2_legs, is_playoff, playoff_round, created_at, updated_at, completed_at, legs_to_win, starting_score, game_type, result,
           player1:players!matches_player1_id_fkey(id, name),
           player2:players!matches_player2_id_fkey(id, name)
         `)
@@ -2072,7 +2106,9 @@ export const tournamentService = {
       const recentMatches = (recentRaw || []).map(m => {
         const isPlayer1 = m.player1_id === playerId;
         const opponent = isPlayer1 ? m.player2 : m.player1;
-        const matchAverage = parseFloat(statsByMatch.get(m.id)?.average);
+        const isCricket = isCricketGame(m.game_type);
+        const matchAverage = isCricket ? NaN : parseFloat(statsByMatch.get(m.id)?.average);
+        const cricketSide = isCricket ? (isPlayer1 ? m.result?.player1Stats : m.result?.player2Stats) : null;
         return {
           id: m.id,
           tournamentId: m.tournament_id,
@@ -2084,6 +2120,8 @@ export const tournamentService = {
           won: m.winner_id === playerId,
           isPlayoff: !!m.is_playoff,
           average: Number.isFinite(matchAverage) ? matchAverage : null,
+          gameType: m.game_type || 'x01',
+          ...(isCricket && { mpr: cricketSide?.darts > 0 ? (cricketSide.marks / cricketSide.darts) * 3 : 0 }),
           playedAt: m.updated_at || m.created_at,
           // For the statistics dialog on the profile page
           player1: m.player1 || null,
@@ -2119,6 +2157,7 @@ export const tournamentService = {
           tournamentWins,
           tournamentsPlayed: tournaments.length
         },
+        cricketStats,
         leagues: leagueMemberships || []
       };
     } catch (error) {
@@ -2395,7 +2434,7 @@ export const tournamentService = {
       // First, get the current tournament to preserve existing group_settings
       const { data: currentTournament, error: fetchError } = await supabase
         .from('tournaments')
-        .select('group_settings')
+        .select('group_settings, game_type')
         .eq('id', tournamentId)
         .single();
 
@@ -2430,6 +2469,23 @@ export const tournamentService = {
       if (settings.defaultScoringMode) {
         updateData.default_scoring_mode = settings.defaultScoringMode;
       }
+
+      // The game type can only change before any match has been played;
+      // afterwards it is silently kept (results of both types can't mix).
+      let gameTypeChanged = false;
+      if (settings.gameType && settings.gameType !== currentTournament?.game_type) {
+        const { count: playedCount, error: playedError } = await supabase
+          .from('matches')
+          .select('id', { count: 'exact', head: true })
+          .eq('tournament_id', tournamentId)
+          .in('status', ['in_progress', 'completed']);
+        if (playedError) throw playedError;
+        if (!playedCount) {
+          updateData.game_type = settings.gameType;
+          gameTypeChanged = true;
+        }
+      }
+      const isCricket = (updateData.game_type || currentTournament?.game_type) === 'cricket';
       
       // Optionally update tournament status if provided in settings (e.g., for playoff-only start)
       if (settings.status) {
@@ -2463,7 +2519,7 @@ export const tournamentService = {
       // when a playoff match is started.
       const matchFormatUpdate = {};
       if (settings.legsToWin) matchFormatUpdate.legs_to_win = settings.legsToWin;
-      if (settings.startingScore) matchFormatUpdate.starting_score = settings.startingScore;
+      if (settings.startingScore && !isCricket) matchFormatUpdate.starting_score = settings.startingScore;
 
       if (Object.keys(matchFormatUpdate).length > 0) {
         matchFormatUpdate.updated_at = new Date().toISOString();
@@ -2478,6 +2534,17 @@ export const tournamentService = {
           console.error('Error applying settings to pending matches:', pendingMatchesError);
           throw pendingMatchesError;
         }
+      }
+
+      // matches.game_type is only set on insert (trigger), so carry a change
+      // over to the rows that already exist, playoff rows included.
+      if (gameTypeChanged) {
+        const { error: gameTypeError } = await supabase
+          .from('matches')
+          .update({ game_type: updateData.game_type, updated_at: new Date().toISOString() })
+          .eq('tournament_id', tournamentId)
+          .eq('status', 'pending');
+        if (gameTypeError) throw gameTypeError;
       }
 
       return data;
@@ -2506,6 +2573,7 @@ export const matchService = {
       .from('matches')
       .select('player1_id, player2_id, winner_id, completed_at, s1:result->player1Stats->totalScore, d1:result->player1Stats->totalDarts, s2:result->player2Stats->totalScore, d2:result->player2Stats->totalDarts')
       .eq('status', 'completed')
+      .eq('game_type', 'x01') // strength is X01-only; Cricket rows would also eat the limit
       .or(`player1_id.in.(${list}),player2_id.in.(${list})`);
     if (before && !Number.isNaN(Date.parse(before))) query = query.lt('completed_at', new Date(before).toISOString());
     const { data, error } = await query
@@ -2853,6 +2921,7 @@ export const matchService = {
         current_leg: 1,
         player1_current_score: null,
         player2_current_score: null,
+        live_state: null,
         current_player: 0,
         match_starter: null,
         live_device_id: null,
@@ -3010,6 +3079,20 @@ export const matchService = {
         throw new Error('Authentication required to complete match. Please log in again.');
       }
 
+      // Cricket results carry marks/MPR instead of X01 scores (no visits,
+      // no totalScore/totalDarts), so X01 aggregates skip them naturally.
+      const isCricket = matchResult.gameType === 'cricket';
+      const cricketStats = s => ({
+        darts: s?.darts || 0,
+        marks: s?.marks || 0,
+        mpr: s?.mpr || 0,
+        points: s?.points || 0,
+        bestVisit: s?.bestVisit || 0,
+        fiveMarkVisits: s?.fiveMarkVisits || 0,
+        nineMarkVisits: s?.nineMarkVisits || 0,
+        legs: Array.isArray(s?.legs) ? s.legs : []
+      });
+
       // Update the match with results
       
       const updateData = {
@@ -3019,7 +3102,14 @@ export const matchService = {
         player2_legs: matchResult.player2Legs,
         updated_at: new Date().toISOString(),
         // Save full match result including checkouts and leg averages
-        result: {
+        result: isCricket ? {
+          gameType: 'cricket',
+          winner: matchResult.winner,
+          player1Legs: matchResult.player1Legs,
+          player2Legs: matchResult.player2Legs,
+          player1Stats: cricketStats(matchResult.player1Stats),
+          player2Stats: cricketStats(matchResult.player2Stats)
+        } : {
           winner: matchResult.winner,
           player1Legs: matchResult.player1Legs,
           player2Legs: matchResult.player2Legs,
@@ -3182,13 +3272,17 @@ export const matchService = {
       }
 
       try {
-      // Save player statistics to match_player_stats table
+      // Save player statistics to match_player_stats table. Cricket rows hold
+      // legs only, so old apps' career X01 numbers stay untouched.
       const statsPromises = [];
+      const noX01Stats = { totalDarts: 0, totalScore: 0, average: 0, checkouts: [] };
+      const p1RowStats = isCricket ? noX01Stats : matchResult.player1Stats;
+      const p2RowStats = isCricket ? noX01Stats : matchResult.player2Stats;
 
       // Player 1 stats
       if (matchResult.player1Id && matchResult.player1Stats) {
-        const highestCheckout = matchResult.player1Stats.checkouts?.length > 0 
-          ? Math.max(...matchResult.player1Stats.checkouts.map(c => c.checkout || 0))
+        const highestCheckout = p1RowStats.checkouts?.length > 0 
+          ? Math.max(...p1RowStats.checkouts.map(c => c.checkout || 0))
           : 0;
         
         statsPromises.push(
@@ -3200,9 +3294,9 @@ export const matchService = {
               player_id: matchResult.player1Id,
               legs_won: matchResult.player1Legs,
               legs_lost: matchResult.player2Legs,
-              total_darts: matchResult.player1Stats.totalDarts,
-              total_score: matchResult.player1Stats.totalScore,
-              average: matchResult.player1Stats.average,
+              total_darts: p1RowStats.totalDarts,
+              total_score: p1RowStats.totalScore,
+              average: p1RowStats.average,
               highest_checkout: highestCheckout
             })
         );
@@ -3210,8 +3304,8 @@ export const matchService = {
       
       // Player 2 stats
       if (matchResult.player2Id && matchResult.player2Stats) {
-        const highestCheckout = matchResult.player2Stats.checkouts?.length > 0 
-          ? Math.max(...matchResult.player2Stats.checkouts.map(c => c.checkout || 0))
+        const highestCheckout = p2RowStats.checkouts?.length > 0 
+          ? Math.max(...p2RowStats.checkouts.map(c => c.checkout || 0))
           : 0;
         
         statsPromises.push(
@@ -3223,9 +3317,9 @@ export const matchService = {
               player_id: matchResult.player2Id,
               legs_won: matchResult.player2Legs,
               legs_lost: matchResult.player1Legs,
-              total_darts: matchResult.player2Stats.totalDarts,
-              total_score: matchResult.player2Stats.totalScore,
-              average: matchResult.player2Stats.average,
+              total_darts: p2RowStats.totalDarts,
+              total_score: p2RowStats.totalScore,
+              average: p2RowStats.average,
               highest_checkout: highestCheckout
             })
         );
@@ -3288,8 +3382,9 @@ export const matchService = {
         const p1WonBefore = player1LegDetails.length ? 0 : Math.min(legNum - 1, player1LegAverages.length - 1);
         const p2WonBefore = player2LegDetails.length ? 0 : Math.min(legNum - 1, player2LegAverages.length - 1);
 
-        const player1Average = p1Leg ? (p1Leg.average || 0) : (winnerId === matchResult.player1Id ? legAverageFallback(player1LegAverages, Math.max(p1WonBefore, 0)) : 0);
-        const player2Average = p2Leg ? (p2Leg.average || 0) : (winnerId === matchResult.player2Id ? legAverageFallback(player2LegAverages, Math.max(p2WonBefore, 0)) : 0);
+        // Cricket legs store MPR as the leg average and points as the score
+        const player1Average = isCricket ? (p1Leg?.mpr || 0) : p1Leg ? (p1Leg.average || 0) : (winnerId === matchResult.player1Id ? legAverageFallback(player1LegAverages, Math.max(p1WonBefore, 0)) : 0);
+        const player2Average = isCricket ? (p2Leg?.mpr || 0) : p2Leg ? (p2Leg.average || 0) : (winnerId === matchResult.player2Id ? legAverageFallback(player2LegAverages, Math.max(p2WonBefore, 0)) : 0);
         const player1Darts = p1Leg ? (p1Leg.darts || 0) : (player1Average > 0 ? Math.round((startingScore / player1Average) * 3) : 0);
         const player2Darts = p2Leg ? (p2Leg.darts || 0) : (player2Average > 0 ? Math.round((startingScore / player2Average) * 3) : 0);
 
@@ -3304,8 +3399,8 @@ export const matchService = {
               player1_id: matchResult.player1Id,
               player2_id: matchResult.player2Id,
               // remaining score at the end of the leg (0 for the winner)
-              player1_score: winnerId === matchResult.player1Id ? 0 : (p1Leg?.remainingScore ?? startingScore),
-              player2_score: winnerId === matchResult.player2Id ? 0 : (p2Leg?.remainingScore ?? startingScore),
+              player1_score: isCricket ? (p1Leg?.points || 0) : winnerId === matchResult.player1Id ? 0 : (p1Leg?.remainingScore ?? startingScore),
+              player2_score: isCricket ? (p2Leg?.points || 0) : winnerId === matchResult.player2Id ? 0 : (p2Leg?.remainingScore ?? startingScore),
               player1_darts: player1Darts,
               player2_darts: player2Darts,
               player1_average: Math.round(player1Average * 100) / 100,

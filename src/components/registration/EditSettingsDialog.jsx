@@ -10,6 +10,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { GAME_TYPES, isCricketGame } from '@/lib/cricket';
 
 const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
 const PLAYOFF_LEGS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -37,11 +39,12 @@ const radioRow = 'flex cursor-pointer items-center gap-2 text-sm font-normal';
 export function EditSettingsDialog({ open, onClose, settings, setSettings, playersCount, isSaving, onSave }) {
   const { t } = useLanguage();
   const isGroups = settings.tournamentType === 'groups_with_playoffs';
+  const isCricket = isCricketGame(settings.gameType);
   const legsLabel = (n) => (n === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: n }));
   const criterionLabels = {
     matchesWon: t('registration.matchesWon'),
     legDifference: t('registration.legDifference'),
-    average: t('registration.average'),
+    average: isCricket ? t('common.mpr') : t('registration.average'),
     headToHead: t('registration.headToHead')
   };
 
@@ -106,6 +109,28 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
 
           <section className="flex flex-col gap-4">
             <h4 className="text-sm font-semibold">{t('registration.matchSettings')}</h4>
+            <div className="flex flex-col gap-2">
+              <Label>{t('common.gameType')}</Label>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={settings.gameType || 'x01'}
+                // '' when the active item is tapped again; Cricket is scored dart by dart only
+                onValueChange={(v) => v && setSettings(prev => ({
+                  ...prev,
+                  gameType: v,
+                  ...(isCricketGame(v) ? { defaultScoringMode: 'dart' } : {})
+                }))}
+                aria-label={t('common.gameType')}
+                className="justify-start"
+              >
+                {GAME_TYPES.map(g => (
+                  <ToggleGroupItem key={g} value={g} className="min-h-11 px-5">
+                    {isCricketGame(g) ? t('common.gameTypeCricket') : t('common.gameTypeX01')}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-legs-to-win">{t('registration.legsToWin')}</Label>
@@ -120,7 +145,7 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2">
+              {!isCricket && <div className="flex flex-col gap-2">
                 <Label htmlFor="edit-starting-score">{t('registration.startingScore')}</Label>
                 <Select value={String(settings.startingScore)} onValueChange={(v) => setSettings({ ...settings, startingScore: parseInt(v) })}>
                   <SelectTrigger id="edit-starting-score" className="w-full tabular-nums">
@@ -132,9 +157,9 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
             </div>
-            <div className="flex flex-col gap-2">
+            {!isCricket && <div className="flex flex-col gap-2">
               <Label>{t('registration.scoringMode')}</Label>
               <RadioGroup
                 value={settings.defaultScoringMode === 'turnTotal' ? 'turnTotal' : 'dart'}
@@ -150,7 +175,7 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
                   {t('registration.scoringModeTurnTotal')}
                 </Label>
               </RadioGroup>
-            </div>
+            </div>}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="edit-auto-scorer" className="cursor-pointer font-normal">
                 <Checkbox

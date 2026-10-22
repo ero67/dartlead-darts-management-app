@@ -48,6 +48,14 @@ export function PracticeBests({ entries, title, compact = false }) {
         [t('practice.bests.fastestTime'), s.aroundTheClock.fastestSeconds === null ? dash : secs(s.aroundTheClock.fastestSeconds), '', true],
         [t('practice.bests.fewestDarts'), s.aroundTheClock.fewestDarts ?? dash]
       ]
+    },
+    s.cricket.sessions > 0 && {
+      key: 'cricket',
+      rows: [
+        [t('practice.bests.bestMpr'), num(s.cricket.bestMpr, 2), '', true],
+        [t('practice.cricket.stats.bestVisit'), s.cricket.bestVisit ?? dash, s.cricket.bestVisit === null ? '' : ` ${t('common.marks').toLowerCase()}`],
+        [t('practice.bests.mostLegs'), s.cricket.mostLegs ?? dash]
+      ]
     }
   ].filter(Boolean);
 

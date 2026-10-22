@@ -21,13 +21,13 @@
 // tests (scripts/calibrate-bots.mjs).
 
 // ---- Board geometry (mm, standard board) -----------------------------------
-const SEGMENTS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
-const R_DOUBLE_BULL = 6.35;
-const R_SINGLE_BULL = 15.9;
-const R_TRIPLE_IN = 99;
-const R_TRIPLE_OUT = 107;
-const R_DOUBLE_IN = 162;
-const R_DOUBLE_OUT = 170;
+export const SEGMENTS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+export const R_DOUBLE_BULL = 6.35;
+export const R_SINGLE_BULL = 15.9;
+export const R_TRIPLE_IN = 99;
+export const R_TRIPLE_OUT = 107;
+export const R_DOUBLE_IN = 162;
+export const R_DOUBLE_OUT = 170;
 const SEGMENT_DEG = 18;
 
 const RING_RADIUS = { T: (R_TRIPLE_IN + R_TRIPLE_OUT) / 2, D: (R_DOUBLE_IN + R_DOUBLE_OUT) / 2, S: 135 };

@@ -13,6 +13,7 @@ import { StatusBadge } from './shared/StatusBadge';
 import { EmptyState } from './shared/EmptyState';
 import { PhaseBar } from './shared/DartsAccents';
 import { isTournamentRunning, tournamentStatusClass, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
+import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
 
@@ -122,6 +123,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge status={tournament.status} t={t} />
+                        {isCricketGame(tournament.gameType) && <Badge variant="secondary">{t('common.gameTypeCricket')}</Badge>}
                         {isOwner && <Badge variant="outline">{t('tournaments.yours')}</Badge>}
                       </div>
                     </div>
