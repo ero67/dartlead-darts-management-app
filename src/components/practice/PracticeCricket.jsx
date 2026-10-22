@@ -20,12 +20,13 @@ import {
   createCricketMatch, cricketApplyDart, cricketEndVisit, cricketSetStarter, cricketCanUndo, cricketUndoHuman,
   isCricketBotTurn, cricketBotVisit, computeCricketStats, mprOf, CRICKET_LEG_OPTIONS
 } from '../../lib/cricket';
-import { dartFromInput, displayLabel } from '../../lib/x01Engine';
+import { displayLabel } from '../../lib/x01Engine';
 import { BOT_LEVELS, getBotLevel, newSeed } from '../../lib/botPlayer';
 import { formatDuration, formatSessionDate, pluralSuffix } from '../../lib/practiceGames';
 import { usePracticeSession } from '../../hooks/usePracticeSession';
 import { getUserDisplayName } from '../../utils/userDisplayName';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
+import { useIsMobile } from '../../hooks/use-mobile';
 import { hapticTap, hapticLegWon } from '../../lib/haptics';
 
 const GAME = 'cricket';
@@ -90,7 +91,8 @@ export function PracticeCricket() {
   });
   // The finished state behind `summary`, for the leg table (not persisted).
   const [finalState, setFinalState] = useState(null);
-  const [input, setInput] = useState('board'); // 'board' | 'pad'
+  // Phones enter darts on the keypad; the board above it only shows them.
+  const isMobile = useIsMobile();
   const [flash, setFlash] = useState(null); // { by, darts, byBullup? }
   const flashTimer = useRef(null);
   const finishTimer = useRef(null); // pending summary after the winning dart
@@ -442,7 +444,6 @@ export function PracticeCricket() {
     );
   };
 
-  const actionKey = 'h-12 flex-1 font-medium';
   return (
     <PracticePlay
       onFinish={handleFinishEarly}
@@ -463,70 +464,37 @@ export function PracticeCricket() {
         title={botBusy ? t('practice.bot.skip') : undefined}
       >
         <div className="grid grid-cols-2 gap-2">{[0, 1].map(playerCard)}</div>
-        {input === 'board' && (
-          <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
-            <CricketBoard
-              marks={leg.marks}
-              thrower={viewer}
-              visitDarts={visitDarts}
-              onDart={isLocked ? undefined : handleDart}
-              className="mx-auto max-w-[min(100%,26rem)]"
-            />
-            {/* Wide screens only: on phones the board shows both sides' marks
-                (and in pad mode the pad rows do). */}
-            <CricketMarksTable
-              players={[0, 1].map(i => ({ name: playerName(i), points: leg.points[i], legs: session.legsWon[i] }))}
-              marks={leg.marks}
-              thrower={turn}
-              className="max-md:hidden"
-            />
-          </div>
-        )}
-        <div className="flex min-h-6 items-center justify-center">
-          {botBusy && <span className="text-sm font-medium text-muted-foreground">{t('practice.bot.skip')}</span>}
-        </div>
-      </PracticeBoard>
-
-      <div role="group" aria-label={t('practice.cricket.input')} className="grid grid-cols-2 gap-0.5 rounded-lg bg-muted p-[3px]">
-        {['board', 'pad'].map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            aria-pressed={input === mode}
-            onClick={() => setInput(mode)}
-            className={cn('min-h-11 rounded-md text-[13px] font-semibold text-muted-foreground', input === mode && 'bg-background text-foreground shadow-sm dark:bg-input/60')}
-          >
-            {t(mode === 'board' ? 'practice.cricket.inputBoard' : 'practice.cricket.inputPad')}
-          </button>
-        ))}
-      </div>
-
-      {input === 'pad' ? (
-        <PracticeKeypad>
-          <CricketPad
-            onDart={handleDart}
-            onUndo={handleUndo}
-            onEndVisit={handleEndVisit}
-            canUndo={canUndoNow}
-            dartsInVisit={visitDarts.length}
-            disabled={!!isLocked}
+        <div className="grid items-center gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
+          <CricketBoard
+            marks={leg.marks}
+            thrower={viewer}
+            visitDarts={visitDarts}
+            onDart={isLocked || isMobile ? undefined : handleDart}
+            className="mx-auto max-w-[min(100%,26rem)] max-md:max-w-[clamp(11rem,calc(100dvh-41.5rem),17rem)]"
+          />
+          {/* Wide screens only: on phones the board shows both sides' marks. */}
+          <CricketMarksTable
+            players={[0, 1].map(i => ({ name: playerName(i), points: leg.points[i], legs: session.legsWon[i] }))}
             marks={leg.marks}
             thrower={turn}
+            className="max-md:hidden"
           />
-        </PracticeKeypad>
-      ) : (
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className={actionKey} disabled={!!isLocked} onClick={() => handleDart(dartFromInput(0))}>
-            {t('match.miss')}
-          </Button>
-          <Button type="button" variant="outline" className={cn(actionKey, 'border-destructive/30 bg-destructive/10 text-destructive')} disabled={!canUndoNow || !!flash} onClick={handleUndo}>
-            <ArrowLeft /> {t('match.undo')}
-          </Button>
-          <Button type="button" className={actionKey} disabled={!!isLocked || visitDarts.length === 0} onClick={handleEndVisit}>
-            {t('cricket.pad.nextPlayer')} <ChevronsRight />
-          </Button>
         </div>
-      )}
+        {botBusy && <div className="text-center text-sm font-medium text-muted-foreground">{t('practice.bot.skip')}</div>}
+      </PracticeBoard>
+
+      <PracticeKeypad>
+        <CricketPad
+          onDart={handleDart}
+          onUndo={handleUndo}
+          onEndVisit={handleEndVisit}
+          canUndo={canUndoNow}
+          dartsInVisit={visitDarts.length}
+          disabled={!!isLocked}
+          marks={leg.marks}
+          thrower={turn}
+        />
+      </PracticeKeypad>
     </PracticePlay>
   );
 }

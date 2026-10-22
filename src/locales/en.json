@@ -1426,9 +1426,6 @@
       "rules": "15–20 and bull · 3 marks close · extra marks score",
       "aboutMpr": "about {{mpr}} MPR",
       "opponentMpr": "{{name}}: {{mpr}} MPR",
-      "input": "Input",
-      "inputBoard": "Board",
-      "inputPad": "Keypad",
       "points": "points {{a}}–{{b}}",
       "stats": {
         "bestVisit": "Best visit",
@@ -1454,10 +1451,7 @@
     },
     "match": {
       "bullupOffer": "This leg has gone long ({{count}}+ visits each).",
-      "bullupPrompt": "Both players throw at the bull — closest wins the leg. Who won the bull-up?",
-      "inputBoard": "Board",
-      "inputPad": "Keypad",
-      "inputLabel": "Scoring input"
+      "bullupPrompt": "Both players throw at the bull — closest wins the leg. Who won the bull-up?"
     }
   }
 }

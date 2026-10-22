@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, ChevronsRight, Eye, Target } from 'lucide-react';
+import { ArrowLeft, Eye, Target } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -8,16 +8,16 @@ import { supabase } from '../lib/supabase';
 import { matchService, tournamentService } from '../services/tournamentService';
 import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
+import { useIsMobile } from '../hooks/use-mobile';
 import { hapticTap, hapticLegWon, hapticMatchWon } from '../lib/haptics';
 import {
   createCricketMatch, isCricketState, cricketApplyDart, cricketEndVisit, cricketAwardLegByBullup,
   cricketSetStarter, cricketCanUndo, cricketUndo, mprOf
 } from '../lib/cricket';
-import { dartFromInput, displayLabel } from '../lib/x01Engine';
+import { displayLabel } from '../lib/x01Engine';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { LoadingState } from './shared/LoadingState';
 import { LegPips } from './shared/DartsAccents';
@@ -33,7 +33,6 @@ import { storableCricketState, withLegsTarget, cricketLiveUpdate, cricketStateFr
 // leg is 10–20 visits each, so 30 each is clearly stuck (X01 offers it at 15).
 const BULLUP_VISIT_THRESHOLD = 30;
 
-const INPUT_STORAGE_KEY = 'dartlead-cricket-input';
 
 // Tournament Cricket scorer. Same lifecycle as MatchInterface (permission,
 // live device, crash recovery, guarded live sync, bull-up, completion) but the
@@ -95,14 +94,9 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
   const [matchComplete, setMatchComplete] = useState(false);
   const [completedRow, setCompletedRow] = useState(null); // { legs, winnerId } when re-opening a finished match
   const [showBullup, setShowBullup] = useState(false);
-  const [inputMode, setInputMode] = useState(() => {
-    try { return localStorage.getItem(INPUT_STORAGE_KEY) === 'pad' ? 'pad' : 'board'; } catch { return 'board'; }
-  });
-  const handleInputMode = (mode) => {
-    if (!mode) return;
-    setInputMode(mode);
-    try { localStorage.setItem(INPUT_STORAGE_KEY, mode); } catch { /* ignore */ }
-  };
+  // Phones enter darts on the keypad; the board above it only shows them
+  // (at phone size its rings are too thin to tap reliably).
+  const isMobile = useIsMobile();
 
   // Scoring permission, exactly as MatchInterface: null until resolved,
   // offline (null from the RPC) counts as allowed.
@@ -342,25 +336,9 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
   const mpr = (p) => mprOf(engine.totals[p].marks, engine.totals[p].darts).toFixed(2);
   const metaTitle = [match.groupName, `${t('match.leg')} ${engine.legNumber}`].filter(Boolean).join(' · ');
 
-  const actionRow = (
-    <div className="grid shrink-0 grid-cols-[1fr_1fr_1.5fr] gap-1">
-      <Button type="button" variant="outline" className="h-12 text-base" onClick={() => handleDart(dartFromInput(0))}>
-        {t('match.miss')}
-      </Button>
-      <Button type="button" variant="outline" className="h-12 border-destructive/30 bg-destructive/10 text-base text-destructive" onClick={handleUndo} disabled={!canUndo}>
-        <ArrowLeft />
-        {t('match.undo')}
-      </Button>
-      <Button type="button" className="h-12 text-base" onClick={handleEndVisit} disabled={visitDarts.length === 0}>
-        <span className="truncate">{t('cricket.pad.nextPlayer')}</span>
-        <ChevronsRight />
-      </Button>
-    </div>
-  );
-
   // Fixed to the viewport like MatchInterface so the input never scrolls away.
   return (
-    <div className="flex h-[calc(100dvh-3.5rem-var(--safe-area-inset-top,0px)-var(--safe-area-inset-bottom,0px))] flex-col overflow-hidden bg-background text-foreground lg:h-[calc(100dvh-var(--safe-area-inset-top,0px)-var(--safe-area-inset-bottom,0px))]">
+    <div className="flex h-[calc(100dvh-var(--safe-area-inset-top,0px)-var(--safe-area-inset-bottom,0px))] flex-col overflow-hidden bg-background text-foreground">
       <BullupDialog
         open={showBullup}
         onOpenChange={(open) => { if (!open) setShowBullup(false); }}
@@ -387,7 +365,7 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 short:pb-2 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 short:pb-2 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.05fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4">
         {/* Scores. Phone: two tiles; wide: the full marks table. */}
         <div className="flex shrink-0 flex-col gap-2 lg:min-h-0 lg:overflow-y-auto">
           <div className="grid grid-cols-2 gap-2 lg:hidden">
@@ -453,34 +431,18 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
           </div>
         ) : (
           <>
-            {/* Phone / portrait tablet: board or keypad; wide: both. */}
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              aria-label={t('cricket.match.inputLabel')}
-              className="grid w-full shrink-0 grid-cols-2 lg:hidden"
-              value={inputMode}
-              onValueChange={handleInputMode}
-            >
-              <ToggleGroupItem value="board" className="min-h-11 data-[state=on]:bg-accent">{t('cricket.match.inputBoard')}</ToggleGroupItem>
-              <ToggleGroupItem value="pad" className="min-h-11 data-[state=on]:bg-accent">{t('cricket.match.inputPad')}</ToggleGroupItem>
-            </ToggleGroup>
-
-            <div className={cn('min-h-0 flex-1 flex-col gap-2', inputMode === 'board' ? 'flex' : 'hidden lg:flex')}>
-              <div className="flex min-h-0 flex-1 items-center justify-center">
-                <CricketBoard
-                  marks={leg.marks}
-                  thrower={turn}
-                  visitDarts={visitDarts}
-                  onDart={handleDart}
-                  className="h-full max-h-full w-auto max-w-full"
-                />
-              </div>
-              <div className="lg:hidden">{actionRow}</div>
+            {/* Board shows the marks and the visit's darts; the keypad enters them. */}
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <CricketBoard
+                marks={leg.marks}
+                thrower={turn}
+                visitDarts={visitDarts}
+                onDart={isMobile ? undefined : handleDart}
+                className="h-full max-h-full w-auto max-w-full"
+              />
             </div>
 
-            <div className={cn('min-h-0 flex-1 flex-col overflow-hidden rounded-xl border', inputMode === 'pad' ? 'flex' : 'hidden lg:flex')}>
+            <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border lg:min-h-0 lg:flex-1">
               <CricketPad
                 onDart={handleDart}
                 onUndo={handleUndo}
