@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { leagueService } from '../services/leagueService';
+import { matchWinProbability } from '../lib/winProbability';
+import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
 import { cn } from '@/lib/utils';
 
 // shadcn Select items need a non-empty value; '' (nobody picked) maps to this.
@@ -61,6 +63,10 @@ export function HeadToHead({ leagueId, players }) {
   const player1 = players.find(p => p.id === player1Id);
   const player2 = players.find(p => p.id === player2Id);
   const oneDecimal = (v) => (v == null ? '–' : v.toFixed(1));
+  const percent = (v) => `${Math.round(v)}%`;
+  // From each player's whole recent form, not just their meetings (often one or two matches).
+  const strengths = usePlayerStrengths([player1Id, player2Id]);
+  const winChance = stats ? matchWinProbability(strengths[player1Id], strengths[player2Id]) : null;
   const stageLabel = (m) => (m.isPlayoff ? t('management.playoffs') : t('management.groups'));
 
   const renderPlayerSelect = (id, value, onChange, label) => (
@@ -126,6 +132,9 @@ export function HeadToHead({ leagueId, players }) {
               {renderSide(player2, true)}
             </div>
             <div className="flex flex-col gap-3.5">
+              {winChance !== null && (
+                <StatBar label={t('leagues.winChance')} left={winChance * 100} right={(1 - winChance) * 100} format={percent} />
+              )}
               <StatBar label={t('management.legsWon')} left={stats.p1Legs} right={stats.p2Legs} />
               <StatBar label={t('leagues.avgAgainst')} left={stats.p1Avg} right={stats.p2Avg} format={oneDecimal} />
               <StatBar label={t('practice.stats.oneEighties')} left={stats.p1OneEighties} right={stats.p2OneEighties} />

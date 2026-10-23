@@ -15,8 +15,10 @@ import { BracketVisualization } from './BracketVisualization';
 import { EmptyState } from './shared/EmptyState';
 import { StatusBadge } from './shared/StatusBadge';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
+import { matchWinProbability } from '../lib/winProbability';
 import { LastVisitChip } from './tournament/LiveMatchesTab';
 import { useLastVisits } from '@/hooks/useLastVisits';
+import { usePlayerStrengths } from '@/hooks/usePlayerStrengths';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
 // dark high-contrast palette independent of the app theme. Cycles through
@@ -188,6 +190,20 @@ export function TvDisplay() {
     return () => window.removeEventListener('keydown', onKey);
   }, [showView, viewIndex]);
 
+  // Player strengths from all their matches, for the win chances on the boards
+  // and the queue. Reloaded when a match of this tournament completes.
+  const completedCount = useMemo(
+    () => (tournament?.groups || []).reduce((n, g) => n + (g.matches || []).filter((m) => m.status === 'completed').length, 0)
+      + playoffRows.filter((m) => m.status === 'completed').length,
+    [tournament, playoffRows]
+  );
+  const avgById = usePlayerStrengths((tournament?.players || []).map((p) => p.id), completedCount);
+  const winChance = useCallback(
+    (m, legsA = 0, legsB = 0) =>
+      matchWinProbability(avgById[m.player1?.id], avgById[m.player2?.id], { legsToWin: m.legs_to_win || m.legsToWin || 3, legsA, legsB }),
+    [avgById]
+  );
+
   const upNext = useMemo(() => {
     if (!tournament) return [];
     const liveIds = new Set(liveMatches.map((m) => m.id));
@@ -195,13 +211,13 @@ export function TvDisplay() {
     // device) or done — never "up next".
     const ready = (m) => m.status === 'pending' && m.player1 && m.player2 && !liveIds.has(m.id);
     const groupQueues = (tournament.groups || []).map((g) =>
-      (g.matches || []).filter(ready).map((m) => ({ id: m.id, label: g.name, p1: m.player1.name, p2: m.player2.name }))
+      (g.matches || []).filter(ready).map((m) => ({ id: m.id, label: g.name, p1: m.player1.name, p2: m.player2.name, chance: winChance(m) }))
     );
     const playoffItems = upcomingPlayoffMatches(bracketRounds)
       .filter((m) => !liveIds.has(m.id))
-      .map((m) => ({ id: m.id, label: m.roundName, p1: m.player1.name, p2: m.player2.name }));
+      .map((m) => ({ id: m.id, label: m.roundName, p1: m.player1.name, p2: m.player2.name, chance: winChance(m) }));
     return [...roundRobin(groupQueues), ...playoffItems].slice(0, 8);
-  }, [tournament, liveMatches, bracketRounds]);
+  }, [tournament, liveMatches, bracketRounds, winChance]);
 
   const qualifiersPerGroup = tournament?.playoffSettings?.enabled ? Number(tournament.playoffSettings.qualifiersPerGroup || tournament.playoffSettings.playersPerGroup || 0) : 0;
 
@@ -259,6 +275,19 @@ export function TvDisplay() {
     </div>
   );
 
+  // Mirrored bar: left share in primary, right in amber, same as head-to-head.
+  const renderWinChance = (p) => p === null || p === undefined ? null : (
+    <div className="mt-1 flex items-center gap-3 px-4 text-sm text-muted-foreground">
+      <span className="w-10 tabular-nums">{Math.round(p * 100)}%</span>
+      <span className="flex h-1.5 flex-1 gap-1">
+        <span className="rounded-full bg-primary" style={{ flex: Math.max(p, 0.02) }} />
+        <span className="rounded-full bg-amber-500" style={{ flex: Math.max(1 - p, 0.02) }} />
+      </span>
+      <span className="w-10 text-right tabular-nums">{Math.round((1 - p) * 100)}%</span>
+      <span className="text-xs uppercase tracking-wider">{t('tv.winChance')}</span>
+    </div>
+  );
+
   const renderLive = () => (
     <div className="flex h-full min-h-0 flex-col gap-6 lg:flex-row">
       <section className="flex min-w-0 flex-1 flex-col gap-4">
@@ -285,6 +314,7 @@ export function TvDisplay() {
                   <CardContent className="flex flex-col gap-1 px-4">
                     {renderPlayerRow(p1, m.player1_legs ?? 0, m.player1_current_score ?? m.starting_score ?? 501, turn === 0, lastVisits[m.id]?.player === 0 ? lastVisits[m.id] : null)}
                     {renderPlayerRow(p2, m.player2_legs ?? 0, m.player2_current_score ?? m.starting_score ?? 501, turn === 1, lastVisits[m.id]?.player === 1 ? lastVisits[m.id] : null)}
+                    {renderWinChance(winChance(m, m.player1_legs ?? 0, m.player2_legs ?? 0))}
                   </CardContent>
                 </Card>
               );
@@ -307,6 +337,9 @@ export function TvDisplay() {
                 <li key={m.id} className="flex flex-col gap-0.5 py-2.5">
                   <span className="text-xs uppercase tracking-wider text-muted-foreground">{m.label}</span>
                   <span className="text-lg font-semibold">{m.p1} <span className="mx-1 font-normal text-muted-foreground">vs</span> {m.p2}</span>
+                  {m.chance != null && (
+                    <span className="text-xs tabular-nums text-muted-foreground">{Math.round(m.chance * 100)}% · {Math.round((1 - m.chance) * 100)}%</span>
+                  )}
                 </li>
               ))}
             </ul>
