@@ -30,6 +30,14 @@ assert.equal(r.leg.marks[0][20], 4);
 assert.equal(r.turn, 1);
 assert.equal(r.legStarter, 0);
 assert.equal(cricketApplyDart(r, D('T19')).state.leg.marks[1][19], 3, 'play continues');
+// The running totals (match MPR) and finished legs survive the resume.
+assert.deepEqual(r.totals[0], s.totals[0]);
+assert.deepEqual(cricketStateFromRow({ ...row, live_state: { marks: row.live_state.marks } }, { legsTarget: 2, players }).totals[0].visitMarks, [], 'older rows without totals');
+// A closes everything over three visits (B misses in between) and takes leg 1.
+const twoLegs = play(s, ['0', '0', '0', 'T19', 'T18', 'T17', '0', '0', '0', 'T16', 'T15', 'D25', '0', '0', '0', '25']);
+const r2 = cricketStateFromRow({ ...JSON.parse(JSON.stringify(cricketLiveUpdate(twoLegs))), match_starter: 0, status: 'in_progress' }, { legsTarget: 2, players });
+assert.equal(r2.legLog.length, 1);
+assert.equal(cricketMatchResult(r2, { id: 'm', player1: players[0], player2: players[1] }).player1Stats.legs.length, 1);
 // Leg 2 starter alternates from the match starter.
 assert.equal(cricketStateFromRow({ ...row, current_leg: 2 }, { legsTarget: 2, players }).legStarter, 1);
 

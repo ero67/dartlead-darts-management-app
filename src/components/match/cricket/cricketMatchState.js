@@ -35,7 +35,10 @@ export const cricketLiveUpdate = (state) => {
       marks: leg.marks,
       points: leg.points,
       visit: leg.visit.darts,
-      lastVisit: leg.visits[leg.visits.length - 1] || null
+      lastVisit: leg.visits[leg.visits.length - 1] || null,
+      // So a resume on another device keeps the match MPR and the leg stats.
+      totals: state.totals,
+      legLog: state.legLog
     }
   };
 };
@@ -43,7 +46,7 @@ export const cricketLiveUpdate = (state) => {
 const toMarks = (m) => Object.fromEntries(CRICKET_NUMBERS.map((n) => [n, Number(m?.[n]) || 0]));
 
 // Another device (or a cleared browser) resumes from the row: marks, points,
-// legs and turn survive; per-dart stats and undo before this point are lost,
+// legs, turn and the running totals survive; undo before this point is lost,
 // as with X01's loadMatchStateFromDatabase.
 export const cricketStateFromRow = (row, { legsTarget, players }) => {
   const live = row.live_state || {};
@@ -58,6 +61,8 @@ export const cricketStateFromRow = (row, { legsTarget, players }) => {
     legStarter: starter === null ? turn : (legNumber % 2 === 1 ? starter : 1 - starter),
     turn,
     legsWon: [row.player1_legs || 0, row.player2_legs || 0],
+    totals: fresh.totals.map((t, i) => ({ ...t, ...(live.totals?.[i] || {}), visitMarks: live.totals?.[i]?.visitMarks || [] })),
+    legLog: Array.isArray(live.legLog) ? live.legLog : [],
     leg: {
       ...fresh.leg,
       marks: [0, 1].map((i) => toMarks(live.marks?.[i])),

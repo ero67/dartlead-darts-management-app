@@ -6,7 +6,7 @@ import { MarkGlyph } from './MarkGlyph';
 import { CRICKET_ROWS, markCount, numberState } from './cricketView';
 import { cn } from '@/lib/utils';
 
-const KEY = 'flex min-h-11 min-w-0 items-center justify-center rounded-lg border bg-card font-display text-xl font-semibold leading-none tabular-nums transition-colors active:bg-accent disabled:pointer-events-none disabled:opacity-40';
+const KEY = 'flex min-h-11 short:min-h-9 min-w-0 items-center justify-center rounded-lg border bg-card font-display text-xl font-semibold leading-none tabular-nums transition-colors active:bg-accent disabled:pointer-events-none disabled:opacity-40';
 // Same tint code as DartKeypad: green doubles, red trebles.
 const MULT = {
   single: '',
@@ -42,7 +42,7 @@ export function CricketPad({ onDart, onUndo, onEndVisit, canUndo = true, dartsIn
             : [['single', String(n)], ['double', `D${n}`], ['triple', `T${n}`]];
           return (
             <React.Fragment key={n}>
-              <span className={cn('flex min-h-11 items-center justify-between gap-1 rounded-lg border px-2', ROW[state])}>
+              <span className={cn('flex min-h-11 short:min-h-9 items-center justify-between gap-1 rounded-lg border px-2', ROW[state])}>
                 <span className={cn('font-display text-xl font-bold uppercase leading-none', isDead && 'line-through decoration-2')}>
                   {n === 25 ? t('cricket.board.bullShort') : n}
                 </span>

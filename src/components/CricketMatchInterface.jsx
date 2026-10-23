@@ -425,15 +425,26 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
         </div>
 
         {isViewOnly ? (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border p-6 text-center lg:col-span-2">
-            <Eye className="size-10 text-muted-foreground" />
-            <h3 className="text-lg font-semibold">{t('match.viewOnlyMode')}</h3>
-            <p className="text-sm text-muted-foreground">{isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyScoreDescription')}</p>
-          </div>
+          <>
+            {/* Phones: the marks table lives above only on wide screens. */}
+            <CricketMarksTable
+              className="lg:hidden"
+              size="sm"
+              thrower={turn}
+              marks={leg.marks}
+              players={playerNames.map((name, p) => ({ name, points: leg.points[p], legs: engine.legsWon[p] }))}
+            />
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border p-6 text-center lg:col-span-2">
+              <Eye className="size-10 text-muted-foreground" />
+              <h3 className="text-lg font-semibold">{t('match.viewOnlyMode')}</h3>
+              <p className="text-sm text-muted-foreground">{isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyScoreDescription')}</p>
+            </div>
+          </>
         ) : (
           <>
-            {/* Board shows the marks and the visit's darts; the keypad enters them. */}
-            <div className="flex min-h-0 flex-1 items-center justify-center">
+            {/* Board shows the marks and the visit's darts; the keypad enters them.
+                Too short a viewport (iPhone SE with toolbars) leaves it unreadable. */}
+            <div className="flex min-h-0 flex-1 items-center justify-center [@media(max-height:640px)]:hidden">
               <CricketBoard
                 marks={leg.marks}
                 thrower={turn}
