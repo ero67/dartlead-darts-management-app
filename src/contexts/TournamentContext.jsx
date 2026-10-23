@@ -3,6 +3,7 @@ import { tournamentService, matchService } from '../services/tournamentService.j
 import { leagueService } from '../services/leagueService.js';
 import { supabase } from '../lib/supabase.js';
 import { enqueueWrite, hasPendingResults, QUEUE_TYPES } from '../lib/offlineQueue.js';
+import { isCricketGame } from '../lib/cricket.js';
 
 
 const TournamentContext = createContext();
@@ -486,6 +487,10 @@ function updateGroupStandings(group, tournament = null) {
   }
   
   const standings = {};
+  // Cricket: 'average' is MPR, so the totals add up marks instead of score.
+  const isCricket = isCricketGame(tournament?.gameType);
+  const scoreKey = isCricket ? 'marks' : 'totalScore';
+  const dartsKey = isCricket ? 'darts' : 'totalDarts';
   
   // Initialize standings
   group.players.forEach(player => {
@@ -547,17 +552,17 @@ function updateGroupStandings(group, tournament = null) {
       p2Stats.legsLost += result.player1Legs || 0;
       
       // Accumulate totalScore and totalDarts for cumulative average calculation
-      if (result.player1Stats?.totalScore !== undefined) {
-        p1Stats.totalScore = (p1Stats.totalScore || 0) + (result.player1Stats.totalScore || 0);
+      if (result.player1Stats?.[scoreKey] !== undefined) {
+        p1Stats.totalScore = (p1Stats.totalScore || 0) + (result.player1Stats[scoreKey] || 0);
       }
-      if (result.player1Stats?.totalDarts !== undefined) {
-        p1Stats.dartsThrown = (p1Stats.dartsThrown || 0) + (result.player1Stats.totalDarts || 0);
+      if (result.player1Stats?.[dartsKey] !== undefined) {
+        p1Stats.dartsThrown = (p1Stats.dartsThrown || 0) + (result.player1Stats[dartsKey] || 0);
       }
-      if (result.player2Stats?.totalScore !== undefined) {
-        p2Stats.totalScore = (p2Stats.totalScore || 0) + (result.player2Stats.totalScore || 0);
+      if (result.player2Stats?.[scoreKey] !== undefined) {
+        p2Stats.totalScore = (p2Stats.totalScore || 0) + (result.player2Stats[scoreKey] || 0);
       }
-      if (result.player2Stats?.totalDarts !== undefined) {
-        p2Stats.dartsThrown = (p2Stats.dartsThrown || 0) + (result.player2Stats.totalDarts || 0);
+      if (result.player2Stats?.[dartsKey] !== undefined) {
+        p2Stats.dartsThrown = (p2Stats.dartsThrown || 0) + (result.player2Stats[dartsKey] || 0);
       }
     }
   });

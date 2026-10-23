@@ -36,7 +36,7 @@ export function ExportMenu({ tournament, imageSuffix = 'standings', items = ['im
   const labels = {
     group: t('export.colGroup'), position: t('management.pos'), player: t('management.player'), played: t('management.played'),
     won: t('management.won'), lost: t('management.lost'), legsWon: t('export.colLegsWon'), legsLost: t('export.colLegsLost'),
-    legDiff: t('management.legsDiff'), average: t('management.avg'), points: t('management.pts'),
+    legDiff: t('management.legsDiff'), average: tournament?.gameType === 'cricket' ? t('common.mpr') : t('management.avg'), points: t('management.pts'),
     stage: t('export.colStage'), player1: t('export.colPlayer1'), player2: t('export.colPlayer2'), legs1: t('export.colLegs1'), legs2: t('export.colLegs2'),
     winner: t('export.colWinner'), thirdPlace: t('export.thirdPlace')
   };

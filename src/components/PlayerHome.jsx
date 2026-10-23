@@ -10,11 +10,13 @@ import { Card } from '@/components/ui/card';
 import { StatusBadge } from './shared/StatusBadge';
 import { BoardMotif, FormDots, LegPips, LiveDot } from './shared/DartsAccents';
 import { StatTile } from './shared/StatTile';
-import { tournamentService } from '../services/tournamentService';
+import { CricketMarksTable } from './cricket/CricketMarksTable';
+import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { getUserDisplayName } from '../utils/userDisplayName';
 import { loadActiveSession, loadHistory } from '../lib/practiceStorage';
 import { PRACTICE_GAMES } from '../lib/practiceGames';
+import { isCricketGame } from '../lib/cricket';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -37,7 +39,8 @@ function summarizePractice(history, formatDate) {
   }, { sessions: 0, thisWeek: 0, oneEighties: 0, bestAverage: 0, bestAverageAt: null, lastOneEightyAt: null });
 }
 
-// The signed-in player's own live match: both players, legs and the running leg score.
+// The signed-in player's own live match: both players, legs and the running
+// leg score (Cricket: points and marks on the scoreboard).
 function MyLiveMatchCard({ match, playerId, tournamentName, onOpen, t }) {
   const rows = [
     { player: match.player1, legs: match.player1_legs, score: match.player1_current_score },
@@ -58,23 +61,32 @@ function MyLiveMatchCard({ match, playerId, tournamentName, onOpen, t }) {
           {t('liveMatches.live')}
         </Badge>
       </div>
-      <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-4 gap-y-1">
-        {rows.map(({ player, legs, score }) => {
-          const isMe = player?.id === playerId;
-          return (
-            <React.Fragment key={player?.id || 'tbd'}>
-              <span className={isMe ? 'truncate font-semibold' : 'truncate font-medium text-muted-foreground'}>
-                {player?.name || t('management.tbd')}
-                {isMe && <span className="ml-1.5 text-xs font-medium text-primary">{t('practice.setup.you').toLowerCase()}</span>}
-              </span>
-              <LegPips won={legs || 0} total={match.legs_to_win} label={`${legs || 0} ${t('match.legs')}`} className={isMe ? 'text-primary' : 'text-muted-foreground'} />
-              <span className={`font-display text-3xl font-semibold leading-none ${isMe ? '' : 'text-muted-foreground'}`}>
-                {score ?? match.starting_score ?? '—'}
-              </span>
-            </React.Fragment>
-          );
-        })}
-      </div>
+      {isCricketGame(match.game_type) ? (
+        <CricketMarksTable
+          size="sm"
+          players={rows.map(({ player, legs, score }) => ({ name: player?.name || t('management.tbd'), points: score ?? 0, legs: legs || 0 }))}
+          marks={match.live_state?.marks}
+          thrower={match.current_player}
+        />
+      ) : (
+        <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-4 gap-y-1">
+          {rows.map(({ player, legs, score }) => {
+            const isMe = player?.id === playerId;
+            return (
+              <React.Fragment key={player?.id || 'tbd'}>
+                <span className={isMe ? 'truncate font-semibold' : 'truncate font-medium text-muted-foreground'}>
+                  {player?.name || t('management.tbd')}
+                  {isMe && <span className="ml-1.5 text-xs font-medium text-primary">{t('practice.setup.you').toLowerCase()}</span>}
+                </span>
+                <LegPips won={legs || 0} total={match.legs_to_win} label={`${legs || 0} ${t('match.legs')}`} className={isMe ? 'text-primary' : 'text-muted-foreground'} />
+                <span className={`font-display text-3xl font-semibold leading-none ${isMe ? '' : 'text-muted-foreground'}`}>
+                  {score ?? match.starting_score ?? '—'}
+                </span>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3 border-t pt-3 text-sm text-muted-foreground">
         <span>{t('match.firstTo')} {match.legs_to_win} {t('match.legs')}</span>
         <Button variant="ghost" size="sm" className="-mr-2" onClick={onOpen}>
@@ -148,7 +160,7 @@ export function PlayerHome({ onNavigate }) {
       const player = await tournamentService.getPlayerByUserId(user.id);
       if (!player || cancelled) return;
       const [liveMatches, profile] = await Promise.all([
-        tournamentService.getLiveMatches().catch(() => []),
+        matchService.getLiveMatches().catch(() => []),
         tournamentService.getPlayerProfile(player.id).catch(() => null),
       ]);
       const liveMatch = (liveMatches || []).find(m => m.player1_id === player.id || m.player2_id === player.id) || null;

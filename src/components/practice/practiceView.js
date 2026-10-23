@@ -3,11 +3,11 @@ import { sessionHighlights } from '../../lib/practiceGames';
 // Presentation helpers shared by the practice screens (kept out of
 // PracticeShared.jsx so that file only exports components).
 
-// Headline of a finished session: the match result for an X01 match, the
+// Headline of a finished session: the match result for an X01 or Cricket match, the
 // first highlight otherwise. `isWin` tints it green.
 export const sessionHeadline = (entry, t) => {
   const s = entry.stats || {};
-  if (entry.game === 'x01' && s.legsFor !== undefined) {
+  if ((entry.game === 'x01' || entry.game === 'cricket') && s.legsFor !== undefined) {
     const scores = { for: s.legsFor, against: s.legsAgainst ?? 0, name: entry.settings?.opponent?.name || '' };
     if (s.won === true) return { text: t('practice.match.youWon', scores), isWin: true };
     if (s.won === false) return { text: t('practice.match.opponentWon', scores), isWin: false };

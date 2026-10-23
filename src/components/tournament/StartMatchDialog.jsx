@@ -3,6 +3,7 @@ import { Play, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { isCricketGame } from '@/lib/cricket';
 
 // Match start confirmation. `match` null = closed.
 export function StartMatchDialog({ match, onConfirm, onCancel, t }) {
@@ -22,6 +23,7 @@ export function StartMatchDialog({ match, onConfirm, onCancel, t }) {
             </div>
             {match.groupName && <Badge variant="secondary">{match.groupName}</Badge>}
             {match.isPlayoff && <Badge variant="outline">{t('management.playoffMatch')}</Badge>}
+            {isCricketGame(match.gameType) && <Badge variant="outline">{t('common.gameTypeCricket')}</Badge>}
           </div>
         )}
         <DialogFooter>

@@ -904,20 +904,23 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     
     // Update database with user who started the match (only if match is not completed)
     if (user?.id && match.status !== 'completed') {
-      // Mark match as live on THIS device in DB (enables cross-device visibility + admin takeover)
-      if (deviceId) {
-        matchService.startLiveMatch(match.id, deviceId, deviceName, boardNumber).catch(error => {
-          console.error('Error starting live match in database, queueing for retry:', error);
-          enqueueWrite(
-            QUEUE_TYPES.startLiveMatch,
-            { matchId: match.id, deviceId, deviceName, boardNumber },
-            `start:${match.id}`
-          );
+      // startMatch creates a playoff match's row, so mark it live only after.
+      matchService.startMatch(match.id, user.id, match)
+        .catch(error => {
+          console.error('Error marking match as started:', error);
+        })
+        .then(() => {
+          // Mark match as live on THIS device in DB (enables cross-device visibility + admin takeover)
+          if (!deviceId) return;
+          matchService.startLiveMatch(match.id, deviceId, deviceName, boardNumber).catch(error => {
+            console.error('Error starting live match in database, queueing for retry:', error);
+            enqueueWrite(
+              QUEUE_TYPES.startLiveMatch,
+              { matchId: match.id, deviceId, deviceName, boardNumber },
+              `start:${match.id}`
+            );
+          });
         });
-      }
-      matchService.startMatch(match.id, user.id, match).catch(error => {
-        console.error('Error marking match as started:', error);
-      });
     }
     
     // Cleanup: end live match when component unmounts

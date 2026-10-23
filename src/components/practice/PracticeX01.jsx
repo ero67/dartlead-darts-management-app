@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, CheckCircle, Flag, Keyboard, Minus, Plus, Target, Trophy, User, Users } from 'lucide-react';
+import { Bot, CheckCircle, Flag, Keyboard, Target, Trophy, User, Users } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { DartKeypad } from '../scoring/DartKeypad';
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BoardMotif, FormDots, LegPips } from '../shared/DartsAccents';
 import {
-  PracticeScreenHeader, PracticeSetup, PracticeField, PracticeChips, PracticeStepper,
+  PracticeScreenHeader, PracticeSetup, PracticeField, PracticeChips, PracticeStepper, PracticeBotLevelPicker,
   PracticeSummaryBar, PracticeSummaryHeader, PracticeSummaryActions, PracticeStatGrid, PracticeBandRow,
   PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeCheckoutHint,
   PracticeLastThrows, PracticeBoardStats, PracticeKeypad
@@ -90,6 +90,7 @@ export function PracticeX01() {
   const [flash, setFlash] = useState(null); // { type: 'bust' } | { type: 'legWon', darts, by, byBullup }
   const [showBullup, setShowBullup] = useState(false); // over-long leg: decide it at the bull
   const flashTimer = useRef(null);
+  const finishTimer = useRef(null); // pending summary after the winning dart
   // Bot visit in flight: timers animating the darts and the state to commit
   const botTimers = useRef([]);
   const pendingBot = useRef(null);
@@ -107,7 +108,7 @@ export function PracticeX01() {
     pendingBot.current = null;
   };
 
-  useEffect(() => () => { clearTimeout(flashTimer.current); clearBotTimers(); }, []);
+  useEffect(() => () => { clearTimeout(flashTimer.current); clearTimeout(finishTimer.current); clearBotTimers(); }, []);
 
   const myName = (user && getUserDisplayName(user)) || t('practice.setup.you');
   const botName = (level) => t('practice.bot.name', { level });
@@ -184,7 +185,7 @@ export function PracticeX01() {
     if (state.finishedAt) {
       // Let the leg-won flash land before the summary replaces the board.
       setSession(state);
-      setTimeout(() => finishSession(state), FLASH_MS);
+      finishTimer.current = setTimeout(() => finishSession(state), FLASH_MS);
       return;
     }
     setSession(state);
@@ -221,7 +222,7 @@ export function PracticeX01() {
     showFlash({ type: 'legWon', by: winner, byBullup: true });
     if (next.finishedAt) {
       setSession(next);
-      setTimeout(() => finishSession(next), FLASH_MS);
+      finishTimer.current = setTimeout(() => finishSession(next), FLASH_MS);
       return;
     }
     setSession(next);
@@ -232,6 +233,7 @@ export function PracticeX01() {
     setSummary(null);
     setInputMode('single');
     setTurnTotalInput('');
+    clearTimeout(finishTimer.current);
     clearBotTimers();
     if (settings.opponent) {
       const second = settings.opponent.kind === 'bot'
@@ -343,6 +345,7 @@ export function PracticeX01() {
   // Unlimited sessions (and abandoned ones) end by hand.
   const handleFinishEarly = () => {
     if (!session) return;
+    clearTimeout(finishTimer.current);
     clearBotTimers();
     const states = isMatch(session) ? session.players : [session];
     const hasVisits = states.some(s => s.legs.length > 0 || s.current.visits.length > 0);
@@ -599,34 +602,12 @@ export function PracticeX01() {
               )}
             />
             {settings.opponent?.kind === 'bot' && (
-              <div className="flex flex-col gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 pt-1.5 pb-1">
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.easier')} disabled={settings.opponent.level <= BOT_LEVELS[0].level} onClick={() => setBotLevel(settings.opponent.level - 1)}>
-                    <Minus />
-                  </Button>
-                  <div aria-live="polite" className="flex flex-1 flex-col items-center leading-tight">
-                    <span className="font-display text-2xl font-bold">{t('practice.bot.name', { level: settings.opponent.level })}</span>
-                    <span className="text-xs text-primary">{t('practice.bot.aboutAverage', { average: getBotLevel(settings.opponent.level).average })}</span>
-                  </div>
-                  <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.harder')} disabled={settings.opponent.level >= BOT_LEVELS.at(-1).level} onClick={() => setBotLevel(settings.opponent.level + 1)}>
-                    <Plus />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-8 gap-1">
-                  {BOT_LEVELS.map(l => (
-                    <button
-                      key={l.level}
-                      type="button"
-                      aria-label={`${t('practice.bot.name', { level: l.level })} · ~${l.average}`}
-                      aria-pressed={settings.opponent.level === l.level}
-                      className="flex min-h-8 items-center"
-                      onClick={() => setBotLevel(l.level)}
-                    >
-                      <span className={cn('h-1.5 w-full rounded-full', l.level <= settings.opponent.level ? 'bg-primary' : 'bg-border')} />
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <PracticeBotLevelPicker
+                level={settings.opponent.level}
+                levels={BOT_LEVELS}
+                describe={(level) => t('practice.bot.aboutAverage', { average: getBotLevel(level).average })}
+                onChange={setBotLevel}
+              />
             )}
             {settings.opponent?.kind === 'human' && (
               <Input

@@ -120,7 +120,11 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
     return t(`playerProfile.${keyBase}${form}`, { count });
   };
 
-  const { player, tournaments, careerStats, leagues, recentMatches = [] } = profileData;
+  const { player, tournaments, careerStats, leagues, recentMatches = [], cricketStats } = profileData;
+  // X01 numbers come from X01 matches only; name them so when Cricket is in the mix,
+  // and leave them out for a player who has only played Cricket.
+  const hasX01 = !cricketStats || careerStats.matchesPlayed > cricketStats.matches;
+  const x01 = (label) => (cricketStats ? `${label} · ${t('common.gameTypeX01')}` : label);
   const isOwnProfile = !!(user && player.user_id && player.user_id === user.id);
   const winRate = careerStats.matchesPlayed > 0
     ? (careerStats.wins / careerStats.matchesPlayed) * 100
@@ -150,23 +154,37 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
         ? `${plural('winsCount', careerStats.wins)} · ${plural('lossesCount', careerStats.losses)}`
         : undefined
     },
-    {
+    hasX01 ? {
       key: 'average',
       icon: TrendingUp,
-      label: t('playerProfile.overallAverage'),
+      label: x01(t('playerProfile.overallAverage')),
       value: careerStats.overallAverage.toFixed(2)
+    } : {
+      key: 'mpr',
+      icon: TrendingUp,
+      label: t('playerProfile.cricketMpr'),
+      value: cricketStats.mpr.toFixed(2)
     }
   ];
 
+  const x01Tiles = hasX01 ? [
+    { key: 'bestAverage', icon: Award, label: x01(t('playerProfile.bestAverage')), value: careerStats.bestAverage.toFixed(2) },
+    { key: 'highestCheckout', icon: Zap, label: x01(t('playerProfile.highestCheckout')), value: careerStats.highestCheckout || '—' },
+    { key: 'total180s', icon: Flame, label: x01(t('playerProfile.total180s')), value: careerStats.total180s || 0 }
+  ] : [];
+  const cricketTiles = cricketStats ? [
+    { key: 'cricketMatches', icon: Swords, label: t('playerProfile.cricketMatches'), value: cricketStats.matches },
+    { key: 'cricketMpr', icon: TrendingUp, label: t('playerProfile.cricketMpr'), value: (cricketStats.mpr || 0).toFixed(2) },
+    { key: 'cricketBestMpr', icon: Award, label: t('playerProfile.cricketBestMpr'), value: (cricketStats.bestMpr || 0).toFixed(2) }
+  ] : [];
   const statTiles = [
     { key: 'wins', icon: Trophy, label: t('playerProfile.wins'), value: careerStats.wins },
     { key: 'losses', icon: Target, label: t('playerProfile.losses'), value: careerStats.losses },
-    { key: 'bestAverage', icon: Award, label: t('playerProfile.bestAverage'), value: careerStats.bestAverage.toFixed(2) },
-    { key: 'highestCheckout', icon: Zap, label: t('playerProfile.highestCheckout'), value: careerStats.highestCheckout || '—' },
-    { key: 'total180s', icon: Flame, label: t('playerProfile.total180s'), value: careerStats.total180s || 0 },
+    ...x01Tiles,
     { key: 'legs', icon: Activity, label: t('playerProfile.legsRecord'), value: `${careerStats.totalLegsWon || 0}:${careerStats.totalLegsLost || 0}` },
     { key: 'titles', icon: Crown, label: t('playerProfile.tournamentWins'), value: careerStats.tournamentWins || 0 },
-    { key: 'darts', icon: Target, label: t('playerProfile.dartsThrown'), value: (careerStats.totalDarts || 0).toLocaleString() }
+    ...(hasX01 ? [{ key: 'darts', icon: Target, label: x01(t('playerProfile.dartsThrown')), value: (careerStats.totalDarts || 0).toLocaleString() }] : []),
+    ...cricketTiles
   ];
 
   const practiceHistory = isOwnProfile ? loadHistory() : [];
@@ -264,7 +282,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
             <StatTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} />
           ))}
         </div>
-        <FormRating playerId={playerId} />
+        <FormRating playerId={playerId} gameLabel={cricketStats ? t('common.gameTypeX01') : null} />
       </Section>
 
       {/* Practice bests */}
@@ -339,7 +357,9 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
                   <div className="flex shrink-0 flex-col items-end">
                     <span className="font-display text-xl font-semibold">{match.legsFor}:{match.legsAgainst}</span>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {match.average ? match.average.toFixed(2) : '—'} {t('playerProfile.avgShort')}
+                      {match.gameType === 'cricket'
+                        ? `${match.mpr ? match.mpr.toFixed(2) : '—'} ${t('common.mpr')}`
+                        : `${match.average ? match.average.toFixed(2) : '—'} ${t('playerProfile.avgShort')}`}
                     </span>
                   </div>
                   {match.result && (

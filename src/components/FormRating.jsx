@@ -12,8 +12,9 @@ const MIN_MATCHES = 3;
 
 // The player's form rating: the strength the win chances use (recent 3-dart
 // average, newer matches weigh more, settled toward the field while there are
-// few matches), its change over the last 10 matches and a trend line.
-export function FormRating({ playerId }) {
+// few matches), its change over the last 10 matches and a trend line. X01 only
+// (getRecentMatchTotals skips Cricket); `gameLabel` names that when it matters.
+export function FormRating({ playerId, gameLabel = null }) {
   const { t } = useLanguage();
   const [points, setPoints] = useState(null);
 
@@ -48,7 +49,7 @@ export function FormRating({ playerId }) {
   return (
     <Card className="flex-col gap-4 p-6 sm:flex-row sm:items-center">
       <div className="flex shrink-0 flex-col gap-1">
-        <span className="text-sm font-medium text-muted-foreground">{t('playerProfile.formRating')}</span>
+        <span className="text-sm font-medium text-muted-foreground">{t('playerProfile.formRating')}{gameLabel ? ` · ${gameLabel}` : ''}</span>
         <span className="font-display text-5xl font-semibold leading-none tabular-nums">{now.toFixed(1)}</span>
         {count > 0 && (
           <span className={cn('flex items-center gap-1 text-sm font-medium', isUp && 'text-primary', isDown && 'text-destructive', !isUp && !isDown && 'text-muted-foreground')}>

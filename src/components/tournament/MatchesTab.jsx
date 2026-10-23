@@ -166,6 +166,7 @@ export function MatchesTab({
                   ? {
                     ...match,
                     adminOverride: true,
+                    gameType: match.gameType || tournament.gameType,
                     legsToWin: match.legsToWin || tournament.legsToWin,
                     startingScore: match.startingScore || tournament.startingScore,
                     defaultScoringMode: tournament.defaultScoringMode
@@ -174,6 +175,7 @@ export function MatchesTab({
                     ...match,
                     tournamentId: tournament.id,
                     groupId: match.groupId,
+                    gameType: match.gameType || tournament.gameType,
                     legsToWin: match.legsToWin || tournament.legsToWin,
                     startingScore: match.startingScore || tournament.startingScore,
                     defaultScoringMode: tournament.defaultScoringMode

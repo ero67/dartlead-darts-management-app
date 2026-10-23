@@ -72,7 +72,7 @@ export function buildStandingsCsv(tournament, labels) {
   const rows = [[labels.group, labels.position, labels.player, labels.played, labels.won, labels.lost, labels.legsWon, labels.legsLost, labels.legDiff, labels.average, labels.points]];
   for (const g of tournament.groups || []) {
     (g.standings || []).forEach((s, i) => {
-      rows.push([g.name, i + 1, s.player?.name, s.matchesPlayed, s.matchesWon, s.matchesLost, s.legsWon, s.legsLost, (s.legsWon || 0) - (s.legsLost || 0), fmt(s.average), s.points]);
+      rows.push([g.name, i + 1, s.player?.name, s.matchesPlayed, s.matchesWon, s.matchesLost, s.legsWon, s.legsLost, (s.legsWon || 0) - (s.legsLost || 0), fmt(s.average, tournament.gameType === 'cricket' ? 2 : 1), s.points]);
     });
   }
   return toCsv(rows);

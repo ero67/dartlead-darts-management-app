@@ -145,6 +145,42 @@ export function PracticeChips({ options, value, onChange, render, numeric, colum
   );
 }
 
+// Bot strength picker: − name + with the level's strength underneath
+// (`describe(level)`, per game), and one bar per level to jump straight there.
+export function PracticeBotLevelPicker({ level, levels, describe, onChange }) {
+  const { t } = useLanguage();
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 pt-1.5 pb-1">
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.easier')} disabled={level <= levels[0].level} onClick={() => onChange(level - 1)}>
+          <Minus />
+        </Button>
+        <div aria-live="polite" className="flex flex-1 flex-col items-center leading-tight">
+          <span className="font-display text-2xl font-bold">{t('practice.bot.name', { level })}</span>
+          <span className="text-xs text-primary">{describe(level)}</span>
+        </div>
+        <Button type="button" variant="outline" size="icon" className="size-11" aria-label={t('practice.bot.harder')} disabled={level >= levels.at(-1).level} onClick={() => onChange(level + 1)}>
+          <Plus />
+        </Button>
+      </div>
+      <div className="grid grid-cols-8 gap-1">
+        {levels.map(l => (
+          <button
+            key={l.level}
+            type="button"
+            aria-label={`${t('practice.bot.name', { level: l.level })} · ${describe(l.level)}`}
+            aria-pressed={level === l.level}
+            className="flex min-h-8 items-center"
+            onClick={() => onChange(l.level)}
+          >
+            <span className={cn('h-1.5 w-full rounded-full', l.level <= level ? 'bg-primary' : 'bg-border')} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // − value + in the same track as the segmented control.
 export function PracticeStepper({ value, label, decrementLabel, incrementLabel, onDecrement, onIncrement, canDecrement = true, canIncrement = true }) {
   return (

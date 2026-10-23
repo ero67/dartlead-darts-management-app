@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '../shared/EmptyState';
+import { CricketMarksTable } from '../cricket/CricketMarksTable';
+import { isCricketGame } from '../../lib/cricket';
 import { useLastVisits } from '@/hooks/useLastVisits';
 import { cn } from '@/lib/utils';
 
@@ -94,25 +96,37 @@ export function LiveMatchesTab({ liveMatches, favoriteMatchIds, toggleFavoriteMa
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <div className="px-3 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('management.legs')}</div>
-                  <LivePlayerRow
-                    name={match.player1?.name || t('common.unknown')}
-                    legs={match.player1_legs || 0}
-                    score={match.player1_current_score || 501}
-                    isActive={match.current_player === 0}
-                    visit={lastVisits[match.id]?.player === 0 ? lastVisits[match.id] : null}
-                    t={t}
+                {isCricketGame(match.game_type) ? (
+                  <CricketMarksTable
+                    size="sm"
+                    players={[
+                      { name: match.player1?.name || t('common.unknown'), points: match.player1_current_score ?? 0, legs: match.player1_legs || 0 },
+                      { name: match.player2?.name || t('common.unknown'), points: match.player2_current_score ?? 0, legs: match.player2_legs || 0 }
+                    ]}
+                    marks={match.live_state?.marks}
+                    thrower={match.current_player}
                   />
-                  <LivePlayerRow
-                    name={match.player2?.name || t('common.unknown')}
-                    legs={match.player2_legs || 0}
-                    score={match.player2_current_score || 501}
-                    isActive={match.current_player === 1}
-                    visit={lastVisits[match.id]?.player === 1 ? lastVisits[match.id] : null}
-                    t={t}
-                  />
-                </div>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <div className="px-3 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('management.legs')}</div>
+                    <LivePlayerRow
+                      name={match.player1?.name || t('common.unknown')}
+                      legs={match.player1_legs || 0}
+                      score={match.player1_current_score || 501}
+                      isActive={match.current_player === 0}
+                      visit={lastVisits[match.id]?.player === 0 ? lastVisits[match.id] : null}
+                      t={t}
+                    />
+                    <LivePlayerRow
+                      name={match.player2?.name || t('common.unknown')}
+                      legs={match.player2_legs || 0}
+                      score={match.player2_current_score || 501}
+                      isActive={match.current_player === 1}
+                      visit={lastVisits[match.id]?.player === 1 ? lastVisits[match.id] : null}
+                      t={t}
+                    />
+                  </div>
+                )}
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   {match.group && <span>{match.group.name}</span>}

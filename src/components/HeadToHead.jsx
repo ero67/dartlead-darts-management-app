@@ -63,7 +63,10 @@ export function HeadToHead({ leagueId, players }) {
   const player1 = players.find(p => p.id === player1Id);
   const player2 = players.find(p => p.id === player2Id);
   const oneDecimal = (v) => (v == null ? '–' : v.toFixed(1));
+  const twoDecimals = (v) => (v == null ? '–' : v.toFixed(2));
   const percent = (v) => `${Math.round(v)}%`;
+  // Average, 180s and checkouts come from X01 meetings only.
+  const hasX01Meeting = stats?.meetings?.some(m => m.gameType !== 'cricket');
   // From each player's whole recent form, not just their meetings (often one or two matches).
   const strengths = usePlayerStrengths([player1Id, player2Id]);
   const winChance = stats ? matchWinProbability(strengths[player1Id], strengths[player2Id]) : null;
@@ -136,9 +139,13 @@ export function HeadToHead({ leagueId, players }) {
                 <StatBar label={t('leagues.winChance')} left={winChance * 100} right={(1 - winChance) * 100} format={percent} />
               )}
               <StatBar label={t('management.legsWon')} left={stats.p1Legs} right={stats.p2Legs} />
-              <StatBar label={t('leagues.avgAgainst')} left={stats.p1Avg} right={stats.p2Avg} format={oneDecimal} />
-              <StatBar label={t('practice.stats.oneEighties')} left={stats.p1OneEighties} right={stats.p2OneEighties} />
-              <StatBar label={t('playerProfile.highestCheckout')} left={stats.p1HighestCheckout} right={stats.p2HighestCheckout} />
+              {hasX01Meeting && (
+                <>
+                  <StatBar label={t('leagues.avgAgainst')} left={stats.p1Avg} right={stats.p2Avg} format={oneDecimal} />
+                  <StatBar label={t('practice.stats.oneEighties')} left={stats.p1OneEighties} right={stats.p2OneEighties} />
+                  <StatBar label={t('playerProfile.highestCheckout')} left={stats.p1HighestCheckout} right={stats.p2HighestCheckout} />
+                </>
+              )}
             </div>
           </Card>
 
@@ -147,6 +154,9 @@ export function HeadToHead({ leagueId, players }) {
             {stats.meetings.map(m => {
               const isP1Win = m.winnerId === player1Id;
               const isP2Win = m.winnerId === player2Id;
+              const isCricket = m.gameType === 'cricket';
+              const avgLabel = isCricket ? t('common.mpr') : t('playerProfile.avgShort');
+              const fmtAvg = isCricket ? twoDecimals : oneDecimal;
               return (
                 <div key={m.id} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 border-b px-4 py-2.5 last:border-b-0 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_minmax(0,1fr)]">
                   <span className="col-span-3 flex min-w-0 flex-col leading-tight sm:col-span-1">
@@ -154,7 +164,7 @@ export function HeadToHead({ leagueId, players }) {
                     <span className="text-xs text-muted-foreground">{stageLabel(m)}</span>
                   </span>
                   <span className="text-right text-xs text-muted-foreground sm:text-sm">
-                    {t('playerProfile.avgShort')} <b className="text-foreground tabular-nums">{oneDecimal(m.p1Avg)}</b>
+                    {avgLabel} <b className="text-foreground tabular-nums">{fmtAvg(isCricket ? m.p1Mpr : m.p1Avg)}</b>
                   </span>
                   <span className="flex justify-center gap-1.5 font-display text-2xl font-bold tabular-nums">
                     <span className={cn(isP1Win ? 'text-primary' : 'text-muted-foreground')}>{m.p1Legs}</span>
@@ -162,7 +172,7 @@ export function HeadToHead({ leagueId, players }) {
                     <span className={cn(isP2Win ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>{m.p2Legs}</span>
                   </span>
                   <span className="text-xs text-muted-foreground sm:text-sm">
-                    {t('playerProfile.avgShort')} <b className="text-foreground tabular-nums">{oneDecimal(m.p2Avg)}</b>
+                    {avgLabel} <b className="text-foreground tabular-nums">{fmtAvg(isCricket ? m.p2Mpr : m.p2Avg)}</b>
                   </span>
                 </div>
               );

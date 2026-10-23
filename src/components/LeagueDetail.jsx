@@ -26,6 +26,7 @@ import { confirmDialog } from '../lib/confirmDialog';
 // Default tournament settings shape (matches TournamentCreation defaults)
 const DEFAULT_TOURNAMENT_SETTINGS = {
   tournamentType: 'groups_with_playoffs',
+  gameType: 'x01',
   legsToWin: 3,
   startingScore: 501,
   defaultScoringMode: 'dart',

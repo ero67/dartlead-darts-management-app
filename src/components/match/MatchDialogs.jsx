@@ -11,7 +11,8 @@ const stay = (e) => e.preventDefault();
 
 // Pre-match "who starts" — cannot be dismissed, the match needs a starter.
 // `children` (optional) sits above the starter buttons: the match screen puts
-// the pre-match card there; practice passes nothing.
+// the pre-match card there; practice passes nothing. Without
+// `onScoringModeChange` there is no scoring-mode toggle (Cricket is per dart).
 export function StarterDialog({ players, scoringMode, onScoringModeChange, onSelect, children }) {
   const { t } = useLanguage();
   return (
@@ -20,21 +21,23 @@ export function StarterDialog({ players, scoringMode, onScoringModeChange, onSel
         <DialogHeader>
           <DialogTitle>{t('match.whoStarts')}</DialogTitle>
         </DialogHeader>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          spacing={2}
-          className="grid w-full grid-cols-2"
-          value={scoringMode}
-          onValueChange={(v) => { if (v) onScoringModeChange(v); }}
-        >
-          <ToggleGroupItem value="dart" className="h-12 w-full rounded-lg data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-            {t('registration.scoringModeDart')}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="turnTotal" className="h-12 w-full rounded-lg data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-            {t('registration.scoringModeTurnTotal')}
-          </ToggleGroupItem>
-        </ToggleGroup>
+        {onScoringModeChange && (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            spacing={2}
+            className="grid w-full grid-cols-2"
+            value={scoringMode}
+            onValueChange={(v) => { if (v) onScoringModeChange(v); }}
+          >
+            <ToggleGroupItem value="dart" className="h-12 w-full rounded-lg data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+              {t('registration.scoringModeDart')}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="turnTotal" className="h-12 w-full rounded-lg data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+              {t('registration.scoringModeTurnTotal')}
+            </ToggleGroupItem>
+          </ToggleGroup>
+        )}
         {children}
         <div className="flex flex-col gap-2">
           {players.map((player, idx) => (
@@ -70,14 +73,15 @@ export function ViewOnlyDialog({ description, onBack }) {
 }
 
 // Over-long leg: pick who won the bull-up (no checkout is recorded).
-export function BullupDialog({ open, onOpenChange, players, onPick }) {
+// `description` replaces the X01 prompt (which mentions the checkout).
+export function BullupDialog({ open, onOpenChange, players, onPick, description }) {
   const { t } = useLanguage();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={CONTENT} showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{t('match.bullup.title')}</DialogTitle>
-          <DialogDescription>{t('match.bullup.prompt')}</DialogDescription>
+          <DialogDescription>{description || t('match.bullup.prompt')}</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-2">
           {players.map((player, idx) => (

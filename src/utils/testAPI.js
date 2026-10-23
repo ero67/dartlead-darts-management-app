@@ -6,6 +6,15 @@
 
 import { matchService } from '../services/tournamentService'
 
+// Contract-shaped Cricket stats: player 1 wins the first p1Legs legs.
+const cricketTestStats = (p1Legs, p2Legs, isPlayer1) => ({
+  darts: 60, marks: 40, mpr: 2, points: 120, bestVisit: 6, fiveMarkVisits: 1, nineMarkVisits: 0,
+  legs: Array.from({ length: p1Legs + p2Legs }, (_, i) => ({
+    leg: i + 1, darts: 30, marks: 20, mpr: 2, points: 60,
+    isWin: isPlayer1 ? i < p1Legs : i >= p1Legs, byBullup: false
+  }))
+})
+
 /**
  * Initialize test API if in development and Cypress is detected
  */
@@ -16,10 +25,22 @@ export function initTestAPI() {
       /**
        * Complete a match directly via API
        * @param {string} matchId - Match ID
-       * @param {object} result - Match result
+       * @param {object} result - Match result; gameType 'cricket' sends a Cricket result
        */
       completeMatch: async (matchId, result) => {
-        const matchResult = {
+        const player1Legs = result.player1Legs || 2
+        const player2Legs = result.player2Legs || 0
+        const matchResult = result.gameType === 'cricket' ? {
+          matchId,
+          gameType: 'cricket',
+          winner: result.winner === 'player1' ? result.player1Id : result.player2Id,
+          player1Id: result.player1Id,
+          player2Id: result.player2Id,
+          player1Legs,
+          player2Legs,
+          player1Stats: result.player1Stats || cricketTestStats(player1Legs, player2Legs, true),
+          player2Stats: result.player2Stats || cricketTestStats(player1Legs, player2Legs, false)
+        } : {
           matchId,
           winner: result.winner === 'player1' ? result.player1Id : result.player2Id,
           player1Id: result.player1Id,
@@ -161,6 +182,7 @@ export function initTestAPI() {
             player2Id,
             player1Legs: randomWinner === 'player1' ? 2 : 0,
             player2Legs: randomWinner === 'player2' ? 2 : 0,
+            gameType: match.game_type,
             ...options
           })
           results.push(result)
@@ -201,6 +223,7 @@ export function initTestAPI() {
             player2Id,
             player1Legs: randomWinner === 'player1' ? 2 : 0,
             player2Legs: randomWinner === 'player2' ? 2 : 0,
+            gameType: match.game_type,
             ...options
           })
           

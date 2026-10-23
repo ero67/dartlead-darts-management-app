@@ -9,8 +9,10 @@ import { practiceService } from '../services/practiceService';
 
 // Setup → play → summary lifecycle shared by the practice games: restores an
 // unfinished session of this game, persists every change, remembers the last
-// settings and writes the history entry when the session ends.
-export function usePracticeSession(game, { defaultSettings, sanitize, computeStats }) {
+// settings and writes the history entry when the session ends. `buildEntry`
+// (optional) returns the entry's { settings, stats } for games that do not
+// store the state's settings as they are (1v1 matches).
+export function usePracticeSession(game, { defaultSettings, sanitize, computeStats, buildEntry }) {
   const { user } = useAuth();
   const [session, setSession] = useState(() => {
     const active = loadActiveSession();
@@ -33,8 +35,7 @@ export function usePracticeSession(game, { defaultSettings, sanitize, computeSta
     const entry = {
       id: newSessionId(),
       game,
-      settings: state.settings,
-      stats: computeStats(state),
+      ...(buildEntry ? buildEntry(state) : { settings: state.settings, stats: computeStats(state) }),
       startedAt: state.startedAt,
       finishedAt: state.finishedAt || Date.now()
     };

@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { isCricketGame } from '@/lib/cricket';
 
 const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
 const PLAYOFF_LEGS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -37,10 +38,11 @@ function Section({ title, description, children }) {
 
 export function EditSettingsDialog({ open, onClose, onSave, tournament, tournamentSettings, setTournamentSettings, hasTournamentStarted, t }) {
   const legsLabel = (n) => (n === 1 ? t('tournaments.firstToLeg', { count: 1 }) : t('tournaments.firstToLegs', { count: n }));
+  const isCricket = isCricketGame(tournamentSettings.gameType);
   const criterionLabels = {
     matchesWon: t('registration.matchesWon'),
     legDifference: t('registration.legDifference'),
-    average: t('registration.average'),
+    average: isCricket ? t('common.mpr') : t('registration.average'),
     headToHead: t('registration.headToHead')
   };
   const setPlayoff = (patch) => setTournamentSettings({
@@ -294,6 +296,11 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
 
         <div className="-mx-6 flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-1">
           <Section title={t('registration.matchSettings')}>
+            {/* Read-only here: the game can only change before any match starts (registration dialog) */}
+            <p className="text-sm">
+              <span className="text-muted-foreground">{t('common.gameType')}: </span>
+              <span className="font-medium">{isCricket ? t('common.gameTypeCricket') : t('common.gameTypeX01')}</span>
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="mgmt-legs-to-win">{t('registration.legsToWin')}</Label>
@@ -304,7 +311,7 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
                   LEGS_OPTIONS
                 )}
               </div>
-              <div className="flex flex-col gap-2">
+              {!isCricket && <div className="flex flex-col gap-2">
                 <Label htmlFor="mgmt-starting-score">{t('tournaments.startingScore')}</Label>
                 <Select
                   value={String(tournamentSettings.startingScore)}
@@ -319,9 +326,9 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
             </div>
-            <div className="flex flex-col gap-2">
+            {!isCricket && <div className="flex flex-col gap-2">
               <Label>{t('registration.scoringMode')}</Label>
               <RadioGroup
                 name="scoringModeMgmt"
@@ -338,7 +345,7 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
                   {t('registration.scoringModeTurnTotal')}
                 </Label>
               </RadioGroup>
-            </div>
+            </div>}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="mgmt-auto-scorer-assignment" className="cursor-pointer font-normal">
                 <Checkbox

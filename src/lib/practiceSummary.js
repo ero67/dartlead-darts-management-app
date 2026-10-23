@@ -4,6 +4,7 @@
 
 const MIN_X01_DARTS = 9;          // a "best average" from three darts is noise
 const MIN_CHECKOUT_ATTEMPTS = 10; // same for hit rates
+const MIN_CRICKET_DARTS = 9;      // and for MPR
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const better = (current, candidate, pick) =>
@@ -19,7 +20,8 @@ export const computePracticeSummary = (entries, now = Date.now()) => {
     x01: { sessions: 0, bestAverage: null, bestFirstNine: null, oneEighties: 0, highestCheckout: null, bestCheckoutPercent: null, bestLegDarts: null },
     checkout: { sessions: 0, bestHitPercent: null, bestStreak: null, totalHits: 0 },
     oneTwentyOne: { sessions: 0, highestSuccess: null, bestStreak: null },
-    aroundTheClock: { sessions: 0, fewestDarts: null, fastestSeconds: null }
+    aroundTheClock: { sessions: 0, fewestDarts: null, fastestSeconds: null },
+    cricket: { sessions: 0, bestMpr: null, bestVisit: null, mostLegs: null }
   };
   for (const entry of entries || []) {
     const s = entry.stats || {};
@@ -62,6 +64,14 @@ export const computePracticeSummary = (entries, now = Date.now()) => {
           g.fewestDarts = better(g.fewestDarts, s.totalDarts, min);
           g.fastestSeconds = better(g.fastestSeconds, s.seconds, min);
         }
+        break;
+      }
+      case 'cricket': {
+        const g = summary.cricket;
+        g.sessions += 1;
+        if ((s.totalDarts || 0) >= MIN_CRICKET_DARTS) g.bestMpr = better(g.bestMpr, s.mpr, max);
+        g.bestVisit = better(g.bestVisit, s.bestVisit, max);
+        g.mostLegs = better(g.mostLegs, s.legsFor, max);
         break;
       }
       default:

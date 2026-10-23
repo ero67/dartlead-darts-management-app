@@ -23,6 +23,7 @@ import { TournamentCreation } from './components/TournamentCreation';
 import { TournamentManagement } from './components/TournamentManagement';
 import { TournamentRegistration } from './components/TournamentRegistration';
 import { MatchInterface } from './components/MatchInterface';
+import { CricketMatchInterface } from './components/CricketMatchInterface';
 import { LeaguesList } from './components/LeaguesList';
 import { LeagueDetail } from './components/LeagueDetail';
 import { LeagueCreation } from './components/LeagueCreation';
@@ -45,9 +46,11 @@ import { PracticeHistory } from './components/practice/PracticeHistory';
 import { PracticeCheckout } from './components/practice/PracticeCheckout';
 import { PracticeOneTwentyOne } from './components/practice/PracticeOneTwentyOne';
 import { PracticeAroundTheClock } from './components/practice/PracticeAroundTheClock';
+import { PracticeCricket } from './components/practice/PracticeCricket';
 import { AccountDeletion } from './components/AccountDeletion';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
+import { isCricketGame } from './lib/cricket';
 import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from './utils/postLoginRedirect';
 import { getUserDisplayName } from './utils/userDisplayName';
 import { DisplayNameEditor } from './components/DisplayNameEditor';
@@ -289,8 +292,13 @@ function MatchRoute({ onMatchComplete }) {
     }
   }, [id, currentTournament, currentMatch, startMatch, navigate, tournaments.length]);
 
+  // Bracket matches restored from the playoffs JSONB carry no gameType: the
+  // tournament's decides (one game type per tournament).
+  const Scorer = isCricketGame(currentMatch?.gameType || currentTournament?.gameType)
+    ? CricketMatchInterface
+    : MatchInterface;
   return (
-    <MatchInterface
+    <Scorer
       match={currentMatch}
       onMatchComplete={onMatchComplete}
       onBack={() => navigate(`/tournament/${currentTournament?.id}`)}
@@ -548,6 +556,7 @@ function AppContent() {
           <Route path="/practice/checkout" element={<PracticeCheckout />} />
           <Route path="/practice/121" element={<PracticeOneTwentyOne />} />
           <Route path="/practice/around-the-clock" element={<PracticeAroundTheClock />} />
+          <Route path="/practice/cricket" element={<PracticeCricket />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />

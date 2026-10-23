@@ -1,4 +1,4 @@
-import { Target, Crosshair, Hash, Clock } from 'lucide-react';
+import { Target, Crosshair, Hash, Clock, CircleDot } from 'lucide-react';
 
 // Catalogue of practice games. `available` gates the tile; the others are
 // shown as "coming soon" so players see what the free tier is growing into.
@@ -6,7 +6,8 @@ export const PRACTICE_GAMES = [
   { id: 'x01', path: '/practice/x01', icon: Target, available: true },
   { id: 'checkout', path: '/practice/checkout', icon: Crosshair, available: true },
   { id: 'oneTwentyOne', path: '/practice/121', icon: Hash, available: true },
-  { id: 'aroundTheClock', path: '/practice/around-the-clock', icon: Clock, available: true }
+  { id: 'aroundTheClock', path: '/practice/around-the-clock', icon: Clock, available: true },
+  { id: 'cricket', path: '/practice/cricket', icon: CircleDot, available: true }
 ];
 
 // One-line description of a finished session's settings for lists.
@@ -41,6 +42,13 @@ export const describeSession = (entry, t) => {
     const { mode, includeBull } = entry.settings || {};
     return `${t(`practice.aroundTheClock.modes.${mode || 'singles'}`)}${includeBull ? ` · ${t('practice.aroundTheClock.withBull')}` : ''}`;
   }
+  if (entry.game === 'cricket') {
+    // A finished entry names the opponent in settings.opponent; a session in
+    // progress only has the engine's player list.
+    const { legsTarget, opponent, players } = entry.settings || {};
+    const name = opponent?.name || players?.[1]?.name;
+    return `${t('practice.setup.firstTo')} ${legsTarget ?? ''}${name ? ` · ${t('practice.match.vs')} ${name}` : ''}`;
+  }
   return entry.game;
 };
 
@@ -71,6 +79,13 @@ export const sessionHighlights = (entry, t) => {
         [t('practice.aroundTheClock.time'), secs(s.seconds ?? 0)],
         [t('practice.aroundTheClock.stats.avgDartsPerTarget'), s.avgDartsPerTarget ?? t('practice.noStats')],
         [t('practice.aroundTheClock.stats.firstDartHits'), s.firstDartHits ?? 0]
+      ];
+    case 'cricket':
+      return [
+        [t('practice.match.result'), `${s.legsFor ?? 0}:${s.legsAgainst ?? 0}`],
+        [t('common.mpr'), (s.mpr ?? 0).toFixed(2)],
+        [t('practice.cricket.stats.bestVisit'), s.bestVisit ?? 0],
+        [t('practice.stats.darts'), s.totalDarts ?? 0]
       ];
     default:
       return [

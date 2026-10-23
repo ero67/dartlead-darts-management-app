@@ -410,6 +410,7 @@ export function ManagerPanel() {
           current_leg: 1,
           player1_current_score: null,
           player2_current_score: null,
+          live_state: null,
           current_player: 0,
           live_device_id: null,
           live_started_at: null,

@@ -491,7 +491,10 @@
     "notScorerHint": "You are not assigned as a scorer for this tournament. Ask the tournament manager to add you under Scorers, then you can count matches on this device.",
     "noScorersTitle": "Only you can count matches right now",
     "noScorersText": "Add scorers so players can count matches on their own devices. Anyone else who opens a match can only watch.",
-    "addScorers": "Add scorers"
+    "addScorers": "Add scorers",
+    "bestMpr": "Best match MPR",
+    "bestVisits": "Best visits",
+    "bestVisitMarks": "Best"
   },
   "summary": {
     "biggestUpset": "Biggest upset",
@@ -513,7 +516,10 @@
     "fewestDartsLeg": "Fewest Darts (Single Leg)",
     "poweredBy": "Powered by",
     "exportImage": "Export as Image",
-    "exporting": "Exporting..."
+    "exporting": "Exporting...",
+    "bestTournamentMpr": "Best Tournament MPR",
+    "bestMatchMpr": "Best Match MPR",
+    "bestVisit": "Best Visit (marks)"
   },
   "landing": {
     "heroBadge": "For darts leagues & tournaments",
@@ -658,7 +664,20 @@
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
     "pullToRefresh": "Pull down to refresh",
-    "releaseToRefresh": "Release to refresh"
+    "releaseToRefresh": "Release to refresh",
+    "gameType": "Game",
+    "gameTypeX01": "X01",
+    "gameTypeCricket": "Cricket",
+    "mpr": "MPR",
+    "mprLong": "Marks per round",
+    "marks": "Marks",
+    "points": "Points",
+    "mprInfo": {
+      "title": "MPR — marks per round",
+      "body": "Average marks per visit of 3 darts: marks ÷ darts × 3. A single is 1 mark, a double 2, a treble 3; the outer bull is 1 and the bull 2.",
+      "counting": "Only marks that close a number or score points count. The best possible is 9.00 (three trebles every visit).",
+      "scale": "Roughly: 1–1.5 beginner · 2–2.5 good club player · 3+ strong · 4+ top level."
+    }
   },
   "deviceSettings": {
     "title": "Device Settings",
@@ -974,7 +993,10 @@
     "winsCountMany": "{{count}} wins",
     "lossesCountOne": "{{count}} loss",
     "lossesCountFew": "{{count}} losses",
-    "lossesCountMany": "{{count}} losses"
+    "lossesCountMany": "{{count}} losses",
+    "cricketMpr": "Cricket MPR",
+    "cricketBestMpr": "Best Cricket Match MPR",
+    "cricketMatches": "Cricket Matches"
   },
   "userSearch": {
     "placeholder": "Search by name or email...",
@@ -1111,7 +1133,9 @@
     "noDetails": "No detailed statistics were recorded for this match.",
     "open": "Statistics",
     "checkoutPercent": "Checkout %",
-    "highScores": "High scores"
+    "highScores": "High scores",
+    "bestVisit": "Best visit (marks)",
+    "fiveMarkVisits": "5+ mark visits"
   },
   "practice": {
     "title": "Practice",
@@ -1142,6 +1166,11 @@
         "title": "Around the Clock",
         "desc": "1 to 20, then bull. Darts and time to finish.",
         "short": "ATC"
+      },
+      "cricket": {
+        "title": "Cricket",
+        "desc": "Close 15–20 and the bull before your opponent and score on what they leave open. Against a friend or a bot.",
+        "short": "CR"
       }
     },
     "setup": {
@@ -1370,7 +1399,9 @@
       "bestLeg": "Best leg",
       "bestHitRate": "Best hit rate",
       "fewestDarts": "Fewest darts",
-      "fastestTime": "Fastest time"
+      "fastestTime": "Fastest time",
+      "bestMpr": "Best MPR",
+      "mostLegs": "Most legs won"
     },
     "sync": {
       "signInTitle": "Keep your history",
@@ -1396,6 +1427,37 @@
       "out": "out {{score}}",
       "left": "left {{score}}",
       "byBullup": "won on the bull-up"
+    },
+    "cricket": {
+      "rules": "15–20 and bull · 3 marks close · extra marks score",
+      "aboutMpr": "about {{mpr}} MPR",
+      "opponentMpr": "{{name}}: {{mpr}} MPR",
+      "points": "points {{a}}–{{b}}",
+      "stats": {
+        "bestVisit": "Best visit",
+        "fiveMarkVisits": "5+ mark visits",
+        "nineMarkVisits": "9-mark visits: {{count}}",
+        "marksDarts": "{{marks}} marks · {{darts}} darts"
+      }
+    }
+  },
+  "cricket": {
+    "board": {
+      "label": "Cricket board",
+      "single": "Single {{n}}",
+      "double": "Double {{n}}",
+      "triple": "Treble {{n}}",
+      "outerBull": "Outer bull (25)",
+      "bull": "Bull (50)",
+      "bullShort": "Bull",
+      "miss": "Miss"
+    },
+    "pad": {
+      "nextPlayer": "Next player"
+    },
+    "match": {
+      "bullupOffer": "This leg has gone long ({{count}}+ visits each).",
+      "bullupPrompt": "Both players throw at the bull — closest wins the leg. Who won the bull-up?"
     }
   }
 }
