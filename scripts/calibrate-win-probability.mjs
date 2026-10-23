@@ -209,3 +209,29 @@ const noFinishTest = lossWith(finishPreds[0], 0, bestNoF.scale, fTest);
 console.log(`\nfinishing: ${fIdx.length} matches with attempts (train ${fTrain.length}, test ${fTest.length}); field checkout rate ${(fieldRate * 100).toFixed(1)}%`);
 console.log(`best on train: prior ${bestF.prior} attempts, beta ${bestF.beta.toFixed(2)}, scale ${bestF.scale}`);
 console.log(`held-out leg log loss ${finishTest.toFixed(4)} with finishing vs ${noFinishTest.toFixed(4)} without (same matches)`);
+
+// Leg in progress (src/lib/legChance.js): fit SPREAD so the simulated
+// leg-start chance (both throw orders averaged) matches the picked model,
+// then score the simulation's leg-start chances on the held-out matches.
+const { legWinChance } = await import('../src/lib/legChance.js');
+const checkouts = JSON.parse(readFileSync(new URL('../src/data/checkouts.json', import.meta.url), 'utf8'));
+const simStart = (a, b, spread, sims) => (
+  legWinChance({ remaining: [501, 501], thrower: 0, strengths: [a, b], checkouts, sims, spread })
+  + legWinChance({ remaining: [501, 501], thrower: 1, strengths: [a, b], checkouts, sims, spread })) / 2;
+const PAIRS = [[40, 35], [45, 40], [50, 40], [55, 45], [45, 30], [60, 45], [65, 50], [70, 55]];
+let bestSpread = { err: Infinity };
+for (let spread = 1; spread <= 2.01; spread += 0.05) {
+  const err = PAIRS.reduce((e, [a, b]) => e + (logit(clamp(simStart(a, b, spread, 1000))) - logit(legWinProbability(a, b, pick.scale))) ** 2, 0);
+  if (err < bestSpread.err) bestSpread = { spread: Math.round(spread * 100) / 100, err };
+}
+console.log(`\nleg in progress: SPREAD ${bestSpread.spread} makes the simulated leg start match the model`);
+for (const [a, b] of PAIRS.slice(0, 4)) console.log(`  ${a} vs ${b}: sim ${(simStart(a, b, bestSpread.spread, 2000) * 100).toFixed(0)}%  model ${(legWinProbability(a, b, pick.scale) * 100).toFixed(0)}%`);
+let simLoss = 0, simLegs = 0;
+for (let j = cut; j < matches.length; j++) {
+  const m = matches[j];
+  const a = 50 + preds[pi][j] / 2, b = 50 - preds[pi][j] / 2;
+  const p = clamp(simStart(a, b, bestSpread.spread, 300));
+  simLoss -= m.l1 * Math.log(p) + m.l2 * Math.log(1 - p);
+  simLegs += m.l1 + m.l2;
+}
+console.log(`held-out leg log loss of the simulated leg start ${(simLoss / simLegs).toFixed(4)} vs model ${pick.test.toFixed(4)}`);

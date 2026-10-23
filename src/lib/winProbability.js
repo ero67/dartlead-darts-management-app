@@ -12,11 +12,13 @@ export const legWinProbability = (avgA, avgB, scale = AVG_SCALE) => 1 / (1 + Mat
 
 export const matchWinProbability = (avgA, avgB, { legsToWin = 3, legsA = 0, legsB = 0, scale = AVG_SCALE } = {}) => {
   if (!(avgA > 0) || !(avgB > 0)) return null;
-  const needA = legsToWin - legsA;
-  const needB = legsToWin - legsB;
+  return chanceToWinFirst(legWinProbability(avgA, avgB, scale), legsToWin - legsA, legsToWin - legsB);
+};
+
+// Chance A wins needA legs before B wins needB, each leg won with chance p.
+export const chanceToWinFirst = (p, needA, needB) => {
   if (needA <= 0) return 1;
   if (needB <= 0) return 0;
-  const p = legWinProbability(avgA, avgB, scale);
   // A wins exactly needA legs before B wins needB: negative binomial tail.
   let total = 0;
   let combos = 1; // C(needA - 1 + k, k)
@@ -47,4 +49,14 @@ export const playerStrength = (history, { halfLife = HALF_LIFE, priorDarts = PRI
     darts += w * m.darts;
   });
   return darts > 0 ? (score / darts) * 3 : null;
+};
+
+// The strength after each of the last `count` matches, oldest first, from a
+// newest-first history: the form-rating trend on the player profile.
+export const strengthHistory = (history, count) => {
+  const points = [];
+  for (let i = Math.min(count, history.length) - 1; i >= 0; i--) {
+    points.push({ at: history[i].at || null, strength: playerStrength(history.slice(i)) });
+  }
+  return points;
 };

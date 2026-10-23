@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { X, BarChart3 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCloseOnBack } from '../hooks/useCloseOnBack';
@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { HIGH_SCORE_BANDS, countHighScores, checkoutRate } from '../utils/dartStats';
+import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
+import { winChanceLine } from '../utils/winChanceLine';
+import { WinChanceChart } from './match/WinChanceChart';
+import checkoutData from '../data/checkouts.json';
 
 // Statistics of one completed match: score hero, side-by-side comparison with
 // the better side highlighted, leg-by-leg table, checkout chips. Used from the
@@ -40,6 +44,47 @@ const bandCount = (stats, bands, band) => {
   if (hasVisitScores(stats)) return bands[band];
   return band === 180 ? num(stats?.oneEighties) : null;
 };
+
+// Win chance over the match, for results that carry the visit log (see
+// saveMatchResult). Strengths as they were before the match when its
+// completion time is known. Renders nothing for older or partial logs.
+function WinChanceSection({ match }) {
+  const { t } = useLanguage();
+  const r = match.result;
+  const hasVisits = Array.isArray(r.visits) && r.visits.length > 0;
+  const ids = hasVisits ? [match.player1?.id, match.player2?.id] : [];
+  const strengths = usePlayerStrengths(ids, 0, match.completedAt || null);
+  const s1 = strengths[match.player1?.id];
+  const s2 = strengths[match.player2?.id];
+  const line = useMemo(() => (hasVisits && s1 && s2 ? winChanceLine({
+    visits: r.visits,
+    strengths: [s1, s2],
+    legsToWin: match.legsToWin || Math.max(num(r.player1Legs), num(r.player2Legs)),
+    startingScore: match.startingScore || 501,
+    finalLegs: [num(r.player1Legs), num(r.player2Legs)],
+    checkouts: checkoutData
+  }) : null), [hasVisits, s1, s2, r, match.legsToWin, match.startingScore]);
+  if (!line) return null;
+
+  const turn = line.turningPoint && line.points[line.turningPoint.index];
+  const before = turn && line.points[line.turningPoint.index - 1];
+  const p1 = match.player1?.name || t('management.player1');
+  const p2 = match.player2?.name || t('management.player2');
+  const pct = (p, player) => Math.round((player === 0 ? p : 1 - p) * 100);
+  const caption = turn ? t('matchStats.turningPoint', {
+    name: turn.player === 0 ? p1 : p2,
+    score: turn.score,
+    leg: turn.leg,
+    from: pct(before.p, turn.player),
+    to: pct(turn.p, turn.player)
+  }) : null;
+  return (
+    <section className="flex flex-col gap-2">
+      <h4 className="text-sm font-semibold">{t('matchStats.winChance')}</h4>
+      <WinChanceChart points={line.points} turningPointIndex={line.turningPoint?.index ?? null} player1Name={p1} player2Name={p2} caption={caption} />
+    </section>
+  );
+}
 
 const WINNER_BADGE = 'border-transparent bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200';
 
@@ -215,6 +260,8 @@ export function MatchStatisticsModal({ match, onClose }) {
         ) : (
           <>
             {renderCompare(rows)}
+
+            <WinChanceSection match={match} />
 
             <section className="flex flex-col gap-2">
               <h4 className="text-sm font-semibold">{t('matchStats.highScores')}</h4>

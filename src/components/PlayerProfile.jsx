@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from './shared/StatusBadge';
 import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
+import { FormRating } from './FormRating';
 import { DisplayNameEditor } from './DisplayNameEditor';
 import { AccountDeletion } from './AccountDeletion';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
@@ -263,6 +264,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
             <StatTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} />
           ))}
         </div>
+        <FormRating playerId={playerId} />
       </Section>
 
       {/* Practice bests */}
