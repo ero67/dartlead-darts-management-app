@@ -6,6 +6,7 @@ import { StarterDialog } from '../match/MatchDialogs';
 import { CricketBoard } from '../cricket/CricketBoard';
 import { CricketPad } from '../cricket/CricketPad';
 import { CricketMarksTable } from '../cricket/CricketMarksTable';
+import { MprInfo } from '../cricket/MprInfo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -432,7 +433,7 @@ export function PracticeCricket() {
         <div className="flex items-end justify-between gap-2">
           <span className="font-display text-5xl font-semibold leading-[0.85] tabular-nums" aria-label={`${leg.points[i]} ${t('common.points')}`}>{leg.points[i]}</span>
           <span className={cn('text-xs tabular-nums', isTurn ? 'opacity-85' : 'text-muted-foreground')}>
-            {t('common.mpr')} <b className={cn('font-semibold', !isTurn && 'text-foreground')}>{mprOf(session.totals[i].marks, session.totals[i].darts).toFixed(2)}</b>
+            <MprInfo /> <b className={cn('font-semibold', !isTurn && 'text-foreground')}>{mprOf(session.totals[i].marks, session.totals[i].darts).toFixed(2)}</b>
           </span>
         </div>
         <div className="flex h-6 gap-1">

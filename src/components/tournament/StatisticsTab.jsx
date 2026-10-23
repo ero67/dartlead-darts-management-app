@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { isValidLegDartCount, HIGH_SCORE_BANDS, countHighScores, addHighScores, cricketPlayerRecords } from '../../utils/dartStats';
 import { isCricketGame } from '../../lib/cricket';
+import { MprInfo } from '../cricket/MprInfo';
 
 // Helper function to get checkout value (handles both numeric and legacy string format)
 const getCheckoutValue = (checkout) => {
@@ -88,7 +89,7 @@ function CricketStatistics({ matches, renderPlayerLink, t }) {
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>{t('management.player')}</TableHead>
-                <TableHead className={num}>{t('common.mpr')}</TableHead>
+                <TableHead className={num}><MprInfo /></TableHead>
                 <TableHead>{t('management.opponent')}</TableHead>
               </TableRow>
             </TableHeader>

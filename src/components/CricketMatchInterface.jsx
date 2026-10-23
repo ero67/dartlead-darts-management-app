@@ -27,6 +27,7 @@ import { MatchCompleteCard } from './match/MatchCompleteCard';
 import { CricketBoard } from './cricket/CricketBoard';
 import { CricketPad } from './cricket/CricketPad';
 import { CricketMarksTable } from './cricket/CricketMarksTable';
+import { MprInfo } from './cricket/MprInfo';
 import { storableCricketState, withLegsTarget, cricketLiveUpdate, cricketStateFromRow, cricketMatchResult } from './match/cricket/cricketMatchState';
 
 // Cricket legs stall when the leader keeps scoring instead of closing; a normal
@@ -378,7 +379,7 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
                 <div className="flex items-end justify-between gap-2">
                   <span className="font-display text-4xl font-semibold leading-none tabular-nums short:text-3xl">{leg.points[p]}</span>
                   <span className={cn('text-xs tabular-nums', turn === p ? 'opacity-85' : 'text-muted-foreground')}>
-                    {t('common.mpr')} <b className="font-semibold">{mpr(p)}</b>
+                    <MprInfo /> <b className="font-semibold">{mpr(p)}</b>
                   </span>
                 </div>
               </div>
@@ -393,8 +394,8 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
             players={playerNames.map((name, p) => ({ name, points: leg.points[p], legs: engine.legsWon[p] }))}
           />
           <div className="hidden grid-cols-2 text-sm tabular-nums text-muted-foreground lg:grid">
-            <span>{t('common.mpr')} <b className="font-semibold text-foreground">{mpr(0)}</b></span>
-            <span className="text-right">{t('common.mpr')} <b className="font-semibold text-foreground">{mpr(1)}</b></span>
+            <span><MprInfo /> <b className="font-semibold text-foreground">{mpr(0)}</b></span>
+            <span className="text-right"><MprInfo /> <b className="font-semibold text-foreground">{mpr(1)}</b></span>
           </div>
 
           {!isViewOnly && isBullupDue && (

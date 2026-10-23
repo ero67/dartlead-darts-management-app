@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ExportMenu } from '../ExportMenu';
 import { EmptyState } from '../shared/EmptyState';
 import { cn } from '@/lib/utils';
+import { MprInfo } from '../cricket/MprInfo';
 
 export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, renderPlayerLink, t }) {
   const playoffsEnabled = tournament?.playoffSettings?.enabled !== false;
@@ -63,7 +64,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                             <TableHead className={num} title={t('management.lost')}>{t('management.lost')}</TableHead>
                             <TableHead className={num}>{t('management.legsWL')}</TableHead>
                             <TableHead className={num}>{t('management.legsDiff')}</TableHead>
-                            <TableHead className={num}>{isCricket ? t('common.mpr') : t('management.avg')}</TableHead>
+                            <TableHead className={num}>{isCricket ? <MprInfo /> : t('management.avg')}</TableHead>
                             <TableHead className={num}>{t('management.pts')}</TableHead>
                           </TableRow>
                         </TableHeader>

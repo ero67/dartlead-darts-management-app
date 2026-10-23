@@ -671,7 +671,13 @@
     "mpr": "MPR",
     "mprLong": "Marks per round",
     "marks": "Marks",
-    "points": "Points"
+    "points": "Points",
+    "mprInfo": {
+      "title": "MPR — marks per round",
+      "body": "Average marks per visit of 3 darts: marks ÷ darts × 3. A single is 1 mark, a double 2, a treble 3; the outer bull is 1 and the bull 2.",
+      "counting": "Only marks that close a number or score points count. The best possible is 9.00 (three trebles every visit).",
+      "scale": "Roughly: 1–1.5 beginner · 2–2.5 good club player · 3+ strong · 4+ top level."
+    }
   },
   "deviceSettings": {
     "title": "Device Settings",

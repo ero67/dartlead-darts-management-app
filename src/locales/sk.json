@@ -671,7 +671,13 @@
     "mpr": "MPR",
     "mprLong": "Zásahy za kolo",
     "marks": "Zásahy",
-    "points": "Body"
+    "points": "Body",
+    "mprInfo": {
+      "title": "MPR — zásahy za kolo",
+      "body": "Priemerný počet zásahov za kolo (3 šípky): zásahy ÷ šípky × 3. Single je 1 zásah, double 2, treble 3; vonkajší bull 1 a bull 2.",
+      "counting": "Počítajú sa len zásahy, ktoré zatvárajú číslo alebo prinášajú body. Maximum je 9,00 (tri treble v každom kole).",
+      "scale": "Orientačne: 1–1,5 začiatočník · 2–2,5 dobrý klubový hráč · 3+ silný hráč · 4+ špička."
+    }
   },
   "deviceSettings": {
     "title": "Nastavenia zariadenia",
