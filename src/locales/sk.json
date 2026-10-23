@@ -494,6 +494,8 @@
     "addScorers": "Pridať zapisovateľov"
   },
   "summary": {
+    "biggestUpset": "Najväčšie prekvapenie",
+    "upsetSubtitle": "{{score}} proti {{loser}}, šanca pred zápasom",
     "tab": "Súhrn",
     "title": "Súhrn Turnaja",
     "finalStandings": "Konečné Poradie",
@@ -913,6 +915,10 @@
     "everyMeeting": "Všetky vzájomné zápasy v sezóne"
   },
   "playerProfile": {
+    "formRating": "Forma",
+    "formChange": "{{delta}} za posledných {{count}} zápasov",
+    "formTrend": "Posledných {{count}} zápasov",
+    "formHint": "Nedávny priemer na 3 šípky, novšie zápasy majú väčšiu váhu. Z neho sa počítajú šance na výhru; pri málo zápasoch sa drží blízko priemeru všetkých hráčov.",
     "title": "Profil hráča",
     "careerStats": "Kariérne štatistiky",
     "tournamentHistory": "História turnajov",
@@ -1042,7 +1048,13 @@
     "noAccessTitle": "Nemôžete sa prihlásiť?",
     "noAccessText": "Ak už nemáte prístup k svojmu prihláseniu, pošlite žiadosť o zmazanie z e-mailovej adresy, ktorou ste sa registrovali; overíme ju a účet zmažeme."
   },
+  "preMatch": {
+    "lastFive": "Posledných 5",
+    "headToHead": "Vzájomne"
+  },
   "tv": {
+    "upsetOfTheNight": "Prekvapenie večera",
+    "upsetChance": "šanca pred zápasom {{pct}}",
     "liveBoards": "Hrá sa",
     "board": "Terč",
     "leg": "Leg",
@@ -1079,6 +1091,8 @@
     "thirdPlace": "Zápas o 3. miesto"
   },
   "matchStats": {
+    "winChance": "Šanca na výhru",
+    "turningPoint": "Zlom zápasu: {{score}} hráča {{name}} v legu {{leg}} ({{from}} % → {{to}} %)",
     "title": "Štatistika zápasu",
     "average": "Priemer na 3 šípky",
     "legs": "Legy",

@@ -10,7 +10,9 @@ const CONTENT = 'text-foreground sm:max-w-md';
 const stay = (e) => e.preventDefault();
 
 // Pre-match "who starts" — cannot be dismissed, the match needs a starter.
-export function StarterDialog({ players, scoringMode, onScoringModeChange, onSelect }) {
+// `children` (optional) sits above the starter buttons: the match screen puts
+// the pre-match card there; practice passes nothing.
+export function StarterDialog({ players, scoringMode, onScoringModeChange, onSelect, children }) {
   const { t } = useLanguage();
   return (
     <Dialog open onOpenChange={() => {}}>
@@ -33,6 +35,7 @@ export function StarterDialog({ players, scoringMode, onScoringModeChange, onSel
             {t('registration.scoringModeTurnTotal')}
           </ToggleGroupItem>
         </ToggleGroup>
+        {children}
         <div className="flex flex-col gap-2">
           {players.map((player, idx) => (
             <Button key={idx} type="button" variant="outline" className="h-16 w-full flex-col gap-0" onClick={() => onSelect(idx)}>

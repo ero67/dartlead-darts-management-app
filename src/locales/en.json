@@ -494,6 +494,8 @@
     "addScorers": "Add scorers"
   },
   "summary": {
+    "biggestUpset": "Biggest upset",
+    "upsetSubtitle": "{{score}} against {{loser}}, chance beforehand",
     "tab": "Summary",
     "title": "Tournament Summary",
     "finalStandings": "Final Standings",
@@ -913,6 +915,10 @@
     "everyMeeting": "Every meeting this season"
   },
   "playerProfile": {
+    "formRating": "Form rating",
+    "formChange": "{{delta}} over the last {{count}} matches",
+    "formTrend": "Last {{count}} matches",
+    "formHint": "Recent 3-dart average, newer matches count more. It drives the win chances and settles toward the field average while there are few matches.",
     "title": "Player Profile",
     "careerStats": "Career Statistics",
     "tournamentHistory": "Tournament History",
@@ -1042,7 +1048,13 @@
     "noAccessTitle": "Can't sign in?",
     "noAccessText": "If you no longer have access to your login, send a deletion request from the email address you registered with and we will verify and delete the account."
   },
+  "preMatch": {
+    "lastFive": "Last 5",
+    "headToHead": "Head to head"
+  },
   "tv": {
+    "upsetOfTheNight": "Upset of the night",
+    "upsetChance": "{{pct}} chance beforehand",
     "liveBoards": "Live boards",
     "board": "Board",
     "leg": "Leg",
@@ -1079,6 +1091,8 @@
     "thirdPlace": "3rd place match"
   },
   "matchStats": {
+    "winChance": "Win chance",
+    "turningPoint": "Turning point: {{name}}’s {{score}} in leg {{leg}} ({{from}}% → {{to}}%)",
     "title": "Match statistics",
     "average": "3-dart average",
     "legs": "Legs",
