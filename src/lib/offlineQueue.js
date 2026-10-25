@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { matchService, tournamentService } from '../services/tournamentService.js';
+import { belongsToOtherUser, isTerminalWriteError, MAX_BLOCKING_ATTEMPTS } from './queuePolicy.js';
 
 // A small, durable queue for Supabase writes that must not be lost on bad WiFi.
 //
@@ -27,6 +28,8 @@ const QUEUE_TYPES = {
 let listeners = new Set();
 let flushing = false;
 let initialized = false;
+// Signed-in user, stamped on each item so it is never replayed under another account.
+let currentUserId = null;
 
 function readQueue() {
   try {
@@ -77,8 +80,11 @@ function makeItemId() {
  * @param {object} payload the data needed to perform the write
  * @param {string} dedupeKey replace any existing queued item with this key
  *   (last-write-wins). E.g. `result:<matchId>`, `live:<matchId>`.
+ * @param {{flush?: boolean}} options flush: false when the caller is about to
+ *   try the write itself and only wants it kept in case that never finishes.
+ * @returns {string|undefined} the item id, for removeWrite
  */
-export function enqueueWrite(type, payload, dedupeKey) {
+export function enqueueWrite(type, payload, dedupeKey, { flush = true } = {}) {
   if (!QUEUE_TYPES[type]) {
     console.error('enqueueWrite: unknown type', type);
     return;
@@ -89,6 +95,7 @@ export function enqueueWrite(type, payload, dedupeKey) {
     type,
     payload,
     dedupeKey: dedupeKey || null,
+    userId: currentUserId,
     attempts: 0,
     createdAt: new Date().toISOString()
   };
@@ -104,7 +111,14 @@ export function enqueueWrite(type, payload, dedupeKey) {
   writeQueue(next);
 
   // Try to flush right away (no-op if offline / already flushing)
-  flushQueue();
+  if (flush) flushQueue();
+  return item.id;
+}
+
+// Drop a queued item once its write went through by another path.
+export function removeWrite(id) {
+  if (!id) return;
+  writeQueue(readQueue().filter(q => q.id !== id));
 }
 
 export function hasPending() {
@@ -114,9 +128,12 @@ export function hasPending() {
 // Pending writes that change what a tournament refetch would show (results,
 // bracket advances). Live score snapshots are not among them: one stuck on bad
 // WiFi used to block every silent refresh of the tournament for as long as it
-// kept failing.
+// kept failing. The same goes for a result that keeps failing, or one queued
+// by another account: neither will reach the server from here any time soon.
 export function hasPendingResults() {
-  return readQueue().some(q => q.type !== QUEUE_TYPES.liveSync && q.type !== QUEUE_TYPES.startLiveMatch);
+  return readQueue().some(q =>
+    q.type !== QUEUE_TYPES.liveSync && q.type !== QUEUE_TYPES.startLiveMatch &&
+    (q.attempts || 0) < MAX_BLOCKING_ATTEMPTS && !belongsToOtherUser(q, currentUserId));
 }
 
 export function getQueueLength() {
@@ -141,9 +158,16 @@ export function subscribe(callback) {
 // item stays in the queue for retry.
 async function performWrite(item) {
   switch (item.type) {
-    case QUEUE_TYPES.saveMatchResult:
-      await matchService.saveMatchResult(item.payload);
+    case QUEUE_TYPES.saveMatchResult: {
+      const saved = await matchService.saveMatchResult(item.payload);
+      // Another device finished this match with a different winner: the
+      // bracket must follow that result, so drop our pending advance too.
+      if (saved?.conflict) {
+        const advanceKey = `advance:${item.payload.matchId}`;
+        writeQueue(readQueue().filter(q => q.dedupeKey !== advanceKey));
+      }
       return;
+    }
 
     case QUEUE_TYPES.startLiveMatch: {
       const { matchId, deviceId, deviceName, boardNumber } = item.payload;
@@ -207,25 +231,36 @@ export async function flushQueue() {
 
   flushing = true;
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id || null;
     // Process oldest-first; stop early on the first failure to preserve order
     // (a failure usually means we're offline again).
     for (const item of queue) {
+      // Removed meanwhile (written inline, or dropped with a conflicting save).
+      if (!readQueue().some(q => q.id === item.id)) continue;
+      if (belongsToOtherUser(item, userId)) continue;
       try {
         await performWrite(item);
         // Remove this item on success
         queue = readQueue().filter(q => q.id !== item.id);
         writeQueue(queue);
       } catch (error) {
-        // Bump attempt count and keep the item; stop the run.
-        const current = readQueue();
-        const updated = current.map(q =>
-          q.id === item.id ? { ...q, attempts: (q.attempts || 0) + 1 } : q
-        );
-        writeQueue(updated);
+        if (isTerminalWriteError(error)) {
+          // Row gone or access lost: retrying can never succeed.
+          writeQueue(readQueue().filter(q => q.id !== item.id));
+          console.warn(`Offline queue: dropped write that can never succeed (type=${item.type}).`, error?.code || error?.message);
+          continue;
+        }
+        // Bump attempt count and keep the item.
+        const attempts = (item.attempts || 0) + 1;
+        writeQueue(readQueue().map(q => (q.id === item.id ? { ...q, attempts } : q)));
         console.warn(
-          `Offline queue: write failed (type=${item.type}, attempts=${(item.attempts || 0) + 1}), will retry.`,
+          `Offline queue: write failed (type=${item.type}, attempts=${attempts}), will retry.`,
           error?.message || error
         );
+        // A long-failing item stops blocking the rest; anything else stops the
+        // run (usually we are offline again).
+        if (attempts >= MAX_BLOCKING_ATTEMPTS) continue;
         break;
       }
     }
@@ -241,6 +276,10 @@ export async function flushQueue() {
 export function initOfflineQueue() {
   if (initialized || typeof window === 'undefined') return;
   initialized = true;
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    currentUserId = session?.user?.id || null;
+  });
 
   window.addEventListener('online', () => {
     flushQueue();

@@ -5,7 +5,8 @@
     "pendingCount": "{{count}} zmena(y) čaká na synchronizáciu",
     "backOnline": "Späť online — synchronizujem",
     "updateAvailable": "Nová verzia je pripravená — načíta sa po odchode zo zápasu",
-    "waitingForConnection": "Čaká sa na pripojenie"
+    "waitingForConnection": "Čaká sa na pripojenie",
+    "resultConflict": "Tento zápas už bol ukončený na inom zariadení s iným víťazom. Platí ten výsledok; váš sa neuložil."
   },
   "navigation": {
     "home": "Domov",
