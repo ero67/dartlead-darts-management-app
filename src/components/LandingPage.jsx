@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Check, CheckCircle2, Mail, Shield, Trophy, Activity, BarChart3, Users, Target } from 'lucide-react';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo-256.webp';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

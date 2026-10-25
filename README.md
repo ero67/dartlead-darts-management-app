@@ -199,7 +199,6 @@ src/
 - **Tournament CRUD**:
   - `createTournament()`: Create tournament with players, groups, matches
   - `getTournament()`: Load single tournament with all data
-  - `getTournaments()`: Load all tournaments
   - `updateTournamentSettings()`: Update tournament configuration
   - `deleteTournament()`: Delete tournament
 - **Group Standings**:

@@ -936,15 +936,22 @@ export function TournamentProvider({ children }) {
   // Refresh when the app comes back to the foreground or regains network —
   // the moments a device that sat idle through other boards' results needs it.
   useEffect(() => {
+    // The list RPC aggregates whole tables, so a quick glance away (e.g. from
+    // the scoring screen) within a minute of the last list load skips it.
+    let listLoadedAt = 0;
+    const reloadListThrottled = async () => {
+      if (Date.now() - listLoadedAt < 60_000) return;
+      if (await reloadTournaments()) listLoadedAt = Date.now();
+    };
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         refreshCurrentTournament();
-        reloadTournaments();
+        reloadListThrottled();
       }
     };
     const handleOnline = () => {
       refreshCurrentTournament();
-      reloadTournaments();
+      reloadListThrottled();
     };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('online', handleOnline);

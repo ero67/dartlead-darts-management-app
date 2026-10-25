@@ -9,7 +9,7 @@ import { deliverFile, exportFileName } from '../lib/exportShare';
 import { tournamentToPngBlob, imageLabels } from '../lib/tournamentImage';
 import { isValidLegDartCount, cricketPlayerRecords } from '../utils/dartStats';
 import { isCricketGame } from '../lib/cricket';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo-128.webp';
 import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
 import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
 

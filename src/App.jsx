@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -19,18 +19,12 @@ import { OfflineProvider } from './contexts/OfflineContext';
 import { Navigation, MobileHeader } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { TournamentsList } from './components/TournamentsList';
-import { TournamentCreation } from './components/TournamentCreation';
-import { TournamentManagement } from './components/TournamentManagement';
 import { TournamentRegistration } from './components/TournamentRegistration';
 import { MatchInterface } from './components/MatchInterface';
 import { CricketMatchInterface } from './components/CricketMatchInterface';
 import { LeaguesList } from './components/LeaguesList';
-import { LeagueDetail } from './components/LeagueDetail';
-import { LeagueCreation } from './components/LeagueCreation';
 import { Auth } from './components/Auth';
 import { PrivacyPolicy } from './components/PrivacyPolicy';
-import { AdminPanel } from './components/AdminPanel';
-import { ManagerPanel } from './components/ManagerPanel';
 import { LandingPage } from './components/LandingPage';
 import { PlayerProfile } from './components/PlayerProfile';
 import { OfflineBanner } from './components/OfflineBanner';
@@ -39,14 +33,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { NotFound } from './components/NotFound';
 import { ResetPassword } from './components/ResetPassword';
 import { DeleteAccountInfo } from './components/DeleteAccountInfo';
-import { TvDisplay } from './components/TvDisplay';
-import { PracticeHome } from './components/practice/PracticeHome';
-import { PracticeX01 } from './components/practice/PracticeX01';
-import { PracticeHistory } from './components/practice/PracticeHistory';
-import { PracticeCheckout } from './components/practice/PracticeCheckout';
-import { PracticeOneTwentyOne } from './components/practice/PracticeOneTwentyOne';
-import { PracticeAroundTheClock } from './components/practice/PracticeAroundTheClock';
-import { PracticeCricket } from './components/practice/PracticeCricket';
 import { AccountDeletion } from './components/AccountDeletion';
 import { useLanguage } from './contexts/LanguageContext';
 import { tournamentService } from './services/tournamentService';
@@ -57,6 +43,22 @@ import { DisplayNameEditor } from './components/DisplayNameEditor';
 import { PracticeBests } from './components/practice/PracticeBests';
 import { loadHistory } from './lib/practiceStorage';
 import { toast } from 'sonner';
+
+// Heavy or role-only screens load on first visit (named exports, so map to default).
+const TournamentCreation = lazy(() => import('./components/TournamentCreation').then(m => ({ default: m.TournamentCreation })));
+const TournamentManagement = lazy(() => import('./components/TournamentManagement').then(m => ({ default: m.TournamentManagement })));
+const LeagueDetail = lazy(() => import('./components/LeagueDetail').then(m => ({ default: m.LeagueDetail })));
+const LeagueCreation = lazy(() => import('./components/LeagueCreation').then(m => ({ default: m.LeagueCreation })));
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const ManagerPanel = lazy(() => import('./components/ManagerPanel').then(m => ({ default: m.ManagerPanel })));
+const TvDisplay = lazy(() => import('./components/TvDisplay').then(m => ({ default: m.TvDisplay })));
+const PracticeHome = lazy(() => import('./components/practice/PracticeHome').then(m => ({ default: m.PracticeHome })));
+const PracticeX01 = lazy(() => import('./components/practice/PracticeX01').then(m => ({ default: m.PracticeX01 })));
+const PracticeHistory = lazy(() => import('./components/practice/PracticeHistory').then(m => ({ default: m.PracticeHistory })));
+const PracticeCheckout = lazy(() => import('./components/practice/PracticeCheckout').then(m => ({ default: m.PracticeCheckout })));
+const PracticeOneTwentyOne = lazy(() => import('./components/practice/PracticeOneTwentyOne').then(m => ({ default: m.PracticeOneTwentyOne })));
+const PracticeAroundTheClock = lazy(() => import('./components/practice/PracticeAroundTheClock').then(m => ({ default: m.PracticeAroundTheClock })));
+const PracticeCricket = lazy(() => import('./components/practice/PracticeCricket').then(m => ({ default: m.PracticeCricket })));
 
 // Shown when a signed-in user has no player record yet (they have never been
 // approved into a tournament, so there are no stats to display).
@@ -490,9 +492,11 @@ function AppContent() {
   // TV / wall display: no navigation, no app chrome, its own palette.
   if (location.pathname.startsWith('/tv/')) {
     return (
-      <Routes>
-        <Route path="/tv/:id" element={<TvDisplay />} />
-      </Routes>
+      <Suspense fallback={<LoadingState />}>
+        <Routes>
+          <Route path="/tv/:id" element={<TvDisplay />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -526,6 +530,7 @@ function AppContent() {
       {!location.pathname.startsWith('/match/') && <MobileHeader />}
 
       <main className="flex min-w-0 flex-1 flex-col">
+        <Suspense fallback={<LoadingState />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/dashboard" element={
@@ -623,6 +628,7 @@ function AppContent() {
           } />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
       </main>
       </SidebarInset>
     </SidebarProvider>

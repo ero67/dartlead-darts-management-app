@@ -18,7 +18,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DeviceSettings } from './DeviceSettings';
-import logoIcon from '../assets/logo-icon.png';
+import logoIcon from '../assets/logo-icon-128.webp';
 import { getUserDisplayName, getUserInitials } from '../utils/userDisplayName';
 
 // Phone/tablet drawer rows: bigger text, icons and touch targets. Desktop

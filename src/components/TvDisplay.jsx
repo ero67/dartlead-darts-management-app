@@ -90,14 +90,16 @@ export function TvDisplay() {
   const [bracketScale, setBracketScale] = useState(MAX_BRACKET_SCALE);
   const rootRef = useRef(null);
   const bracketBoxRef = useRef(null);
+  const liveIdsRef = useRef(new Set());
 
   const load = useCallback(async () => {
     try {
       const [full, live] = await Promise.all([
         tournamentService.getTournament(id),
-        matchService.getLiveMatches().catch(() => [])
+        matchService.getLiveMatches({ tournamentId: id }).catch(() => [])
       ]);
-      const liveNow = (live || []).filter((m) => m.tournament_id === id && m.status !== 'completed');
+      const liveNow = (live || []).filter((m) => m.status !== 'completed');
+      liveIdsRef.current = new Set(liveNow.map((m) => m.id));
       // Realtime + polling refetch every few seconds during a match. Keep the
       // previous object when nothing changed so memos, the bracket layout and
       // its scroll position survive the refresh.
@@ -118,9 +120,20 @@ export function TvDisplay() {
       if (timer) clearTimeout(timer);
       timer = setTimeout(load, 500);
     };
+    // A turn on a board already shown only changes that row: patch it in place.
+    // Anything else (new live match, completion, released board) can move
+    // standings or the bracket, so it reloads the tournament.
+    const onMatchChange = (payload) => {
+      const row = payload.new;
+      if (payload.eventType === 'UPDATE' && row?.status === 'in_progress' && row.live_device_id && liveIdsRef.current.has(row.id)) {
+        setLiveMatches((prev) => prev.map((m) => (m.id === row.id ? { ...m, ...row } : m)));
+        return;
+      }
+      schedule();
+    };
     const channel = supabase
       .channel(`tv-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${id}` }, schedule)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `tournament_id=eq.${id}` }, onMatchChange)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${id}` }, schedule)
       .subscribe();
     const poll = setInterval(load, POLL_MS);
