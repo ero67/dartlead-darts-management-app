@@ -17,6 +17,21 @@ const getCheckoutValue = (checkout) => {
   }, 0);
 };
 
+// Find-or-create the player row for a league member on the server: looks in
+// the league first (case-insensitive), so a co-manager reuses the owner's row
+// instead of creating a duplicate in their own roster. Links the account when
+// userId is given; throws PLAYER_NAME_TAKEN when the name belongs to another
+// account.
+const resolveLeaguePlayer = async (leagueId, name, userId = null) => {
+  const { data, error } = await supabase.rpc('league_member_player', {
+    l_id: leagueId,
+    p_name: name,
+    p_user_id: userId
+  });
+  if (error) throw new Error(error.message);
+  return data;
+};
+
 export const leagueService = {
   // Create a new league
   async createLeague(leagueData) {
@@ -204,11 +219,6 @@ export const leagueService = {
       // players can be array of player IDs or array of player objects with id
       const playerIds = players.map(p => typeof p === 'string' ? p : p.id);
 
-      // Players are scoped per manager (owner_id); lookups and inserts must
-      // stay inside the caller's roster.
-      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
-      if (currentUserError) throw currentUserError;
-
       // Check if players exist, create if needed
       const membersToAdd = [];
       for (const player of players) {
@@ -218,31 +228,7 @@ export const leagueService = {
         } else if (player.id) {
           playerId = player.id;
         } else if (player.name) {
-          // Find or create the player. Trim first: players.name is unique per
-          // owner and matched exactly, so " Erik" would otherwise become a
-          // second profile.
-          const name = player.name.trim();
-          const { data: existingPlayer } = await supabase
-            .from('players')
-            .select('id')
-            .eq('name', name)
-            .eq('owner_id', currentUser.id)
-            .maybeSingle();
-
-          if (existingPlayer) {
-            playerId = existingPlayer.id;
-          } else {
-            playerId = generateId();
-            const { error: playerError } = await supabase
-              .from('players')
-              .insert({
-                id: playerId,
-                name,
-                owner_id: currentUser.id
-              });
-
-            if (playerError) throw playerError;
-          }
+          playerId = await resolveLeaguePlayer(leagueId, player.name);
         } else {
           continue; // Skip invalid player data
         }
@@ -2009,48 +1995,7 @@ export const leagueService = {
       // user who already has a player row (from a tournament or another league)
       // cannot get a second one. Reusing it also keeps their career stats on a
       // single profile as they move between leagues and tournaments.
-      let playerId;
-      const { data: linkedPlayer } = await supabase
-        .from('players')
-        .select('id')
-        .eq('user_id', reg.user_id)
-        .maybeSingle();
-
-      if (linkedPlayer) {
-        playerId = linkedPlayer.id;
-      } else {
-        // players.name is unique per owner: an existing row in the approving
-        // manager's roster is either an unlinked manual player (claim it) or
-        // somebody else's account (reject).
-        const { data: playerByName } = await supabase
-          .from('players')
-          .select('id, user_id')
-          .eq('name', reg.player_name)
-          .eq('owner_id', user.id)
-          .maybeSingle();
-
-        if (playerByName) {
-          if (playerByName.user_id && playerByName.user_id !== reg.user_id) {
-            throw new Error('PLAYER_NAME_TAKEN');
-          }
-          playerId = playerByName.id;
-          if (!playerByName.user_id) {
-            const { error: linkError } = await supabase
-              .from('players')
-              .update({ user_id: reg.user_id })
-              .eq('id', playerId);
-            if (linkError) throw linkError;
-          }
-        } else {
-          const { data: newPlayer, error: createError } = await supabase
-            .from('players')
-            .insert({ name: reg.player_name, user_id: reg.user_id, owner_id: user.id })
-            .select('id')
-            .single();
-          if (createError) throw createError;
-          playerId = newPlayer.id;
-        }
-      }
+      const playerId = await resolveLeaguePlayer(reg.league_id, reg.player_name, reg.user_id);
 
       // Add to league_members. No explicit id: on conflict the update must not
       // try to rewrite the existing row's PK. left_at: null so a returning
@@ -2127,40 +2072,7 @@ export const leagueService = {
 
   async addUserToLeague(leagueId, userId, playerName) {
     try {
-      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
-      if (currentUserError) throw currentUserError;
-
-      // Find or create player linked to user
-      let { data: existingPlayer } = await supabase
-        .from('players')
-        .select('id, user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (!existingPlayer) {
-        // Try by name within the caller's roster (players are owner-scoped)
-        const { data: byName } = await supabase
-          .from('players')
-          .select('id, user_id')
-          .eq('name', playerName)
-          .eq('owner_id', currentUser.id)
-          .maybeSingle();
-
-        if (byName) {
-          existingPlayer = byName;
-          if (!byName.user_id) {
-            await supabase.from('players').update({ user_id: userId }).eq('id', byName.id);
-          }
-        } else {
-          const { data: newPlayer, error } = await supabase
-            .from('players')
-            .insert({ name: playerName, user_id: userId, owner_id: currentUser.id })
-            .select('id')
-            .single();
-          if (error) throw error;
-          existingPlayer = newPlayer;
-        }
-      }
+      const existingPlayer = { id: await resolveLeaguePlayer(leagueId, playerName, userId) };
 
       const { error: memberError } = await supabase.from('league_members').upsert({
         league_id: leagueId,

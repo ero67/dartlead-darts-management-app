@@ -112,7 +112,7 @@ RESET ROLE;
 
 SELECT pg_temp.act_as('00000000-0000-0000-0000-0000000000a1');
 SET LOCAL ROLE authenticated;
-DO $$ BEGIN
+DO $$ DECLARE pid uuid; BEGIN
   ASSERT (SELECT count(*) FROM public.tournament_registrations) = 0, 'other manager sees registrations';
 -- M1: short and wildcard terms return nothing; role hidden from managers.
   ASSERT (SELECT count(*) FROM public.search_users('')) = 0, 'empty search lists users';
@@ -120,6 +120,12 @@ DO $$ BEGIN
   ASSERT (SELECT role FROM public.search_users('victim@test') LIMIT 1) IS NULL, 'role leaked to manager';
 -- M18: a case-insensitive name already in the league is reused.
   ASSERT public.league_member_player('10000000-0000-0000-0000-000000000001', ' anna ') = 'a0000000-0000-0000-0000-000000000001', 'duplicate player created';
+  pid := public.league_member_player('10000000-0000-0000-0000-000000000001', 'Newcomer');
+  ASSERT (SELECT owner_id FROM public.players WHERE id = pid) = '00000000-0000-0000-0000-0000000000a1', 'new player not created in caller roster';
+  pid := public.league_member_player('10000000-0000-0000-0000-000000000001', 'ANNA', '00000000-0000-0000-0000-0000000000c1');
+  ASSERT (SELECT user_id FROM public.players WHERE id = pid) = '00000000-0000-0000-0000-0000000000c1', 'account not linked to existing member';
+  ASSERT pg_temp.raises($q$SELECT public.league_member_player('10000000-0000-0000-0000-000000000001', 'Anna', '00000000-0000-0000-0000-0000000000d1')$q$), 'name of another account reused';
+  ASSERT pg_temp.raises($q$SELECT public.league_member_player('10000000-0000-0000-0000-000000000002', 'Anna')$q$), 'foreign league allowed';
 END $$;
 RESET ROLE;
 

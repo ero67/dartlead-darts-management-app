@@ -840,3 +840,6 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_match_player_stats_player_id ON public.match_player_stats (player_id);
 CREATE INDEX IF NOT EXISTS idx_matches_player1_completed ON public.matches (player1_id, completed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_matches_player2_completed ON public.matches (player2_id, completed_at DESC);
+
+-- M12: X01 now also keeps its in-progress state here (leg scores, visit log).
+COMMENT ON COLUMN public.matches.live_state IS 'In-progress match state: Cricket marks/points/visit/totals, or X01 legScores/visitLog; null when not live';
