@@ -19,6 +19,7 @@ export function LanguageProvider({ children }) {
   // Save language preference to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('language', language);
+    document.documentElement.lang = language;
   }, [language]);
 
   // Helper function to get nested translation

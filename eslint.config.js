@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'android/app/src/main/assets/public']),
+  globalIgnores(['dist', 'android/app/src/main/assets/public', '.claude']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -25,6 +25,16 @@ export default defineConfig([
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
+  },
+  {
+    // Cypress specs run in the browser with Mocha/Chai and Cypress globals;
+    // config and scripts run in Node.
+    files: ['cypress/**/*.js'],
+    languageOptions: { globals: { ...globals.mocha, cy: 'readonly', Cypress: 'readonly', expect: 'readonly', assert: 'readonly' } },
+  },
+  {
+    files: ['cypress.config.js', 'scripts/**/*.{js,mjs}'],
+    languageOptions: { globals: globals.node },
   },
   {
     // shadcn/ui files export cva variants next to their components
