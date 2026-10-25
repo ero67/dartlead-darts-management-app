@@ -222,6 +222,7 @@
     "failedToRemovePlayer": "Failed to remove player. Please try again.",
     "cannotRemovePlayerAfterStart": "Cannot remove players after tournament has started",
     "needsAtLeast2Players": "Tournament needs at least 2 players to start",
+    "groupNeedsTwoPlayers": "Every group needs at least 2 players. Move a player into the one-player group.",
     "failedToStartTournament": "Failed to start tournament. Please try again.",
     "settingsUpdatedSuccessfully": "Tournament settings updated successfully!",
     "failedToUpdateSettings": "Failed to update settings. Please try again.",

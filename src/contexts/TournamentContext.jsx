@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase.js';
 import { enqueueWrite, removeWrite, hasPendingResults, flushQueue, QUEUE_TYPES } from '../lib/offlineQueue.js';
 import { isTerminalWriteError } from '../lib/queuePolicy.js';
 import { isCricketGame } from '../lib/cricket.js';
+import { sortStandings } from '../utils/standings.js';
 
 
 const TournamentContext = createContext();
@@ -508,8 +509,7 @@ function updateGroupStandings(group, tournament = null) {
         totalScore: 0,
         dartsThrown: 0,
         average: 0,
-        points: 0,
-        headToHeadWins: {} // Track head-to-head wins against each opponent
+        points: 0
       };
     }
   });
@@ -533,20 +533,10 @@ function updateGroupStandings(group, tournament = null) {
         p1Stats.matchesWon++;
         p2Stats.matchesLost++;
         p1Stats.points += 3;
-        // Track head-to-head
-        if (!p1Stats.headToHeadWins[player2.id]) {
-          p1Stats.headToHeadWins[player2.id] = 0;
-        }
-        p1Stats.headToHeadWins[player2.id]++;
       } else {
         p2Stats.matchesWon++;
         p1Stats.matchesLost++;
         p2Stats.points += 3;
-        // Track head-to-head
-        if (!p2Stats.headToHeadWins[player1.id]) {
-          p2Stats.headToHeadWins[player1.id] = 0;
-        }
-        p2Stats.headToHeadWins[player1.id]++;
       }
       
       p1Stats.legsWon += result.player1Legs || 0;
@@ -579,48 +569,7 @@ function updateGroupStandings(group, tournament = null) {
     }
   });
 
-  // Get criteria order from tournament settings or use default
-  const criteriaOrder = tournament?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-  console.log('updateGroupStandings - tournament?.standingsCriteriaOrder:', tournament?.standingsCriteriaOrder);
-  console.log('updateGroupStandings - Using criteriaOrder:', criteriaOrder);
-  
-  // Sort standings according to criteria order
-  group.standings = Object.values(standings).sort((a, b) => {
-    for (const criterion of criteriaOrder) {
-      let comparison = 0;
-      
-      switch (criterion) {
-        case 'matchesWon':
-          comparison = b.matchesWon - a.matchesWon;
-          break;
-        case 'legDifference':
-          const legDiffA = a.legsWon - a.legsLost;
-          const legDiffB = b.legsWon - b.legsLost;
-          comparison = legDiffB - legDiffA;
-          break;
-        case 'average':
-          comparison = (b.average || 0) - (a.average || 0);
-          break;
-        case 'headToHead':
-          // Compare head-to-head: if players played each other, check who won more matches
-          const aWinsVsB = a.headToHeadWins[b.player.id] || 0;
-          const bWinsVsA = b.headToHeadWins[a.player.id] || 0;
-          comparison = bWinsVsA - aWinsVsB;
-          break;
-        default:
-          comparison = 0;
-      }
-      
-      // If this criterion shows a difference, return the comparison
-      if (comparison !== 0) {
-        return comparison;
-      }
-      // Otherwise, continue to next criterion
-    }
-    
-    // If all criteria are equal, maintain current order (stable sort)
-    return 0;
-  });
+  group.standings = sortStandings(Object.values(standings), tournament?.standingsCriteriaOrder, group.matches);
 }
 
 // Context Provider

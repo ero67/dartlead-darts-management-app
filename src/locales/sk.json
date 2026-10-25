@@ -222,6 +222,7 @@
     "failedToRemovePlayer": "Nepodarilo sa odstrániť hráča. Skúste to prosím znova.",
     "cannotRemovePlayerAfterStart": "Nie je možné odstrániť hráčov po spustení turnaja",
     "needsAtLeast2Players": "Turnaj potrebuje aspoň 2 hráčov na spustenie",
+    "groupNeedsTwoPlayers": "Každá skupina potrebuje aspoň 2 hráčov. Presuňte hráča do skupiny s jedným hráčom.",
     "failedToStartTournament": "Nepodarilo sa spustiť turnaj. Skúste to prosím znova.",
     "settingsUpdatedSuccessfully": "Nastavenia turnaja boli úspešne aktualizované!",
     "failedToUpdateSettings": "Nepodarilo sa aktualizovať nastavenia. Skúste to prosím znova.",

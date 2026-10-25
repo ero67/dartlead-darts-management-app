@@ -1,5 +1,6 @@
 import { supabase, generateId } from '../lib/supabase.js'
 import { isCricketGame } from '../lib/cricket.js'
+import { sortStandings } from '../utils/standings.js'
 
 // Group matches in their intended play order. The DB rows carry match_order
 // (migration 20260910190000); rows from before it fall back to insert order.
@@ -38,8 +39,7 @@ function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') 
       totalScore: 0,
       dartsThrown: 0,
       average: 0,
-      points: 0,
-      headToHeadWins: {} // Track head-to-head wins against each opponent
+      points: 0
     });
   });
 
@@ -65,20 +65,10 @@ function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') 
           p1Stats.matchesWon++;
           p1Stats.points += 3;
           p2Stats.matchesLost++;
-          // Track head-to-head
-          if (!p1Stats.headToHeadWins[match.player2?.id]) {
-            p1Stats.headToHeadWins[match.player2?.id] = 0;
-          }
-          p1Stats.headToHeadWins[match.player2?.id]++;
         } else if (match.result.winner === match.player2?.id) {
           p2Stats.matchesWon++;
           p2Stats.points += 3;
           p1Stats.matchesLost++;
-          // Track head-to-head
-          if (!p2Stats.headToHeadWins[match.player1?.id]) {
-            p2Stats.headToHeadWins[match.player1?.id] = 0;
-          }
-          p2Stats.headToHeadWins[match.player1?.id]++;
         }
         
         // Accumulate totalScore and totalDarts for cumulative average calculation
@@ -107,51 +97,7 @@ function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') 
     }
   });
 
-  // Convert to array
-  const standings = Array.from(playerStats.values());
-
-  // Use provided criteria order or default
-  const order = criteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-  
-  // Sort standings according to criteria order
-  standings.sort((a, b) => {
-    for (const criterion of order) {
-      let comparison = 0;
-      
-      switch (criterion) {
-        case 'matchesWon':
-          comparison = b.matchesWon - a.matchesWon;
-          break;
-        case 'legDifference':
-          const legDiffA = a.legsWon - a.legsLost;
-          const legDiffB = b.legsWon - b.legsLost;
-          comparison = legDiffB - legDiffA;
-          break;
-        case 'average':
-          comparison = (b.average || 0) - (a.average || 0);
-          break;
-        case 'headToHead':
-          // Compare head-to-head: if players played each other, check who won more matches
-          const aWinsVsB = a.headToHeadWins[b.player.id] || 0;
-          const bWinsVsA = b.headToHeadWins[a.player.id] || 0;
-          comparison = bWinsVsA - aWinsVsB;
-          break;
-        default:
-          comparison = 0;
-      }
-      
-      // If this criterion shows a difference, return the comparison
-      if (comparison !== 0) {
-        return comparison;
-      }
-      // Otherwise, continue to next criterion
-    }
-    
-    // If all criteria are equal, maintain current order (stable sort)
-    return 0;
-  });
-
-  return standings;
+  return sortStandings(Array.from(playerStats.values()), criteriaOrder, group.matches);
 }
 
 // Tournament Operations
@@ -805,10 +751,30 @@ export const tournamentService = {
       if (groupsCheckError) throw groupsCheckError;
       
       if (existingGroups && existingGroups.length > 0) {
-        console.warn('Groups already exist for this tournament. Skipping group creation.');
-        // Return the existing tournament data instead of creating duplicates
-        const completeTournament = await this.getTournament(tournamentId);
-        return completeTournament;
+        // Admin Panel can set a played tournament back to registration: never
+        // drop groups once any match has been started.
+        const { data: playedMatches, error: playedError } = await supabase
+          .from('matches')
+          .select('id')
+          .eq('tournament_id', tournamentId)
+          .neq('status', 'pending')
+          .limit(1);
+        if (playedError) throw playedError;
+        if (tournament.status !== 'open_for_registration' || playedMatches.length > 0) {
+          console.warn('Groups already exist for this tournament. Skipping group creation.');
+          // Return the existing tournament data instead of creating duplicates
+          const completeTournament = await this.getTournament(tournamentId);
+          return completeTournament;
+        }
+        // Leftovers of a start that failed halfway (the writes below are not one
+        // transaction): drop them so the retry starts clean. group_players and
+        // matches go with them (ON DELETE CASCADE).
+        // shortcut: two devices pressing Start at once can still race; move to a start_tournament RPC if that shows up.
+        const { error: cleanupError } = await supabase
+          .from('groups')
+          .delete()
+          .eq('tournament_id', tournamentId);
+        if (cleanupError) throw cleanupError;
       }
 
       // Get all players for this tournament
@@ -849,6 +815,11 @@ export const tournamentService = {
       if (hasCustomGroups && assignedPlayerIds.size !== players.length) {
         console.warn('Custom group assignment did not include all players; falling back to auto-generation.');
         groups = this.generateGroups(players, groupSettings);
+      }
+
+      // A one-player group has no matches and would qualify without playing.
+      if (groups.some(g => g.players.length < 2)) {
+        throw new Error('Every group needs at least 2 players');
       }
       
       // Batch insert all groups
@@ -919,12 +890,14 @@ export const tournamentService = {
     let groupCount;
     let playersPerGroup;
 
+    // Never build a group of one: it has no matches and would qualify for free.
     if (settings.type === 'groups') {
       groupCount = Math.max(1, Number(settings.value) || 1);
-      groupCount = Math.min(groupCount, players.length);
+      groupCount = Math.max(1, Math.min(groupCount, Math.floor(players.length / 2)));
     } else {
-      playersPerGroup = settings.value;
-      groupCount = Math.ceil(players.length / playersPerGroup);
+      playersPerGroup = Math.max(2, Number(settings.value) || 2);
+      // A trailing remainder of 1 joins the last full group instead.
+      groupCount = Math.max(1, Math.floor(players.length / playersPerGroup) + (players.length % playersPerGroup > 1 ? 1 : 0));
     }
 
     const seededSet = seededPlayerIds instanceof Set ? seededPlayerIds : new Set(seededPlayerIds);
@@ -945,10 +918,9 @@ export const tournamentService = {
         groupSizes[i] = baseSize + (i < extra ? 1 : 0);
       }
     } else {
-      playersPerGroup = Math.max(1, Number(playersPerGroup) || 1);
       for (let i = 0; i < groupCount; i++) {
         const remaining = players.length - i * playersPerGroup;
-        groupSizes[i] = Math.min(playersPerGroup, remaining);
+        groupSizes[i] = i === groupCount - 1 ? remaining : Math.min(playersPerGroup, remaining);
       }
     }
 
@@ -1303,6 +1275,16 @@ export const tournamentService = {
       if (regError) throw regError;
       if (reg.status !== 'pending') throw new Error('Registration already processed');
 
+      // A stale screen could otherwise add a player to a started tournament,
+      // where they have no group and no matches.
+      const { data: regTournament, error: regTournamentError } = await supabase
+        .from('tournaments')
+        .select('status')
+        .eq('id', reg.tournament_id)
+        .single();
+      if (regTournamentError) throw regTournamentError;
+      if (regTournament.status !== 'open_for_registration') throw new Error('REGISTRATION_CLOSED');
+
       // Resolve the player row for this registration.
       //
       // Look up by account link FIRST, by name second. players.user_id has a
@@ -1452,6 +1434,21 @@ export const tournamentService = {
       return data === true;
     } catch (error) {
       console.error('Error checking scoring permission:', error);
+      return null;
+    }
+  },
+
+  // Whether the current user manages this tournament: owner, the linked
+  // league's creator or co-managers, or admin (can_manage_tournament in the DB).
+  async canManage(tournamentId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return false;
+      const { data, error } = await supabase.rpc('can_manage_tournament', { t_id: tournamentId });
+      if (error) throw error;
+      return data === true;
+    } catch (error) {
+      console.error('Error checking manage permission:', error);
       return null;
     }
   },
@@ -1930,10 +1927,10 @@ export const tournamentService = {
     try {
       console.log('Attempting to soft delete tournament:', tournamentId);
       
-      // First, check if tournament exists and get user info
+      // First, check the tournament exists
       const { data: existingTournament, error: checkError } = await supabase
         .from('tournaments')
-        .select('id, name, deleted, user_id')
+        .select('id')
         .eq('id', tournamentId)
         .maybeSingle();
 
@@ -1947,22 +1944,11 @@ export const tournamentService = {
         throw new Error(`Tournament not found with ID: ${tournamentId}`);
       }
 
-      console.log('Tournament found:', existingTournament);
-
-      // Check current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error('Error getting current user:', userError);
-      }
-      console.log('Current user ID:', user?.id);
-      console.log('Tournament user_id:', existingTournament.user_id);
-      
-      // Roles live in app_metadata only (user_metadata is user-editable)
-      const isAdmin = user?.app_metadata?.role === 'admin';
-      
-      // Allow deletion if user is admin OR if user owns the tournament
-      if (user && existingTournament.user_id && user.id !== existingTournament.user_id && !isAdmin) {
-        throw new Error(`Permission denied: You can only delete tournaments you created. Tournament belongs to user ${existingTournament.user_id}, but you are ${user.id}`);
+      // Same rule as the DB (owner, league creator/co-managers, admin). Keep it:
+      // the soft delete runs through the scorer UPDATE policy, so RLS alone
+      // would let plain scorers delete.
+      if (await this.canManage(tournamentId) !== true) {
+        throw new Error('Permission denied: you cannot delete this tournament.');
       }
 
       // Soft delete: set deleted = true instead of actually deleting
@@ -2019,7 +2005,6 @@ export const tournamentService = {
         }
       }
 
-      console.log('Successfully soft deleted tournament:', data);
       return true;
 
     } catch (error) {
@@ -2385,30 +2370,10 @@ export const matchService = {
 
       // If match doesn't exist and we have matchData (for playoff matches), create it
       if (matchData) {
-        // Get tournament_id for playoff matches
-        let tournamentId = matchData.tournamentId || matchData.tournament_id;
-        
-        // If tournament_id not provided and it's a playoff match, look it up from players
-        if (!tournamentId && matchData.isPlayoff && matchData.player1?.id && matchData.player2?.id) {
-          const { data: tournamentPlayers, error: tpError } = await supabase
-            .from('tournament_players')
-            .select('tournament_id')
-            .in('player_id', [matchData.player1.id, matchData.player2.id]);
-          
-          if (!tpError && tournamentPlayers) {
-            // Find tournament where both players are registered
-            const tournamentCounts = {};
-            tournamentPlayers.forEach(tp => {
-              tournamentCounts[tp.tournament_id] = (tournamentCounts[tp.tournament_id] || 0) + 1;
-            });
-            
-            // Find tournament where both players appear (count = 2)
-            tournamentId = Object.keys(tournamentCounts).find(
-              tid => tournamentCounts[tid] === 2
-            ) || null;
-          }
-        }
-        
+        // The caller must name the tournament: guessing it from the players
+        // picked the wrong round for league players who meet in many rounds.
+        const tournamentId = matchData.tournamentId || matchData.tournament_id || null;
+
         const { data: newMatch, error: createError } = await supabase
           .from('matches')
           .insert({
