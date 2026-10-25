@@ -8,7 +8,7 @@ export function PrivacyPolicy() {
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground">Last updated: September 5, 2026</p>
+        <p className="text-sm text-muted-foreground">Last updated: October 25, 2026</p>
       </div>
 
       <section className="flex flex-col gap-3">
@@ -46,7 +46,7 @@ export function PrivacyPolicy() {
         <h2 className="text-xl font-semibold tracking-tight">4. How we share data</h2>
         <ul className="list-disc pl-6 text-muted-foreground leading-7 [&>li]:mt-1">
           <li><strong className="font-medium text-foreground">Service providers:</strong> We use Supabase for authentication, database, and realtime updates; hosting/CDN providers may process IP addresses and basic request data.</li>
-          <li><strong className="font-medium text-foreground">Tournament visibility:</strong> Tournament information (players, scores, standings) may be visible to other users when a tournament is public or when you share links.</li>
+          <li><strong className="font-medium text-foreground">Tournament visibility:</strong> Tournament results, standings, match statistics and player profiles (the player name you use) are public: anyone with the link can see them, without signing in. League pages, leaderboards and member lists are visible to signed-in users. Registration requests are visible only to you and the organisers.</li>
           <li><strong className="font-medium text-foreground">Legal:</strong> We may disclose information if required by law or to protect the safety, rights, or property of users or the service.</li>
           <li>We do not sell personal data.</li>
         </ul>
@@ -68,7 +68,7 @@ export function PrivacyPolicy() {
           <li>You can delete your account yourself at any time: sign in, open <em>My profile</em> and use <em>Account → Delete my account</em>. See <Link to="/delete-account" className="font-medium text-primary underline underline-offset-4">how account deletion works</Link> for what is removed and what is kept.</li>
           <li>You can change the name shown in tournaments from your profile.</li>
           <li>You can clear browser storage (localStorage/cookies) to remove locally cached state.</li>
-          <li>You can choose not to share tournament links; private tournaments limit visibility.</li>
+          <li>You can ask an organiser to enter you under a nickname instead of your full name.</li>
         </ul>
       </section>
 

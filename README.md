@@ -237,6 +237,8 @@ src/
 
 ## Database Schema
 
+The schema, RLS policies and RPCs come only from `supabase/migrations/`, applied in order. `supabase/tests/` holds SQL self-checks. Do not apply hand-written SQL to production outside a migration.
+
 ### Tables
 
 - **tournaments**: Tournament metadata, settings, playoff data
