@@ -1,6 +1,7 @@
 import { supabase, generateId } from '../lib/supabase.js';
 import { isValidLegDartCount } from '../utils/dartStats.js';
 import { isCricketGame } from '../lib/cricket.js';
+import { fetchAllRows } from '../lib/fetchAllRows.js';
 
 // Checkout like "T20+T20+D20" (or a plain number) -> points scored.
 const getCheckoutValue = (checkout) => {
@@ -311,6 +312,22 @@ export const leagueService = {
       }));
     } catch (error) {
       console.error('Error fetching league members:', error);
+      throw error;
+    }
+  },
+
+  // A player's league memberships, same shape as getPlayerProfile().leagues
+  async getPlayerLeagues(playerId) {
+    try {
+      const { data, error } = await supabase
+        .from('league_members')
+        .select('league_id, role, is_active, leagues(id, name, status)')
+        .eq('player_id', playerId);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching player leagues:', error);
       throw error;
     }
   },
@@ -947,15 +964,14 @@ export const leagueService = {
       });
 
       // ── 2. Get all tournament results for this league ──────────────
-      const { data: allResults, error: resultsError } = await supabase
+      const allResults = await fetchAllRows(() => supabase
         .from('league_tournament_results')
         .select(`
           *,
           tournament:tournaments(created_at, deleted)
         `)
-        .eq('league_id', leagueId);
-
-      if (resultsError) throw resultsError;
+        .eq('league_id', leagueId)
+        .order('id'));
 
       // Soft-deleted tournaments keep their result rows, but they must not
       // count toward the leaderboard (the leg stats below already exclude
@@ -983,16 +999,14 @@ export const leagueService = {
 
       const playerLegs = {};
       if (leagueTournamentIds.length > 0) {
-        const { data: matches, error: matchesError } = await supabase
+        const matches = await fetchAllRows(() => supabase
           .from('matches')
           .select('player1_id, player2_id, player1_legs, player2_legs, winner_id')
           .in('tournament_id', leagueTournamentIds)
           .eq('status', 'completed')
-          .limit(10000);
+          .order('id'));
 
-        if (matchesError) throw matchesError;
-
-        (matches || []).forEach(match => {
+        matches.forEach(match => {
           const p1 = match.player1_id;
           const p2 = match.player2_id;
           const p1Legs = match.player1_legs || 0;
@@ -1590,14 +1604,11 @@ export const leagueService = {
   // ── Admin: get all players ────────────────────────────────────────
   async getAllPlayers() {
     try {
-      const { data, error } = await supabase
+      return await fetchAllRows(() => supabase
         .from('players')
         .select('id, name, user_id')
         .order('name')
-        .limit(10000);
-
-      if (error) throw error;
-      return data || [];
+        .order('id'));
     } catch (error) {
       console.error('Error fetching all players:', error);
       throw error;
@@ -1624,45 +1635,40 @@ export const leagueService = {
       const tournaments = (allTournaments || []).filter(t => !isCricketGame(t.game_type));
       if (!tournaments.length) return empty;
 
-      // 2+3. All completed matches with results, in ONE query. This previously
-      // fetched the full nested tournament tree per tournament (a season league
-      // meant 40-50 heavy sequential queries and megabytes of transfer every
-      // time the Statistics tab opened) — the aggregation below only needs the
-      // result JSONB, player names, and the starting score.
+      // 2+3. All completed matches in one paged query. Only the result fields
+      // the aggregation below reads are selected: the full result JSONB also
+      // carries per-visit arrays that made this megabytes per season.
       const nameById = new Map(tournaments.map(t => [t.id, t.name]));
+      const statKeys = ['totalScore', 'totalDarts', 'oneEighties', 'checkouts', 'average', 'legs', 'legAverages'];
+      const statPaths = side => statKeys
+        .map(key => `${side}_${key}:result->${side}Stats->${key}`)
+        .join(', ');
 
-      const { data: matchRows, error: matchesError } = await supabase
+      const matchRows = await fetchAllRows(() => supabase
         .from('matches')
         .select(`
           id,
-          status,
-          result,
           starting_score,
           tournament_id,
+          ${statPaths('player1')},
+          ${statPaths('player2')},
           player1:players!matches_player1_id_fkey(id, name),
           player2:players!matches_player2_id_fkey(id, name)
         `)
         .in('tournament_id', tournaments.map(t => t.id))
         .eq('status', 'completed')
         .not('result', 'is', null)
-        .limit(10000);
+        .order('id'));
 
-      if (matchesError) throw matchesError;
-
-      const allMatches = (matchRows || [])
-        .map(m => {
-          let result = m.result;
-          if (typeof result === 'string') {
-            try { result = JSON.parse(result); } catch { result = null; }
-          }
-          return {
-            ...m,
-            result,
-            tournamentName: nameById.get(m.tournament_id) || '',
-            startingScore: m.starting_score || 501
-          };
-        })
-        .filter(m => m.result);
+      const sideStats = (m, side) => Object.fromEntries(statKeys.map(key => [key, m[`${side}_${key}`]]));
+      const allMatches = matchRows.map(m => ({
+        player1: m.player1,
+        player2: m.player2,
+        tournament_id: m.tournament_id,
+        result: { player1Stats: sideStats(m, 'player1'), player2Stats: sideStats(m, 'player2') },
+        tournamentName: nameById.get(m.tournament_id) || '',
+        startingScore: m.starting_score || 501
+      }));
 
       // 5. Aggregate stats
       // Maps: playerId → accumulated data
