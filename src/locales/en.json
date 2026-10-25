@@ -5,7 +5,8 @@
     "pendingCount": "{{count}} change(s) waiting to sync",
     "backOnline": "Back online — syncing",
     "updateAvailable": "A new version is ready — it will load when you leave this match",
-    "waitingForConnection": "Waiting for connection"
+    "waitingForConnection": "Waiting for connection",
+    "resultConflict": "This match was already finished on another device with a different winner. That result stands; yours was not saved."
   },
   "navigation": {
     "home": "Home",
