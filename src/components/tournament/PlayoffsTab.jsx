@@ -252,9 +252,10 @@ export function PlayoffsTab(props) {
                           legsToWin: getPlayoffLegsToWin(roundSize),
                           startingScore: tournament.startingScore,
                           defaultScoringMode: tournament.defaultScoringMode,
-                          isPlayoff: true
+                          isPlayoff: true,
+                          // startMatch creates the playoff row under this tournament
+                          tournamentId: tournament.id
                         };
-                        if (kind === 'start') data.tournamentId = tournament.id;
                         if (kind === 'admin') data.adminOverride = true;
                         return data;
                       };

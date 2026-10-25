@@ -33,6 +33,7 @@ import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
+import { sortStandings } from '../utils/standings';
 import { cn } from '@/lib/utils';
 import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
@@ -110,10 +111,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   });
   const modalOpenRef = useRef(false); // Track if any modal is open
   const activeTabRef = useRef(activeTab); // Track active tab for interval callback
-  // Refs mirroring tournament scope so the realtime channel handlers (which only
-  // re-subscribe on tournament id) never read stale group/playoff id sets.
-  const tournamentGroupIdsRef = useRef(new Set());
-  const tournamentPlayoffIdsRef = useRef(new Set());
   const applyRemoteMatchResultRef = useRef(null);
   const [matchGroupFilter, setMatchGroupFilter] = useState('all'); // Filter by group
   const [matchPlayerFilter, setMatchPlayerFilter] = useState(''); // Filter by player name
@@ -202,13 +199,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     liveMatchesRef.current = liveMatches;
   }, [liveMatches]);
 
-  // Keep tournament-scope refs current for the realtime channel handlers
-  useEffect(() => {
-    tournamentGroupIdsRef.current = tournamentGroupIds;
-  }, [tournamentGroupIds]);
-  useEffect(() => {
-    tournamentPlayoffIdsRef.current = tournamentPlayoffIds;
-  }, [tournamentPlayoffIds]);
   // NOTE: the applyRemoteMatchResult ref-sync effect lives AFTER the
   // useTournament() destructuring below — referencing it here would hit the
   // temporal dead zone (the const isn't initialized until later in render).
@@ -309,7 +299,21 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const { isMatchLive, toggleFavoriteGroup, isGroupFavorite, getFavoriteGroups } = useLiveMatch();
   const { isAdmin } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
-  const canManage = isAdmin || isOwner;
+  // The linked league's creator and co-managers manage too; ask the DB
+  // (can_manage_tournament) so the UI follows the same rule as RLS.
+  const [isLeagueManager, setIsLeagueManager] = useState(false);
+  useEffect(() => {
+    if (!user || !tournament?.id || !tournament?.leagueId || isAdmin || isOwner) {
+      setIsLeagueManager(false);
+      return;
+    }
+    let cancelled = false;
+    tournamentService.canManage(tournament.id).then(allowed => {
+      if (!cancelled) setIsLeagueManager(allowed === true);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id, tournament?.id, tournament?.leagueId, isAdmin, isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
+  const canManage = Boolean(isAdmin || isOwner || isLeagueManager);
 
   // Whether this user may count matches: managers always, everyone else only
   // when listed as a tournament/league scorer (can_score_tournament in the
@@ -643,7 +647,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
       tournament.groups.forEach(group => {
         if (!group?.standings) return;
-        const sorted = sortStandingsByCriteria(group.standings, criteriaOrder);
+        const sorted = sortStandings(group.standings, criteriaOrder, group.matches);
         const ranked = sorted
           .map(s => s.player)
           .filter(p => p?.id && qualifyingIds.has(p.id));
@@ -738,35 +742,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       const playersByGroup = {};
       tournament.groups.forEach(group => {
         if (group.standings && group.standings.length > 0) {
-          const sortedStandings = [...group.standings].sort((a, b) => {
-            // Use tournament's standings criteria order
-            const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-            for (const criterion of criteriaOrder) {
-              let comparison = 0;
-              switch (criterion) {
-                case 'matchesWon':
-                  comparison = b.matchesWon - a.matchesWon;
-                  break;
-                case 'legDifference': {
-                  const legDiffA = a.legsWon - a.legsLost;
-                  const legDiffB = b.legsWon - b.legsLost;
-                  comparison = legDiffB - legDiffA;
-                  break;
-                }
-                case 'average':
-                  comparison = (b.average || 0) - (a.average || 0);
-                  break;
-                case 'headToHead': {
-                  const aWinsVsB = a.headToHeadWins?.[b.player.id] || 0;
-                  const bWinsVsA = b.headToHeadWins?.[a.player.id] || 0;
-                  comparison = bWinsVsA - aWinsVsB;
-                  break;
-                }
-              }
-              if (comparison !== 0) return comparison;
-            }
-            return 0;
-          });
+          const sortedStandings = sortStandings(group.standings, tournament.standingsCriteriaOrder, group.matches);
           
           // Take this group's qualifying players, in seeded order. Falls back to the
           // playersPerGroup slice if qualifying info isn't available (defensive).
@@ -1259,62 +1235,16 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     );
   };
 
-  // Shared sorting function that uses the tournament's standingsCriteriaOrder
-  // This ensures standings are sorted the SAME way everywhere (UI display, qualifying players, seeding)
-  const sortStandingsByCriteria = (standings, criteriaOrder) => {
-    return [...standings].sort((a, b) => {
-      for (const criterion of criteriaOrder) {
-        let comparison = 0;
-        switch (criterion) {
-          case 'matchesWon':
-            comparison = (b.matchesWon || b.points / 3 || 0) - (a.matchesWon || a.points / 3 || 0);
-            break;
-          case 'legDifference': {
-            const legDiffA = (a.legsWon || 0) - (a.legsLost || 0);
-            const legDiffB = (b.legsWon || 0) - (b.legsLost || 0);
-            comparison = legDiffB - legDiffA;
-            break;
-          }
-          case 'average':
-            comparison = (b.average || 0) - (a.average || 0);
-            break;
-          case 'headToHead': {
-            const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
-            const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
-            comparison = bWinsVsA - aWinsVsB;
-            break;
-          }
-        }
-        if (comparison !== 0) return comparison;
-      }
-      return 0;
-    });
-  };
-
-  const comparePlayersByCriteria = (a, b, criteriaOrder) => {
-    for (const criterion of criteriaOrder) {
-      let comparison = 0;
-      switch (criterion) {
-        case 'matchesWon':
-          comparison = (b.matchesWon || b.points / 3 || 0) - (a.matchesWon || a.points / 3 || 0);
-          break;
-        case 'legDifference':
-          comparison = ((b.legsWon || 0) - (b.legsLost || 0)) - ((a.legsWon || 0) - (a.legsLost || 0));
-          break;
-        case 'average':
-          comparison = (b.average || 0) - (a.average || 0);
-          break;
-        case 'headToHead': {
-          const aWinsVsB = a.headToHeadWins?.[b.player?.id] || 0;
-          const bWinsVsA = b.headToHeadWins?.[a.player?.id] || 0;
-          comparison = bWinsVsA - aWinsVsB;
-          break;
-        }
-      }
-      if (comparison !== 0) return comparison;
-    }
-    return (a.groupPosition || 0) - (b.groupPosition || 0);
-  };
+  // Sorts standings the SAME way everywhere (UI display, qualifying players,
+  // seeding). Rows from several groups are fine: head-to-head only counts
+  // matches between the tied players.
+  const allGroupMatches = (tournament?.groups || []).flatMap(g => g.matches || []);
+  const sortStandingsByCriteria = (standings, criteriaOrder) => sortStandings(standings, criteriaOrder, allGroupMatches);
+  // Cross-group seeding order; group position (1st before 2nd) breaks full ties.
+  const sortByGroupPositionThenCriteria = (rows, criteriaOrder) => sortStandingsByCriteria(
+    [...rows].sort((a, b) => (a.groupPosition || 0) - (b.groupPosition || 0)),
+    criteriaOrder
+  );
 
   // Get qualifying players based on group standings, sorted by performance for seeding
   const getQualifyingPlayers = () => {
@@ -1418,9 +1348,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     
     // Sort all qualifying players globally for seeding using the same criteria as UI standings,
     // with group position as final tiebreaker (1st in group > 2nd in group)
-    allQualifyingPlayers.sort((a, b) => comparePlayersByCriteria(a, b, criteriaOrder));
-    
-    return allQualifyingPlayers.map(qp => qp.player);
+    return sortByGroupPositionThenCriteria(allQualifyingPlayers, criteriaOrder).map(qp => qp.player);
   };
 
   const getRankedPlayersForSeeding = () => {
@@ -1461,10 +1389,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
     });
 
-    allPlayers.sort((a, b) => comparePlayersByCriteria(a, b, criteriaOrder));
-
     const seen = new Set();
-    return allPlayers
+    return sortByGroupPositionThenCriteria(allPlayers, criteriaOrder)
       .filter(entry => {
         const playerId = entry.player?.id;
         if (!playerId || seen.has(playerId)) return false;
@@ -1834,8 +1760,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         });
       }
 
-      await getTournament(tournament.id);
+      const fresh = await getTournament(tournament.id);
       setCorrectingMatch(null);
+      // Placements of a finished league round were recorded once; re-record
+      // them (an upsert) so the leaderboard follows the corrected result.
+      if (fresh?.status === 'completed' && fresh.leagueId) {
+        await leagueService.calculateTournamentPlacements(fresh.leagueId, fresh.id, fresh);
+      }
     } catch (error) {
       console.error('Error correcting match result:', error);
       toast.error(error.message);
@@ -1994,26 +1925,52 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
     }, 5000);
 
+    // A match completed on another device: apply it granularly to the local
+    // bracket/standings.
+    const applyRemoteCompletion = (match) => {
+      // Build a matchResult from the payload row. saveMatchResult writes the
+      // full result JSONB + winner + leg counts, so the payload carries
+      // everything the standings/bracket transform needs. applyMatchCompletion
+      // synthesizes a minimal result if `result` is somehow absent.
+      const matchResult = {
+        matchId: match.id,
+        winner: match.winner_id,
+        player1Id: match.player1_id,
+        player2Id: match.player2_id,
+        player1Legs: match.player1_legs,
+        player2Legs: match.player2_legs,
+        isPlayoff: !!match.is_playoff,
+        playoffRound: match.playoff_round,
+        groupId: match.group_id,
+        result: match.result || null,
+        ...(match.result || {})
+      };
+
+      const apply = applyRemoteMatchResultRef.current;
+      if (apply) {
+        apply(matchResult);
+      }
+    };
+
     // Set up real-time subscription
     const channel = supabase
       .channel(`live-matches-tournament-${tournament.id}`)
-      .on('postgres_changes', 
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
+      // One UPDATE listener for live scores and completions; the server-side
+      // filter keeps other tournaments' scoring traffic off this page.
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
           table: 'matches',
-          filter: 'status=eq.in_progress'
+          filter: `tournament_id=eq.${tournament.id}`
         },
         async (payload) => {
-          // Check if this match belongs to this tournament
           const match = payload.new;
-          const belongsToTournament = 
-            (uniqueGroups?.some(g => g.id === match.group_id)) ||
-            (tournament.playoffMatches?.some(m => m.id === match.id));
-
-          if (!belongsToTournament) {
-            return; // Not our tournament, ignore
+          if (match?.status === 'completed') {
+            applyRemoteCompletion(match);
+            return;
           }
+          if (match?.status !== 'in_progress') return;
 
           // Reload the full match data
           const { data: updatedMatch, error } = await supabase
@@ -2058,17 +2015,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           event: 'INSERT',
           schema: 'public',
           table: 'matches',
-          filter: 'status=eq.in_progress'
+          filter: `tournament_id=eq.${tournament.id}`
         },
         async (payload) => {
           const match = payload.new;
-          const belongsToTournament = 
-            (uniqueGroups?.some(g => g.id === match.group_id)) ||
-            (tournament.playoffMatches?.some(m => m.id === match.id));
-
-          if (!belongsToTournament) {
-            return;
-          }
+          if (match?.status !== 'in_progress') return;
 
           // Load full match data
           const { data: newMatch, error } = await supabase
@@ -2095,54 +2046,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               liveMatchesRef.current = updated;
               return updated;
             });
-          }
-        }
-      )
-      // Detect matches that transition to 'completed' on another device and
-      // apply them granularly to the local bracket/standings. NOTE: no status
-      // filter here — the in_progress-filtered listeners above can never match
-      // a row whose new status is 'completed'. We filter in JS instead.
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'matches'
-        },
-        (payload) => {
-          const match = payload.new;
-          if (!match || match.status !== 'completed') {
-            return; // Only care about completions here
-          }
-
-          const belongsToTournament =
-            tournamentGroupIdsRef.current.has(match.group_id) ||
-            tournamentPlayoffIdsRef.current.has(match.id);
-
-          if (!belongsToTournament) {
-            return;
-          }
-
-          // Build a matchResult from the payload row. saveMatchResult writes the
-          // full result JSONB + winner + leg counts, so the payload carries
-          // everything the standings/bracket transform needs. applyMatchCompletion
-          // synthesizes a minimal result if `result` is somehow absent.
-          const matchResult = {
-            matchId: match.id,
-            winner: match.winner_id,
-            player1Id: match.player1_id,
-            player2Id: match.player2_id,
-            player1Legs: match.player1_legs,
-            player2Legs: match.player2_legs,
-            isPlayoff: !!match.is_playoff,
-            playoffRound: match.playoff_round,
-            groupId: match.group_id,
-            result: match.result || null,
-            ...(match.result || {})
-          };
-
-          const apply = applyRemoteMatchResultRef.current;
-          if (apply) {
-            apply(matchResult);
           }
         }
       )

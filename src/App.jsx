@@ -274,7 +274,8 @@ function MatchRoute({ onMatchComplete }) {
         }
 
         if (match) {
-          startMatch(match);
+          // Bracket matches carry no tournamentId; startMatch needs it to create the row.
+          startMatch({ ...match, tournamentId: match.tournamentId || currentTournament.id });
         } else {
           // Match not found, redirect to tournament. replace: a redirect must
           // not leave the dead /match URL in history, or "back" bounces
