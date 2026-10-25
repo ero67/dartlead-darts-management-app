@@ -24,6 +24,7 @@ import { LoadingState } from './shared/LoadingState';
 import { Scoreboard } from './match/Scoreboard';
 import { StarterDialog, ViewOnlyDialog, BullupDialog } from './match/MatchDialogs';
 import { MatchCompleteCard } from './match/MatchCompleteCard';
+import { isLocalSnapshotStale, rememberServerStamp, x01StateFromRow } from './match/liveSnapshot';
 
 // When both players have thrown this many visits in a single leg, the leg has run
 // too long and the app offers to decide it by a bull-up. See awardLegByBullup.
@@ -206,6 +207,16 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     visitLogRef.current = [];
     setVisitLog([]);
   };
+  // Row updated_at as of this device's last read or write, kept in the
+  // snapshot so a reopen can tell whether the row moved on without us.
+  const serverUpdatedAtRef = useRef(initialState?.serverUpdatedAt || null);
+  const rememberStamp = (updatedAt) => {
+    if (!updatedAt) return;
+    serverUpdatedAtRef.current = updatedAt;
+    rememberServerStamp(`match-state-${match.id}`, updatedAt);
+  };
+  // No live write until the mount effect has compared the snapshot with the row.
+  const isRowCheckedRef = useRef(false);
   const [matchComplete, setMatchComplete] = useState(initialState?.matchComplete || false);
   const [completedWinnerId, setCompletedWinnerId] = useState(null); // winner per DB row when re-opening a finished match
   const [inputMode, setInputMode] = useState(initialState?.inputMode || 'single');
@@ -245,6 +256,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   }, [currentLeg, matchStarter, matchComplete, legScores, turnHistory, matchSettings.startingScore, showMatchStarter, currentPlayer]);
   
   const { startLiveMatch, endLiveMatch, updateLiveMatch, isMatchLiveOnThisDevice, deviceId, deviceName, boardNumber } = useLiveMatch();
+  // Set where this device marks the match live (startLiveMatch below), so only
+  // the scoring device writes. A ref rather than isMatchLiveOnThisDevice: the
+  // context drops entries idle for an hour, and closures from an older render
+  // would miss the start.
+  const isLiveHereRef = useRef(false);
   const { user } = useAuth();
   const { t } = useLanguage();
   const { currentTournament } = useTournament();
@@ -279,7 +295,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     try {
       const { data, error } = await supabase
         .from('matches')
-        .select('current_leg, player1_current_score, player2_current_score, player1_legs, player2_legs, current_player, started_by_user_id, match_starter, legs_to_win, starting_score, status, winner_id')
+        .select('current_leg, player1_current_score, player2_current_score, player1_legs, player2_legs, current_player, started_by_user_id, match_starter, legs_to_win, starting_score, status, winner_id, live_state')
         .eq('id', matchId)
         .single();
 
@@ -299,30 +315,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         return {
           currentLeg: data.current_leg || 1,
           currentPlayer: data.current_player !== null && data.current_player !== undefined ? data.current_player : 0,
-          legScores: {
-            player1: {
-              legs: data.player1_legs || 0,
-              currentScore: data.player1_current_score !== null && data.player1_current_score !== undefined ? data.player1_current_score : startingScore,
-              totalScore: 0,
-              totalDarts: 0,
-              legDarts: 0,
-              oneEighties: 0,
-              legAverages: [],
-              checkouts: [],
-              legDetails: []
-            },
-            player2: {
-              legs: data.player2_legs || 0,
-              currentScore: data.player2_current_score !== null && data.player2_current_score !== undefined ? data.player2_current_score : startingScore,
-              totalScore: 0,
-              totalDarts: 0,
-              legDarts: 0,
-              oneEighties: 0,
-              legAverages: [],
-              checkouts: [],
-              legDetails: []
-            }
-          },
+          ...x01StateFromRow(data, startingScore),
           isInProgress,
           status: data.status,
           // The persisted starter is authoritative. Fallback for rows written
@@ -351,7 +344,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   // Function to update match state to database
   const updateMatchToDatabase = async (matchId, matchState) => {
     if (!matchId) return;
-    
+    // Only the device scoring the match writes, and only once the mount effect
+    // has checked the row: a stale snapshot must not overwrite a newer row.
+    if (!isRowCheckedRef.current || !isLiveHereRef.current) return;
+
+    let update = null;
     try {
       const p1Score = matchState.legScores.player1.currentScore;
       const p2Score = matchState.legScores.player2.currentScore;
@@ -360,14 +357,17 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         console.warn('⚠️ Skipping DB sync: invalid scores detected', { p1Score, p2Score });
         return;
       }
-      const update = {
+      update = {
         current_leg: matchState.currentLeg,
         player1_current_score: p1Score,
         player2_current_score: p2Score,
         player1_legs: matchState.legScores.player1.legs,
         player2_legs: matchState.legScores.player2.legs,
         current_player: matchState.currentPlayer,
-        last_activity_at: new Date().toISOString()
+        last_activity_at: new Date().toISOString(),
+        // Running totals, so a resume on another device keeps the averages
+        // (read back by x01StateFromRow).
+        live_state: { legScores: matchState.legScores, visitLog: visitLogRef.current }
       };
 
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
@@ -388,7 +388,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         .eq('id', matchId)
         .neq('status', 'completed')
         .or(`last_activity_at.is.null,last_activity_at.lt.${update.last_activity_at}`)
-        .select('id');
+        .select('id, updated_at');
 
       if (error) {
         console.error('Error updating match to database, queueing live sync:', error);
@@ -396,27 +396,37 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       } else if (!data || data.length === 0) {
         console.log('Live sync skipped (row is newer or match completed):', matchId);
       } else {
+        rememberStamp(data[0].updated_at);
         console.log('✅ Database sync:', matchId);
       }
     } catch (error) {
       console.error('Error updating match to database, queueing live sync:', error);
-      enqueueWrite(QUEUE_TYPES.liveSync, {
-        matchId,
-        update: {
-          current_leg: matchState.currentLeg,
-          player1_current_score: matchState.legScores.player1.currentScore,
-          player2_current_score: matchState.legScores.player2.currentScore,
-          player1_legs: matchState.legScores.player1.legs,
-          player2_legs: matchState.legScores.player2.legs,
-          current_player: matchState.currentPlayer,
-          last_activity_at: new Date().toISOString()
-        }
-      }, `live:${matchId}`);
+      if (update) enqueueWrite(QUEUE_TYPES.liveSync, { matchId, update }, `live:${matchId}`);
     }
   };
 
   // Load match state from database if localStorage is empty or match is in progress
   useEffect(() => {
+    isRowCheckedRef.current = false;
+    const storageKey = `match-state-${match.id}`;
+    let rowStatus = null;
+
+    const resetToFreshMatch = (startingScore) => {
+      localStorage.removeItem(storageKey);
+      setCurrentLeg(1);
+      setCurrentPlayer(null);
+      setMatchStarter(null);
+      setLegScores({
+        player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] },
+        player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] }
+      });
+      setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
+      setTurnHistory([]);
+      resetVisitLog();
+      setMatchComplete(false);
+      setShowMatchStarter(true);
+    };
+
     const loadMatchState = async () => {
       if (!match?.id) return;
 
@@ -427,11 +437,26 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       try {
         const { data: dbRow } = await supabase
           .from('matches')
-          .select('legs_to_win, starting_score, status, match_starter, player1_legs, player2_legs, winner_id')
+          .select('legs_to_win, starting_score, status, match_starter, player1_legs, player2_legs, winner_id, updated_at')
           .eq('id', match.id)
           .maybeSingle();
 
         if (dbRow) {
+          rowStatus = dbRow.status;
+          // Another device scored on, or a manager reset the match, after this
+          // device last saw the row: the local snapshot is stale, the row wins.
+          let snapshot = null;
+          try {
+            snapshot = JSON.parse(localStorage.getItem(storageKey));
+          } catch {
+            // corrupted entry: nothing to compare
+          }
+          if (isLocalSnapshotStale(snapshot, dbRow)) {
+            console.log('Local match state is older than the row, restoring from the database:', match.id);
+            localStorage.removeItem(storageKey);
+          }
+          serverUpdatedAtRef.current = dbRow.updated_at || serverUpdatedAtRef.current;
+          rememberServerStamp(storageKey, dbRow.updated_at);
           if (dbRow.legs_to_win || dbRow.starting_score) {
             dbSettingsRef.current = {
               legsToWin: dbRow.legs_to_win || null,
@@ -469,8 +494,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
       // If match DB status is pending, only reset if localStorage has no real progress.
       // The DB status can be stale (e.g. startLiveMatch failed due to a missing column,
       // or the tournament reloaded before the PATCH completed).
-      if (match?.status === 'pending') {
-        const stored = localStorage.getItem(`match-state-${match.id}`);
+      if ((rowStatus || match?.status) === 'pending') {
+        const stored = localStorage.getItem(storageKey);
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
@@ -491,23 +516,11 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         }
 
         // No local progress – this is truly a fresh/reset match
-        localStorage.removeItem(`match-state-${match.id}`);
-        setCurrentLeg(1);
-        setCurrentPlayer(null);
-        setMatchStarter(null);
-        setLegScores({
-          player1: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] },
-          player2: { legs: 0, currentScore: startingScore, totalScore: 0, totalDarts: 0, legDarts: 0, oneEighties: 0, visitScores: [], doubleAttempts: 0, legAverages: [], checkouts: [], legDetails: [] }
-        });
-        setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
-        setTurnHistory([]);
-        resetVisitLog();
-        setMatchComplete(false);
-        setShowMatchStarter(true);
+        resetToFreshMatch(startingScore);
         return;
       }
 
-      const stored = localStorage.getItem(`match-state-${match.id}`);
+      const stored = localStorage.getItem(storageKey);
       let hasLocalState = false;
       
       // If localStorage has state with currentPlayer or matchStarter, use it
@@ -540,9 +553,14 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         if (dbState) {
           if (dbState.isInProgress) {
             // Match is already in progress - restore state from database
+            // (replacing a stale snapshot the initial render may have used)
             setCurrentLeg(dbState.currentLeg);
             setCurrentPlayer(dbState.currentPlayer);
             setLegScores(dbState.legScores);
+            setCurrentTurn({ score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null });
+            setTurnHistory([]);
+            visitLogRef.current = dbState.visitLog;
+            setVisitLog(dbState.visitLog);
             
             // If we can determine the match starter, set it
             if (dbState.matchStarter !== null && dbState.matchStarter !== undefined) {
@@ -560,21 +578,27 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
               legScores: dbState.legScores,
               currentTurn: { score: 0, darts: 0, scores: [], dartCount: 0, turnStartScore: null },
               turnHistory: [],
+              visitLog: dbState.visitLog,
               matchComplete: false,
               inputMode: 'single',
               scoringMode: match?.defaultScoringMode === 'turnTotal' ? 'turnTotal' : 'dart',
-              showMatchStarter: false
+              showMatchStarter: false,
+              serverUpdatedAt: serverUpdatedAtRef.current
             };
-            localStorage.setItem(`match-state-${match.id}`, JSON.stringify(matchState));
+            localStorage.setItem(storageKey, JSON.stringify(matchState));
           } else {
-            // Match is new - show match starter dialog
-            setShowMatchStarter(true);
+            // Match is new - show match starter dialog (and drop whatever a
+            // stale snapshot put on screen in the first render)
+            resetToFreshMatch(startingScore);
           }
         }
       }
     };
 
-    loadMatchState();
+    loadMatchState().finally(() => {
+      isRowCheckedRef.current = true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match?.id]); // Only run when match ID changes
 
   // Ensure localStorage is updated when matchStarter changes
@@ -591,13 +615,17 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
 
       // Persist to the DB too: crash recovery on another device needs the
       // starter to alternate legs correctly (localStorage doesn't travel).
-      if (!isViewOnly) {
+      // Not before the row check, and only from the live device: a stale
+      // snapshot's starter must not overwrite a reset or newer row.
+      if (!isViewOnly && isRowCheckedRef.current && isLiveHereRef.current) {
         supabase
           .from('matches')
           .update({ match_starter: matchStarter })
           .eq('id', match.id)
-          .then(({ error }) => {
+          .select('updated_at')
+          .then(({ data, error }) => {
             if (error) console.error('Error persisting match starter:', error);
+            else rememberStamp(data?.[0]?.updated_at);
           });
       }
     }
@@ -625,6 +653,9 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
   useEffect(() => {
     if (!match?.id || matchComplete) return;
     if (!user) return; // view-only users don't write
+    // Mount-time run (or the restore that follows it): the closure may hold a
+    // stale snapshot, and the row already has whatever the restore read.
+    if (!isRowCheckedRef.current) return;
 
     const timeout = setTimeout(() => {
       updateMatchToDatabase(match.id, {
@@ -680,7 +711,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         matchComplete,
         inputMode,
         scoringMode,
-        showMatchStarter
+        showMatchStarter,
+        serverUpdatedAt: serverUpdatedAtRef.current
       };
       localStorage.setItem(`match-state-${match.id}`, JSON.stringify(matchState));
     }
@@ -901,6 +933,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     
     // Start live match in context
     startLiveMatch(match.id, matchData);
+    isLiveHereRef.current = true;
     
     // Update database with user who started the match (only if match is not completed)
     if (user?.id && match.status !== 'completed') {
@@ -925,6 +958,7 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     
     // Cleanup: end live match when component unmounts
     return () => {
+      isLiveHereRef.current = false;
       endLiveMatch(match.id);
     };
     // Keyed on the ids only: AuthContext hands out a new user object on every
