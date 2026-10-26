@@ -14,7 +14,8 @@ import { currentSeasonName, defaultSeasonName, seasonStartYear } from '../../uti
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const formatDate = (date) => new Date(date).toLocaleDateString();
+// App language, not the browser locale (same pattern as PlayerHome).
+const formatDate = (date, language) => new Date(date).toLocaleDateString(language === 'sk' ? 'sk-SK' : 'en-GB');
 
 // "Current season / past seasons / all time" for statistics and head-to-head.
 // Nothing to choose until a season has ended.
@@ -108,7 +109,7 @@ export function EndSeasonDialog({ league, onEnded }) {
 
 // The frozen final table of an ended season; managers can rename it.
 function SeasonDialog({ season, isManager, onClose, onRenamed }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isRenaming, setIsRenaming] = useState(false);
   const [name, setName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -152,7 +153,7 @@ function SeasonDialog({ season, isManager, onClose, onRenamed }) {
                 </DialogTitle>
               )}
               <DialogDescription>
-                {t('leagues.finalStandings')} · {formatDate(season.started_at)} – {formatDate(season.ended_at)}
+                {t('leagues.finalStandings')} · {formatDate(season.started_at, language)} – {formatDate(season.ended_at, language)}
               </DialogDescription>
             </DialogHeader>
             <Table>
@@ -185,7 +186,7 @@ function SeasonDialog({ season, isManager, onClose, onRenamed }) {
 }
 
 export function PastSeasons({ league, isManager, onChanged }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [openSeasonId, setOpenSeasonId] = useState(null);
   const seasons = league.seasons || [];
   if (!seasons.length) return null;
@@ -201,7 +202,7 @@ export function PastSeasons({ league, isManager, onChanged }) {
               <Crown className="size-6 shrink-0 text-amber-500" aria-hidden="true" />
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-semibold">{season.name}</span>
-                <span className="text-xs text-muted-foreground">{formatDate(season.started_at)} – {formatDate(season.ended_at)}</span>
+                <span className="text-xs text-muted-foreground">{formatDate(season.started_at, language)} – {formatDate(season.ended_at, language)}</span>
                 <span className="truncate text-sm">
                   {champion ? t('leagues.champion', { name: champion.name, points: champion.points }) : t('leagues.noResultsYet')}
                 </span>
