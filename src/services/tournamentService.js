@@ -582,6 +582,7 @@ export const tournamentService = {
           gameType: match.game_type || tournament.game_type || 'x01',
           startedByUserId: match.started_by_user_id,
           isPlayoff: true,
+          assignedBoard: match.assigned_board ?? null,
           playoffRound: match.playoff_round,
           playoffMatchNumber: match.playoff_match_number,
           result: match.winner_id ? (() => {
@@ -629,6 +630,7 @@ export const tournamentService = {
           playoffSettings: tournament.playoff_settings,
           playoffs: tournament.playoffs,
           playoffMatches: playoffMatches,
+          boardCount: tournament.board_count ?? null,
           tournamentType: tournament.tournament_type || 'groups_with_playoffs',
           standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
           leagueId: tournament.league_id || null,
@@ -654,6 +656,7 @@ export const tournamentService = {
                 // but cannot update local standings ("Group not found").
                 groupId: group.id,
                 matchOrder: match.match_order ?? null,
+                assignedBoard: match.assigned_board ?? null,
                 player1: match.player1 || null,
                 player2: match.player2 || null,
                 status: match.status,
@@ -1436,6 +1439,17 @@ export const tournamentService = {
       console.error('Error checking scoring permission:', error);
       return null;
     }
+  },
+
+  // Board count plus the board of waiting matches ({ matchId: board | null });
+  // the RPC checks can_manage_tournament and only touches pending matches.
+  async setMatchBoards(tournamentId, boardCount, assignments = {}) {
+    const { error } = await supabase.rpc('set_match_boards', {
+      p_tournament_id: tournamentId,
+      p_board_count: boardCount,
+      p_assignments: assignments
+    });
+    if (error) throw error;
   },
 
   // Whether the current user manages this tournament: owner, the linked
