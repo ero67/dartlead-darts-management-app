@@ -21,7 +21,7 @@ export function TournamentsTab({
   linkPlayers, linkPlayerMap, setLinkPlayerMap, isLinkMapComplete, isLinking,
   onOpenLink, onCloseLink, onSelectTournamentToLink, onLinkTournament, onUnlinkTournament,
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const members = (league.members || []).map(m => m.player).filter(Boolean);
   // Newest round at the top; round numbers count from the season's first tournament.
   const rounds = [...(league.tournaments || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -95,7 +95,7 @@ export function TournamentsTab({
                 <div className="flex min-w-0 flex-[1_1_15rem] flex-col">
                   <span className="text-xs text-muted-foreground">
                     {t('leagues.roundNumber', { number: roundNumber })}
-                    {isUpcoming ? ` · ${t('schedule.upcoming')}` : !tournament.startsAt && ` · ${new Date(tournament.created_at).toLocaleDateString()}`}
+                    {isUpcoming ? ` · ${t('schedule.upcoming')}` : !tournament.startsAt && ` · ${new Date(tournament.created_at).toLocaleDateString(language === 'sk' ? 'sk-SK' : 'en-GB')}`}
                   </span>
                   <span className="truncate text-base font-semibold">{tournament.name}</span>
                   <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} className="mt-1 text-xs [&_svg]:size-3.5" />
