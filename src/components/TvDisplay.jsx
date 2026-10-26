@@ -15,6 +15,7 @@ import { BracketVisualization } from './BracketVisualization';
 import { EmptyState } from './shared/EmptyState';
 import { StatusBadge } from './shared/StatusBadge';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
+import { boardQueues } from '../utils/boardSchedule';
 import { matchWinProbability } from '../lib/winProbability';
 import { liveMatchChance } from '../lib/legChance';
 import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
@@ -253,6 +254,14 @@ export function TvDisplay() {
     return [...roundRobin(groupQueues), ...playoffItems].slice(0, 8);
   }, [tournament, liveMatches, bracketRounds, winChance]);
 
+  // Waiting matches per assigned board, in the order they will be played.
+  const queues = useMemo(
+    () => (tournament ? boardQueues(tournament, new Set(liveMatches.map((m) => m.id))) : new Map()),
+    [tournament, liveMatches]
+  );
+  // Two per board fit the column up to four boards; beyond that, one each.
+  const perBoard = queues.size > 4 ? 1 : 2;
+
   const qualifiersPerGroup = tournament?.playoffSettings?.enabled ? Number(tournament.playoffSettings.qualifiersPerGroup || tournament.playoffSettings.playersPerGroup || 0) : 0;
 
   const liveScores = useMemo(
@@ -332,6 +341,18 @@ export function TvDisplay() {
     </CardHeader>
   );
 
+  // Who plays on this board after the live match.
+  const renderNextOnBoard = (m) => {
+    const next = queues.get(m.live_board_number)?.[0];
+    if (!next) return null;
+    return (
+      <CardContent className="flex items-baseline gap-3 border-t px-4 pt-3 text-lg">
+        <span className="shrink-0 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('boards.next')}</span>
+        <span className="min-w-0 truncate font-semibold">{next.player1.name} <span className="mx-1 font-normal text-muted-foreground">vs</span> {next.player2.name}</span>
+      </CardContent>
+    );
+  };
+
   // Cricket: the scoreboard (points, legs, marks); a lone board also gets the
   // dartboard from the thrower's side with the darts of the visit in progress.
   const renderCricketBoard = (m, p1, p2) => {
@@ -354,6 +375,7 @@ export function TvDisplay() {
             <CricketBoard marks={marks} thrower={m.current_player ?? 0} visitDarts={m.live_state?.visit} className="hidden w-[34rem] shrink-0 xl:block" />
           )}
         </CardContent>
+        {renderNextOnBoard(m)}
       </Card>
     );
   };
@@ -389,6 +411,7 @@ export function TvDisplay() {
                       checkouts: checkoutData
                     }))}
                   </CardContent>
+                  {renderNextOnBoard(m)}
                 </Card>
               );
             })}
@@ -402,7 +425,23 @@ export function TvDisplay() {
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4">
-          {upNext.length === 0 ? (
+          {queues.size > 0 ? (
+            <ul className="flex flex-col divide-y">
+              {[...queues].map(([board, list]) => (
+                <li key={board} className="flex flex-col gap-1 py-2.5">
+                  <span className="font-mono text-sm font-semibold uppercase tracking-wider text-primary">{t('deviceSettings.board')} {board}</span>
+                  {list.slice(0, perBoard).map((m, i) => (
+                    <div key={m.id} className="flex min-w-0 items-baseline gap-3">
+                      <span className="w-16 shrink-0 text-xs uppercase tracking-wider text-muted-foreground">{i === 0 ? t('boards.next') : t('boards.then')}</span>
+                      <span className={cn('min-w-0 truncate font-semibold', i === 0 ? 'text-lg' : 'text-base text-muted-foreground')}>
+                        {m.player1.name} <span className="mx-1 font-normal text-muted-foreground">vs</span> {m.player2.name}
+                      </span>
+                    </div>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          ) : upNext.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">{t('tv.nothingQueued')}</p>
           ) : (
             <ul className="flex flex-col divide-y">
