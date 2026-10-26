@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EmptyState } from '../shared/EmptyState';
-import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions } from './MatchCardParts';
+import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions, MatchBoard } from './MatchCardParts';
 import { cn } from '@/lib/utils';
 
 // `card` bundles the match-card callbacks/flags owned by TournamentManagement:
@@ -184,9 +184,12 @@ export function MatchesTab({
                 return (
                   <Card key={match.id} className={cn('gap-3 p-4', isLive && 'border-destructive/50')}>
                     <div className="flex items-center justify-between gap-2">
-                      <MatchStatusBadge status={match.status} isLive={isLive}>
-                        {getMatchStatusText(match.status, match.id)}
-                      </MatchStatusBadge>
+                      <div className="flex items-center gap-2">
+                        <MatchStatusBadge status={match.status} isLive={isLive}>
+                          {getMatchStatusText(match.status, match.id)}
+                        </MatchStatusBadge>
+                        {!isLive && <MatchBoard match={match} canManage={canManage && !!user} boardCount={tournament.boardCount} onAssign={card.handleAssignBoard} t={t} />}
+                      </div>
                       <div className="flex items-center">
                         {isCompleted && (
                           <Button

@@ -1159,6 +1159,22 @@
     "loadError": "Could not load the tournament",
     "pinned": "Fixed view — remove ?view= from the address to rotate"
   },
+  "boards": {
+    "count": "Boards",
+    "autoAssign": "Auto-assign",
+    "clear": "Clear",
+    "noBoard": "No board",
+    "assignLabel": "Board for this match",
+    "assigned": "{{count}} matches assigned to boards",
+    "cleared": "Board assignments cleared",
+    "saveFailed": "Could not save the boards",
+    "hint": "{{assigned}} of {{waiting}} waiting matches have a board. Auto-assign spreads them in play order so nobody is due on two boards at once.",
+    "nothingWaiting": "No match is waiting for a board",
+    "startHint": "This match is scheduled for board {{board}}.",
+    "startHintDevice": "This match is scheduled for board {{board}}; this device is set to board {{device}}.",
+    "next": "Next",
+    "then": "Then"
+  },
   "export": {
     "title": "Share / export",
     "shareImage": "Share as image",

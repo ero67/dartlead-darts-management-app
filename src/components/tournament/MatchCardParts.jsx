@@ -1,7 +1,9 @@
 import React from 'react';
-import { Play, Eye, Lock } from 'lucide-react';
+import { Play, Eye, Lock, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DeviceBadge } from '../DeviceSettings';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { confirmDialog } from '../../lib/confirmDialog';
@@ -23,6 +25,28 @@ export function MatchStatusBadge({ status, isLive, children }) {
   }
   if (status === 'completed') return <Badge variant="secondary">{children}</Badge>;
   return <Badge variant="outline">{children}</Badge>;
+}
+
+// The board a waiting match is scheduled on. Managers get a picker once the
+// tournament has a board count; everyone else sees the badge.
+export function MatchBoard({ match, canManage, boardCount, onAssign, t }) {
+  if (match.status !== 'pending' || !match.player1 || !match.player2) return null;
+  if (canManage && boardCount > 0 && onAssign) {
+    const boards = Array.from({ length: Math.max(boardCount, match.assignedBoard || 0) }, (_, i) => i + 1);
+    return (
+      <Select value={match.assignedBoard ? String(match.assignedBoard) : 'none'} onValueChange={(v) => onAssign(match, v === 'none' ? null : Number(v))}>
+        <SelectTrigger size="sm" className="h-7 gap-1 px-2 text-xs" aria-label={t('boards.assignLabel')} title={t('boards.assignLabel')}>
+          <Target className="size-3.5" />
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">{t('boards.noBoard')}</SelectItem>
+          {boards.map((b) => <SelectItem key={b} value={String(b)}>{t('deviceSettings.board')} {b}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    );
+  }
+  return <DeviceBadge boardNumber={match.assignedBoard} compact />;
 }
 
 // Name + tabular score. `score` null renders a dash.
