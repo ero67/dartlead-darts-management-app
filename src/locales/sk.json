@@ -1139,6 +1139,22 @@
     "loadError": "Turnaj sa nepodarilo načítať",
     "pinned": "Pevné zobrazenie — odstráňte ?view= z adresy pre striedanie"
   },
+  "boards": {
+    "count": "Počet terčov",
+    "autoAssign": "Rozdeliť na terče",
+    "clear": "Zrušiť priradenie",
+    "noBoard": "Bez terča",
+    "assignLabel": "Terč pre tento zápas",
+    "assigned": "Zápasy rozdelené na terče: {{count}}",
+    "cleared": "Priradenie terčov zrušené",
+    "saveFailed": "Terče sa nepodarilo uložiť",
+    "hint": "Terč má {{assigned}} z {{waiting}} čakajúcich zápasov. Rozdelenie ide v poradí hry, aby nikto nemal byť naraz na dvoch terčoch.",
+    "nothingWaiting": "Žiadny zápas nečaká na terč",
+    "startHint": "Tento zápas je naplánovaný na terč {{board}}.",
+    "startHintDevice": "Tento zápas je naplánovaný na terč {{board}}, toto zariadenie je nastavené na terč {{device}}.",
+    "next": "Na rade",
+    "then": "Potom"
+  },
   "export": {
     "title": "Zdieľať / export",
     "shareImage": "Zdieľať ako obrázok",
