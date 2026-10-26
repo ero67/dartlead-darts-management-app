@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor } from 'lucide-react';
+import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -34,6 +34,7 @@ import { leagueService } from '../services/leagueService';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { sortStandings } from '../utils/standings';
+import { cloneTournamentPath } from '../utils/cloneTournament';
 import { cn } from '@/lib/utils';
 import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
@@ -2151,6 +2152,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               >
                 <Settings />
                 {t('registration.editSettings')}
+              </Button>
+            )}
+            {canManage && user && (
+              <Button variant="outline" onClick={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}>
+                <CopyPlus />
+                {tournament.leagueId ? t('tournaments.nextRound') : t('tournaments.duplicate')}
               </Button>
             )}
             {canManage && user && (

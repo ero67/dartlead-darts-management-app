@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Plus, Link, Unlink, Check, X } from 'lucide-react';
+import { Trophy, Plus, Link, Unlink, Check, X, CopyPlus } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +35,12 @@ export function TournamentsTab({
         <Link />
         {t('leagues.addExistingTournament')}
       </Button>
+      {onCreateTournament && rounds.length > 0 && (
+        <Button variant="outline" onClick={() => onCreateTournament(league, rounds[0].id)}>
+          <CopyPlus />
+          {t('tournaments.nextRound')}
+        </Button>
+      )}
       {onCreateTournament && (
         <Button onClick={() => onCreateTournament(league)}>
           <Plus />
