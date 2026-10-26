@@ -73,7 +73,7 @@ COMMENT ON COLUMN matches.live_board_number IS 'Board/target number where the ma
 CREATE INDEX IF NOT EXISTS idx_matches_board_number ON matches(live_board_number) WHERE live_board_number IS NOT NULL;
 ```
 
-Alebo použite súbor: `SQLscripts/add-device-info-columns.sql`
+Tieto stĺpce už vytvárajú migrácie v `supabase/migrations/`.
 
 ## Použitie v kóde
 

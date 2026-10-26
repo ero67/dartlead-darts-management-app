@@ -1,74 +1,40 @@
-# Admin Role Setup Guide
+# Admin and Manager Roles
 
-This guide explains how to set up admin roles for the Darts Tournament App.
+Roles live in `auth.users.raw_app_meta_data.role` (the JWT's `app_metadata`).
+Users cannot edit app metadata themselves. The app ignores any `role` in
+`user_metadata`, because users can change that field from the client.
 
-## Database Setup
+The database schema comes only from `supabase/migrations/`. Do not run ad-hoc
+SQL from old guides against production.
 
-1. **SQL Script Reference**:
-   - See `SQLscripts/set-admin-role.sql` for SQL examples on how to set/check/remove admin roles
-   - No database migration is required - admin roles are stored in user metadata
+## Roles
 
-## Setting a User as Admin
+| Role | Can do |
+|------|--------|
+| `admin` | Everything, including granting roles, banning users and the billing ledger |
+| `manager` | Create and run tournaments and leagues, add scorers and co-managers |
+| (none) | Register for tournaments and leagues, score matches they are assigned to, practice |
 
-There are two ways to set a user as admin in Supabase:
+Granting `manager` starts a 30-day trial row in `manager_subscriptions`.
 
-### Method 1: Using Supabase Dashboard (Recommended)
+## Granting a role
 
-1. Go to your Supabase Dashboard
-2. Navigate to **Authentication** > **Users**
-3. Find the user you want to make admin
-4. Click on the user to open their details
-5. Scroll to **User Metadata** section
-6. Click **Add** and add:
-   ```json
-   {
-     "role": "admin"
-   }
-   ```
-7. Save the changes
+**In the app (normal way):** sign in as an admin, open **Admin**, find the
+user and pick the role. This calls the `set_user_role_secure` RPC, which
+checks that the caller is an admin and writes an `admin_audit_log` entry.
 
-### Method 2: Using SQL (Advanced)
-
-Run this SQL in Supabase SQL Editor (replace `user-uuid-here` with the actual user ID):
+**First admin on a fresh project:** no admin exists yet to use the app, so run
+this once in the Supabase SQL editor (it runs as `postgres`):
 
 ```sql
-UPDATE auth.users 
-SET raw_user_meta_data = jsonb_set(
-  COALESCE(raw_user_meta_data, '{}'::jsonb),
-  '{role}',
-  '"admin"'
-) 
-WHERE id = 'user-uuid-here';
+UPDATE auth.users
+SET raw_app_meta_data = jsonb_set(COALESCE(raw_app_meta_data, '{}'::jsonb), '{role}', '"admin"')
+WHERE lower(email) = lower('you@example.com');
 ```
 
-## Admin Permissions
+The user has to sign out and back in (or wait for the token refresh) before
+the new role shows up in their session.
 
-**Admins can:**
-- Create tournaments
-- Edit tournament settings
-- Delete tournaments
-- Access all admin features
+## Removing a role
 
-**Non-admin logged-in users can:**
-- Start matches
-- Count/score matches
-- View tournaments and statistics
-- View live matches
-
-**Non-logged-in users can:**
-- View tournaments
-- View statistics
-- View live matches (read-only)
-
-## Verifying Admin Status
-
-To verify a user is admin, check their `user_metadata.role` field in Supabase Dashboard. It should be set to `"admin"`.
-
-The app checks for admin role in multiple places:
-- `user.user_metadata.role`
-- `user.app_metadata.role`
-- `user.raw_user_meta_data.role`
-- `user.raw_app_meta_data.role`
-
-Any of these fields set to `"admin"` will grant admin access.
-
+Use the Admin screen, or call `set_user_role_secure(email, NULL)` as an admin.

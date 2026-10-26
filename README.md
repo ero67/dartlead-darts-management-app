@@ -199,7 +199,6 @@ src/
 - **Tournament CRUD**:
   - `createTournament()`: Create tournament with players, groups, matches
   - `getTournament()`: Load single tournament with all data
-  - `getTournaments()`: Load all tournaments
   - `updateTournamentSettings()`: Update tournament configuration
   - `deleteTournament()`: Delete tournament
 - **Group Standings**:
@@ -236,6 +235,8 @@ src/
 - ID generation utilities
 
 ## Database Schema
+
+The schema, RLS policies and RPCs come only from `supabase/migrations/`, applied in order. `supabase/tests/` holds SQL self-checks. Do not apply hand-written SQL to production outside a migration.
 
 ### Tables
 

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /manager
+Disallow: /match/
+Disallow: /my-profile
+Sitemap: https://dartlead.app/sitemap.xml

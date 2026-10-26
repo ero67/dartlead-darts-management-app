@@ -1,6 +1,7 @@
 import { supabase, generateId } from '../lib/supabase.js';
 import { isValidLegDartCount } from '../utils/dartStats.js';
 import { isCricketGame } from '../lib/cricket.js';
+import { fetchAllRows } from '../lib/fetchAllRows.js';
 
 // Checkout like "T20+T20+D20" (or a plain number) -> points scored.
 const getCheckoutValue = (checkout) => {
@@ -14,6 +15,21 @@ const getCheckoutValue = (checkout) => {
     const n = parseInt(part);
     return isNaN(n) ? total : total + n;
   }, 0);
+};
+
+// Find-or-create the player row for a league member on the server: looks in
+// the league first (case-insensitive), so a co-manager reuses the owner's row
+// instead of creating a duplicate in their own roster. Links the account when
+// userId is given; throws PLAYER_NAME_TAKEN when the name belongs to another
+// account.
+const resolveLeaguePlayer = async (leagueId, name, userId = null) => {
+  const { data, error } = await supabase.rpc('league_member_player', {
+    l_id: leagueId,
+    p_name: name,
+    p_user_id: userId
+  });
+  if (error) throw new Error(error.message);
+  return data;
 };
 
 export const leagueService = {
@@ -203,11 +219,6 @@ export const leagueService = {
       // players can be array of player IDs or array of player objects with id
       const playerIds = players.map(p => typeof p === 'string' ? p : p.id);
 
-      // Players are scoped per manager (owner_id); lookups and inserts must
-      // stay inside the caller's roster.
-      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
-      if (currentUserError) throw currentUserError;
-
       // Check if players exist, create if needed
       const membersToAdd = [];
       for (const player of players) {
@@ -217,31 +228,7 @@ export const leagueService = {
         } else if (player.id) {
           playerId = player.id;
         } else if (player.name) {
-          // Find or create the player. Trim first: players.name is unique per
-          // owner and matched exactly, so " Erik" would otherwise become a
-          // second profile.
-          const name = player.name.trim();
-          const { data: existingPlayer } = await supabase
-            .from('players')
-            .select('id')
-            .eq('name', name)
-            .eq('owner_id', currentUser.id)
-            .maybeSingle();
-
-          if (existingPlayer) {
-            playerId = existingPlayer.id;
-          } else {
-            playerId = generateId();
-            const { error: playerError } = await supabase
-              .from('players')
-              .insert({
-                id: playerId,
-                name,
-                owner_id: currentUser.id
-              });
-
-            if (playerError) throw playerError;
-          }
+          playerId = await resolveLeaguePlayer(leagueId, player.name);
         } else {
           continue; // Skip invalid player data
         }
@@ -311,6 +298,22 @@ export const leagueService = {
       }));
     } catch (error) {
       console.error('Error fetching league members:', error);
+      throw error;
+    }
+  },
+
+  // A player's league memberships, same shape as getPlayerProfile().leagues
+  async getPlayerLeagues(playerId) {
+    try {
+      const { data, error } = await supabase
+        .from('league_members')
+        .select('league_id, role, is_active, leagues(id, name, status)')
+        .eq('player_id', playerId);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching player leagues:', error);
       throw error;
     }
   },
@@ -947,15 +950,14 @@ export const leagueService = {
       });
 
       // ── 2. Get all tournament results for this league ──────────────
-      const { data: allResults, error: resultsError } = await supabase
+      const allResults = await fetchAllRows(() => supabase
         .from('league_tournament_results')
         .select(`
           *,
           tournament:tournaments(created_at, deleted)
         `)
-        .eq('league_id', leagueId);
-
-      if (resultsError) throw resultsError;
+        .eq('league_id', leagueId)
+        .order('id'));
 
       // Soft-deleted tournaments keep their result rows, but they must not
       // count toward the leaderboard (the leg stats below already exclude
@@ -983,16 +985,14 @@ export const leagueService = {
 
       const playerLegs = {};
       if (leagueTournamentIds.length > 0) {
-        const { data: matches, error: matchesError } = await supabase
+        const matches = await fetchAllRows(() => supabase
           .from('matches')
           .select('player1_id, player2_id, player1_legs, player2_legs, winner_id')
           .in('tournament_id', leagueTournamentIds)
           .eq('status', 'completed')
-          .limit(10000);
+          .order('id'));
 
-        if (matchesError) throw matchesError;
-
-        (matches || []).forEach(match => {
+        matches.forEach(match => {
           const p1 = match.player1_id;
           const p2 = match.player2_id;
           const p1Legs = match.player1_legs || 0;
@@ -1590,14 +1590,11 @@ export const leagueService = {
   // ── Admin: get all players ────────────────────────────────────────
   async getAllPlayers() {
     try {
-      const { data, error } = await supabase
+      return await fetchAllRows(() => supabase
         .from('players')
         .select('id, name, user_id')
         .order('name')
-        .limit(10000);
-
-      if (error) throw error;
-      return data || [];
+        .order('id'));
     } catch (error) {
       console.error('Error fetching all players:', error);
       throw error;
@@ -1624,45 +1621,40 @@ export const leagueService = {
       const tournaments = (allTournaments || []).filter(t => !isCricketGame(t.game_type));
       if (!tournaments.length) return empty;
 
-      // 2+3. All completed matches with results, in ONE query. This previously
-      // fetched the full nested tournament tree per tournament (a season league
-      // meant 40-50 heavy sequential queries and megabytes of transfer every
-      // time the Statistics tab opened) — the aggregation below only needs the
-      // result JSONB, player names, and the starting score.
+      // 2+3. All completed matches in one paged query. Only the result fields
+      // the aggregation below reads are selected: the full result JSONB also
+      // carries per-visit arrays that made this megabytes per season.
       const nameById = new Map(tournaments.map(t => [t.id, t.name]));
+      const statKeys = ['totalScore', 'totalDarts', 'oneEighties', 'checkouts', 'average', 'legs', 'legAverages'];
+      const statPaths = side => statKeys
+        .map(key => `${side}_${key}:result->${side}Stats->${key}`)
+        .join(', ');
 
-      const { data: matchRows, error: matchesError } = await supabase
+      const matchRows = await fetchAllRows(() => supabase
         .from('matches')
         .select(`
           id,
-          status,
-          result,
           starting_score,
           tournament_id,
+          ${statPaths('player1')},
+          ${statPaths('player2')},
           player1:players!matches_player1_id_fkey(id, name),
           player2:players!matches_player2_id_fkey(id, name)
         `)
         .in('tournament_id', tournaments.map(t => t.id))
         .eq('status', 'completed')
         .not('result', 'is', null)
-        .limit(10000);
+        .order('id'));
 
-      if (matchesError) throw matchesError;
-
-      const allMatches = (matchRows || [])
-        .map(m => {
-          let result = m.result;
-          if (typeof result === 'string') {
-            try { result = JSON.parse(result); } catch { result = null; }
-          }
-          return {
-            ...m,
-            result,
-            tournamentName: nameById.get(m.tournament_id) || '',
-            startingScore: m.starting_score || 501
-          };
-        })
-        .filter(m => m.result);
+      const sideStats = (m, side) => Object.fromEntries(statKeys.map(key => [key, m[`${side}_${key}`]]));
+      const allMatches = matchRows.map(m => ({
+        player1: m.player1,
+        player2: m.player2,
+        tournament_id: m.tournament_id,
+        result: { player1Stats: sideStats(m, 'player1'), player2Stats: sideStats(m, 'player2') },
+        tournamentName: nameById.get(m.tournament_id) || '',
+        startingScore: m.starting_score || 501
+      }));
 
       // 5. Aggregate stats
       // Maps: playerId → accumulated data
@@ -2003,48 +1995,7 @@ export const leagueService = {
       // user who already has a player row (from a tournament or another league)
       // cannot get a second one. Reusing it also keeps their career stats on a
       // single profile as they move between leagues and tournaments.
-      let playerId;
-      const { data: linkedPlayer } = await supabase
-        .from('players')
-        .select('id')
-        .eq('user_id', reg.user_id)
-        .maybeSingle();
-
-      if (linkedPlayer) {
-        playerId = linkedPlayer.id;
-      } else {
-        // players.name is unique per owner: an existing row in the approving
-        // manager's roster is either an unlinked manual player (claim it) or
-        // somebody else's account (reject).
-        const { data: playerByName } = await supabase
-          .from('players')
-          .select('id, user_id')
-          .eq('name', reg.player_name)
-          .eq('owner_id', user.id)
-          .maybeSingle();
-
-        if (playerByName) {
-          if (playerByName.user_id && playerByName.user_id !== reg.user_id) {
-            throw new Error('PLAYER_NAME_TAKEN');
-          }
-          playerId = playerByName.id;
-          if (!playerByName.user_id) {
-            const { error: linkError } = await supabase
-              .from('players')
-              .update({ user_id: reg.user_id })
-              .eq('id', playerId);
-            if (linkError) throw linkError;
-          }
-        } else {
-          const { data: newPlayer, error: createError } = await supabase
-            .from('players')
-            .insert({ name: reg.player_name, user_id: reg.user_id, owner_id: user.id })
-            .select('id')
-            .single();
-          if (createError) throw createError;
-          playerId = newPlayer.id;
-        }
-      }
+      const playerId = await resolveLeaguePlayer(reg.league_id, reg.player_name, reg.user_id);
 
       // Add to league_members. No explicit id: on conflict the update must not
       // try to rewrite the existing row's PK. left_at: null so a returning
@@ -2121,40 +2072,7 @@ export const leagueService = {
 
   async addUserToLeague(leagueId, userId, playerName) {
     try {
-      const { data: { user: currentUser }, error: currentUserError } = await supabase.auth.getUser();
-      if (currentUserError) throw currentUserError;
-
-      // Find or create player linked to user
-      let { data: existingPlayer } = await supabase
-        .from('players')
-        .select('id, user_id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (!existingPlayer) {
-        // Try by name within the caller's roster (players are owner-scoped)
-        const { data: byName } = await supabase
-          .from('players')
-          .select('id, user_id')
-          .eq('name', playerName)
-          .eq('owner_id', currentUser.id)
-          .maybeSingle();
-
-        if (byName) {
-          existingPlayer = byName;
-          if (!byName.user_id) {
-            await supabase.from('players').update({ user_id: userId }).eq('id', byName.id);
-          }
-        } else {
-          const { data: newPlayer, error } = await supabase
-            .from('players')
-            .insert({ name: playerName, user_id: userId, owner_id: currentUser.id })
-            .select('id')
-            .single();
-          if (error) throw error;
-          existingPlayer = newPlayer;
-        }
-      }
+      const existingPlayer = { id: await resolveLeaguePlayer(leagueId, playerName, userId) };
 
       const { error: memberError } = await supabase.from('league_members').upsert({
         league_id: leagueId,

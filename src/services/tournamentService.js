@@ -1,5 +1,6 @@
 import { supabase, generateId } from '../lib/supabase.js'
 import { isCricketGame } from '../lib/cricket.js'
+import { sortStandings } from '../utils/standings.js'
 
 // Group matches in their intended play order. The DB rows carry match_order
 // (migration 20260910190000); rows from before it fall back to insert order.
@@ -38,8 +39,7 @@ function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') 
       totalScore: 0,
       dartsThrown: 0,
       average: 0,
-      points: 0,
-      headToHeadWins: {} // Track head-to-head wins against each opponent
+      points: 0
     });
   });
 
@@ -65,20 +65,10 @@ function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') 
           p1Stats.matchesWon++;
           p1Stats.points += 3;
           p2Stats.matchesLost++;
-          // Track head-to-head
-          if (!p1Stats.headToHeadWins[match.player2?.id]) {
-            p1Stats.headToHeadWins[match.player2?.id] = 0;
-          }
-          p1Stats.headToHeadWins[match.player2?.id]++;
         } else if (match.result.winner === match.player2?.id) {
           p2Stats.matchesWon++;
           p2Stats.points += 3;
           p1Stats.matchesLost++;
-          // Track head-to-head
-          if (!p2Stats.headToHeadWins[match.player1?.id]) {
-            p2Stats.headToHeadWins[match.player1?.id] = 0;
-          }
-          p2Stats.headToHeadWins[match.player1?.id]++;
         }
         
         // Accumulate totalScore and totalDarts for cumulative average calculation
@@ -107,51 +97,7 @@ function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') 
     }
   });
 
-  // Convert to array
-  const standings = Array.from(playerStats.values());
-
-  // Use provided criteria order or default
-  const order = criteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-  
-  // Sort standings according to criteria order
-  standings.sort((a, b) => {
-    for (const criterion of order) {
-      let comparison = 0;
-      
-      switch (criterion) {
-        case 'matchesWon':
-          comparison = b.matchesWon - a.matchesWon;
-          break;
-        case 'legDifference':
-          const legDiffA = a.legsWon - a.legsLost;
-          const legDiffB = b.legsWon - b.legsLost;
-          comparison = legDiffB - legDiffA;
-          break;
-        case 'average':
-          comparison = (b.average || 0) - (a.average || 0);
-          break;
-        case 'headToHead':
-          // Compare head-to-head: if players played each other, check who won more matches
-          const aWinsVsB = a.headToHeadWins[b.player.id] || 0;
-          const bWinsVsA = b.headToHeadWins[a.player.id] || 0;
-          comparison = bWinsVsA - aWinsVsB;
-          break;
-        default:
-          comparison = 0;
-      }
-      
-      // If this criterion shows a difference, return the comparison
-      if (comparison !== 0) {
-        return comparison;
-      }
-      // Otherwise, continue to next criterion
-    }
-    
-    // If all criteria are equal, maintain current order (stable sort)
-    return 0;
-  });
-
-  return standings;
+  return sortStandings(Array.from(playerStats.values()), criteriaOrder, group.matches);
 }
 
 // Tournament Operations
@@ -522,281 +468,6 @@ export const tournamentService = {
     }
   },
 
-  // Get all tournaments
-  async getTournaments() {
-    try {
-      // First, get all tournaments with basic info (excluding deleted ones)
-      const { data: tournaments, error: tournamentsError } = await supabase
-        .from('tournaments')
-        .select('*')
-        .eq('deleted', false)
-        .order('created_at', { ascending: false })
-
-      if (tournamentsError) throw tournamentsError
-
-      if (tournaments.length === 0) return []
-
-      const tournamentIds = tournaments.map(t => t.id)
-
-      // Get all players (override default 1000-row limit)
-      const { data: allPlayers, error: playersError } = await supabase
-        .from('players')
-        .select('*')
-        .limit(10000)
-
-      if (playersError) throw playersError
-
-      // Create a player lookup map
-      const playerMap = new Map(allPlayers.map(player => [player.id, player]))
-
-      // Get matches scoped to these tournaments (override default 1000-row limit)
-      const { data: allMatches, error: matchesError } = await supabase
-        .from('matches')
-        .select('*')
-        .in('tournament_id', tournamentIds)
-        .limit(10000)
-
-      if (matchesError) throw matchesError
-
-      // Get groups scoped to these tournaments (override default 1000-row limit)
-      const { data: allGroups, error: groupsError } = await supabase
-        .from('groups')
-        .select('*')
-        .in('tournament_id', tournamentIds)
-        .limit(10000)
-
-      if (groupsError) throw groupsError
-
-      // Get tournament players scoped to these tournaments (override default 1000-row limit)
-      const { data: tournamentPlayers, error: tpError } = await supabase
-        .from('tournament_players')
-        .select('*')
-        .in('tournament_id', tournamentIds)
-        .limit(10000)
-
-      if (tpError) throw tpError
-
-      // Get group players scoped to the fetched groups
-      const groupIds = allGroups.map(g => g.id)
-      const { data: groupPlayers, error: gpError } = await supabase
-        .from('group_players')
-        .select('*')
-        .in('group_id', groupIds)
-        .limit(10000)
-
-      if (gpError) throw gpError
-
-      // Fetch match player stats for completed matches
-      const completedMatchIds = allMatches
-        .filter(m => m.status === 'completed')
-        .map(m => m.id)
-      let matchPlayerStats = []
-      if (completedMatchIds.length > 0) {
-        // Chunk into batches of 500 to avoid URL length limits
-        for (let i = 0; i < completedMatchIds.length; i += 500) {
-          const chunk = completedMatchIds.slice(i, i + 500)
-          const { data: statsChunk, error: statsError } = await supabase
-            .from('match_player_stats')
-            .select('*')
-            .in('match_id', chunk)
-            .limit(5000)
-          if (statsError) throw statsError
-          matchPlayerStats = matchPlayerStats.concat(statsChunk)
-        }
-      }
-
-
-      // Transform data to match our app structure
-      return tournaments.map(tournament => {
-        // Parse group_settings if it's a string (JSONB from Supabase might be string)
-        let groupSettings = tournament.group_settings;
-        if (typeof groupSettings === 'string') {
-          try {
-            groupSettings = JSON.parse(groupSettings);
-          } catch (e) {
-            console.error('Error parsing group_settings:', e);
-            groupSettings = {};
-          }
-        }
-        
-        // Extract standingsCriteriaOrder from groupSettings
-        const standingsCriteriaOrder = groupSettings?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-        // Get tournament players
-        const tournamentPlayerIds = tournamentPlayers
-          .filter(tp => tp.tournament_id === tournament.id)
-          .map(tp => tp.player_id)
-        const tournamentPlayersList = tournamentPlayerIds
-          .map(id => playerMap.get(id))
-          .filter(Boolean)
-
-        // Get groups for this tournament
-        const tournamentGroups = allGroups
-          .filter(group => group.tournament_id === tournament.id)
-          .map(group => {
-            // Get group players
-            const groupPlayerIds = groupPlayers
-              .filter(gp => gp.group_id === group.id)
-              .map(gp => gp.player_id)
-            const groupPlayersList = groupPlayerIds
-              .map(id => playerMap.get(id))
-              .filter(Boolean)
-
-            // Get matches for this group
-            const groupMatches = sortByPlayOrder(allMatches.filter(match => match.group_id === group.id))
-              .map(match => {
-                
-                // Get player stats for this match
-                const player1Stats = matchPlayerStats?.find(s => s.match_id === match.id && s.player_id === match.player1_id);
-                const player2Stats = matchPlayerStats?.find(s => s.match_id === match.id && s.player_id === match.player2_id);
-                
-                return {
-                  id: match.id,
-                  matchOrder: match.match_order ?? null,
-                  player1: playerMap.get(match.player1_id) || null,
-                  player2: playerMap.get(match.player2_id) || null,
-                  status: match.status,
-                  legsToWin: match.legs_to_win,
-                  completedAt: match.completed_at || null,
-                  startingScore: match.starting_score,
-                  gameType: match.game_type || tournament.game_type || 'x01',
-                  startedByUserId: match.started_by_user_id,
-                  result: match.winner_id ? (() => {
-                    // If result JSONB exists, use it (it contains full data including checkouts and legAverages)
-                    if (match.result) {
-                      // Parse if it's a string (JSONB from Supabase might be string)
-                      let parsedResult = match.result;
-                      if (typeof parsedResult === 'string') {
-                        try {
-                          parsedResult = JSON.parse(parsedResult);
-                        } catch (e) {
-                          console.error('Error parsing match result:', e);
-                          parsedResult = null;
-                        }
-                      }
-                      if (parsedResult) {
-                        // ALWAYS use match.winner_id as the authoritative winner.
-                        // The JSONB result.winner can become stale after player merges.
-                        return { ...parsedResult, winner: match.winner_id };
-                      }
-                    }
-                    // Fallback to basic stats if result doesn't exist
-                    return {
-                      winner: match.winner_id,
-                      player1Id: match.player1_id,
-                      player2Id: match.player2_id,
-                      player1Legs: match.player1_legs,
-                      player2Legs: match.player2_legs,
-                      player1Stats: player1Stats ? {
-                        totalScore: player1Stats.total_score,
-                        totalDarts: player1Stats.total_darts,
-                        average: parseFloat(player1Stats.average),
-                        checkouts: [],
-                        legAverages: [],
-                        legs: []
-                      } : null,
-                      player2Stats: player2Stats ? {
-                        totalScore: player2Stats.total_score,
-                        totalDarts: player2Stats.total_darts,
-                        average: parseFloat(player2Stats.average),
-                        checkouts: [],
-                        legAverages: [],
-                        legs: []
-                      } : null
-                    };
-                  })() : null
-                };
-              })
-
-            const groupWithData = {
-              id: group.id,
-              name: group.name,
-              players: groupPlayersList,
-              matches: groupMatches,
-              standings: []
-            };
-
-            // Calculate standings for this group with tournament criteria order
-            groupWithData.standings = calculateGroupStandings(groupWithData, standingsCriteriaOrder, tournament.game_type);
-
-            return groupWithData;
-          })
-
-        // Get playoff matches for this tournament
-        // IMPORTANT: playoff matches have group_id = NULL, so we must scope by matches.tournament_id
-        // Otherwise every tournament would "see" every playoff match in the DB, leaking statistics across tournaments.
-        const playoffMatches = allMatches
-          .filter(match => match.is_playoff === true && match.tournament_id === tournament.id)
-          .map(match => {
-            return {
-              id: match.id,
-              player1: playerMap.get(match.player1_id) || null,
-              player2: playerMap.get(match.player2_id) || null,
-              status: match.status,
-              legsToWin: match.legs_to_win,
-              completedAt: match.completed_at || null,
-              startingScore: match.starting_score,
-              gameType: match.game_type || tournament.game_type || 'x01',
-              startedByUserId: match.started_by_user_id,
-              isPlayoff: true,
-              playoffRound: match.playoff_round,
-              playoffMatchNumber: match.playoff_match_number,
-              result: match.winner_id ? (() => {
-                // If result JSONB exists, use it (it contains full data including checkouts and legAverages)
-                if (match.result) {
-                  // Parse if it's a string (JSONB from Supabase might be string)
-                  let parsedResult = match.result;
-                  if (typeof parsedResult === 'string') {
-                    try {
-                      parsedResult = JSON.parse(parsedResult);
-                    } catch (e) {
-                      console.error('Error parsing playoff match result:', e);
-                      parsedResult = null;
-                    }
-                  }
-                  if (parsedResult) {
-                    // ALWAYS use match.winner_id as the authoritative winner.
-                    // The JSONB result.winner can become stale after player merges.
-                    return { ...parsedResult, winner: match.winner_id };
-                  }
-                }
-                // Fallback to basic stats if result doesn't exist
-                return {
-                  winner: match.winner_id,
-                  player1Legs: match.player1_legs,
-                  player2Legs: match.player2_legs
-                };
-              })() : null
-            };
-          });
-
-        return {
-          id: tournament.id,
-          name: tournament.name,
-          status: tournament.status,
-          legsToWin: tournament.legs_to_win,
-          startingScore: tournament.starting_score,
-          gameType: tournament.game_type || 'x01',
-          defaultScoringMode: tournament.default_scoring_mode || 'dart',
-          playoffSettings: tournament.playoff_settings,
-          playoffs: tournament.playoffs,
-          playoffMatches: playoffMatches,
-          tournamentType: tournament.tournament_type || 'groups_with_playoffs',
-          standingsCriteriaOrder: standingsCriteriaOrder,
-          leagueId: tournament.league_id || null,
-          createdAt: tournament.created_at,
-          updatedAt: tournament.updated_at,
-          userId: tournament.user_id,
-          players: tournamentPlayersList,
-          groups: tournamentGroups
-        }
-      })
-
-    } catch (error) {
-      console.error('Error fetching tournaments:', error)
-      throw error
-    }
-  },
-
   // Get a single tournament
   async getTournament(tournamentId) {
     try {
@@ -1080,10 +751,30 @@ export const tournamentService = {
       if (groupsCheckError) throw groupsCheckError;
       
       if (existingGroups && existingGroups.length > 0) {
-        console.warn('Groups already exist for this tournament. Skipping group creation.');
-        // Return the existing tournament data instead of creating duplicates
-        const completeTournament = await this.getTournament(tournamentId);
-        return completeTournament;
+        // Admin Panel can set a played tournament back to registration: never
+        // drop groups once any match has been started.
+        const { data: playedMatches, error: playedError } = await supabase
+          .from('matches')
+          .select('id')
+          .eq('tournament_id', tournamentId)
+          .neq('status', 'pending')
+          .limit(1);
+        if (playedError) throw playedError;
+        if (tournament.status !== 'open_for_registration' || playedMatches.length > 0) {
+          console.warn('Groups already exist for this tournament. Skipping group creation.');
+          // Return the existing tournament data instead of creating duplicates
+          const completeTournament = await this.getTournament(tournamentId);
+          return completeTournament;
+        }
+        // Leftovers of a start that failed halfway (the writes below are not one
+        // transaction): drop them so the retry starts clean. group_players and
+        // matches go with them (ON DELETE CASCADE).
+        // shortcut: two devices pressing Start at once can still race; move to a start_tournament RPC if that shows up.
+        const { error: cleanupError } = await supabase
+          .from('groups')
+          .delete()
+          .eq('tournament_id', tournamentId);
+        if (cleanupError) throw cleanupError;
       }
 
       // Get all players for this tournament
@@ -1124,6 +815,11 @@ export const tournamentService = {
       if (hasCustomGroups && assignedPlayerIds.size !== players.length) {
         console.warn('Custom group assignment did not include all players; falling back to auto-generation.');
         groups = this.generateGroups(players, groupSettings);
+      }
+
+      // A one-player group has no matches and would qualify without playing.
+      if (groups.some(g => g.players.length < 2)) {
+        throw new Error('Every group needs at least 2 players');
       }
       
       // Batch insert all groups
@@ -1194,12 +890,14 @@ export const tournamentService = {
     let groupCount;
     let playersPerGroup;
 
+    // Never build a group of one: it has no matches and would qualify for free.
     if (settings.type === 'groups') {
       groupCount = Math.max(1, Number(settings.value) || 1);
-      groupCount = Math.min(groupCount, players.length);
+      groupCount = Math.max(1, Math.min(groupCount, Math.floor(players.length / 2)));
     } else {
-      playersPerGroup = settings.value;
-      groupCount = Math.ceil(players.length / playersPerGroup);
+      playersPerGroup = Math.max(2, Number(settings.value) || 2);
+      // A trailing remainder of 1 joins the last full group instead.
+      groupCount = Math.max(1, Math.floor(players.length / playersPerGroup) + (players.length % playersPerGroup > 1 ? 1 : 0));
     }
 
     const seededSet = seededPlayerIds instanceof Set ? seededPlayerIds : new Set(seededPlayerIds);
@@ -1220,10 +918,9 @@ export const tournamentService = {
         groupSizes[i] = baseSize + (i < extra ? 1 : 0);
       }
     } else {
-      playersPerGroup = Math.max(1, Number(playersPerGroup) || 1);
       for (let i = 0; i < groupCount; i++) {
         const remaining = players.length - i * playersPerGroup;
-        groupSizes[i] = Math.min(playersPerGroup, remaining);
+        groupSizes[i] = i === groupCount - 1 ? remaining : Math.min(playersPerGroup, remaining);
       }
     }
 
@@ -1578,6 +1275,16 @@ export const tournamentService = {
       if (regError) throw regError;
       if (reg.status !== 'pending') throw new Error('Registration already processed');
 
+      // A stale screen could otherwise add a player to a started tournament,
+      // where they have no group and no matches.
+      const { data: regTournament, error: regTournamentError } = await supabase
+        .from('tournaments')
+        .select('status')
+        .eq('id', reg.tournament_id)
+        .single();
+      if (regTournamentError) throw regTournamentError;
+      if (regTournament.status !== 'open_for_registration') throw new Error('REGISTRATION_CLOSED');
+
       // Resolve the player row for this registration.
       //
       // Look up by account link FIRST, by name second. players.user_id has a
@@ -1727,6 +1434,21 @@ export const tournamentService = {
       return data === true;
     } catch (error) {
       console.error('Error checking scoring permission:', error);
+      return null;
+    }
+  },
+
+  // Whether the current user manages this tournament: owner, the linked
+  // league's creator or co-managers, or admin (can_manage_tournament in the DB).
+  async canManage(tournamentId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return false;
+      const { data, error } = await supabase.rpc('can_manage_tournament', { t_id: tournamentId });
+      if (error) throw error;
+      return data === true;
+    } catch (error) {
+      console.error('Error checking manage permission:', error);
       return null;
     }
   },
@@ -1925,18 +1647,26 @@ export const tournamentService = {
 
   async getPlayerProfile(playerId) {
     try {
-      const { data: player, error: playerError } = await supabase
-        .from('players')
-        .select('*')
-        .eq('id', playerId)
-        .single();
+      // Queries run in three parallel waves: by player id, then the player's
+      // tournaments, then everything scoped to those tournaments.
+      const [
+        { data: player, error: playerError },
+        { data: tournamentLinks },
+        { data: matchStatsRaw },
+        { data: placementResults },
+        { data: leagueMemberships }
+      ] = await Promise.all([
+        supabase.from('players').select('*').eq('id', playerId).single(),
+        // Tournament history
+        supabase.from('tournament_players').select('tournament_id').eq('player_id', playerId),
+        // Match stats for career aggregation (no tournament_id column — scope by match)
+        supabase.from('match_player_stats').select('*').eq('player_id', playerId),
+        // League-recorded placements fill in tournaments without a bracket result
+        supabase.from('league_tournament_results').select('tournament_id, placement').eq('player_id', playerId),
+        // League memberships
+        supabase.from('league_members').select('league_id, role, is_active, leagues(id, name, status)').eq('player_id', playerId)
+      ]);
       if (playerError) throw playerError;
-
-      // Tournament history
-      const { data: tournamentLinks } = await supabase
-        .from('tournament_players')
-        .select('tournament_id')
-        .eq('player_id', playerId);
 
       const tournamentIds = (tournamentLinks || []).map(tp => tp.tournament_id);
       let tournaments = [];
@@ -1957,30 +1687,72 @@ export const tournamentService = {
       // A never-matching id keeps `.in()` valid when the player has no tournaments.
       const scopeIds = activeTournamentIds.length > 0 ? activeTournamentIds : ['00000000-0000-0000-0000-000000000000'];
 
-      // Win/loss from matches
-      const { data: matchesAsP1 } = await supabase
-        .from('matches')
-        .select('id, winner_id, game_type')
-        .eq('player1_id', playerId)
-        .eq('status', 'completed')
-        .in('tournament_id', scopeIds);
-      const { data: matchesAsP2 } = await supabase
-        .from('matches')
-        .select('id, winner_id, game_type')
-        .eq('player2_id', playerId)
-        .eq('status', 'completed')
-        .in('tournament_id', scopeIds);
+      const [
+        { data: matchesAsP1 },
+        { data: matchesAsP2 },
+        { data: matchesWithResults },
+        { data: playoffMatches },
+        { data: recentRaw }
+      ] = await Promise.all([
+        // Win/loss from matches
+        supabase
+          .from('matches')
+          .select('id, winner_id, game_type')
+          .eq('player1_id', playerId)
+          .eq('status', 'completed')
+          .in('tournament_id', scopeIds),
+        supabase
+          .from('matches')
+          .select('id, winner_id, game_type')
+          .eq('player2_id', playerId)
+          .eq('status', 'completed')
+          .in('tournament_id', scopeIds),
+        // 180s (X01) and Cricket marks: only these result fields, not the
+        // full JSONB with its per-visit arrays
+        supabase
+          .from('matches')
+          .select(`
+            player1_id, player2_id, game_type,
+            l1:result->player1Legs, l2:result->player2Legs,
+            o1:result->player1Stats->oneEighties, o2:result->player2Stats->oneEighties,
+            m1:result->player1Stats->marks, m2:result->player2Stats->marks,
+            d1:result->player1Stats->darts, d2:result->player2Stats->darts
+          `)
+          .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
+          .eq('status', 'completed')
+          .in('tournament_id', scopeIds)
+          .not('result', 'is', null),
+        // Knockout matches for placements (see below)
+        tournamentIds.length > 0
+          ? supabase
+            .from('matches')
+            .select('tournament_id, playoff_round, playoff_match_number, winner_id, player1_id, player2_id')
+            .in('tournament_id', tournamentIds)
+            .eq('is_playoff', true)
+            .eq('status', 'completed')
+            .limit(5000)
+          : { data: [] },
+        // Recent form — newest completed matches with opponent and score
+        supabase
+          .from('matches')
+          .select(`
+            id, tournament_id, winner_id, player1_id, player2_id,
+            player1_legs, player2_legs, is_playoff, playoff_round, created_at, updated_at, completed_at, legs_to_win, starting_score, game_type, result,
+            player1:players!matches_player1_id_fkey(id, name),
+            player2:players!matches_player2_id_fkey(id, name)
+          `)
+          .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
+          .eq('status', 'completed')
+          .in('tournament_id', scopeIds)
+          .order('updated_at', { ascending: false })
+          .limit(10)
+      ]);
 
       const allMatches = [...(matchesAsP1 || []), ...(matchesAsP2 || [])];
       const allMatchIds = new Set(allMatches.map(m => m.id));
       // Averages, checkouts and darts are X01 numbers — Cricket matches only count for legs
       const cricketMatchIds = new Set(allMatches.filter(m => isCricketGame(m.game_type)).map(m => m.id));
 
-      // Match stats for career aggregation (no tournament_id column — scope by match)
-      const { data: matchStatsRaw } = await supabase
-        .from('match_player_stats')
-        .select('*')
-        .eq('player_id', playerId);
       const matchStats = (matchStatsRaw || []).filter(st => allMatchIds.has(st.match_id));
       const wins = allMatches.filter(m => m.winner_id === playerId).length;
       const losses = allMatches.length - wins;
@@ -2007,29 +1779,22 @@ export const tournamentService = {
       // Count 180s (X01) and Cricket marks from match results
       let total180s = 0;
       let cricketStats = null;
-      const { data: matchesWithResults } = await supabase
-        .from('matches')
-        .select('player1_id, player2_id, game_type, result')
-        .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
-        .eq('status', 'completed')
-        .in('tournament_id', scopeIds)
-        .not('result', 'is', null);
-
       (matchesWithResults || []).forEach(m => {
-        if (!m.result) return;
         const isPlayer1 = m.player1_id === playerId;
-        const stats = isPlayer1 ? m.result.player1Stats : m.result.player2Stats;
+        const oneEighties = isPlayer1 ? m.o1 : m.o2;
         if (!isCricketGame(m.game_type)) {
-          if (stats?.oneEighties) total180s += stats.oneEighties;
+          if (oneEighties) total180s += oneEighties;
           return;
         }
+        const marks = (isPlayer1 ? m.m1 : m.m2) || 0;
+        const darts = (isPlayer1 ? m.d1 : m.d2) || 0;
         cricketStats = cricketStats || { matches: 0, legsWon: 0, legsLost: 0, marks: 0, darts: 0, bestMpr: 0 };
         cricketStats.matches++;
-        cricketStats.legsWon += (isPlayer1 ? m.result.player1Legs : m.result.player2Legs) || 0;
-        cricketStats.legsLost += (isPlayer1 ? m.result.player2Legs : m.result.player1Legs) || 0;
-        cricketStats.marks += stats?.marks || 0;
-        cricketStats.darts += stats?.darts || 0;
-        if (stats?.darts > 0) cricketStats.bestMpr = Math.max(cricketStats.bestMpr, (stats.marks / stats.darts) * 3);
+        cricketStats.legsWon += (isPlayer1 ? m.l1 : m.l2) || 0;
+        cricketStats.legsLost += (isPlayer1 ? m.l2 : m.l1) || 0;
+        cricketStats.marks += marks;
+        cricketStats.darts += darts;
+        if (darts > 0) cricketStats.bestMpr = Math.max(cricketStats.bestMpr, (marks / darts) * 3);
       });
       if (cricketStats) {
         const { marks, darts, ...rest } = cricketStats;
@@ -2042,14 +1807,6 @@ export const tournamentService = {
       // but sits at match number 2 (see generatePlayoffRounds).
       const placementByTournament = {};
       if (tournamentIds.length > 0) {
-        const { data: playoffMatches } = await supabase
-          .from('matches')
-          .select('tournament_id, playoff_round, playoff_match_number, winner_id, player1_id, player2_id')
-          .in('tournament_id', tournamentIds)
-          .eq('is_playoff', true)
-          .eq('status', 'completed')
-          .limit(5000);
-
         const matchesByTournament = new Map();
         (playoffMatches || []).forEach(m => {
           if (!matchesByTournament.has(m.tournament_id)) matchesByTournament.set(m.tournament_id, []);
@@ -2070,10 +1827,6 @@ export const tournamentService = {
       }
 
       // League-recorded placements fill in tournaments without a bracket result
-      const { data: placementResults } = await supabase
-        .from('league_tournament_results')
-        .select('tournament_id, placement')
-        .eq('player_id', playerId);
       (placementResults || []).forEach(r => {
         if (!placementByTournament[r.tournament_id] && r.placement) {
           placementByTournament[r.tournament_id] = r.placement;
@@ -2089,19 +1842,6 @@ export const tournamentService = {
       // Recent form — newest completed matches with opponent and score
       const statsByMatch = new Map((matchStats || []).map(s => [s.match_id, s]));
       const tournamentNameById = new Map(tournaments.map(tourn => [tourn.id, tourn.name]));
-      const { data: recentRaw } = await supabase
-        .from('matches')
-        .select(`
-          id, tournament_id, winner_id, player1_id, player2_id,
-          player1_legs, player2_legs, is_playoff, playoff_round, created_at, updated_at, completed_at, legs_to_win, starting_score, game_type, result,
-          player1:players!matches_player1_id_fkey(id, name),
-          player2:players!matches_player2_id_fkey(id, name)
-        `)
-        .or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
-        .eq('status', 'completed')
-        .in('tournament_id', scopeIds)
-        .order('updated_at', { ascending: false })
-        .limit(10);
 
       const recentMatches = (recentRaw || []).map(m => {
         const isPlayer1 = m.player1_id === playerId;
@@ -2132,12 +1872,6 @@ export const tournamentService = {
           startingScore: m.starting_score || null
         };
       });
-
-      // League memberships
-      const { data: leagueMemberships } = await supabase
-        .from('league_members')
-        .select('league_id, role, is_active, leagues(id, name, status)')
-        .eq('player_id', playerId);
 
       return {
         player,
@@ -2193,10 +1927,10 @@ export const tournamentService = {
     try {
       console.log('Attempting to soft delete tournament:', tournamentId);
       
-      // First, check if tournament exists and get user info
+      // First, check the tournament exists
       const { data: existingTournament, error: checkError } = await supabase
         .from('tournaments')
-        .select('id, name, deleted, user_id')
+        .select('id')
         .eq('id', tournamentId)
         .maybeSingle();
 
@@ -2210,22 +1944,11 @@ export const tournamentService = {
         throw new Error(`Tournament not found with ID: ${tournamentId}`);
       }
 
-      console.log('Tournament found:', existingTournament);
-
-      // Check current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error('Error getting current user:', userError);
-      }
-      console.log('Current user ID:', user?.id);
-      console.log('Tournament user_id:', existingTournament.user_id);
-      
-      // Roles live in app_metadata only (user_metadata is user-editable)
-      const isAdmin = user?.app_metadata?.role === 'admin';
-      
-      // Allow deletion if user is admin OR if user owns the tournament
-      if (user && existingTournament.user_id && user.id !== existingTournament.user_id && !isAdmin) {
-        throw new Error(`Permission denied: You can only delete tournaments you created. Tournament belongs to user ${existingTournament.user_id}, but you are ${user.id}`);
+      // Same rule as the DB (owner, league creator/co-managers, admin). Keep it:
+      // the soft delete runs through the scorer UPDATE policy, so RLS alone
+      // would let plain scorers delete.
+      if (await this.canManage(tournamentId) !== true) {
+        throw new Error('Permission denied: you cannot delete this tournament.');
       }
 
       // Soft delete: set deleted = true instead of actually deleting
@@ -2282,7 +2005,6 @@ export const tournamentService = {
         }
       }
 
-      console.log('Successfully soft deleted tournament:', data);
       return true;
 
     } catch (error) {
@@ -2648,30 +2370,10 @@ export const matchService = {
 
       // If match doesn't exist and we have matchData (for playoff matches), create it
       if (matchData) {
-        // Get tournament_id for playoff matches
-        let tournamentId = matchData.tournamentId || matchData.tournament_id;
-        
-        // If tournament_id not provided and it's a playoff match, look it up from players
-        if (!tournamentId && matchData.isPlayoff && matchData.player1?.id && matchData.player2?.id) {
-          const { data: tournamentPlayers, error: tpError } = await supabase
-            .from('tournament_players')
-            .select('tournament_id')
-            .in('player_id', [matchData.player1.id, matchData.player2.id]);
-          
-          if (!tpError && tournamentPlayers) {
-            // Find tournament where both players are registered
-            const tournamentCounts = {};
-            tournamentPlayers.forEach(tp => {
-              tournamentCounts[tp.tournament_id] = (tournamentCounts[tp.tournament_id] || 0) + 1;
-            });
-            
-            // Find tournament where both players appear (count = 2)
-            tournamentId = Object.keys(tournamentCounts).find(
-              tid => tournamentCounts[tid] === 2
-            ) || null;
-          }
-        }
-        
+        // The caller must name the tournament: guessing it from the players
+        // picked the wrong round for league players who meet in many rounds.
+        const tournamentId = matchData.tournamentId || matchData.tournament_id || null;
+
         const { data: newMatch, error: createError } = await supabase
           .from('matches')
           .insert({
@@ -3042,10 +2744,10 @@ export const matchService = {
     }
   },
 
-  // Get live matches
-  async getLiveMatches() {
+  // Get live matches, optionally only one tournament's or one player's
+  async getLiveMatches({ tournamentId = null, playerId = null } = {}) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('matches')
         .select(`
           *,
@@ -3053,6 +2755,9 @@ export const matchService = {
           player2:players!matches_player2_id_fkey(*)
         `)
         .not('live_device_id', 'is', null)
+      if (tournamentId) query = query.eq('tournament_id', tournamentId)
+      if (playerId) query = query.or(`player1_id.eq.${playerId},player2_id.eq.${playerId}`)
+      const { data, error } = await query
 
       if (error) throw error
       return data

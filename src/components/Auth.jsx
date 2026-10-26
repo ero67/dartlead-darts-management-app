@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo-128.webp';
 
 // Google's "G" in its brand colours (sign-in button guidelines).
 function GoogleMark() {

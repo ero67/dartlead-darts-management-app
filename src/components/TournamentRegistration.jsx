@@ -463,6 +463,10 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
 
   const confirmStartWithGroups = async () => {
     if (isStarting) return;
+    if ((draftGroups || []).some(g => (g.players || []).length < 2)) {
+      toast.error(t('registration.groupNeedsTwoPlayers'));
+      return;
+    }
     setIsStarting(true);
     try {
       await startTournament(tournamentSettings.groupSettings, draftGroups);

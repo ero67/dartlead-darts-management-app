@@ -58,7 +58,10 @@ export async function deliverFile({ blob, filename, title, text }) {
 
 // ---- CSV -------------------------------------------------------------------
 const csvCell = (v) => {
-  const s = v === null || v === undefined ? '' : String(v);
+  let s = v === null || v === undefined ? '' : String(v);
+  // Player names are user input: a leading = @ or +/- (not a signed number)
+  // would run as a spreadsheet formula when the CSV is opened.
+  if (typeof v === 'string' && /^(?:[=@\t\r]|[+-](?![\d.]))/.test(s)) s = `'${s}`;
   return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 // Semicolon-separated with a BOM: opens correctly in Excel with a Slovak/Czech

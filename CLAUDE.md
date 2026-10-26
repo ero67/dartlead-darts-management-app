@@ -93,3 +93,5 @@ See `AGENTS.md` for full details. Key points:
 Requires `.env.local` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 Optional `VITE_PUBLIC_APP_URL` (public website address) — required for the
 Android build, where outgoing links must not use the shell's local origin.
+Optional `VITE_DEMO_TOURNAMENT_ID` shows the demo tournament buttons on the
+landing page (see `docs/DEMO_LEAGUE.md`); without it they are hidden.

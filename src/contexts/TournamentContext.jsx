@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
+import { useLanguage } from './LanguageContext';
 import { tournamentService, matchService } from '../services/tournamentService.js';
 import { leagueService } from '../services/leagueService.js';
 import { supabase } from '../lib/supabase.js';
-import { enqueueWrite, hasPendingResults, QUEUE_TYPES } from '../lib/offlineQueue.js';
+import { enqueueWrite, removeWrite, hasPendingResults, flushQueue, QUEUE_TYPES } from '../lib/offlineQueue.js';
+import { isTerminalWriteError } from '../lib/queuePolicy.js';
 import { isCricketGame } from '../lib/cricket.js';
+import { sortStandings } from '../utils/standings.js';
 
 
 const TournamentContext = createContext();
@@ -505,8 +509,7 @@ function updateGroupStandings(group, tournament = null) {
         totalScore: 0,
         dartsThrown: 0,
         average: 0,
-        points: 0,
-        headToHeadWins: {} // Track head-to-head wins against each opponent
+        points: 0
       };
     }
   });
@@ -530,20 +533,10 @@ function updateGroupStandings(group, tournament = null) {
         p1Stats.matchesWon++;
         p2Stats.matchesLost++;
         p1Stats.points += 3;
-        // Track head-to-head
-        if (!p1Stats.headToHeadWins[player2.id]) {
-          p1Stats.headToHeadWins[player2.id] = 0;
-        }
-        p1Stats.headToHeadWins[player2.id]++;
       } else {
         p2Stats.matchesWon++;
         p1Stats.matchesLost++;
         p2Stats.points += 3;
-        // Track head-to-head
-        if (!p2Stats.headToHeadWins[player1.id]) {
-          p2Stats.headToHeadWins[player1.id] = 0;
-        }
-        p2Stats.headToHeadWins[player1.id]++;
       }
       
       p1Stats.legsWon += result.player1Legs || 0;
@@ -576,53 +569,13 @@ function updateGroupStandings(group, tournament = null) {
     }
   });
 
-  // Get criteria order from tournament settings or use default
-  const criteriaOrder = tournament?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-  console.log('updateGroupStandings - tournament?.standingsCriteriaOrder:', tournament?.standingsCriteriaOrder);
-  console.log('updateGroupStandings - Using criteriaOrder:', criteriaOrder);
-  
-  // Sort standings according to criteria order
-  group.standings = Object.values(standings).sort((a, b) => {
-    for (const criterion of criteriaOrder) {
-      let comparison = 0;
-      
-      switch (criterion) {
-        case 'matchesWon':
-          comparison = b.matchesWon - a.matchesWon;
-          break;
-        case 'legDifference':
-          const legDiffA = a.legsWon - a.legsLost;
-          const legDiffB = b.legsWon - b.legsLost;
-          comparison = legDiffB - legDiffA;
-          break;
-        case 'average':
-          comparison = (b.average || 0) - (a.average || 0);
-          break;
-        case 'headToHead':
-          // Compare head-to-head: if players played each other, check who won more matches
-          const aWinsVsB = a.headToHeadWins[b.player.id] || 0;
-          const bWinsVsA = b.headToHeadWins[a.player.id] || 0;
-          comparison = bWinsVsA - aWinsVsB;
-          break;
-        default:
-          comparison = 0;
-      }
-      
-      // If this criterion shows a difference, return the comparison
-      if (comparison !== 0) {
-        return comparison;
-      }
-      // Otherwise, continue to next criterion
-    }
-    
-    // If all criteria are equal, maintain current order (stable sort)
-    return 0;
-  });
+  group.standings = sortStandings(Object.values(standings), tournament?.standingsCriteriaOrder, group.matches);
 }
 
 // Context Provider
 export function TournamentProvider({ children }) {
   const [state, dispatch] = useReducer(tournamentReducer, initialState);
+  const { t } = useLanguage();
   const stateRef = useRef(state);
   // Silent refresh bookkeeping (see refreshCurrentTournament)
   const refreshSeqRef = useRef(0);
@@ -749,18 +702,65 @@ export function TournamentProvider({ children }) {
     completionsInFlightRef.current += 1;
     completionStartedAtRef.current = Date.now();
 
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      // Known offline – don't even attempt; queue the result so it syncs later.
-      enqueueWrite(QUEUE_TYPES.saveMatchResult, matchResult, `result:${matchResult.matchId}`);
-    } else {
+    const tournament = stateRef.current.currentTournament;
+    const tournamentId = tournament?.id;
+    const isPlayoffAdvance = Boolean(matchResult.isPlayoff && tournament?.playoffs);
+
+    // Queue both writes before touching the network: if the app is killed
+    // mid-way, the next start replays them (save first, then the advance).
+    // On success below they are removed again.
+    const saveItemId = enqueueWrite(
+      QUEUE_TYPES.saveMatchResult, matchResult, `result:${matchResult.matchId}`, { flush: false }
+    );
+    const advanceItemId = isPlayoffAdvance
+      ? enqueueWrite(
+        QUEUE_TYPES.playoffAdvance,
+        { tournamentId, matchId: matchResult.matchId, matchResult },
+        `advance:${matchResult.matchId}`,
+        { flush: false }
+      )
+      : null;
+
+    let advanced = null;
+    let isConflict = false;
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) {
       try {
-        // Save to Supabase first
-        await matchService.saveMatchResult(matchResult);
+        const saved = await matchService.saveMatchResult(matchResult);
+        removeWrite(saveItemId);
+        if (saved?.conflict) {
+          // Another device already finished this match with a different
+          // winner; its result stands, so neither apply nor advance ours.
+          isConflict = true;
+          removeWrite(advanceItemId);
+        } else if (advanceItemId) {
+          // Playoff match: let the database advance the bracket atomically.
+          // The RPC locks the tournament row and only writes the slots this
+          // result owns; it is idempotent for the same winner, so a queued
+          // replay of it is harmless.
+          try {
+            advanced = await tournamentService.completePlayoffMatch(tournamentId, matchResult.matchId, matchResult);
+            removeWrite(advanceItemId);
+          } catch (advanceErr) {
+            if (isTerminalWriteError(advanceErr)) {
+              // e.g. winner_mismatch: the refresh below shows the server's bracket.
+              removeWrite(advanceItemId);
+            }
+            console.warn('Could not advance playoff bracket in DB:', advanceErr?.message || advanceErr);
+          }
+        }
       } catch (error) {
-        console.error('Error saving match result to Supabase, queueing for retry:', error);
-        // Don't lose the result – queue it for retry when connectivity returns.
-        enqueueWrite(QUEUE_TYPES.saveMatchResult, matchResult, `result:${matchResult.matchId}`);
+        console.error('Error saving match result to Supabase, queued for retry:', error);
       }
+      flushQueue();
+    }
+
+    if (isConflict) {
+      toast.error(t('offline.resultConflict'));
+      // Nothing of ours to persist; let the tournament route re-fetch the
+      // server's view once we are back on it.
+      completionsInFlightRef.current = Math.max(0, completionsInFlightRef.current - 1);
+      setTimeout(() => refreshCurrentTournament(), 500);
+      return;
     }
 
     // Update local state first
@@ -778,37 +778,20 @@ export function TournamentProvider({ children }) {
           // results other devices saved.
           let finalTournament = currentState.currentTournament;
 
-          // Playoff match: let the database advance the bracket atomically.
+          // Replace the optimistic local bracket with what the server returned.
           // Previously each device wrote its own copy of the whole playoffs
-          // JSONB here, so two boards finishing the two quarterfinals of one
-          // semifinal pair overwrote each other's winner. The RPC locks the
-          // tournament row and only writes the slots this result owns; we then
-          // replace the optimistic local bracket with what the server returns.
-          if (matchResult.isPlayoff && currentState.currentTournament.playoffs) {
-            const tournamentId = currentState.currentTournament.id;
-            try {
-              const advanced = await tournamentService.completePlayoffMatch(
-                tournamentId,
-                matchResult.matchId,
-                matchResult
-              );
-              dispatch({
-                type: ACTIONS.SET_PLAYOFFS,
-                payload: { tournamentId, playoffs: advanced.playoffs, status: advanced.status }
-              });
-              finalTournament = {
-                ...finalTournament,
-                playoffs: advanced.playoffs,
-                status: advanced.status || finalTournament.status
-              };
-            } catch (advanceErr) {
-              console.warn('Could not advance playoff bracket in DB, queueing for retry:', advanceErr);
-              enqueueWrite(
-                QUEUE_TYPES.playoffAdvance,
-                { tournamentId, matchId: matchResult.matchId, matchResult },
-                `advance:${matchResult.matchId}`
-              );
-            }
+          // JSONB, so two boards finishing the two quarterfinals of one
+          // semifinal pair overwrote each other's winner.
+          if (advanced && currentState.currentTournament.id === tournamentId) {
+            dispatch({
+              type: ACTIONS.SET_PLAYOFFS,
+              payload: { tournamentId, playoffs: advanced.playoffs, status: advanced.status }
+            });
+            finalTournament = {
+              ...finalTournament,
+              playoffs: advanced.playoffs,
+              status: advanced.status || finalTournament.status
+            };
           }
           
           // If tournament is completed, update status in database and settle
@@ -936,15 +919,22 @@ export function TournamentProvider({ children }) {
   // Refresh when the app comes back to the foreground or regains network —
   // the moments a device that sat idle through other boards' results needs it.
   useEffect(() => {
+    // The list RPC aggregates whole tables, so a quick glance away (e.g. from
+    // the scoring screen) within a minute of the last list load skips it.
+    let listLoadedAt = 0;
+    const reloadListThrottled = async () => {
+      if (Date.now() - listLoadedAt < 60_000) return;
+      if (await reloadTournaments()) listLoadedAt = Date.now();
+    };
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         refreshCurrentTournament();
-        reloadTournaments();
+        reloadListThrottled();
       }
     };
     const handleOnline = () => {
       refreshCurrentTournament();
-      reloadTournaments();
+      reloadListThrottled();
     };
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('online', handleOnline);

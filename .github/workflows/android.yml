@@ -107,6 +107,11 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "path=$RUNNER_TEMP/release.jks" >> "$GITHUB_OUTPUT"
             echo "signing=release" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            # A release must be release-signed: a debug-signed APK cannot
+            # update the installed app and would be published as android-latest.
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing; refusing to build a debug-signed release."
+            exit 1
           else
             echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — APK will be debug-signed (uninstall before installing a newer build)."
             echo "signing=debug" >> "$GITHUB_OUTPUT"

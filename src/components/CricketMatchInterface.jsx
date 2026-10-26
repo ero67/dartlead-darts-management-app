@@ -29,6 +29,7 @@ import { CricketPad } from './cricket/CricketPad';
 import { CricketMarksTable } from './cricket/CricketMarksTable';
 import { MprInfo } from './cricket/MprInfo';
 import { storableCricketState, withLegsTarget, cricketLiveUpdate, cricketStateFromRow, cricketMatchResult } from './match/cricket/cricketMatchState';
+import { isLocalSnapshotStale, rememberServerStamp } from './match/liveSnapshot';
 
 // Cricket legs stall when the leader keeps scoring instead of closing; a normal
 // leg is 10–20 visits each, so 30 each is clearly stuck (X01 offers it at 15).
@@ -65,7 +66,8 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
   ];
 
   // Crash recovery, read once: a saved Cricket state wins unless an admin
-  // reset the match to pending and nothing was thrown yet (X01's rule).
+  // reset the match to pending and nothing was thrown yet (X01's rule), or the
+  // row turns out newer than it (checked by the row load below).
   const initRef = useRef(null);
   if (initRef.current === null) {
     let saved = null;
@@ -82,6 +84,7 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
     }
     initRef.current = {
       hasProgress,
+      serverUpdatedAt: saved?.serverUpdatedAt || null,
       engine: saved
         ? { ...saved.engine, undoStack: Array.isArray(saved.engine.undoStack) ? saved.engine.undoStack : [] }
         : createCricketMatch({ legsTarget: match.legsToWin || 3, players: enginePlayers, starter: 'bullup' })
@@ -92,6 +95,13 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
   const engineRef = useRef(engine);
   engineRef.current = engine;
   const [isLoaded, setIsLoaded] = useState(initRef.current.hasProgress);
+  // Row updated_at as of this device's last read or write (see liveSnapshot.js).
+  const serverUpdatedAtRef = useRef(initRef.current.serverUpdatedAt);
+  // No live write until the row load has compared the snapshot with the row.
+  const isRowCheckedRef = useRef(false);
+  // Set where this device marks the match live, so only the scoring device
+  // writes (a ref: see MatchInterface).
+  const isLiveHereRef = useRef(false);
   const [matchComplete, setMatchComplete] = useState(false);
   const [completedRow, setCompletedRow] = useState(null); // { legs, winnerId } when re-opening a finished match
   const [showBullup, setShowBullup] = useState(false);
@@ -121,20 +131,26 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
   // never overwrites a completed match or a newer snapshot; queued offline.
   const syncLive = async (state = engineRef.current) => {
     if (!user || canScore === false || state.starterPending) return;
+    // Only the device scoring the match writes, and only after the row check.
+    if (!isRowCheckedRef.current || !isLiveHereRef.current) return;
     const update = cricketLiveUpdate(state);
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       enqueueWrite(QUEUE_TYPES.liveSync, { matchId: match.id, update }, `live:${match.id}`);
       return;
     }
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('matches')
         .update(update)
         .eq('id', match.id)
         .neq('status', 'completed')
         .or(`last_activity_at.is.null,last_activity_at.lt.${update.last_activity_at}`)
-        .select('id');
+        .select('id, updated_at');
       if (error) throw error;
+      if (data?.[0]?.updated_at) {
+        serverUpdatedAtRef.current = data[0].updated_at;
+        rememberServerStamp(storageKey, data[0].updated_at);
+      }
     } catch (error) {
       console.error('Error updating cricket match, queueing live sync:', error);
       enqueueWrite(QUEUE_TYPES.liveSync, { matchId: match.id, update }, `live:${match.id}`);
@@ -144,11 +160,12 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
   // The row first: format, completion elsewhere, and resume on another device.
   useEffect(() => {
     let cancelled = false;
+    isRowCheckedRef.current = false;
     const load = async () => {
       try {
         const { data: row, error } = await supabase
           .from('matches')
-          .select('legs_to_win, status, match_starter, current_leg, current_player, player1_legs, player2_legs, player1_current_score, player2_current_score, winner_id, live_state')
+          .select('legs_to_win, status, match_starter, current_leg, current_player, player1_legs, player2_legs, player1_current_score, player2_current_score, winner_id, live_state, updated_at')
           .eq('id', match.id)
           .maybeSingle();
         if (error) throw error;
@@ -161,15 +178,32 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
         const legsTarget = match.legsToWin || row.legs_to_win || 3;
         const rowInProgress = row.status === 'in_progress'
           && (row.match_starter !== null || row.current_leg > 1 || row.player1_legs > 0 || row.player2_legs > 0);
-        if (!initRef.current.hasProgress && rowInProgress) {
+        // Another device scored on, or a manager reset the match, after this
+        // device last saw the row: drop the local state, the row wins.
+        let snapshot = null;
+        try {
+          snapshot = JSON.parse(localStorage.getItem(storageKey));
+        } catch {
+          // corrupted entry: nothing to compare
+        }
+        const isStale = isLocalSnapshotStale(snapshot, row);
+        if (isStale) localStorage.removeItem(storageKey);
+        serverUpdatedAtRef.current = row.updated_at || serverUpdatedAtRef.current;
+        rememberServerStamp(storageKey, row.updated_at);
+        if ((!initRef.current.hasProgress || isStale) && rowInProgress) {
           setEngine(cricketStateFromRow(row, { legsTarget, players: enginePlayers }));
+        } else if (isStale) {
+          setEngine(createCricketMatch({ legsTarget, players: enginePlayers, starter: 'bullup' }));
         } else if (!match.legsToWin && row.legs_to_win) {
           setEngine(s => withLegsTarget(s, row.legs_to_win));
         }
       } catch (error) {
         console.error('Error loading cricket match row:', error);
       } finally {
-        if (!cancelled) setIsLoaded(true);
+        if (!cancelled) {
+          isRowCheckedRef.current = true;
+          setIsLoaded(true);
+        }
       }
     };
     load();
@@ -181,6 +215,7 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
   useEffect(() => {
     if (match.status === 'completed' || matchComplete || !user || canScore !== true) return;
     startLiveMatch(match.id, { player1: match.player1, player2: match.player2, gameType: 'cricket' });
+    isLiveHereRef.current = true;
     // startMatch creates a playoff match's row, so the live device (TV, live
     // lists) and the resumed marks are written only after it.
     matchService.startMatch(match.id, user.id, match)
@@ -194,7 +229,10 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
         }
         syncLive();
       });
-    return () => endLiveMatch(match.id);
+    return () => {
+      isLiveHereRef.current = false;
+      endLiveMatch(match.id);
+    };
     // Keyed on ids like MatchInterface (a token refresh hands out a new user object).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, match.id, canScore]);
@@ -218,7 +256,8 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
         currentLeg: engine.legNumber,
         currentPlayer: engine.starterPending ? null : engine.turn,
         matchStarter: engine.starterPending ? null : engine.settings.starter,
-        matchComplete: false
+        matchComplete: false,
+        serverUpdatedAt: serverUpdatedAtRef.current
       }));
     } catch (error) {
       console.error('Error saving cricket match state:', error);

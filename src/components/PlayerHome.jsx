@@ -159,12 +159,12 @@ export function PlayerHome({ onNavigate }) {
     const loadFollowing = async () => {
       const player = await tournamentService.getPlayerByUserId(user.id);
       if (!player || cancelled) return;
-      const [liveMatches, profile] = await Promise.all([
-        matchService.getLiveMatches().catch(() => []),
-        tournamentService.getPlayerProfile(player.id).catch(() => null),
+      const [liveMatches, playerLeagues] = await Promise.all([
+        matchService.getLiveMatches({ playerId: player.id }).catch(() => []),
+        leagueService.getPlayerLeagues(player.id).catch(() => []),
       ]);
       const liveMatch = (liveMatches || []).find(m => m.player1_id === player.id || m.player2_id === player.id) || null;
-      const memberships = (profile?.leagues || []).filter(m => m.leagues && m.is_active !== false).slice(0, 3);
+      const memberships = playerLeagues.filter(m => m.leagues && m.is_active !== false).slice(0, 3);
       const standings = (await Promise.all(memberships.map(async m => {
         const leaderboard = await leagueService.getLeaderboard(m.leagues.id);
         const index = leaderboard.findIndex(e => e.player?.id === player.id);
