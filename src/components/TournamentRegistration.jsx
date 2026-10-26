@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, ArrowLeft, Settings, Trash2 } from 'lucide-react';
+import { Play, ArrowLeft, Settings, Trash2, CopyPlus } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +18,7 @@ import { EditSettingsDialog } from './registration/EditSettingsDialog';
 import { GroupsPreviewDialog } from './registration/GroupsPreviewDialog';
 import { getPublicAppUrl } from '../utils/publicUrl';
 import { getUserDisplayName } from '../utils/userDisplayName';
+import { cloneTournamentPath } from '../utils/cloneTournament';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
@@ -623,6 +624,12 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               >
                 <Settings />
                 {t('registration.editSettings')}
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="outline" onClick={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}>
+                <CopyPlus />
+                {tournament.leagueId ? t('tournaments.nextRound') : t('tournaments.duplicate')}
               </Button>
             )}
             {canManage && onDeleteTournament && (
