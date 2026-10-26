@@ -102,7 +102,7 @@ function StatBoard({ title, icon, rows, valueFn, detailFn, tone }) {
   );
 }
 
-export function StatisticsTab({ leagueStats, loadingStats }) {
+export function StatisticsTab({ leagueStats, loadingStats, seasonSelect }) {
   const { t } = useLanguage();
   const vsDetail = (r) => `${t('leagues.statVs')} ${r.opponent} · ${r.tournamentName}`;
   const chart = leagueStats?.averageByRound;
@@ -110,7 +110,10 @@ export function StatisticsTab({ leagueStats, loadingStats }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold tracking-tight">{t('leagues.leagueStatistics')}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold tracking-tight">{t('leagues.leagueStatistics')}</h2>
+        {seasonSelect}
+      </div>
 
       {loadingStats && (
         <div className="flex flex-col gap-3">

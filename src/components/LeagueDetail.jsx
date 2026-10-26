@@ -14,6 +14,7 @@ import { TournamentsTab } from './league/TournamentsTab';
 import { StatisticsTab } from './league/StatisticsTab';
 import { PlayersTab } from './league/PlayersTab';
 import { SettingsTab } from './league/SettingsTab';
+import { SeasonSelect } from './league/Seasons';
 import { getUserDisplayName } from '../utils/userDisplayName';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +93,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [leagueStats, setLeagueStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [statsSeason, setStatsSeason] = useState('current'); // 'current' | 'all' | season id
+  const [h2hSeason, setH2hSeason] = useState('current');
   const [loadError, setLoadError] = useState(false);
   const requestedLeagueIdRef = useRef(null);
 
@@ -186,7 +189,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   useEffect(() => {
     if (activeTab === 'statistics' && currentLeague && !statsLoaded && !loadingStats) {
       setLoadingStats(true);
-      leagueService.getLeagueStatistics(currentLeague.id)
+      leagueService.getLeagueStatistics(currentLeague.id, statsSeason)
         .then(data => {
           setLeagueStats(data);
           setStatsLoaded(true);
@@ -197,7 +200,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         })
         .finally(() => setLoadingStats(false));
     }
-  }, [activeTab, currentLeague, statsLoaded, loadingStats]);
+  }, [activeTab, currentLeague, statsLoaded, loadingStats, statsSeason]);
 
   // Reset stats when league changes
   useEffect(() => {
@@ -250,6 +253,14 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const myMembership = user
     ? (currentLeague.members || []).find(m => m.player?.user_id === user.id)
     : null;
+
+  // Ranked players of the live table first, then members without points yet
+  // (after a season ends the table is empty, but past meetings still count).
+  const rankedPlayers = (currentLeague.leaderboard || []).map((e, i) => e.player && { ...e.player, rank: i + 1 }).filter(Boolean);
+  const h2hPlayers = [
+    ...rankedPlayers,
+    ...(currentLeague.members || []).map(m => m.player).filter(p => p && !rankedPlayers.some(r => r.id === p.id))
+  ];
 
   const handleUpdateLeague = async () => {
     if (isSavingLeague) return;
@@ -617,6 +628,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setIsLinking(false);
     }
   };
+  // Ending or renaming a season changes the table, rounds and statistics.
+  const handleSeasonChanged = async () => {
+    await selectLeague(currentLeague.id);
+    setStatsSeason('current');
+    invalidateStats();
+  };
+
   const handleRecalculate = async () => {
     if (isRecalculating) return;
     setIsRecalculating(true);
@@ -718,11 +736,23 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
             isManager={isManager}
             isRecalculating={isRecalculating}
             onRecalculate={handleRecalculate}
+            onSeasonChanged={handleSeasonChanged}
           />
         </TabsContent>
 
         <TabsContent value="statistics">
-          <StatisticsTab leagueStats={leagueStats} loadingStats={loadingStats} />
+          <StatisticsTab
+            leagueStats={leagueStats}
+            loadingStats={loadingStats}
+            seasonSelect={(
+              <SeasonSelect
+                league={currentLeague}
+                value={statsSeason}
+                disabled={loadingStats}
+                onChange={(season) => { setStatsSeason(season); invalidateStats(); }}
+              />
+            )}
+          />
         </TabsContent>
 
         <TabsContent value="tournaments">
@@ -749,12 +779,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         </TabsContent>
 
         <TabsContent value="h2h" className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold tracking-tight">{t('leagues.headToHead')}</h2>
-          {currentLeague.leaderboard && currentLeague.leaderboard.length >= 2 ? (
-            <HeadToHead
-              leagueId={currentLeague.id}
-              players={currentLeague.leaderboard.map((e, i) => e.player && { ...e.player, rank: i + 1 }).filter(Boolean)}
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">{t('leagues.headToHead')}</h2>
+            <SeasonSelect league={currentLeague} value={h2hSeason} onChange={setH2hSeason} />
+          </div>
+          {h2hPlayers.length >= 2 ? (
+            <HeadToHead leagueId={currentLeague.id} players={h2hPlayers} season={h2hSeason} />
           ) : (
             <EmptyState icon={Users} title={t('leagues.noResultsYet')} />
           )}
