@@ -1,5 +1,5 @@
-// Generates the small web images from the committed source PNGs, so no binary
-// derivatives live in git. Runs before `dev` and `build` (npm pre-hooks).
+// Regenerates the small web images from the source PNGs. The outputs are
+// committed; rerun `npm run images` after changing logo.png or logo-icon.png.
 //   src/assets/logo-*.webp  shown in the header, auth, summary and landing
 //   public/og-image.png     1200x630 link preview card (index.html + api/og)
 import { existsSync, statSync } from 'node:fs';
