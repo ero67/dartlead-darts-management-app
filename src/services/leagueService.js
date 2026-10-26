@@ -145,7 +145,7 @@ export const leagueService = {
       // Get tournaments
       const { data: tournaments, error: tournamentsError } = await supabase
         .from('tournaments')
-        .select('id, name, status, created_at, updated_at, season_id')
+        .select('id, name, status, created_at, updated_at, season_id, starts_at, venue')
         .eq('league_id', leagueId)
         .eq('deleted', false)
         .order('created_at', { ascending: false });
@@ -171,7 +171,7 @@ export const leagueService = {
       return {
         ...this.transformLeague(league),
         members,
-        tournaments: tournaments || [],
+        tournaments: (tournaments || []).map(tour => ({ ...tour, startsAt: tour.starts_at })),
         seasons: seasons || [],
         leaderboard
       };

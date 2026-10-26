@@ -1,13 +1,15 @@
 import React from 'react';
-import { Trophy, Plus, Link, Unlink, Check, X } from 'lucide-react';
+import { Trophy, Plus, Link, Unlink, Check, X, CopyPlus } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '../shared/StatusBadge';
 import { EmptyState } from '../shared/EmptyState';
+import { RoundSchedule } from '../shared/RoundSchedule';
 import { isTournamentRunning } from '../../utils/tournamentStatus';
 import { currentSeasonName } from '../../utils/leagueSeason';
+import { upcomingRounds, upcomingFirst } from '../../utils/roundSchedule';
 import { cn } from '@/lib/utils';
 
 // shadcn SelectItem values must be non-empty; '' in state maps to this.
@@ -23,6 +25,7 @@ export function TournamentsTab({
   const members = (league.members || []).map(m => m.player).filter(Boolean);
   // Newest round at the top; round numbers count from the season's first tournament.
   const rounds = [...(league.tournaments || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const upcomingIds = new Set(upcomingRounds(rounds).map(r => r.id));
   const seasons = league.seasons || [];
   // Rounds grouped under their season, current first; no headings before a season has ended.
   const seasonGroups = [
@@ -42,6 +45,12 @@ export function TournamentsTab({
         <Link />
         {t('leagues.addExistingTournament')}
       </Button>
+      {onCreateTournament && rounds.length > 0 && (
+        <Button variant="outline" onClick={() => onCreateTournament(league, rounds[0].id)}>
+          <CopyPlus />
+          {t('tournaments.nextRound')}
+        </Button>
+      )}
       {onCreateTournament && (
         <Button onClick={() => onCreateTournament(league)}>
           <Plus />
@@ -51,10 +60,12 @@ export function TournamentsTab({
     </div>
   );
 
+  // groupRounds is newest first; planned rounds still ahead move to the top.
   const renderRounds = (groupRounds) => (
     <ol className="flex flex-col">
-      {groupRounds.map((tournament, index) => {
-        const roundNumber = groupRounds.length - index;
+      {upcomingFirst(groupRounds).map((tournament, index) => {
+        const roundNumber = groupRounds.length - groupRounds.indexOf(tournament);
+        const isUpcoming = upcomingIds.has(tournament.id);
         const isDone = tournament.status === 'completed';
         const isRunning = isTournamentRunning(tournament.status);
         const isLast = index === groupRounds.length - 1;
@@ -78,14 +89,16 @@ export function TournamentsTab({
                 className={cn(
                   'flex-row flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3.5',
                   isRunning && 'border-live/30 bg-gradient-to-r from-live/10 to-card to-60%',
-                  tournament.status === 'open_for_registration' && 'opacity-80'
+                  tournament.status === 'open_for_registration' && !isUpcoming && 'opacity-80'
                 )}
               >
                 <div className="flex min-w-0 flex-[1_1_15rem] flex-col">
                   <span className="text-xs text-muted-foreground">
-                    {t('leagues.roundNumber', { number: roundNumber })} · {new Date(tournament.created_at).toLocaleDateString()}
+                    {t('leagues.roundNumber', { number: roundNumber })}
+                    {isUpcoming ? ` · ${t('schedule.upcoming')}` : !tournament.startsAt && ` · ${new Date(tournament.created_at).toLocaleDateString()}`}
                   </span>
                   <span className="truncate text-base font-semibold">{tournament.name}</span>
+                  <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} className="mt-1 text-xs [&_svg]:size-3.5" />
                 </div>
                 <StatusBadge status={tournament.status} t={t} />
                 <div className="ml-auto flex items-center gap-1">

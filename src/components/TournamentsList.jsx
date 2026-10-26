@@ -12,7 +12,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
 import { EmptyState } from './shared/EmptyState';
 import { PhaseBar } from './shared/DartsAccents';
+import { RoundSchedule } from './shared/RoundSchedule';
 import { isTournamentRunning, tournamentStatusClass, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
+import { upcomingRounds, upcomingFirst } from '../utils/roundSchedule';
 import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
@@ -54,6 +56,9 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         return new Date(b.updatedAt) - new Date(a.updatedAt);
     }
   });
+  // Default order: planned rounds still ahead lead, soonest first.
+  const visibleTournaments = sortBy === 'updated' ? upcomingFirst(sortedTournaments) : sortedTournaments;
+  const upcomingIds = new Set(upcomingRounds(filteredTournaments).map(x => x.id));
 
   const handleDelete = async (tournament) => {
     if (!(await confirmDialog(t('management.confirmDeleteTournament', { name: tournament.name }), { destructive: true }))) return;
@@ -106,9 +111,9 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         </div>
       </div>
 
-      {sortedTournaments.length > 0 && (
+      {visibleTournaments.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {sortedTournaments.map(tournament => {
+          {visibleTournaments.map(tournament => {
             const phase = getTournamentPhase(tournament);
             const hasActiveMatches = (tournament.pendingMatches ?? 0) > 0;
             const isOwner = isMine(tournament);
@@ -123,6 +128,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge status={tournament.status} t={t} />
+                        {upcomingIds.has(tournament.id) && <Badge variant="outline">{t('schedule.upcoming')}</Badge>}
                         {isCricketGame(tournament.gameType) && <Badge variant="secondary">{t('common.gameTypeCricket')}</Badge>}
                         {isOwner && <Badge variant="outline">{t('tournaments.yours')}</Badge>}
                       </div>
@@ -162,6 +168,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                 </CardHeader>
 
                 <CardContent className="flex flex-col gap-4">
+                  <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} className="font-medium text-foreground" />
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Users className="size-4" />
@@ -171,10 +178,12 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       <LayoutGrid className="size-4" />
                       {tournament.groupCount ?? tournament.groups?.length ?? 0} {t('common.groups')}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="size-4" />
-                      {new Date(tournament.createdAt).toLocaleDateString()}
-                    </span>
+                    {!tournament.startsAt && (
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="size-4" />
+                        {new Date(tournament.createdAt).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between text-xs text-muted-foreground">
@@ -203,7 +212,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         </div>
       )}
 
-      {sortedTournaments.length === 0 && (
+      {visibleTournaments.length === 0 && (
         <EmptyState
           icon={Trophy}
           title={t('tournaments.noTournamentsFound')}

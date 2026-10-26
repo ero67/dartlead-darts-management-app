@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, ArrowLeft, ChevronUp, ChevronDown, Check, Plus, Users, ClipboardList, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Trophy, ArrowLeft, ChevronUp, ChevronDown, Check, Plus, Users, ClipboardList, X, CopyPlus } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLeague } from '../contexts/LeagueContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { UserSearchPicker } from './UserSearchPicker';
+import { LoadingState } from './shared/LoadingState';
+import { RoundScheduleFields } from './shared/RoundSchedule';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +20,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { GAME_TYPES, isCricketGame } from '@/lib/cricket';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { tournamentService } from '../services/tournamentService';
+import { buildClonePrefill } from '../utils/cloneTournament';
 
 const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
 const PLAYOFF_LEGS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -52,14 +56,18 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const leagueId = searchParams.get('leagueId');
+  // ?from=<id>: "Duplicate" / "Create next round" — prefill from that tournament.
+  // Kept in the URL (like leagueId) so a refresh reloads the copy.
+  const fromId = searchParams.get('from');
   
   // Seed from league defaults only when creating FOR that league — currentLeague
-  // otherwise still holds whatever league was viewed last.
-  const leagueDefaults = (leagueId && currentLeague?.id === leagueId)
+  // otherwise still holds whatever league was viewed last. A copy brings its own.
+  const leagueDefaults = (leagueId && !fromId && currentLeague?.id === leagueId)
     ? (currentLeague.defaultTournamentSettings || {})
     : {};
   
   const [tournamentName, setTournamentName] = useState('');
+  const [schedule, setSchedule] = useState({ startsAt: null, venue: leagueDefaults.venue || '' });
   const [gameType, setGameType] = useState(leagueDefaults.gameType || 'x01');
   const [legsToWin, setLegsToWin] = useState(leagueDefaults.legsToWin || 3);
   const [startingScore, setStartingScore] = useState(leagueDefaults.startingScore || 501);
@@ -116,40 +124,69 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     }
   }, [leagueId, currentLeague, selectLeague]);
 
+  // League defaults and a copied tournament share one shape.
+  const applySettings = useCallback((defaults) => {
+    if (defaults.gameType) setGameType(defaults.gameType);
+    if (defaults.legsToWin !== undefined) setLegsToWin(defaults.legsToWin);
+    if (defaults.startingScore !== undefined) setStartingScore(defaults.startingScore);
+    if (defaults.tournamentType !== undefined) setTournamentType(defaults.tournamentType);
+    if (defaults.groupSettings) setGroupSettings(prev => ({ ...prev, ...defaults.groupSettings }));
+    if (defaults.standingsCriteriaOrder) setStandingsCriteriaOrder(defaults.standingsCriteriaOrder);
+    if (defaults.defaultScoringMode) setDefaultScoringMode(defaults.defaultScoringMode);
+    // Venue only: a copied or new round gets its own date.
+    if (defaults.venue) setSchedule(prev => (prev.venue ? prev : { ...prev, venue: defaults.venue }));
+    if (defaults.playoffSettings) setPlayoffSettings(prev => ({
+      ...prev,
+      ...defaults.playoffSettings,
+      legsToWinByRound: {
+        ...prev.legsToWinByRound,
+        ...(defaults.playoffSettings.legsToWinByRound || {})
+      }
+    }));
+  }, []);
+
   // Apply league defaults when league is loaded asynchronously
   useEffect(() => {
-    if (currentLeague && leagueId && currentLeague.id === leagueId) {
-      const defaults = currentLeague.defaultTournamentSettings;
-      if (defaults) {
-        if (defaults.gameType) setGameType(defaults.gameType);
-        if (defaults.legsToWin !== undefined) setLegsToWin(defaults.legsToWin);
-        if (defaults.startingScore !== undefined) setStartingScore(defaults.startingScore);
-        if (defaults.tournamentType !== undefined) setTournamentType(defaults.tournamentType);
-        if (defaults.groupSettings) setGroupSettings(prev => ({ ...prev, ...defaults.groupSettings }));
-        if (defaults.standingsCriteriaOrder) setStandingsCriteriaOrder(defaults.standingsCriteriaOrder);
-        if (defaults.defaultScoringMode) setDefaultScoringMode(defaults.defaultScoringMode);
-        if (defaults.playoffSettings) setPlayoffSettings(prev => ({
-          ...prev,
-          ...defaults.playoffSettings,
-          legsToWinByRound: {
-            ...prev.legsToWinByRound,
-            ...(defaults.playoffSettings.legsToWinByRound || {})
-          }
-        }));
-      }
+    if (!fromId && currentLeague && leagueId && currentLeague.id === leagueId && currentLeague.defaultTournamentSettings) {
+      applySettings(currentLeague.defaultTournamentSettings);
       // Players are NOT auto-selected — the manager picks who is coming
       // from the league pool below.
     }
-  }, [currentLeague, leagueId]);
+  }, [currentLeague, leagueId, fromId, applySettings]);
+
+  const [clonePrefill, setClonePrefill] = useState(null);
+  const [isLoadingSource, setIsLoadingSource] = useState(Boolean(fromId));
+
+  useEffect(() => {
+    if (!fromId) return;
+    let cancelled = false;
+    tournamentService.getTournament(fromId)
+      .then(source => {
+        if (cancelled) return;
+        const prefill = buildClonePrefill(source, t('tournaments.copySuffix'));
+        applySettings(prefill);
+        setTournamentName(prefill.name);
+        setSelectedPlayers(prefill.copyPlayers ? prefill.players : []);
+        setClonePrefill({ ...prefill, sourceName: source.name });
+      })
+      .catch(() => {
+        if (!cancelled) toast.error(t('tournaments.copySourceFailed'));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSource(false);
+      });
+    return () => { cancelled = true; };
+  }, [fromId]); // eslint-disable-line react-hooks/exhaustive-deps -- copy once per source, not on language switch
 
   // Active league members, alphabetical — the pool to pick attendees from.
+  // A copied tournament adds its players, even ones no longer in the league.
   const leaguePlayerPool = useMemo(() => {
-    if (!leagueId || !currentLeague || currentLeague.id !== leagueId) return [];
-    return (currentLeague.members || [])
-      .filter(m => m.isActive && m.player)
-      .map(m => m.player)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [currentLeague, leagueId]);
+    const members = (leagueId && currentLeague?.id === leagueId)
+      ? (currentLeague.members || []).filter(m => m.isActive && m.player).map(m => m.player)
+      : [];
+    const copied = (clonePrefill?.players || []).filter(p => !members.some(m => m.id === p.id));
+    return [...members, ...copied].sort((a, b) => a.name.localeCompare(b.name));
+  }, [currentLeague, leagueId, clonePrefill]);
 
   const [playerFilter, setPlayerFilter] = useState('');
 
@@ -181,6 +218,8 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     const tournament = {
       id: generateId(),
       name: tournamentName.trim(),
+      startsAt: schedule.startsAt,
+      venue: schedule.venue.trim() || null,
       players: selectedPlayers.length > 0 ? selectedPlayers : [], // Pre-populate with league members if available
       groups: [], // Groups will be generated when tournament starts
       gameType,
@@ -248,6 +287,13 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
   const radioCard = 'flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm font-medium transition-colors hover:bg-muted/50 has-data-[state=checked]:border-primary has-data-[state=checked]:ring-2 has-data-[state=checked]:ring-primary/30';
   const radioRow = 'flex cursor-pointer items-center gap-2 text-sm font-normal';
 
+  if (isLoadingSource) {
+    return <LoadingState text={t('common.loadingTournament')} />;
+  }
+
+  const isSamePlayersSelected = clonePrefill?.players.length === selectedPlayers.length
+    && clonePrefill.players.every(p => selectedPlayerIds.has(p.id));
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-3">
@@ -256,9 +302,12 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
           {t('common.backToDashboard')}
         </Button>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Trophy className="size-6 text-primary" />
+          {clonePrefill ? <CopyPlus className="size-6 text-primary" /> : <Trophy className="size-6 text-primary" />}
           {t('tournaments.createNew')}
         </h1>
+        {clonePrefill && (
+          <p className="text-sm text-muted-foreground">{t('tournaments.copiedFrom', { name: clonePrefill.sourceName })}</p>
+        )}
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -296,12 +345,22 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('schedule.title')}</CardTitle>
+              <CardDescription>{t('schedule.hint')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RoundScheduleFields idPrefix="tournament" value={schedule} onChange={setSchedule} />
+            </CardContent>
+          </Card>
+
           {leaguePlayerPool.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="size-4" />
-                  {t('tournaments.leaguePlayersTitle')}
+                  {leagueId ? t('tournaments.leaguePlayersTitle') : t('tournaments.players')}
                 </CardTitle>
                 <CardDescription>{t('tournaments.leaguePlayersHint')}</CardDescription>
               </CardHeader>
@@ -310,6 +369,18 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
                   <span className="mr-auto text-sm text-muted-foreground tabular-nums">
                     {t('tournaments.selectedCount', { selected: selectedPlayers.length, total: leaguePlayerPool.length })}
                   </span>
+                  {clonePrefill?.players.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedPlayers([...clonePrefill.players])}
+                      disabled={isSamePlayersSelected}
+                    >
+                      <CopyPlus />
+                      {t('tournaments.samePlayers', { count: clonePrefill.players.length })}
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"

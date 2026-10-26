@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { StatusBadge } from './shared/StatusBadge';
 import { BoardMotif, FormDots, LegPips, LiveDot } from './shared/DartsAccents';
 import { StatTile } from './shared/StatTile';
+import { RoundSchedule } from './shared/RoundSchedule';
 import { CricketMarksTable } from './cricket/CricketMarksTable';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
@@ -17,6 +18,7 @@ import { getUserDisplayName } from '../utils/userDisplayName';
 import { loadActiveSession, loadHistory } from '../lib/practiceStorage';
 import { PRACTICE_GAMES } from '../lib/practiceGames';
 import { isCricketGame } from '../lib/cricket';
+import { upcomingRounds } from '../utils/roundSchedule';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -137,13 +139,42 @@ function MyLeagueCard({ standing, onOpen, t }) {
   );
 }
 
+// Next planned rounds in the player's leagues, soonest first.
+function UpcomingRoundsCard({ rounds, leagueNames, onOpen, t }) {
+  return (
+    <Card className="gap-3 p-5">
+      <span className="text-xs text-muted-foreground">{t('schedule.upcomingRounds')}</span>
+      <ul className="flex flex-col divide-y">
+        {rounds.map(round => (
+          <li key={round.id} className="py-3 first:pt-0 last:pb-0">
+            <button
+              type="button"
+              onClick={() => onOpen(round)}
+              className="flex w-full min-w-0 flex-col gap-1 rounded-md text-left outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="truncate text-base font-semibold">{round.name}</span>
+              {leagueNames[round.leagueId] && (
+                <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <Crown className="size-3 shrink-0" />
+                  <span className="truncate">{leagueNames[round.leagueId]}</span>
+                </span>
+              )}
+              <RoundSchedule startsAt={round.startsAt} venue={round.venue} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 // Not logged in or regular user: practice first, then what they are playing in.
 export function PlayerHome({ onNavigate }) {
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const { tournaments } = useTournament();
   const { leagues } = useLeague();
-  const [following, setFollowing] = useState({ playerId: null, liveMatch: null, standings: [] });
+  const [following, setFollowing] = useState({ playerId: null, liveMatch: null, standings: [], leagueNames: {} });
 
   const locale = language === 'sk' ? 'sk-SK' : 'en-GB';
   const playerName = user ? (getUserDisplayName(user) || user?.email?.split('@')[0]) : null;
@@ -164,22 +195,25 @@ export function PlayerHome({ onNavigate }) {
         leagueService.getPlayerLeagues(player.id).catch(() => []),
       ]);
       const liveMatch = (liveMatches || []).find(m => m.player1_id === player.id || m.player2_id === player.id) || null;
-      const memberships = playerLeagues.filter(m => m.leagues && m.is_active !== false).slice(0, 3);
+      const activeLeagues = playerLeagues.filter(m => m.leagues && m.is_active !== false);
+      const leagueNames = Object.fromEntries(activeLeagues.map(m => [m.leagues.id, m.leagues.name]));
+      const memberships = activeLeagues.slice(0, 3);
       const standings = (await Promise.all(memberships.map(async m => {
         const leaderboard = await leagueService.getLeaderboard(m.leagues.id);
         const index = leaderboard.findIndex(e => e.player?.id === player.id);
         if (index < 0) return null;
         return { league: m.leagues, rank: index + 1, entry: leaderboard[index], leader: leaderboard[0], memberCount: leaderboard.length };
       }))).filter(Boolean);
-      if (!cancelled) setFollowing({ playerId: player.id, liveMatch, standings });
+      if (!cancelled) setFollowing({ playerId: player.id, liveMatch, standings, leagueNames });
     };
     loadFollowing().catch(error => console.error('Error loading player home:', error));
     return () => { cancelled = true; };
   }, [user]);
 
-  const { playerId, liveMatch, standings } = following;
+  const { playerId, liveMatch, standings, leagueNames } = following;
   const liveTournament = liveMatch ? tournaments.find(tr => tr.id === liveMatch.tournament_id) : null;
-  const hasFollowing = Boolean(liveMatch || standings.length > 0);
+  const myUpcoming = upcomingRounds(tournaments.filter(tr => leagueNames[tr.leagueId])).slice(0, 3);
+  const hasFollowing = Boolean(liveMatch || standings.length > 0 || myUpcoming.length > 0);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
@@ -262,6 +296,14 @@ export function PlayerHome({ onNavigate }) {
         <section className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold tracking-tight">{t('dashboard.following')}</h2>
           <div className="grid gap-4 md:grid-cols-2">
+            {myUpcoming.length > 0 && (
+              <UpcomingRoundsCard
+                rounds={myUpcoming}
+                leagueNames={leagueNames}
+                onOpen={(round) => onNavigate(`/tournament/${round.id}`)}
+                t={t}
+              />
+            )}
             {liveMatch && (
               <MyLiveMatchCard
                 match={liveMatch}
