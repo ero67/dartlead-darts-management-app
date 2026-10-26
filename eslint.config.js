@@ -33,7 +33,7 @@ export default defineConfig([
     languageOptions: { globals: { ...globals.mocha, cy: 'readonly', Cypress: 'readonly', expect: 'readonly', assert: 'readonly' } },
   },
   {
-    files: ['cypress.config.js', 'scripts/**/*.{js,mjs}'],
+    files: ['cypress.config.js', 'scripts/**/*.{js,mjs}', 'api/**/*.js'],
     languageOptions: { globals: globals.node },
   },
   {

@@ -4,7 +4,9 @@
   "version": "1.7.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/build-images.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/build-images.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

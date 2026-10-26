@@ -50,3 +50,7 @@ android/app/*.keystore
 android/app/*.jks
 .cap-assets-tmp/
 .vercel
+
+# Generated from src/assets/*.png by scripts/build-images.mjs (predev/prebuild)
+src/assets/logo-*.webp
+public/og-image.png

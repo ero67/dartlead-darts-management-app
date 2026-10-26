@@ -61,6 +61,8 @@ export default defineConfig({
         clientsClaim: false,
         // Precache the app shell so it loads/reloads with no network
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        // Link preview card is for crawlers only, not worth precaching on every device
+        globIgnores: ['og-image.png'],
         // SPA fallback – pairs with the Vercel rewrite for client-side routing
         navigateFallback: '/index.html',
         runtimeCaching: [
