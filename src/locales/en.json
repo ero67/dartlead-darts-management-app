@@ -84,6 +84,12 @@
     "selectedCount": "{{selected}} of {{total}} selected",
     "selectAllPlayers": "Select all",
     "clearSelection": "Clear selection",
+    "duplicate": "Duplicate",
+    "nextRound": "Create next round",
+    "copySuffix": "(copy)",
+    "copiedFrom": "Settings copied from {{name}} — change anything before creating.",
+    "samePlayers": "Same players ({{count}})",
+    "copySourceFailed": "Couldn't load the tournament to copy — starting with an empty form.",
     "filterPlayers": "Search players...",
     "noPlayersMatchFilter": "No players match your search",
     "legsToWin": "Legs to Win",
@@ -969,7 +975,27 @@
     "swapPlayers": "Swap players",
     "leagueRank": "League #{{rank}}",
     "matchesWon": "Matches won",
-    "everyMeeting": "Every meeting this season"
+    "everyMeeting": "Every meeting",
+    "season": "Season",
+    "seasonDefaultName": "Season {{years}}",
+    "allTime": "All time",
+    "endSeason": "End season",
+    "endSeasonDescription": "The current table is saved as this season's final standings. A new season starts with the same members and an empty leaderboard. Rounds stay viewable under their season.",
+    "endedSeasonName": "Name of the season you are ending",
+    "nextSeasonName": "Name of the new season",
+    "seasonEnded": "{{name}} is over. The new season has started.",
+    "endSeasonRoundRunning": "A round is still being played. Finish or delete it before ending the season.",
+    "endSeasonEmpty": "No round of this season is finished yet.",
+    "endSeasonFailed": "Failed to end the season",
+    "pastSeasons": "Past seasons",
+    "champion": "Champion: {{name}} ({{points}} pts)",
+    "viewTable": "View table",
+    "finalStandings": "Final standings",
+    "played": "Played",
+    "seasonName": "Season name",
+    "renameSeason": "Rename season",
+    "renameSeasonFailed": "Failed to rename the season",
+    "newSeasonEmpty": "A new season has started. Points appear here after the first finished round."
   },
   "playerProfile": {
     "formRating": "Form rating",
@@ -1132,6 +1158,22 @@
     "fullscreen": "Fullscreen (F)",
     "loadError": "Could not load the tournament",
     "pinned": "Fixed view — remove ?view= from the address to rotate"
+  },
+  "boards": {
+    "count": "Boards",
+    "autoAssign": "Auto-assign",
+    "clear": "Clear",
+    "noBoard": "No board",
+    "assignLabel": "Board for this match",
+    "assigned": "{{count}} matches assigned to boards",
+    "cleared": "Board assignments cleared",
+    "saveFailed": "Could not save the boards",
+    "hint": "{{assigned}} of {{waiting}} waiting matches have a board. Auto-assign spreads them in play order so nobody is due on two boards at once.",
+    "nothingWaiting": "No match is waiting for a board",
+    "startHint": "This match is scheduled for board {{board}}.",
+    "startHintDevice": "This match is scheduled for board {{board}}; this device is set to board {{device}}.",
+    "next": "Next",
+    "then": "Then"
   },
   "export": {
     "title": "Share / export",
@@ -1497,5 +1539,16 @@
       "bullupOffer": "This leg has gone long ({{count}}+ visits each).",
       "bullupPrompt": "Both players throw at the bull — closest wins the leg. Who won the bull-up?"
     }
+  },
+  "schedule": {
+    "title": "Date and venue",
+    "hint": "Optional. Players see upcoming rounds on their home page.",
+    "startsAt": "Date and time",
+    "venue": "Venue",
+    "venuePlaceholder": "Where is it played?",
+    "upcoming": "Upcoming",
+    "upcomingRounds": "Upcoming rounds",
+    "defaultVenue": "Default venue",
+    "defaultVenueHint": "Prefilled when you create a new round."
   }
 }

@@ -84,6 +84,12 @@
     "selectedCount": "Vybraných: {{selected}} z {{total}}",
     "selectAllPlayers": "Vybrať všetkých",
     "clearSelection": "Zrušiť výber",
+    "duplicate": "Duplikovať",
+    "nextRound": "Vytvoriť ďalšie kolo",
+    "copySuffix": "(kópia)",
+    "copiedFrom": "Nastavenia sú prevzaté z turnaja {{name}} — pred vytvorením môžete čokoľvek zmeniť.",
+    "samePlayers": "Rovnakí hráči ({{count}})",
+    "copySourceFailed": "Turnaj na skopírovanie sa nepodarilo načítať — začínate s prázdnym formulárom.",
     "filterPlayers": "Hľadať hráčov...",
     "noPlayersMatchFilter": "Žiadny hráč nezodpovedá hľadaniu",
     "legsToWin": "Legov na Výhru",
@@ -969,7 +975,27 @@
     "swapPlayers": "Vymeniť hráčov",
     "leagueRank": "{{rank}}. v lige",
     "matchesWon": "Vyhrané zápasy",
-    "everyMeeting": "Všetky vzájomné zápasy v sezóne"
+    "everyMeeting": "Všetky vzájomné zápasy",
+    "season": "Sezóna",
+    "seasonDefaultName": "Sezóna {{years}}",
+    "allTime": "Celá história",
+    "endSeason": "Ukončiť sezónu",
+    "endSeasonDescription": "Aktuálny rebríček sa uloží ako konečné poradie tejto sezóny. Nová sezóna začne s rovnakými členmi a prázdnym rebríčkom. Kolá zostanú dostupné pod svojou sezónou.",
+    "endedSeasonName": "Názov končiacej sezóny",
+    "nextSeasonName": "Názov novej sezóny",
+    "seasonEnded": "{{name}} sa skončila. Začala nová sezóna.",
+    "endSeasonRoundRunning": "Jedno kolo sa ešte hrá. Pred ukončením sezóny ho dokončite alebo vymažte.",
+    "endSeasonEmpty": "V tejto sezóne ešte nie je dohrané žiadne kolo.",
+    "endSeasonFailed": "Sezónu sa nepodarilo ukončiť",
+    "pastSeasons": "Minulé sezóny",
+    "champion": "Víťaz: {{name}} ({{points}} b.)",
+    "viewTable": "Zobraziť poradie",
+    "finalStandings": "Konečné poradie",
+    "played": "Odohrané",
+    "seasonName": "Názov sezóny",
+    "renameSeason": "Premenovať sezónu",
+    "renameSeasonFailed": "Sezónu sa nepodarilo premenovať",
+    "newSeasonEmpty": "Začala nová sezóna. Body sa tu objavia po prvom dohranom kole."
   },
   "playerProfile": {
     "formRating": "Forma",
@@ -1132,6 +1158,22 @@
     "fullscreen": "Celá obrazovka (F)",
     "loadError": "Turnaj sa nepodarilo načítať",
     "pinned": "Pevné zobrazenie — odstráňte ?view= z adresy pre striedanie"
+  },
+  "boards": {
+    "count": "Počet terčov",
+    "autoAssign": "Rozdeliť na terče",
+    "clear": "Zrušiť priradenie",
+    "noBoard": "Bez terča",
+    "assignLabel": "Terč pre tento zápas",
+    "assigned": "Zápasy rozdelené na terče: {{count}}",
+    "cleared": "Priradenie terčov zrušené",
+    "saveFailed": "Terče sa nepodarilo uložiť",
+    "hint": "Terč má {{assigned}} z {{waiting}} čakajúcich zápasov. Rozdelenie ide v poradí hry, aby nikto nemal byť naraz na dvoch terčoch.",
+    "nothingWaiting": "Žiadny zápas nečaká na terč",
+    "startHint": "Tento zápas je naplánovaný na terč {{board}}.",
+    "startHintDevice": "Tento zápas je naplánovaný na terč {{board}}, toto zariadenie je nastavené na terč {{device}}.",
+    "next": "Na rade",
+    "then": "Potom"
   },
   "export": {
     "title": "Zdieľať / export",
@@ -1497,5 +1539,16 @@
       "bullupOffer": "Tento leg je príliš dlhý ({{count}}+ kôl pre oboch).",
       "bullupPrompt": "Obaja hráči hádžu na bull — bližší vyhráva leg. Kto vyhral hod na bull?"
     }
+  },
+  "schedule": {
+    "title": "Termín a miesto",
+    "hint": "Nepovinné. Hráči uvidia nadchádzajúce kolá na svojej úvodnej stránke.",
+    "startsAt": "Dátum a čas",
+    "venue": "Miesto",
+    "venuePlaceholder": "Kde sa hrá?",
+    "upcoming": "Nadchádzajúce",
+    "upcomingRounds": "Nadchádzajúce kolá",
+    "defaultVenue": "Predvolené miesto",
+    "defaultVenueHint": "Predvyplní sa pri vytváraní nového kola."
   }
 }

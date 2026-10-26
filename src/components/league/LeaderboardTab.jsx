@@ -7,21 +7,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { EmptyState } from '../shared/EmptyState';
 import { FormDots } from '../shared/DartsAccents';
 import { PlayerLink } from './PlayerLink';
+import { EndSeasonDialog, PastSeasons } from './Seasons';
+import { currentSeasonName } from '../../utils/leagueSeason';
 import { cn } from '@/lib/utils';
 
-export function LeaderboardTab({ league, isManager, isRecalculating, onRecalculate }) {
+export function LeaderboardTab({ league, isManager, isRecalculating, onRecalculate, onSeasonChanged }) {
   const { t } = useLanguage();
   const leaderboard = league.leaderboard || [];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold tracking-tight">{t('leagues.leaderboard')}</h2>
+        <div className="flex min-w-0 flex-col">
+          <h2 className="text-lg font-semibold tracking-tight">{t('leagues.leaderboard')}</h2>
+          <span className="text-sm text-muted-foreground">{currentSeasonName(league, t)}</span>
+        </div>
         {isManager && (
-          <Button variant="outline" size="sm" disabled={isRecalculating} onClick={onRecalculate} title={t('leagues.recalculate')}>
-            <RefreshCw className={cn(isRecalculating && 'animate-spin')} />
-            {isRecalculating ? t('common.loading') : t('leagues.recalculate')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" disabled={isRecalculating} onClick={onRecalculate} title={t('leagues.recalculate')}>
+              <RefreshCw className={cn(isRecalculating && 'animate-spin')} />
+              {isRecalculating ? t('common.loading') : t('leagues.recalculate')}
+            </Button>
+            {leaderboard.length > 0 && <EndSeasonDialog league={league} onEnded={onSeasonChanged} />}
+          </div>
         )}
       </div>
 
@@ -87,8 +95,10 @@ export function LeaderboardTab({ league, isManager, isRecalculating, onRecalcula
           </Table>
         </Card>
       ) : (
-        <EmptyState icon={Trophy} title={t('leagues.noResultsYet')} />
+        <EmptyState icon={Trophy} title={t(league.seasons?.length ? 'leagues.newSeasonEmpty' : 'leagues.noResultsYet')} />
       )}
+
+      <PastSeasons league={league} isManager={isManager} onChanged={onSeasonChanged} />
     </div>
   );
 }

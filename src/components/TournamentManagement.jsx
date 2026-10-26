@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor } from 'lucide-react';
+import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -15,6 +15,7 @@ import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { StatusBadge } from './shared/StatusBadge';
+import { RoundSchedule } from './shared/RoundSchedule';
 import { BoardMotif, LiveDot, PhaseBar } from './shared/DartsAccents';
 import { isTournamentRunning, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
 import { LoadingState } from './shared/LoadingState';
@@ -28,12 +29,14 @@ import { StartMatchDialog } from './tournament/StartMatchDialog';
 import { EditMatchPlayersDialog } from './tournament/EditMatchPlayersDialog';
 import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
+import { BoardsControl } from './tournament/BoardsControl';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { sortStandings } from '../utils/standings';
+import { cloneTournamentPath } from '../utils/cloneTournament';
 import { cn } from '@/lib/utils';
 import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
@@ -255,6 +258,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
     defaultScoringMode: tournament.defaultScoringMode || 'dart',
+    startsAt: tournament.startsAt || null,
+    venue: tournament.venue || '',
     // Use the tournament's real group settings — a hardcoded default here
     // silently reset type/value (and any extra flags) on every settings save.
     groupSettings: tournament.groupSettings || {
@@ -417,6 +422,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
         defaultScoringMode: tournament.defaultScoringMode || 'dart',
+        startsAt: tournament.startsAt || null,
+        venue: tournament.venue || '',
         groupSettings: tournament.groupSettings || {
           type: 'groups',
           value: 2
@@ -2079,10 +2086,21 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       return compareLiveMatchesStable(a, b);
     });
 
+  // Manual board override from a match card (manager only).
+  const handleAssignBoard = async (match, board) => {
+    try {
+      await tournamentService.setMatchBoards(tournament.id, tournament.boardCount, { [match.id]: board });
+      await getTournament(tournament.id);
+    } catch (error) {
+      console.error('Error assigning board:', error);
+      toast.error(t('boards.saveFailed'));
+    }
+  };
+
   // Everything a group/playoff match card needs from this component.
   const card = {
     user, canScore, canManage, isAdmin, isMatchActuallyLive, isMatchInLocalStorage, getMatchStatusText, liveInfoById,
-    setMatchStatistics, handleAdminResetMatch, handleAdminCorrectMatch, handleStartMatchRequest, onMatchStart
+    setMatchStatistics, handleAdminResetMatch, handleAdminCorrectMatch, handleStartMatchRequest, onMatchStart, handleAssignBoard
   };
 
   const isPlayoffOnly = tournament.tournamentType === 'playoff_only';
@@ -2119,6 +2137,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               )}
             </div>
             <p className="text-sm text-muted-foreground tabular-nums">{overview.join(' · ')}</p>
+            <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} />
             {isTournamentRunning(tournament.status) && (
               <div className="mt-2 flex max-w-md items-center gap-3">
                 <PhaseBar {...tournamentPhase} className="flex-1" />
@@ -2151,6 +2170,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               >
                 <Settings />
                 {t('registration.editSettings')}
+              </Button>
+            )}
+            {canManage && user && (
+              <Button variant="outline" onClick={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}>
+                <CopyPlus />
+                {tournament.leagueId ? t('tournaments.nextRound') : t('tournaments.duplicate')}
               </Button>
             )}
             {canManage && user && (
@@ -2227,6 +2252,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <X />
             </Button>
           </Alert>
+        )}
+        {canManage && user && isTournamentRunning(tournament.status) && (activeTab === 'matches' || activeTab === 'playoffs') && (
+          <BoardsControl tournament={tournament} onSaved={() => getTournament(tournament.id)} t={t} />
         )}
         {!isPlayoffOnly && activeTab === 'groups' && (
           <GroupsTab

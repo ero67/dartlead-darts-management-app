@@ -123,6 +123,8 @@ export const tournamentService = {
           starting_score: tournamentData.startingScore || 501,
           game_type: tournamentData.gameType || 'x01',
           default_scoring_mode: tournamentData.defaultScoringMode || 'dart',
+          starts_at: tournamentData.startsAt || null,
+          venue: tournamentData.venue || null,
           group_settings: tournamentData.groupSettings ? {
             ...tournamentData.groupSettings,
             standingsCriteriaOrder: tournamentData.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead']
@@ -349,6 +351,8 @@ export const tournamentService = {
         startingScore: tournament.starting_score,
         gameType: tournament.game_type || 'x01',
         defaultScoringMode: tournament.default_scoring_mode || 'dart',
+        startsAt: tournament.starts_at || null,
+        venue: tournament.venue || null,
         groupSettings: groupSettings || {
           type: 'groups',
           value: 2,
@@ -437,6 +441,8 @@ export const tournamentService = {
           startingScore: row.starting_score,
           gameType: row.game_type || 'x01',
           defaultScoringMode: row.default_scoring_mode || 'dart',
+          startsAt: row.starts_at || null,
+          venue: row.venue || null,
           groupSettings: groupSettings || null,
           playoffSettings: row.playoff_settings,
           tournamentType: row.tournament_type || 'groups_with_playoffs',
@@ -582,6 +588,7 @@ export const tournamentService = {
           gameType: match.game_type || tournament.game_type || 'x01',
           startedByUserId: match.started_by_user_id,
           isPlayoff: true,
+          assignedBoard: match.assigned_board ?? null,
           playoffRound: match.playoff_round,
           playoffMatchNumber: match.playoff_match_number,
           result: match.winner_id ? (() => {
@@ -621,6 +628,8 @@ export const tournamentService = {
           startingScore: tournament.starting_score,
           gameType: tournament.game_type || 'x01',
           defaultScoringMode: tournament.default_scoring_mode || 'dart',
+          startsAt: tournament.starts_at || null,
+          venue: tournament.venue || null,
           groupSettings: groupSettings || {
             type: 'groups',
             value: 2,
@@ -629,6 +638,7 @@ export const tournamentService = {
           playoffSettings: tournament.playoff_settings,
           playoffs: tournament.playoffs,
           playoffMatches: playoffMatches,
+          boardCount: tournament.board_count ?? null,
           tournamentType: tournament.tournament_type || 'groups_with_playoffs',
           standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
           leagueId: tournament.league_id || null,
@@ -654,6 +664,7 @@ export const tournamentService = {
                 // but cannot update local standings ("Group not found").
                 groupId: group.id,
                 matchOrder: match.match_order ?? null,
+                assignedBoard: match.assigned_board ?? null,
                 player1: match.player1 || null,
                 player2: match.player2 || null,
                 status: match.status,
@@ -1438,6 +1449,17 @@ export const tournamentService = {
     }
   },
 
+  // Board count plus the board of waiting matches ({ matchId: board | null });
+  // the RPC checks can_manage_tournament and only touches pending matches.
+  async setMatchBoards(tournamentId, boardCount, assignments = {}) {
+    const { error } = await supabase.rpc('set_match_boards', {
+      p_tournament_id: tournamentId,
+      p_board_count: boardCount,
+      p_assignments: assignments
+    });
+    if (error) throw error;
+  },
+
   // Whether the current user manages this tournament: owner, the linked
   // league's creator or co-managers, or admin (can_manage_tournament in the DB).
   async canManage(tournamentId) {
@@ -2191,6 +2213,10 @@ export const tournamentService = {
       if (settings.defaultScoringMode) {
         updateData.default_scoring_mode = settings.defaultScoringMode;
       }
+
+      // Only callers that edit the schedule send these keys; others keep it.
+      if ('startsAt' in settings) updateData.starts_at = settings.startsAt || null;
+      if ('venue' in settings) updateData.venue = settings.venue?.trim() || null;
 
       // The game type can only change before any match has been played;
       // afterwards it is silently kept (results of both types can't mix).

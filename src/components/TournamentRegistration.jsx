@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, ArrowLeft, Settings, Trash2 } from 'lucide-react';
+import { Play, ArrowLeft, Settings, Trash2, CopyPlus } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import { leagueService } from '../services/leagueService';
 import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { StatusBadge } from './shared/StatusBadge';
+import { RoundSchedule } from './shared/RoundSchedule';
 import { PlayersSection } from './registration/PlayersSection';
 import { RegistrationRequests } from './registration/RegistrationRequests';
 import { SelfRegistration } from './registration/SelfRegistration';
@@ -17,6 +18,7 @@ import { EditSettingsDialog } from './registration/EditSettingsDialog';
 import { GroupsPreviewDialog } from './registration/GroupsPreviewDialog';
 import { getPublicAppUrl } from '../utils/publicUrl';
 import { getUserDisplayName } from '../utils/userDisplayName';
+import { cloneTournamentPath } from '../utils/cloneTournament';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
@@ -52,6 +54,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
     defaultScoringMode: tournament.defaultScoringMode || 'dart',
+    startsAt: tournament.startsAt || null,
+    venue: tournament.venue || '',
     tournamentType: tournament.tournamentType || 'groups_with_playoffs',
     groupSettings: tournament.groupSettings || {
       type: 'groups', // 'groups' or 'playersPerGroup'
@@ -249,6 +253,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
         defaultScoringMode: tournament.defaultScoringMode || 'dart',
+        startsAt: tournament.startsAt || null,
+        venue: tournament.venue || '',
         tournamentType: tournament.tournamentType || 'groups_with_playoffs',
         groupSettings: tournament.groupSettings || {
           type: 'groups',
@@ -605,6 +611,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               <StatusBadge status="open_for_registration" t={t} />
             </div>
             <p className="text-sm text-muted-foreground">{t('registration.openForRegistration')}</p>
+            <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <RefreshButton />
@@ -617,6 +624,12 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               >
                 <Settings />
                 {t('registration.editSettings')}
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="outline" onClick={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}>
+                <CopyPlus />
+                {tournament.leagueId ? t('tournaments.nextRound') : t('tournaments.duplicate')}
               </Button>
             )}
             {canManage && onDeleteTournament && (

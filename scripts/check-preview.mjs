@@ -18,6 +18,11 @@ html = await buildPreview({ kind: 'tv', id: ID, origin }, reply([{ name: 'Cup', 
 assert.match(html, /Cup · živý prenos/);
 assert.match(html, /Prebieha · 8 hráčov · Cricket/);
 
+// Planned date (Slovak wall time) and venue follow the status when set.
+html = await buildPreview({ kind: 'tournament', id: ID, origin },
+  reply([{ name: 'Kolo 5', status: 'open_for_registration', starts_at: '2026-10-31T18:00:00Z', venue: 'Pub <U Kohúta>', legs_to_win: 2, tournament_players: [{ count: 12 }] }]));
+assert.match(html, /Registrácia otvorená · so 31\. októbra 2026 o 19:00 · Pub &lt;U Kohúta&gt; · 12 hráčov · 501 · prvý do 2 legov/);
+
 html = await buildPreview({ kind: 'player', id: ID, origin }, reply([{ name: 'Jana' }]));
 assert.match(html, /Jana · profil hráča/);
 html = await buildPreview({ kind: 'tournament', id: ID, origin }, reply([{ name: 'Duel', status: 'started', legs_to_win: 1, tournament_players: [{ count: 3 }] }]));

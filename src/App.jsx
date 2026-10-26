@@ -39,6 +39,7 @@ import { tournamentService } from './services/tournamentService';
 import { isCricketGame } from './lib/cricket';
 import { POST_LOGIN_REDIRECT_KEY, isSafeRedirectPath } from './utils/postLoginRedirect';
 import { getUserDisplayName } from './utils/userDisplayName';
+import { cloneTournamentPath } from './utils/cloneTournament';
 import { DisplayNameEditor } from './components/DisplayNameEditor';
 import { PracticeBests } from './components/practice/PracticeBests';
 import { loadHistory } from './lib/practiceStorage';
@@ -484,9 +485,11 @@ function AppContent() {
     navigate(`/league/${league.id}`);
   };
 
-  const handleCreateTournamentFromLeague = (league) => {
-    // Navigate to tournament creation with league context
-    navigate(`/create-tournament?leagueId=${league.id}`);
+  // With sourceTournamentId: "Create next round", prefilled from that round.
+  const handleCreateTournamentFromLeague = (league, sourceTournamentId) => {
+    navigate(sourceTournamentId
+      ? cloneTournamentPath(sourceTournamentId, league.id)
+      : `/create-tournament?leagueId=${league.id}`);
   };
 
 
