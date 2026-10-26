@@ -223,6 +223,20 @@ export function SettingsTab({
           <CardDescription>{t('leagues.defaultTournamentSettingsDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="default-venue">{t('schedule.defaultVenue')}</Label>
+            <Input
+              id="default-venue"
+              type="text"
+              className="sm:max-w-md"
+              value={tournamentDefaults.venue || ''}
+              onChange={(e) => setTournamentDefaults({ ...tournamentDefaults, venue: e.target.value })}
+              placeholder={t('schedule.venuePlaceholder')}
+              maxLength={200}
+            />
+            <p className="text-sm text-muted-foreground">{t('schedule.defaultVenueHint')}</p>
+          </div>
+
           {/* Tournament Type */}
           <div className="flex flex-col gap-2">
             <Label>{t('leagues.defaultTournamentType')}</Label>

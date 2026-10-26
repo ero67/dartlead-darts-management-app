@@ -13,6 +13,11 @@ const STATUS_SK = {
 
 const playersSk = (n) => `${n} ${n === 1 ? 'hráč' : n < 5 ? 'hráči' : 'hráčov'}`;
 
+// Server runs in UTC; the leagues play in Slovakia, so show their wall time.
+const roundDateSk = (iso) => new Intl.DateTimeFormat('sk-SK', {
+  weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Bratislava',
+}).format(new Date(iso));
+
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 async function fetchRow(fetchImpl, table, id, select) {
@@ -34,12 +39,12 @@ export async function buildPreview({ kind, id, origin }, fetchImpl = fetch) {
   const page = { title: 'DartLead', description: 'Turnaje, ligy a živé skórovanie šípok v jednej aplikácii.', path: '/' };
   try {
     if (UUID.test(id || '') && (kind === 'tournament' || kind === 'tv')) {
-      const t = await fetchRow(fetchImpl, 'tournaments', id, 'name,status,game_type,starting_score,legs_to_win,deleted,tournament_players(count)');
+      const t = await fetchRow(fetchImpl, 'tournaments', id, 'name,status,game_type,starting_score,legs_to_win,starts_at,venue,deleted,tournament_players(count)');
       if (t && !t.deleted) {
         const players = t.tournament_players?.[0]?.count;
         const game = t.game_type === 'cricket' ? 'Cricket' : String(t.starting_score || 501);
         page.title = kind === 'tv' ? `${t.name} · živý prenos` : t.name;
-        page.description = [STATUS_SK[t.status], players ? playersSk(players) : null, game, t.legs_to_win ? `prvý do ${t.legs_to_win} ${t.legs_to_win === 1 ? 'legu' : 'legov'}` : null]
+        page.description = [STATUS_SK[t.status], t.starts_at ? roundDateSk(t.starts_at) : null, t.venue, players ? playersSk(players) : null, game, t.legs_to_win ? `prvý do ${t.legs_to_win} ${t.legs_to_win === 1 ? 'legu' : 'legov'}` : null]
           .filter(Boolean).join(' · ');
         page.path = `/${kind}/${id}`;
       }

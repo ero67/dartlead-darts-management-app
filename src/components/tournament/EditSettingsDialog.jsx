@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronUp, ChevronDown, X, Plus } from 'lucide-react';
 import { BracketSeedingEditor } from '../BracketSeedingEditor';
+import { RoundScheduleFields } from '../shared/RoundSchedule';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -295,6 +296,12 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
         </DialogHeader>
 
         <div className="-mx-6 flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-1">
+          <Section title={t('schedule.title')}>
+            <RoundScheduleFields idPrefix="mgmt" value={tournamentSettings} onChange={setTournamentSettings} />
+          </Section>
+
+          <Separator />
+
           <Section title={t('registration.matchSettings')}>
             {/* Read-only here: the game can only change before any match starts (registration dialog) */}
             <p className="text-sm">
