@@ -5,6 +5,7 @@ import { useLeague } from '../contexts/LeagueContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { UserSearchPicker } from './UserSearchPicker';
+import { RoundScheduleFields } from './shared/RoundSchedule';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,6 +61,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     : {};
   
   const [tournamentName, setTournamentName] = useState('');
+  const [schedule, setSchedule] = useState({ startsAt: null, venue: leagueDefaults.venue || '' });
   const [gameType, setGameType] = useState(leagueDefaults.gameType || 'x01');
   const [legsToWin, setLegsToWin] = useState(leagueDefaults.legsToWin || 3);
   const [startingScore, setStartingScore] = useState(leagueDefaults.startingScore || 501);
@@ -128,6 +130,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
         if (defaults.groupSettings) setGroupSettings(prev => ({ ...prev, ...defaults.groupSettings }));
         if (defaults.standingsCriteriaOrder) setStandingsCriteriaOrder(defaults.standingsCriteriaOrder);
         if (defaults.defaultScoringMode) setDefaultScoringMode(defaults.defaultScoringMode);
+        if (defaults.venue) setSchedule(prev => (prev.venue ? prev : { ...prev, venue: defaults.venue }));
         if (defaults.playoffSettings) setPlayoffSettings(prev => ({
           ...prev,
           ...defaults.playoffSettings,
@@ -181,6 +184,8 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
     const tournament = {
       id: generateId(),
       name: tournamentName.trim(),
+      startsAt: schedule.startsAt,
+      venue: schedule.venue.trim() || null,
       players: selectedPlayers.length > 0 ? selectedPlayers : [], // Pre-populate with league members if available
       groups: [], // Groups will be generated when tournament starts
       gameType,
@@ -293,6 +298,16 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
                 placeholder={t('tournaments.enterTournamentName')}
                 maxLength={50}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('schedule.title')}</CardTitle>
+              <CardDescription>{t('schedule.hint')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RoundScheduleFields idPrefix="tournament" value={schedule} onChange={setSchedule} />
             </CardContent>
           </Card>
 

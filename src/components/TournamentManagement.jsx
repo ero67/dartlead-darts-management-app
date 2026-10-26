@@ -15,6 +15,7 @@ import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { StatusBadge } from './shared/StatusBadge';
+import { RoundSchedule } from './shared/RoundSchedule';
 import { BoardMotif, LiveDot, PhaseBar } from './shared/DartsAccents';
 import { isTournamentRunning, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
 import { LoadingState } from './shared/LoadingState';
@@ -255,6 +256,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
     defaultScoringMode: tournament.defaultScoringMode || 'dart',
+    startsAt: tournament.startsAt || null,
+    venue: tournament.venue || '',
     // Use the tournament's real group settings — a hardcoded default here
     // silently reset type/value (and any extra flags) on every settings save.
     groupSettings: tournament.groupSettings || {
@@ -417,6 +420,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
         defaultScoringMode: tournament.defaultScoringMode || 'dart',
+        startsAt: tournament.startsAt || null,
+        venue: tournament.venue || '',
         groupSettings: tournament.groupSettings || {
           type: 'groups',
           value: 2
@@ -2119,6 +2124,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               )}
             </div>
             <p className="text-sm text-muted-foreground tabular-nums">{overview.join(' · ')}</p>
+            <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} />
             {isTournamentRunning(tournament.status) && (
               <div className="mt-2 flex max-w-md items-center gap-3">
                 <PhaseBar {...tournamentPhase} className="flex-1" />

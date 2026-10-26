@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '../shared/StatusBadge';
 import { EmptyState } from '../shared/EmptyState';
+import { RoundSchedule } from '../shared/RoundSchedule';
 import { isTournamentRunning } from '../../utils/tournamentStatus';
+import { upcomingRounds, upcomingFirst } from '../../utils/roundSchedule';
 import { cn } from '@/lib/utils';
 
 // shadcn SelectItem values must be non-empty; '' in state maps to this.
@@ -20,8 +22,11 @@ export function TournamentsTab({
 }) {
   const { t } = useLanguage();
   const members = (league.members || []).map(m => m.player).filter(Boolean);
-  // Newest round at the top; round numbers count from the first tournament.
-  const rounds = [...(league.tournaments || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  // Planned rounds still ahead first (soonest first), then newest round at the
+  // top; round numbers count from the first tournament created.
+  const byCreated = [...(league.tournaments || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const rounds = upcomingFirst(byCreated);
+  const upcomingIds = new Set(upcomingRounds(byCreated).map(r => r.id));
 
   const ctaLabel = (status) => {
     if (status === 'completed') return t('dashboard.viewResults');
@@ -125,7 +130,8 @@ export function TournamentsTab({
       {rounds.length > 0 ? (
         <ol className="flex flex-col">
           {rounds.map((tournament, index) => {
-            const roundNumber = rounds.length - index;
+            const roundNumber = byCreated.length - byCreated.indexOf(tournament);
+            const isUpcoming = upcomingIds.has(tournament.id);
             const isDone = tournament.status === 'completed';
             const isRunning = isTournamentRunning(tournament.status);
             const isLast = index === rounds.length - 1;
@@ -149,14 +155,16 @@ export function TournamentsTab({
                     className={cn(
                       'flex-row flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3.5',
                       isRunning && 'border-live/30 bg-gradient-to-r from-live/10 to-card to-60%',
-                      tournament.status === 'open_for_registration' && 'opacity-80'
+                      tournament.status === 'open_for_registration' && !isUpcoming && 'opacity-80'
                     )}
                   >
                     <div className="flex min-w-0 flex-[1_1_15rem] flex-col">
                       <span className="text-xs text-muted-foreground">
-                        {t('leagues.roundNumber', { number: roundNumber })} · {new Date(tournament.created_at).toLocaleDateString()}
+                        {t('leagues.roundNumber', { number: roundNumber })}
+                        {isUpcoming ? ` · ${t('schedule.upcoming')}` : !tournament.startsAt && ` · ${new Date(tournament.created_at).toLocaleDateString()}`}
                       </span>
                       <span className="truncate text-base font-semibold">{tournament.name}</span>
+                      <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} className="mt-1 text-xs [&_svg]:size-3.5" />
                     </div>
                     <StatusBadge status={tournament.status} t={t} />
                     <div className="ml-auto flex items-center gap-1">
