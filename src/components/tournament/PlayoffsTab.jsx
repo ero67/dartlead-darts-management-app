@@ -8,7 +8,7 @@ import { BracketVisualization } from '../BracketVisualization';
 import { ExportMenu } from '../ExportMenu';
 import { EmptyState } from '../shared/EmptyState';
 import { mergeBracketRounds } from '../../utils/bracketView';
-import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions } from './MatchCardParts';
+import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions, MatchBoard } from './MatchCardParts';
 import { cn } from '@/lib/utils';
 
 function StartPlayoffsSection({
@@ -266,9 +266,12 @@ export function PlayoffsTab(props) {
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('management.thirdPlaceMatch')}</span>
                           )}
                           <div className="flex items-center justify-between gap-2">
-                            <MatchStatusBadge status={match.status} isLive={isLive}>
-                              {getMatchStatusText(match.status, match.id)}
-                            </MatchStatusBadge>
+                            <div className="flex items-center gap-2">
+                              <MatchStatusBadge status={match.status} isLive={isLive}>
+                                {getMatchStatusText(match.status, match.id)}
+                              </MatchStatusBadge>
+                              {!isLive && <MatchBoard match={match} canManage={canManage && !!user} boardCount={tournament.boardCount} onAssign={card.handleAssignBoard} t={t} />}
+                            </div>
                             <div className="flex items-center">
                               {canManage && match.status === 'pending' && !isLive && (
                                 <Button

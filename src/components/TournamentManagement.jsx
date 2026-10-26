@@ -28,6 +28,7 @@ import { StartMatchDialog } from './tournament/StartMatchDialog';
 import { EditMatchPlayersDialog } from './tournament/EditMatchPlayersDialog';
 import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
+import { BoardsControl } from './tournament/BoardsControl';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
@@ -2079,10 +2080,21 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       return compareLiveMatchesStable(a, b);
     });
 
+  // Manual board override from a match card (manager only).
+  const handleAssignBoard = async (match, board) => {
+    try {
+      await tournamentService.setMatchBoards(tournament.id, tournament.boardCount, { [match.id]: board });
+      await getTournament(tournament.id);
+    } catch (error) {
+      console.error('Error assigning board:', error);
+      toast.error(t('boards.saveFailed'));
+    }
+  };
+
   // Everything a group/playoff match card needs from this component.
   const card = {
     user, canScore, canManage, isAdmin, isMatchActuallyLive, isMatchInLocalStorage, getMatchStatusText, liveInfoById,
-    setMatchStatistics, handleAdminResetMatch, handleAdminCorrectMatch, handleStartMatchRequest, onMatchStart
+    setMatchStatistics, handleAdminResetMatch, handleAdminCorrectMatch, handleStartMatchRequest, onMatchStart, handleAssignBoard
   };
 
   const isPlayoffOnly = tournament.tournamentType === 'playoff_only';
@@ -2227,6 +2239,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <X />
             </Button>
           </Alert>
+        )}
+        {canManage && user && isTournamentRunning(tournament.status) && (activeTab === 'matches' || activeTab === 'playoffs') && (
+          <BoardsControl tournament={tournament} onSaved={() => getTournament(tournament.id)} t={t} />
         )}
         {!isPlayoffOnly && activeTab === 'groups' && (
           <GroupsTab
