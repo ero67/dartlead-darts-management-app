@@ -1,0 +1,7 @@
+# CLI deploys build with the env vars configured in Vercel; never upload local env files
+.env
+.env.*
+.claude
+dist
+android
+cypress
