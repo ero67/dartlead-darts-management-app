@@ -123,6 +123,8 @@ export const tournamentService = {
           starting_score: tournamentData.startingScore || 501,
           game_type: tournamentData.gameType || 'x01',
           default_scoring_mode: tournamentData.defaultScoringMode || 'dart',
+          starts_at: tournamentData.startsAt || null,
+          venue: tournamentData.venue || null,
           group_settings: tournamentData.groupSettings ? {
             ...tournamentData.groupSettings,
             standingsCriteriaOrder: tournamentData.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead']
@@ -349,6 +351,8 @@ export const tournamentService = {
         startingScore: tournament.starting_score,
         gameType: tournament.game_type || 'x01',
         defaultScoringMode: tournament.default_scoring_mode || 'dart',
+        startsAt: tournament.starts_at || null,
+        venue: tournament.venue || null,
         groupSettings: groupSettings || {
           type: 'groups',
           value: 2,
@@ -437,6 +441,8 @@ export const tournamentService = {
           startingScore: row.starting_score,
           gameType: row.game_type || 'x01',
           defaultScoringMode: row.default_scoring_mode || 'dart',
+          startsAt: row.starts_at || null,
+          venue: row.venue || null,
           groupSettings: groupSettings || null,
           playoffSettings: row.playoff_settings,
           tournamentType: row.tournament_type || 'groups_with_playoffs',
@@ -621,6 +627,8 @@ export const tournamentService = {
           startingScore: tournament.starting_score,
           gameType: tournament.game_type || 'x01',
           defaultScoringMode: tournament.default_scoring_mode || 'dart',
+          startsAt: tournament.starts_at || null,
+          venue: tournament.venue || null,
           groupSettings: groupSettings || {
             type: 'groups',
             value: 2,
@@ -2191,6 +2199,10 @@ export const tournamentService = {
       if (settings.defaultScoringMode) {
         updateData.default_scoring_mode = settings.defaultScoringMode;
       }
+
+      // Only callers that edit the schedule send these keys; others keep it.
+      if ('startsAt' in settings) updateData.starts_at = settings.startsAt || null;
+      if ('venue' in settings) updateData.venue = settings.venue?.trim() || null;
 
       // The game type can only change before any match has been played;
       // afterwards it is silently kept (results of both types can't mix).
