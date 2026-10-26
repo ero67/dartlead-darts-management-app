@@ -10,6 +10,7 @@ import { leagueService } from '../services/leagueService';
 import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { StatusBadge } from './shared/StatusBadge';
+import { RoundSchedule } from './shared/RoundSchedule';
 import { PlayersSection } from './registration/PlayersSection';
 import { RegistrationRequests } from './registration/RegistrationRequests';
 import { SelfRegistration } from './registration/SelfRegistration';
@@ -53,6 +54,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     legsToWin: tournament.legsToWin || 3,
     startingScore: tournament.startingScore || 501,
     defaultScoringMode: tournament.defaultScoringMode || 'dart',
+    startsAt: tournament.startsAt || null,
+    venue: tournament.venue || '',
     tournamentType: tournament.tournamentType || 'groups_with_playoffs',
     groupSettings: tournament.groupSettings || {
       type: 'groups', // 'groups' or 'playersPerGroup'
@@ -250,6 +253,8 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
         legsToWin: tournament.legsToWin || 3,
         startingScore: tournament.startingScore || 501,
         defaultScoringMode: tournament.defaultScoringMode || 'dart',
+        startsAt: tournament.startsAt || null,
+        venue: tournament.venue || '',
         tournamentType: tournament.tournamentType || 'groups_with_playoffs',
         groupSettings: tournament.groupSettings || {
           type: 'groups',
@@ -606,6 +611,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               <StatusBadge status="open_for_registration" t={t} />
             </div>
             <p className="text-sm text-muted-foreground">{t('registration.openForRegistration')}</p>
+            <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <RefreshButton />

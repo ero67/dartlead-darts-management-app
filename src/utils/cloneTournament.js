@@ -40,6 +40,8 @@ export function buildClonePrefill(source, copySuffix) {
     standingsCriteriaOrder: criteria ? [...criteria] : undefined,
     playoffSettings: source.playoffSettings ? structuredClone(source.playoffSettings) : undefined,
     leagueId: source.leagueId || null,
+    // Same venue as last time; the date is new for every round.
+    venue: source.venue || undefined,
     // Same player ids, so league stats and linked accounts stay on one profile.
     players: (source.players || []).filter(p => p?.id).map(({ id, name }) => ({ id, name })),
     // A round still in registration has an incomplete list: offer it, don't preselect.

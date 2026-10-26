@@ -1503,5 +1503,16 @@
       "bullupOffer": "Tento leg je príliš dlhý ({{count}}+ kôl pre oboch).",
       "bullupPrompt": "Obaja hráči hádžu na bull — bližší vyhráva leg. Kto vyhral hod na bull?"
     }
+  },
+  "schedule": {
+    "title": "Termín a miesto",
+    "hint": "Nepovinné. Hráči uvidia nadchádzajúce kolá na svojej úvodnej stránke.",
+    "startsAt": "Dátum a čas",
+    "venue": "Miesto",
+    "venuePlaceholder": "Kde sa hrá?",
+    "upcoming": "Nadchádzajúce",
+    "upcomingRounds": "Nadchádzajúce kolá",
+    "defaultVenue": "Predvolené miesto",
+    "defaultVenueHint": "Predvyplní sa pri vytváraní nového kola."
   }
 }

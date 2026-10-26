@@ -1503,5 +1503,16 @@
       "bullupOffer": "This leg has gone long ({{count}}+ visits each).",
       "bullupPrompt": "Both players throw at the bull — closest wins the leg. Who won the bull-up?"
     }
+  },
+  "schedule": {
+    "title": "Date and venue",
+    "hint": "Optional. Players see upcoming rounds on their home page.",
+    "startsAt": "Date and time",
+    "venue": "Venue",
+    "venuePlaceholder": "Where is it played?",
+    "upcoming": "Upcoming",
+    "upcomingRounds": "Upcoming rounds",
+    "defaultVenue": "Default venue",
+    "defaultVenueHint": "Prefilled when you create a new round."
   }
 }

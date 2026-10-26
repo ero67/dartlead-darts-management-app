@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { RoundScheduleFields } from '../shared/RoundSchedule';
 import { GAME_TYPES, isCricketGame } from '@/lib/cricket';
 
 const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
@@ -78,6 +79,13 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
         </DialogHeader>
 
         <div className="-mx-6 flex max-h-[80vh] flex-col gap-6 overflow-y-auto px-6">
+          <section className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold">{t('schedule.title')}</h4>
+            <RoundScheduleFields idPrefix="edit" value={settings} onChange={setSettings} />
+          </section>
+
+          <Separator />
+
           <section className="flex flex-col gap-3">
             <h4 className="text-sm font-semibold">{t('registration.tournamentType') || 'Tournament Type'}</h4>
             <RadioGroup
