@@ -315,7 +315,7 @@ export function LandingPage() {
                   <Trophy />
                   {t('landing.demoOpen')}
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => navigate(`/tv/${DEMO_TOURNAMENT_ID}`)}>
+                <Button size="lg" variant="outline" onClick={() => navigate(`/tv/${DEMO_TOURNAMENT_ID}?view=bracket`)}>
                   <MonitorPlay />
                   {t('landing.demoTv')}
                 </Button>
