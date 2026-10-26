@@ -34,7 +34,7 @@ function StatBar({ label, left, right, format = (v) => v }) {
   );
 }
 
-export function HeadToHead({ leagueId, players }) {
+export function HeadToHead({ leagueId, players, season = 'current' }) {
   const { t } = useLanguage();
   const [player1Id, setPlayer1Id] = useState('');
   const [player2Id, setPlayer2Id] = useState('');
@@ -48,12 +48,12 @@ export function HeadToHead({ leagueId, players }) {
     }
     let isCurrent = true;
     setIsLoading(true);
-    leagueService.getHeadToHead(leagueId, player1Id, player2Id)
+    leagueService.getHeadToHead(leagueId, player1Id, player2Id, season)
       .then(data => { if (isCurrent) setStats(data || { matches: 0 }); })
       .catch(() => { if (isCurrent) setStats(null); })
       .finally(() => { if (isCurrent) setIsLoading(false); });
     return () => { isCurrent = false; };
-  }, [leagueId, player1Id, player2Id]);
+  }, [leagueId, player1Id, player2Id, season]);
 
   const handleSwap = () => {
     setPlayer1Id(player2Id);

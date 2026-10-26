@@ -32,6 +32,13 @@ const resolveLeaguePlayer = async (leagueId, name, userId = null) => {
   return data;
 };
 
+// Rounds of a season: 'current' (season_id is null), 'all', or an ended
+// season's id (league_seasons.id).
+const forSeason = (query, season = 'current') => {
+  if (season === 'all') return query;
+  return season === 'current' ? query.is('season_id', null) : query.eq('season_id', season);
+};
+
 export const leagueService = {
   // Create a new league
   async createLeague(leagueData) {
@@ -138,13 +145,24 @@ export const leagueService = {
       // Get tournaments
       const { data: tournaments, error: tournamentsError } = await supabase
         .from('tournaments')
-        .select('id, name, status, created_at, updated_at')
+        .select('id, name, status, created_at, updated_at, season_id')
         .eq('league_id', leagueId)
         .eq('deleted', false)
         .order('created_at', { ascending: false });
 
       if (tournamentsError) {
         console.error('Error fetching league tournaments:', tournamentsError);
+      }
+
+      // Ended seasons with their frozen final tables, newest first
+      const { data: seasons, error: seasonsError } = await supabase
+        .from('league_seasons')
+        .select('id, name, started_at, ended_at, standings')
+        .eq('league_id', leagueId)
+        .order('ended_at', { ascending: false });
+
+      if (seasonsError) {
+        console.error('Error fetching league seasons:', seasonsError);
       }
 
       // Get leaderboard
@@ -154,6 +172,7 @@ export const leagueService = {
         ...this.transformLeague(league),
         members,
         tournaments: tournaments || [],
+        seasons: seasons || [],
         leaderboard
       };
     } catch (error) {
@@ -565,7 +584,8 @@ export const leagueService = {
         .select('id, name, league_points_calculated')
         .eq('league_id', leagueId)
         .eq('status', 'completed')
-        .eq('deleted', false);
+        .eq('deleted', false)
+        .is('season_id', null);
 
       if (tournamentsError) throw tournamentsError;
 
@@ -929,181 +949,12 @@ export const leagueService = {
     return placements;
   },
 
-  // Update leaderboard cache from league_tournament_results
-  // manual_points are preserved across recalculations and added on top
+  // Rebuild the leaderboard cache on the server (current season only,
+  // manual_points kept): refresh_league_leaderboard, migration 20261027140000.
   async updateLeaderboardCache(leagueId) {
-    try {
-      // ── 1. Read existing manual_points so we can preserve them ──────
-      // Every read below feeds the rebuild write: a silently failed read here
-      // would rewrite the whole leaderboard with zeros (wiping admin-entered
-      // bonus points), so any read error must abort the rebuild.
-      const { data: existingRows, error: existingError } = await supabase
-        .from('league_leaderboard')
-        .select('player_id, manual_points')
-        .eq('league_id', leagueId);
-
-      if (existingError) throw existingError;
-
-      const existingManual = {};
-      (existingRows || []).forEach(row => {
-        existingManual[row.player_id] = row.manual_points || 0;
-      });
-
-      // ── 2. Get all tournament results for this league ──────────────
-      const allResults = await fetchAllRows(() => supabase
-        .from('league_tournament_results')
-        .select(`
-          *,
-          tournament:tournaments(created_at, deleted)
-        `)
-        .eq('league_id', leagueId)
-        .order('id'));
-
-      // Soft-deleted tournaments keep their result rows, but they must not
-      // count toward the leaderboard (the leg stats below already exclude
-      // them — counting one side and not the other made totals inconsistent).
-      const results = (allResults || []).filter(r => !r.tournament?.deleted);
-
-      // Sort by tournament date in memory (Supabase doesn't support ordering by related fields)
-      results.sort((a, b) => {
-        const dateA = a.tournament?.created_at ? new Date(a.tournament.created_at) : new Date(0);
-        const dateB = b.tournament?.created_at ? new Date(b.tournament.created_at) : new Date(0);
-        return dateB - dateA; // descending order
-      });
-
-      // ── 3. Get leg stats from completed matches in league tournaments ──
-      const { data: leagueTournaments, error: leagueTournamentsError } = await supabase
-        .from('tournaments')
-        .select('id')
-        .eq('league_id', leagueId)
-        .eq('status', 'completed')
-        .eq('deleted', false);
-
-      if (leagueTournamentsError) throw leagueTournamentsError;
-
-      const leagueTournamentIds = (leagueTournaments || []).map(t => t.id);
-
-      const playerLegs = {};
-      if (leagueTournamentIds.length > 0) {
-        const matches = await fetchAllRows(() => supabase
-          .from('matches')
-          .select('player1_id, player2_id, player1_legs, player2_legs, winner_id')
-          .in('tournament_id', leagueTournamentIds)
-          .eq('status', 'completed')
-          .order('id'));
-
-        matches.forEach(match => {
-          const p1 = match.player1_id;
-          const p2 = match.player2_id;
-          const p1Legs = match.player1_legs || 0;
-          const p2Legs = match.player2_legs || 0;
-
-          if (!playerLegs[p1]) playerLegs[p1] = { won: 0, lost: 0 };
-          if (!playerLegs[p2]) playerLegs[p2] = { won: 0, lost: 0 };
-
-          playerLegs[p1].won += p1Legs;
-          playerLegs[p1].lost += p2Legs;
-          playerLegs[p2].won += p2Legs;
-          playerLegs[p2].lost += p1Legs;
-        });
-      }
-
-      // ── 4. Aggregate by player ─────────────────────────────────────
-      const playerStats = {};
-      results.forEach(result => {
-        const playerId = result.player_id;
-        if (!playerStats[playerId]) {
-          playerStats[playerId] = {
-            playerId,
-            tournamentPoints: 0,
-            tournamentsPlayed: 0,
-            placements: [],
-            lastTournamentAt: null
-          };
-        }
-
-        playerStats[playerId].tournamentPoints += result.points_awarded || 0;
-        playerStats[playerId].tournamentsPlayed += 1;
-        playerStats[playerId].placements.push(result.placement);
-        if (result.tournament && result.tournament.created_at) {
-          const tournamentDate = new Date(result.tournament.created_at);
-          if (!playerStats[playerId].lastTournamentAt || tournamentDate > new Date(playerStats[playerId].lastTournamentAt)) {
-            playerStats[playerId].lastTournamentAt = result.tournament.created_at;
-          }
-        }
-      });
-
-      // ── 5. Also include players who have manual_points but no tournament results
-      for (const [playerId, manual] of Object.entries(existingManual)) {
-        if (manual > 0 && !playerStats[playerId]) {
-          playerStats[playerId] = {
-            playerId,
-            tournamentPoints: 0,
-            tournamentsPlayed: 0,
-            placements: [],
-            lastTournamentAt: null
-          };
-        }
-      }
-
-      // ── 6. Build leaderboard entries (tournament + manual) ─────────
-      const leaderboardEntries = Object.values(playerStats).map(stats => {
-        const placements = stats.placements.sort((a, b) => a - b);
-        const avgPlacement = placements.length > 0
-          ? placements.reduce((sum, p) => sum + p, 0) / placements.length
-          : null;
-        const manualPts = existingManual[stats.playerId] || 0;
-        const legs = playerLegs[stats.playerId] || { won: 0, lost: 0 };
-
-        return {
-          league_id: leagueId,
-          player_id: stats.playerId,
-          total_points: stats.tournamentPoints + manualPts,
-          manual_points: manualPts,
-          tournaments_played: stats.tournamentsPlayed,
-          best_placement: placements.length > 0 ? placements[0] : null,
-          worst_placement: placements.length > 0 ? placements[placements.length - 1] : null,
-          avg_placement: avgPlacement,
-          last_tournament_at: stats.lastTournamentAt,
-          legs_won: legs.won,
-          legs_lost: legs.lost
-        };
-      });
-
-      // Upsert leaderboard entries
-      if (leaderboardEntries.length > 0) {
-        const { error: upsertError } = await supabase
-          .from('league_leaderboard')
-          .upsert(leaderboardEntries, {
-            onConflict: 'league_id,player_id'
-          });
-
-        if (upsertError) throw upsertError;
-      }
-
-      // ── 7. Prune ghost rows ─────────────────────────────────────────
-      // Upsert alone can't remove players whose results disappeared (tournament
-      // unlinked or soft-deleted) — their old row would keep showing old totals.
-      const currentIds = new Set(leaderboardEntries.map(e => e.player_id));
-      const staleIds = (existingRows || [])
-        .map(r => r.player_id)
-        .filter(id => !currentIds.has(id));
-
-      if (staleIds.length > 0) {
-        const { error: pruneError } = await supabase
-          .from('league_leaderboard')
-          .delete()
-          .eq('league_id', leagueId)
-          .in('player_id', staleIds);
-
-        if (pruneError) throw pruneError;
-      }
-
-      return leaderboardEntries;
-    } catch (error) {
-      console.error('Error updating leaderboard cache:', error);
-      throw error;
-    }
+    const { data, error } = await supabase.rpc('refresh_league_leaderboard', { l_id: leagueId });
+    if (error) throw error;
+    if (!data?.success) throw new Error(`refresh_league_leaderboard failed: ${data?.error || 'unknown'}`);
   },
 
   // Full leaderboard update: recalculate all results and update cache
@@ -1115,10 +966,7 @@ export const leagueService = {
       await this.recalculateAllResults(leagueId);
       
       // Then update the leaderboard cache
-      const entries = await this.updateLeaderboardCache(leagueId);
-      
-      console.log(`Leaderboard updated with ${entries.length} entries`);
-      return entries;
+      await this.updateLeaderboardCache(leagueId);
     } catch (error) {
       console.error('Error updating leaderboard:', error);
       throw error;
@@ -1604,16 +1452,16 @@ export const leagueService = {
   // ── League-wide statistics (top 10 lists) ──────────────────────────
   // Aggregates stats across all completed matches of all tournaments in
   // the league.  Returns { most180s, bestCheckouts, bestMatchAverages, fewestDartsLegs }.
-  async getLeagueStatistics(leagueId) {
+  async getLeagueStatistics(leagueId, season = 'current') {
     try {
-      // 1. Get all completed tournaments in the league
-      const { data: allTournaments, error } = await supabase
+      // 1. Get all completed tournaments in the league (of the chosen season)
+      const { data: allTournaments, error } = await forSeason(supabase
         .from('tournaments')
         .select('id, name, created_at, game_type')
         .eq('league_id', leagueId)
         .eq('status', 'completed')
         .eq('deleted', false)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true }), season);
 
       if (error) throw error;
       const empty = { most180s: [], bestCheckouts: [], bestMatchAverages: [], fewestDartsLegs: [], averageByRound: { rounds: [], series: [] } };
@@ -1779,13 +1627,13 @@ export const leagueService = {
 
   // Everything the Head to Head tab shows for two league players: the
   // aggregate record plus every completed meeting, oldest first.
-  async getHeadToHead(leagueId, player1Id, player2Id) {
+  async getHeadToHead(leagueId, player1Id, player2Id, season = 'current') {
     try {
-      const { data: tournaments, error: tournamentsError } = await supabase
+      const { data: tournaments, error: tournamentsError } = await forSeason(supabase
         .from('tournaments')
         .select('id, name, created_at')
         .eq('league_id', leagueId)
-        .eq('deleted', false);
+        .eq('deleted', false), season);
       if (tournamentsError) throw tournamentsError;
       if (!tournaments?.length) return null;
       const tournamentById = new Map(tournaments.map(t => [t.id, t]));
@@ -1878,9 +1726,32 @@ export const leagueService = {
         placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
         allowManualOverride: true
       },
+      // Current season: name (null = default label) and start (null = league start)
+      seasonName: league.season_name,
+      seasonStartedAt: league.season_started_at || league.created_at,
       createdAt: league.created_at,
       updatedAt: league.updated_at
     };
+  },
+
+  // Archive the current season's table and start a new one (end_league_season RPC).
+  async endSeason(leagueId, endedName, nextName) {
+    const { data, error } = await supabase.rpc('end_league_season', {
+      l_id: leagueId,
+      ended_name: endedName,
+      next_name: nextName
+    });
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.error || 'unknown');
+    return data;
+  },
+
+  async renameSeason(seasonId, name) {
+    const { error } = await supabase
+      .from('league_seasons')
+      .update({ name })
+      .eq('id', seasonId);
+    if (error) throw error;
   },
 
   // === League Self-Registration ===
