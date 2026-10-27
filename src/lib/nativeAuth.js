@@ -9,10 +9,10 @@ import { supabase } from './supabase.js';
 // on Android/iOS we (1) ask Supabase for the provider URL without redirecting,
 // (2) open it in the system browser (Chrome Custom Tab), and (3) let the
 // provider bounce back to our custom URL scheme, which Android routes to the
-// app as an `appUrlOpen` event. The tokens ride in the URL fragment (implicit
-// flow, the client's default) and are handed to supabase-js with setSession().
-// `?code=` is handled too, so switching the client to PKCE later needs no
-// change here.
+// app as an `appUrlOpen` event. The client uses PKCE on native (see
+// supabase.js), so the link carries only `?code=`, which is worthless without
+// the verifier stored in this WebView. Fragment tokens are refused on purpose:
+// any app could send our scheme a link that signs us into its account.
 //
 // Requirements outside this file:
 //   - android/app/src/main/AndroidManifest.xml: VIEW intent filter for
@@ -58,14 +58,6 @@ export async function completeNativeSignIn(url) {
   const code = query.get('code');
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw error;
-    return true;
-  }
-
-  const access_token = fragment.get('access_token');
-  const refresh_token = fragment.get('refresh_token');
-  if (access_token && refresh_token) {
-    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
     if (error) throw error;
     return true;
   }
