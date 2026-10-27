@@ -55,4 +55,5 @@ android/app/*.jks
 # Python (assistant/)
 .venv/
 __pycache__/
+assistant/.cache/
 
