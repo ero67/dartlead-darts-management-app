@@ -1,0 +1,19 @@
+[project]
+name = "assistant"
+version = "0.1.0"
+description = "DartLead assistant: RAG over rules and tools over live stats (LangChain + LangGraph)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain>=1.4.7",
+    "langchain-google-genai>=4.4.2",
+    "langgraph>=1.2.18",
+    "python-dotenv>=1.2.4",
+]
+
+[project.scripts]
+hello = "assistant.hello:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"

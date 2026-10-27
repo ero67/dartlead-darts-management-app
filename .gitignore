@@ -34,6 +34,7 @@ cypress.env.json
 .env
 .env.local
 .env.*.local
+assistant/.env
 
 # Playwright MCP artifacts
 .playwright-mcp
@@ -50,4 +51,8 @@ android/app/*.keystore
 android/app/*.jks
 .cap-assets-tmp/
 .vercel
+
+# Python (assistant/)
+.venv/
+__pycache__/
 
