@@ -542,6 +542,11 @@
       "games": "X01 and Cricket",
       "languages": "Slovak and English"
     },
+    "stats": {
+      "matches": "Matches scored",
+      "players": "Players",
+      "leagues": "Leagues"
+    },
     "whyEyebrow": "Why DartLead",
     "whyTitle": "Built for real league nights, not spreadsheets.",
     "why": {

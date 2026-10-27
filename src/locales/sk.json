@@ -542,6 +542,11 @@
       "games": "X01 aj Cricket",
       "languages": "Slovensky a anglicky"
     },
+    "stats": {
+      "matches": "Odohrané zápasy",
+      "players": "Hráči",
+      "leagues": "Ligy"
+    },
     "whyEyebrow": "Prečo DartLead",
     "whyTitle": "Pre skutočné ligové večery, nie pre tabuľky v Exceli.",
     "why": {

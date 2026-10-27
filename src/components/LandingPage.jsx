@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Bot, Check, CheckCircle2, Clock, Download, Globe, LineChart, Mail, MonitorPlay, Smartphone, Target, Trophy, Tv, WifiOff, Wifi } from 'lucide-react';
 import logo from '../assets/logo-256.webp';
@@ -10,6 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { BoardMotif, CheckoutRoute, FormDots, LegPips, LiveDot } from './shared/DartsAccents';
 import { WinChanceChart } from './match/WinChanceChart';
 import { BOT_LEVELS } from '../lib/botPlayer';
+import { tournamentService } from '../services/tournamentService';
 
 const CONTACT_EMAIL = 'info@dartlead.app';
 const ANDROID_APK_URL = 'https://github.com/ero67/dartlead-darts-management-app/releases/download/android-latest/DartLead.apk';
@@ -55,6 +56,12 @@ const PREVIEW_STANDINGS = [
   { name: 'Adam N.', won: 0, diff: '-5', avg: '58.3' },
 ];
 
+// 1,725 -> "1,700+", 172 -> "170+", 4 -> "4": a claim that stays true for a while.
+function formatStat(n, language) {
+  const rounded = n >= 1000 ? Math.floor(n / 100) * 100 : n >= 100 ? Math.floor(n / 10) * 10 : n;
+  return `${rounded.toLocaleString(language === 'sk' ? 'sk-SK' : 'en-GB')}${rounded < n ? '+' : ''}`;
+}
+
 function Wordmark({ className = '' }) {
   return (
     <span className={`font-display text-2xl font-bold leading-none tracking-wide ${className}`}>
@@ -72,8 +79,13 @@ function SectionTitle({ id, children }) {
 }
 
 export function LandingPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    tournamentService.getPublicStats().then(setStats);
+  }, []);
 
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
   const proof = [
@@ -133,6 +145,16 @@ export function LandingPage() {
                 </li>
               ))}
             </ul>
+            {stats?.matches > 0 && (
+              <dl className="flex flex-wrap gap-x-8 gap-y-3">
+                {['matches', 'players', 'leagues'].map(key => (
+                  <div key={key} className="flex flex-col-reverse">
+                    <dt className="text-sm text-muted-foreground">{t(`landing.stats.${key}`)}</dt>
+                    <dd className="font-display text-4xl font-bold leading-none tabular-nums">{formatStat(stats[key], language)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
 
           <div aria-hidden="true" className="flex max-w-lg flex-col gap-3.5 lg:justify-self-end lg:w-full">
