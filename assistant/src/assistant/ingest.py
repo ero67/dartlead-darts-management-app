@@ -1,4 +1,6 @@
-# Phase 2: turn the Markdown files in docs/ into chunks ready for embedding.
+# Phase 2: turn the Markdown files in docs/ into embedded chunks in Supabase (public.doc_chunks).
+import hashlib
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -8,13 +10,11 @@ load_dotenv()
 from langchain_classic.embeddings import CacheBackedEmbeddings  # noqa: E402
 from langchain_classic.storage import LocalFileStore  # noqa: E402
 from langchain_core.documents import Document  # noqa: E402
-from langchain_core.vectorstores import InMemoryVectorStore  # noqa: E402
 from langchain_google_genai import GoogleGenerativeAIEmbeddings  # noqa: E402
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter  # noqa: E402
+from supabase import create_client  # noqa: E402
 
 DOCS = Path(__file__).parents[2] / "docs"
-# shortcut: a JSON file instead of a database; moves to Supabase pgvector in step 6.
-INDEX = Path(__file__).parents[2] / ".cache" / "docs-index.json"
 EMBEDDING_CACHE = Path(__file__).parents[2] / ".cache" / "embeddings"
 # Same Google key as the chat model. embed_documents/embed_query pick the matching task type themselves.
 embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-2")
@@ -40,19 +40,40 @@ def load_chunks(chunk_size: int = 800, chunk_overlap: int = 100) -> list[Documen
     return chunks
 
 
+def to_pgvector(vector: list[float]) -> str:
+    # pgvector's text format, which PostgREST passes straight to the vector column.
+    return "[" + ",".join(map(str, vector)) + "]"
+
+
 def index_docs() -> None:
-    # Indexing phase: embed every chunk once and save the vectors, so questions don't re-embed the docs.
+    # Indexing phase: embed every chunk once and store it in Postgres, so questions don't re-embed the docs.
     chunks = load_chunks()
     cache = LocalFileStore(str(EMBEDDING_CACHE))
     cached_before = sum(1 for _ in cache.yield_keys())
     # Each vector is saved under a hash of its chunk's text: unchanged chunks are read from disk and only
     # new or edited ones go to the API. namespace=model so a model switch never reuses another model's vectors.
     cached = CacheBackedEmbeddings.from_bytes_store(embeddings, cache, namespace=embeddings.model, key_encoder="sha256")
-    store = InMemoryVectorStore.from_documents(chunks, cached)
-    INDEX.parent.mkdir(exist_ok=True)
-    store.dump(str(INDEX))
+    vectors = cached.embed_documents([c.page_content for c in chunks])
     new = sum(1 for _ in cache.yield_keys()) - cached_before
-    print(f"Indexed {len(chunks)} chunks: {new} embedded via the API, {len(chunks) - new} from cache")
+
+    # Row id = hash of source + text, so an unchanged chunk keeps its row and an edited one gets a new id.
+    rows = {
+        hashlib.sha256(f"{c.metadata['source']}\n{c.page_content}".encode()).hexdigest():
+            {"content": c.page_content, "metadata": c.metadata, "embedding": to_pgvector(v)}
+        for c, v in zip(chunks, vectors)
+    }
+    # Service role key: the only key allowed to write doc_chunks (RLS blocks everyone else).
+    db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+    # shortcut: select returns at most 1000 rows by default; page through it if the docs ever grow past that.
+    existing = {r["id"] for r in db.table("doc_chunks").select("id").execute().data}
+    to_insert = [{"id": i, **row} for i, row in rows.items() if i not in existing]
+    to_delete = list(existing - rows.keys())
+    for start in range(0, len(to_insert), 25):  # batches keep each request small (3072 numbers per row)
+        db.table("doc_chunks").insert(to_insert[start:start + 25]).execute()
+    if to_delete:
+        db.table("doc_chunks").delete().in_("id", to_delete).execute()
+    print(f"{len(chunks)} chunks: {new} embedded via the API, {len(chunks) - new} from cache")
+    print(f"doc_chunks: {len(to_insert)} inserted, {len(to_delete)} deleted, {len(rows) - len(to_insert)} unchanged")
 
 
 def main() -> None:
