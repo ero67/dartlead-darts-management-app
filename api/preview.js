@@ -33,7 +33,7 @@ async function fetchRow(fetchImpl, table, id, select) {
   return rows[0] || null;
 }
 
-// kind: 'tournament' | 'tv' | 'player'. Unknown or missing rows fall back to
+// kind: 'tournament' | 'tv' | 'player' | 'league'. Unknown or missing rows fall back to
 // the generic card, never an error page.
 export async function buildPreview({ kind, id, origin }, fetchImpl = fetch) {
   const page = { title: 'DartLead', description: 'Turnaje, ligy a živé skórovanie šípok v jednej aplikácii.', path: '/' };
@@ -54,6 +54,15 @@ export async function buildPreview({ kind, id, origin }, fetchImpl = fetch) {
         page.title = `${p.name} · profil hráča`;
         page.description = 'Výsledky, priemery a forma hráča na DartLead.';
         page.path = `/player/${id}`;
+      }
+    } else if (UUID.test(id || '') && kind === 'league') {
+      // Only public leagues are readable with the anon key; others fall back.
+      const l = await fetchRow(fetchImpl, 'leagues', id, 'name,description,league_members(count)');
+      if (l) {
+        const members = l.league_members?.[0]?.count;
+        page.title = `${l.name} · liga`;
+        page.description = [members ? playersSk(members) : null, l.description].filter(Boolean).join(' · ') || 'Rebríček, výsledky a kolá ligy na DartLead.';
+        page.path = `/league/${id}`;
       }
     }
   } catch {

@@ -1004,7 +1004,14 @@
     "seasonName": "Season name",
     "renameSeason": "Rename season",
     "renameSeasonFailed": "Failed to rename the season",
-    "newSeasonEmpty": "A new season has started. Points appear here after the first finished round."
+    "newSeasonEmpty": "A new season has started. Points appear here after the first finished round.",
+    "visibility": "Visibility",
+    "publicLeague": "Public league: anyone with the link can see it without signing in",
+    "publicLeagueHint": "Public by default, like tournament pages: the league page, leaderboard, members, results and past seasons. Switch it off to show the league only to signed-in users. Registration, settings and management always need a login.",
+    "publicLeagueOn": "The league is now public",
+    "publicLeagueOff": "The league is now visible only to signed-in users",
+    "membersOnlyTitle": "Sign in to see this league",
+    "membersOnlyText": "This league is visible to signed-in users only, or it no longer exists."
   },
   "playerProfile": {
     "formRating": "Form rating",

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Pencil, Trash2, X, Check, BarChart3 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Pencil, Trash2, X, Check, BarChart3, LogIn } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +49,7 @@ const DEFAULT_TOURNAMENT_SETTINGS = {
 export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTournament }) {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { isAdmin } = useAdmin();
   const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, approveLeagueRegistration, rejectLeagueRegistration, withdrawLeagueRegistration } = useLeague();
   const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
@@ -228,8 +230,19 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     if (loadError) {
       return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
-          <EmptyState icon={Trophy} title={t('leagues.notFound')}>
-            <Button onClick={onBack}>
+          {/* Signed out, a members-only league looks the same as a missing one. */}
+          <EmptyState
+            icon={Trophy}
+            title={user ? t('leagues.notFound') : t('leagues.membersOnlyTitle')}
+            description={user ? undefined : t('leagues.membersOnlyText')}
+          >
+            {!user && (
+              <Button onClick={() => navigate('/login', { state: { from: `/league/${leagueId}` } })}>
+                <LogIn />
+                {t('auth.signIn')}
+              </Button>
+            )}
+            <Button variant={user ? 'default' : 'outline'} onClick={onBack}>
               <ArrowLeft />
               {t('leagues.backToLeagues')}
             </Button>
@@ -281,6 +294,16 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       toast.error(t('leagues.failedToUpdateLeague'));
     } finally {
       setIsSavingLeague(false);
+    }
+  };
+
+  const handleTogglePublic = async (isPublic) => {
+    try {
+      await updateLeague(currentLeague.id, { is_public: isPublic });
+      toast.success(t(isPublic ? 'leagues.publicLeagueOn' : 'leagues.publicLeagueOff'));
+    } catch (error) {
+      console.error('Error updating league visibility:', error);
+      toast.error(t('leagues.failedToUpdateLeague'));
     }
   };
 
@@ -843,6 +866,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               isSavingDefaults={isSavingDefaults}
               onSaveDefaults={handleSaveTournamentDefaults}
               onResetDefaults={handleResetTournamentDefaults}
+              onTogglePublic={handleTogglePublic}
             />
           </TabsContent>
         )}

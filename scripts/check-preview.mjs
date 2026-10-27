@@ -28,6 +28,13 @@ assert.match(html, /Jana · profil hráča/);
 html = await buildPreview({ kind: 'tournament', id: ID, origin }, reply([{ name: 'Duel', status: 'started', legs_to_win: 1, tournament_players: [{ count: 3 }] }]));
 assert.match(html, /Prebieha · 3 hráči · 501 · prvý do 1 legu/);
 
+html = await buildPreview({ kind: 'league', id: ID, origin }, reply([{ name: 'Piatková liga', description: 'Krčma U Kohúta', league_members: [{ count: 14 }] }]));
+assert.match(html, /Piatková liga · liga/);
+assert.match(html, /14 hráčov · Krčma U Kohúta/);
+assert.match(html, new RegExp(`og:url" content="${origin}/league/${ID}"`));
+html = await buildPreview({ kind: 'league', id: ID, origin }, reply([]));
+assert.match(html, /og:title" content="DartLead"/);
+
 // Bad ids, deleted rows, errors and missing rows all give the generic card.
 for (const [args, f] of [
   [{ kind: 'tournament', id: "x' or 1=1", origin }, reply([])],
