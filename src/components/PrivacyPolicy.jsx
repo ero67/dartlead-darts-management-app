@@ -53,7 +53,7 @@ function PolicyEn({ supportEmail }) {
       <Section title="4. How we share data">
         <List>
           <Item label="Service providers">We use Supabase for authentication, database, and realtime updates; hosting/CDN providers may process IP addresses and basic request data.</Item>
-          <Item label="Tournament visibility">Tournament results, standings, match statistics and player profiles (the player name you use) are public: anyone with the link can see them, without signing in. League pages, leaderboards and member lists are visible to signed-in users. Registration requests are visible only to you and the organisers.</Item>
+          <Item label="Tournament visibility">Tournament results, standings, match statistics and player profiles (the player name you use) are public: anyone with the link can see them, without signing in. League pages, leaderboards and member lists are public too, unless the organiser makes the league visible to signed-in users only. Registration requests are visible only to you and the organisers.</Item>
           <Item label="Legal">We may disclose information if required by law or to protect the safety, rights, or property of users or the service.</Item>
           <Item>We do not sell personal data.</Item>
         </List>
@@ -116,7 +116,7 @@ function PolicySk({ supportEmail }) {
       <Section title="4. Komu údaje poskytujeme">
         <List>
           <Item label="Poskytovatelia služieb">Na prihlásenie, databázu a aktualizácie v reálnom čase používame Supabase; poskytovatelia hostingu a CDN môžu spracúvať IP adresy a základné údaje o požiadavkách.</Item>
-          <Item label="Viditeľnosť turnajov">Výsledky turnajov, tabuľky, štatistiky zápasov a profily hráčov (meno hráča, ktoré používate) sú verejné: vidí ich každý, kto má odkaz, aj bez prihlásenia. Stránky líg, rebríčky a zoznamy členov vidia prihlásení používatelia. Žiadosti o registráciu vidíte iba vy a organizátori.</Item>
+          <Item label="Viditeľnosť turnajov">Výsledky turnajov, tabuľky, štatistiky zápasov a profily hráčov (meno hráča, ktoré používate) sú verejné: vidí ich každý, kto má odkaz, aj bez prihlásenia. Stránky líg, rebríčky a zoznamy členov sú tiež verejné, pokiaľ ich organizátor nesprístupní len prihláseným používateľom. Žiadosti o registráciu vidíte iba vy a organizátori.</Item>
           <Item label="Zákonné dôvody">Údaje môžeme poskytnúť, ak to vyžaduje zákon alebo ak je to potrebné na ochranu bezpečnosti, práv či majetku používateľov alebo služby.</Item>
           <Item>Osobné údaje nepredávame.</Item>
         </List>
@@ -159,7 +159,7 @@ export function PrivacyPolicy() {
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">{isSk ? 'Zásady ochrany osobných údajov' : 'Privacy Policy'}</h1>
-        <p className="text-sm text-muted-foreground">{isSk ? 'Posledná aktualizácia: 26. októbra 2026' : 'Last updated: October 26, 2026'}</p>
+        <p className="text-sm text-muted-foreground">{isSk ? 'Posledná aktualizácia: 27. októbra 2026' : 'Last updated: October 27, 2026'}</p>
       </div>
       {isSk ? <PolicySk supportEmail={supportEmail} /> : <PolicyEn supportEmail={supportEmail} />}
     </div>

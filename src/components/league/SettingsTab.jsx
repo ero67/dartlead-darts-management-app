@@ -43,6 +43,7 @@ export function SettingsTab({
   newPlacement, setNewPlacement, onAddPlacement,
   isSavingScoring, onSaveScoringRules,
   tournamentDefaults, setTournamentDefaults, isSavingDefaults, onSaveDefaults, onResetDefaults,
+  onTogglePublic,
 }) {
   const { t } = useLanguage();
 
@@ -85,6 +86,19 @@ export function SettingsTab({
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-lg font-semibold tracking-tight">{t('leagues.leagueSettings')}</h2>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('leagues.visibility')}</CardTitle>
+          <CardDescription>{t('leagues.publicLeagueHint')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Label htmlFor="league-public" className="cursor-pointer gap-3 font-normal">
+            <Switch id="league-public" checked={!!league.isPublic} onCheckedChange={onTogglePublic} />
+            {t('leagues.publicLeague')}
+          </Label>
+        </CardContent>
+      </Card>
 
       <LeagueManagersPanel leagueId={league.id} canEdit={canEditManagers} />
 

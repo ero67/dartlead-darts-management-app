@@ -1004,7 +1004,14 @@
     "seasonName": "Názov sezóny",
     "renameSeason": "Premenovať sezónu",
     "renameSeasonFailed": "Sezónu sa nepodarilo premenovať",
-    "newSeasonEmpty": "Začala nová sezóna. Body sa tu objavia po prvom dohranom kole."
+    "newSeasonEmpty": "Začala nová sezóna. Body sa tu objavia po prvom dohranom kole.",
+    "visibility": "Viditeľnosť",
+    "publicLeague": "Verejná liga: vidí ju každý s odkazom, aj bez prihlásenia",
+    "publicLeagueHint": "Predvolene verejná, ako stránky turnajov: stránka ligy, rebríček, členovia, výsledky a minulé sezóny. Vypnite, ak má ligu vidieť len prihlásený používateľ. Registrácia, nastavenia a správa vždy vyžadujú prihlásenie.",
+    "publicLeagueOn": "Liga je teraz verejná",
+    "publicLeagueOff": "Ligu teraz vidia len prihlásení používatelia",
+    "membersOnlyTitle": "Prihláste sa, aby ste videli túto ligu",
+    "membersOnlyText": "Túto ligu vidia len prihlásení používatelia, alebo už neexistuje."
   },
   "playerProfile": {
     "formRating": "Forma",

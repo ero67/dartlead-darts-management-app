@@ -1722,6 +1722,8 @@ export const leagueService = {
       managerIds: (league.league_managers || []).map(m => m.user_id),
       createdBy: league.created_by,
       defaultTournamentSettings: league.default_tournament_settings,
+      // Visible without login (see migration 20261027160000_public_leagues)
+      isPublic: !!league.is_public,
       scoringRules: league.scoring_rules || {
         placementPoints: { "1": 5, "2": 4, "3": 3, "4": 2, "playoffDefault": 1, "default": 0 },
         allowManualOverride: true

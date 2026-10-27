@@ -34,6 +34,17 @@
       "destination": "/api/preview?kind=player&id=:id"
     },
     {
+      "source": "/league/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|Twitterbot|WhatsApp|Slackbot|TelegramBot|Discordbot|LinkedInBot|SkypeUriPreview|Pinterest|redditbot|Applebot|Embedly|vkShare|Viber|Iframely|Bluesky|Mastodon).*"
+        }
+      ],
+      "destination": "/api/preview?kind=league&id=:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
