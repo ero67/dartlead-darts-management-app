@@ -24,6 +24,8 @@ embed-demo = "assistant.embed_demo:main"
 index-docs = "assistant.ingest:index_docs"
 search = "assistant.retrieve:main"
 ask = "assistant.answer:main"
+eval-rag = "assistant.eval_rag:main"
+chunk-experiment = "assistant.chunk_experiment:main"
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14.0"]

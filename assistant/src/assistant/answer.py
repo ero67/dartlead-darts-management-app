@@ -20,7 +20,9 @@ Sources:
 {context}"""
 
 prompt = ChatPromptTemplate.from_messages([("system", SYSTEM_PROMPT), ("human", "{question}")])
-model = ChatGoogleGenerativeAI(model="gemini-3.5-flash", name="write-answer")
+# shortcut: Flash-Lite because the free tier allows only 20 Flash requests a day; move to Flash (paid tier
+# or OpenRouter) before Phase 5 and compare scores with evals/rag_cases.json.
+model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", name="write-answer")
 
 
 def format_sources(docs) -> str:
