@@ -517,6 +517,10 @@
     "firstPlace": "1st Place",
     "secondPlace": "2nd Place",
     "thirdPlace": "3rd Place",
+    "podiumAverage": "{{value}} avg",
+    "podiumMpr": "{{value}} MPR",
+    "podiumRecord": "{{won}}W {{lost}}L",
+    "podiumFinal": "Final {{score}}",
     "bestTournamentAverage": "Best Tournament Average",
     "bestMatchAverage": "Best Match Average",
     "highestCheckout": "Highest Checkout",
@@ -541,6 +545,11 @@
       "android": "Android app",
       "games": "X01 and Cricket",
       "languages": "Slovak and English"
+    },
+    "stats": {
+      "matches": "Matches scored",
+      "players": "Players",
+      "leagues": "Leagues"
     },
     "whyEyebrow": "Why DartLead",
     "whyTitle": "Built for real league nights, not spreadsheets.",

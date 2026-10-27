@@ -102,6 +102,18 @@ function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') 
 
 // Tournament Operations
 export const tournamentService = {
+  // Landing page totals { matches, players, leagues }; null when unavailable.
+  async getPublicStats() {
+    try {
+      const { data, error } = await supabase.rpc('get_public_stats');
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error loading public stats:', error);
+      return null;
+    }
+  },
+
   // Create a new tournament
   async createTournament(tournamentData) {
     try {

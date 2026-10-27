@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Trophy, Target, Zap, Award, Hash, Download, Loader, Medal, Flame } from 'lucide-react';
+import { Trophy, Target, Zap, Award, Hash, Download, Loader, Crown, Flame } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarGroup } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,12 @@ import logo from '../assets/logo-128.webp';
 import { usePlayerStrengths } from '../hooks/usePlayerStrengths';
 import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
 
-const PLACE_MEDAL_CLASS = { 1: 'text-amber-500', 2: 'text-zinc-400', 3: 'text-amber-700' };
+// Visual order 2 | 1 | 3; DOM order stays 1, 2, 3 for screen readers.
+const PODIUM_STEP = {
+  1: { order: 'order-2', plinth: 'h-24 bg-amber-400/25 text-amber-700 sm:h-32 dark:bg-amber-400/15 dark:text-amber-300' },
+  2: { order: 'order-1', plinth: 'h-16 bg-muted text-muted-foreground sm:h-24' },
+  3: { order: 'order-3', plinth: 'h-11 bg-muted/60 text-muted-foreground sm:h-16' }
+};
 const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
 // Find the best value AND all players who share it.
@@ -169,7 +174,9 @@ export function TournamentSummary({ tournament }) {
       const winnerId = finalMatch.result.winner;
       const first = winnerId === finalMatch.player1?.id ? finalMatch.player1 : finalMatch.player2;
       const second = winnerId === finalMatch.player1?.id ? finalMatch.player2 : finalMatch.player1;
-      if (first) result.push({ place: 1, player: first });
+      const { player1Legs: l1, player2Legs: l2 } = finalMatch.result;
+      const finalScore = l1 == null || l2 == null ? null : (first === finalMatch.player1 ? `${l1}–${l2}` : `${l2}–${l1}`);
+      if (first) result.push({ place: 1, player: first, finalScore });
       if (second) result.push({ place: 2, player: second });
     }
 
@@ -198,6 +205,22 @@ export function TournamentSummary({ tournament }) {
   }, [tournament]);
 
   const isCricket = isCricketGame(tournament?.gameType);
+
+  // Tournament W–L and average (X01) or MPR (Cricket) for the podium.
+  const podiumStats = useMemo(() => {
+    const stats = new Map();
+    allMatches.forEach(m => {
+      [[m.player1, m.result.player1Stats], [m.player2, m.result.player2Stats]].forEach(([p, s]) => {
+        if (!p?.id) return;
+        if (!stats.has(p.id)) stats.set(p.id, { won: 0, lost: 0, score: 0, darts: 0 });
+        const r = stats.get(p.id);
+        if (m.result.winner === p.id) r.won += 1; else if (m.result.winner) r.lost += 1;
+        r.score += Number(isCricket ? s?.marks : s?.totalScore) || 0;
+        r.darts += Number(isCricket ? s?.darts : s?.totalDarts) || 0;
+      });
+    });
+    return stats;
+  }, [allMatches, isCricket]);
 
   // ── Compute stat awards (with tie support) ───────────────────────────
   const awards = useMemo(() => {
@@ -468,24 +491,70 @@ export function TournamentSummary({ tournament }) {
           {/* Podium */}
           {podium.length > 0 && (
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <ol className="mx-auto grid max-w-2xl grid-cols-3 items-end gap-2 overflow-hidden border-b sm:gap-4">
                 {[1, 2, 3].map(place => {
                   const entries = podium.filter(p => p.place === place);
                   if (entries.length === 0) return null;
-                  return entries.map((entry, idx) => (
-                    <Card key={`${place}-${idx}`} className={cn('items-center gap-3 py-5 text-center', place === 1 && 'border-t-4 border-t-primary')}>
-                      <Medal className={cn('size-7', PLACE_MEDAL_CLASS[place])} />
-                      <Avatar size="lg">
-                        <AvatarFallback className="font-semibold">{initials(entry.player?.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col gap-0.5 px-4">
-                        <span className="text-lg font-semibold">{entry.player?.name || '?'}</span>
-                        <span className="text-xs text-muted-foreground">{placeLabel[place]}</span>
+                  const isWinner = place === 1;
+                  const isShared = entries.length > 1;
+                  return (
+                    <li key={place} aria-label={placeLabel[place]} className={cn('flex min-w-0 flex-col items-center', PODIUM_STEP[place].order)}>
+                      <div className={cn('flex w-full flex-col items-center pb-3', isShared ? 'gap-4' : 'gap-2')}>
+                        {isWinner && <Crown aria-hidden className="size-7 text-amber-500" />}
+                        {/* Shared place (two semi-final losers): one avatar pair keeps the column below the winner. */}
+                        {isShared && (
+                          <AvatarGroup>
+                            {entries.map(({ player }) => (
+                              <Avatar key={player?.id} className="size-10">
+                                <AvatarFallback className="font-semibold">{initials(player?.name)}</AvatarFallback>
+                              </Avatar>
+                            ))}
+                          </AvatarGroup>
+                        )}
+                        {entries.map(({ player, finalScore }) => {
+                          const s = podiumStats.get(player?.id);
+                          const avg = s?.darts > 0 ? ((s.score / s.darts) * 3).toFixed(isCricket ? 2 : 1) : null;
+                          return (
+                            <div key={player?.id} className="flex w-full flex-col items-center gap-1.5 text-center">
+                              {!isShared && (
+                                <Avatar className={cn(isWinner ? 'size-16 ring-4 ring-amber-400/50 sm:size-20' : 'size-12 sm:size-14')}>
+                                  <AvatarFallback className={cn('font-semibold', isWinner && 'bg-amber-400/20 text-xl text-amber-800 dark:text-amber-200')}>
+                                    {initials(player?.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                              )}
+                              <span className={cn('w-full text-balance break-words font-semibold leading-tight', isWinner ? 'text-base sm:text-xl' : 'text-sm sm:text-base')}>
+                                {player?.name || '?'}
+                              </span>
+                              {s && (
+                                <span className="flex flex-wrap justify-center gap-x-1.5 text-xs tabular-nums text-muted-foreground">
+                                  {avg && <span>{t(isCricket ? 'summary.podiumMpr' : 'summary.podiumAverage', { value: avg })}</span>}
+                                  <span>{t('summary.podiumRecord', { won: s.won, lost: s.lost })}</span>
+                                </span>
+                              )}
+                              {finalScore && (
+                                <span className="rounded-full bg-amber-400/20 px-2.5 py-0.5 text-xs font-medium tabular-nums text-amber-800 dark:text-amber-200">
+                                  {t('summary.podiumFinal', { score: finalScore })}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    </Card>
-                  ));
+                      <div
+                        aria-hidden
+                        className={cn(
+                          'flex w-full items-start justify-center rounded-t-lg pt-1.5 font-display text-4xl font-semibold leading-none sm:pt-2 sm:text-5xl',
+                          'origin-bottom motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-6 motion-safe:duration-700 motion-safe:ease-out',
+                          PODIUM_STEP[place].plinth
+                        )}
+                      >
+                        {place}
+                      </div>
+                    </li>
+                  );
                 })}
-              </div>
+              </ol>
             </CardContent>
           )}
 
