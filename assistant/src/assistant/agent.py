@@ -31,7 +31,8 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
   or [2][3]. If they do not cover it, say you don't know based on the DartLead docs, and do not guess.
 - Players' statistics: use the tools and only numbers they return; never invent or estimate a statistic.
   If a name matches several players about equally, ask which one is meant. Numbers from tools get no
-  citation: [n] marks only facts taken from the numbered sources.
+  citation and no bracket at all (never "[stats]" or "[tool]"): [n] marks only facts from the numbered sources.
+Format with Markdown where it helps: **bold** key numbers, short lists, a small table for comparisons.
 Answer in the same language as the question. Be brief.
 
 Sources:

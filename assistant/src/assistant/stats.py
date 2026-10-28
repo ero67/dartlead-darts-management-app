@@ -4,16 +4,36 @@ import json
 import os
 import sys
 import unicodedata
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import date
 from difflib import SequenceMatcher
 
 from dotenv import load_dotenv
-from supabase import create_client
+from supabase import Client, create_client
 
 load_dotenv()
-# shortcut: anon key, so only publicly readable rows (players, matches, stats); switch to the user's JWT
-# in the service so league tables and any stricter RLS apply per user.
-db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
+# Every query runs as the caller: the chat service sets a client carrying the user's JWT (as_user), so RLS
+# decides what the assistant can see, exactly as in the app. Scripts and evals fall back to anon, which sees
+# what a visitor without an account sees.
+_anon = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
+_client: ContextVar[Client] = ContextVar("supabase_client", default=_anon)
+
+
+def db() -> Client:
+    return _client.get()
+
+
+@contextmanager
+def as_user(access_token: str):
+    """Run the stats queries inside this block as the signed-in user with that Supabase access token."""
+    client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
+    client.postgrest.auth(access_token)
+    token = _client.set(client)
+    try:
+        yield
+    finally:
+        _client.reset(token)
 
 HIGH_SCORE_BANDS = [80, 95, 133, 170, 180]  # same as src/utils/dartStats.js
 
@@ -48,19 +68,19 @@ def find_player(name: str, limit: int = 5) -> list[dict]:
     """Players whose name is close to `name`, best match first. More than one result means: ask which one."""
     # shortcut: ranks every player name in Python (PostgREST returns at most 1000 rows); move to a
     # pg_trgm RPC when there are more players than that.
-    return _rank(name, db.table("players").select("id, name").execute().data, limit)
+    return _rank(name, db().table("players").select("id, name").execute().data, limit)
 
 
 def find_league(name: str, limit: int = 5) -> list[dict]:
     """Leagues the caller can see whose name is close to `name`, best match first."""
-    return _rank(name, db.table("leagues").select("id, name").eq("deleted", False).execute().data, limit)
+    return _rank(name, db().table("leagues").select("id, name").eq("deleted", False).execute().data, limit)
 
 
 def _tournaments(player_id: str, league_id: str | None = None) -> dict[str, str]:
     # The player's tournaments as {id: name}. Soft-deleted ones don't count, like on the profile page;
     # with a league, only its current season (season_id IS NULL).
-    links = db.table("tournament_players").select("tournament_id").eq("player_id", player_id).execute().data
-    query = db.table("tournaments").select("id, name").in_("id", [l["tournament_id"] for l in links]).eq("deleted", False)
+    links = db().table("tournament_players").select("tournament_id").eq("player_id", player_id).execute().data
+    query = db().table("tournaments").select("id, name").in_("id", [l["tournament_id"] for l in links]).eq("deleted", False)
     if league_id:
         query = query.eq("league_id", league_id).is_("season_id", "null")
     return {t["id"]: t["name"] for t in query.execute().data}
@@ -68,7 +88,7 @@ def _tournaments(player_id: str, league_id: str | None = None) -> dict[str, str]
 
 def get_player_stats(player_id: str, league_id: str | None = None, last_n: int | None = None) -> dict:
     """Career stats of one player; only the current season of `league_id`, or only the last `last_n` matches."""
-    player = db.table("players").select("id, name").eq("id", player_id).single().execute().data
+    player = db().table("players").select("id, name").eq("id", player_id).single().execute().data
     tournament_ids = list(_tournaments(player_id, league_id))
 
     scope = "career" if not (league_id or last_n) else ", ".join(
@@ -80,7 +100,7 @@ def get_player_stats(player_id: str, league_id: str | None = None, last_n: int |
     fields = ", ".join(f"{alias}{n}:result->player{n}Stats->{key}" for n in (1, 2) for alias, key in
                        [("o", "oneEighties"), ("c", "checkouts"), ("a", "doubleAttempts"), ("v", "visitScores")])
     # shortcut: one page (max 1000 matches per player); page with .range() if a player ever plays more.
-    query = (db.table("matches")
+    query = (db().table("matches")
              .select(f"id, player1_id, winner_id, game_type, {fields}")
              .or_(f"player1_id.eq.{player_id},player2_id.eq.{player_id}")
              .eq("status", "completed")
@@ -90,7 +110,7 @@ def get_player_stats(player_id: str, league_id: str | None = None, last_n: int |
 
     # Per-match rows; fetched by player and filtered here, as the app does (an id list can overflow the URL).
     match_ids = {m["id"] for m in matches}
-    rows = [r for r in db.table("match_player_stats").select("*").eq("player_id", player_id).execute().data
+    rows = [r for r in db().table("match_player_stats").select("*").eq("player_id", player_id).execute().data
             if r["match_id"] in match_ids]
 
     # Average, checkouts and darts are X01 numbers; Cricket matches only count for wins and legs.
@@ -140,11 +160,11 @@ def get_player_stats(player_id: str, league_id: str | None = None, last_n: int |
 
 def get_recent_matches(player_id: str, n: int = 5) -> dict:
     """The player's newest completed matches, newest first, as on the profile page."""
-    player = db.table("players").select("id, name").eq("id", player_id).single().execute().data
+    player = db().table("players").select("id, name").eq("id", player_id).single().execute().data
     tournaments = _tournaments(player_id)
     if not tournaments:
         return {"player": player["name"], "matches": []}
-    matches = (db.table("matches")
+    matches = (db().table("matches")
                .select("id, tournament_id, winner_id, player1_id, player1_legs, player2_legs, is_playoff, game_type,"
                        " completed_at, updated_at, m1:result->player1Stats->marks, d1:result->player1Stats->darts,"
                        " m2:result->player2Stats->marks, d2:result->player2Stats->darts,"
@@ -156,7 +176,7 @@ def get_recent_matches(player_id: str, n: int = 5) -> dict:
                .limit(n)
                .execute().data)
     averages = {r["match_id"]: r["average"] for r in
-                db.table("match_player_stats").select("match_id, average").eq("player_id", player_id)
+                db().table("match_player_stats").select("match_id, average").eq("player_id", player_id)
                 .in_("match_id", [m["id"] for m in matches]).execute().data}
 
     rows = []
@@ -182,12 +202,12 @@ def get_recent_matches(player_id: str, n: int = 5) -> dict:
 def get_head_to_head(player_id: str, opponent_id: str | None = None) -> dict:
     """The player's record against each opponent over all completed matches, most played first.
     Wins and legs count every game type, as in the app's head-to-head (leagueService.getHeadToHead)."""
-    player = db.table("players").select("id, name").eq("id", player_id).single().execute().data
+    player = db().table("players").select("id, name").eq("id", player_id).single().execute().data
     tournaments = _tournaments(player_id)
     if not tournaments:
         return {"player": player["name"], "opponents": []}
     # shortcut: one page (max 1000 matches per player), as in get_player_stats.
-    matches = (db.table("matches")
+    matches = (db().table("matches")
                .select("player1_id, player2_id, winner_id, player1_legs, player2_legs,"
                        " player1:players!matches_player1_id_fkey(name), player2:players!matches_player2_id_fkey(name)")
                .or_(f"player1_id.eq.{player_id},player2_id.eq.{player_id}")
@@ -215,11 +235,11 @@ def get_head_to_head(player_id: str, opponent_id: str | None = None) -> dict:
 
 def get_league_standings(league_id: str) -> dict:
     """The current season's league table, sorted like the app: points, then leg difference, then legs won."""
-    league = db.table("leagues").select("name, season_name, season_started_at").eq("id", league_id).single().execute().data
+    league = db().table("leagues").select("name, season_name, season_started_at").eq("id", league_id).single().execute().data
     # Unnamed seasons are "Season 2026/27" from their start; one starting before July is last year's (leagueSeason.js).
     start = date.fromisoformat(league["season_started_at"][:10]) if league["season_started_at"] else date.today()
     year = start.year if start.month >= 7 else start.year - 1
-    rows = (db.table("league_leaderboard")
+    rows = (db().table("league_leaderboard")
             .select("total_points, tournaments_played, best_placement, avg_placement, legs_won, legs_lost, player:players(name)")
             .eq("league_id", league_id).execute().data)
     rows.sort(key=lambda r: (r["total_points"] or 0, (r["legs_won"] or 0) - (r["legs_lost"] or 0), r["legs_won"] or 0),
