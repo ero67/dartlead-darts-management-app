@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import unicodedata
+from datetime import date
 from difflib import SequenceMatcher
 
 from dotenv import load_dotenv
@@ -22,15 +23,12 @@ def _norm(text: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", text.casefold()) if not unicodedata.combining(c))
 
 
-def find_player(name: str, limit: int = 5) -> list[dict]:
-    """Players whose name is close to `name`, best match first. More than one result means: ask which one."""
-    # shortcut: ranks every player name in Python (PostgREST returns at most 1000 rows); move to a
-    # pg_trgm RPC when there are more players than that.
-    players = db.table("players").select("id, name").execute().data
-    query = _norm(name).strip()
+def _rank(query: str, rows: list[dict], limit: int) -> list[dict]:
+    # Best name matches first, with a 0-1 score; the caller decides what a tie means.
+    query = _norm(query).strip()
 
-    def score(player: dict) -> float:
-        full = _norm(player["name"])
+    def score(row: dict) -> float:
+        full = _norm(row["name"])
         words = full.split()
         if query == full:
             return 1.0
@@ -38,21 +36,40 @@ def find_player(name: str, limit: int = 5) -> list[dict]:
             return 0.95
         if any(w.startswith(query) for w in words):  # "Pet" -> "Peter"
             return 0.9
+        if " " in query and query in full:  # part of a longer name, "demo liga" -> "Demo Liga Šípky"
+            return 0.9
         return max(SequenceMatcher(None, query, w).ratio() for w in [full, *words])  # typos, "Jano" -> "Jan"
 
-    ranked = sorted(((score(p), p) for p in players), key=lambda sp: sp[0], reverse=True)
-    return [{"id": p["id"], "name": p["name"], "match": round(s, 2)} for s, p in ranked if s >= 0.75][:limit]
+    ranked = sorted(((score(r), r) for r in rows), key=lambda sr: sr[0], reverse=True)
+    return [{"id": r["id"], "name": r["name"], "match": round(s, 2)} for s, r in ranked if s >= 0.75][:limit]
+
+
+def find_player(name: str, limit: int = 5) -> list[dict]:
+    """Players whose name is close to `name`, best match first. More than one result means: ask which one."""
+    # shortcut: ranks every player name in Python (PostgREST returns at most 1000 rows); move to a
+    # pg_trgm RPC when there are more players than that.
+    return _rank(name, db.table("players").select("id, name").execute().data, limit)
+
+
+def find_league(name: str, limit: int = 5) -> list[dict]:
+    """Leagues the caller can see whose name is close to `name`, best match first."""
+    return _rank(name, db.table("leagues").select("id, name").eq("deleted", False).execute().data, limit)
+
+
+def _tournaments(player_id: str, league_id: str | None = None) -> dict[str, str]:
+    # The player's tournaments as {id: name}. Soft-deleted ones don't count, like on the profile page;
+    # with a league, only its current season (season_id IS NULL).
+    links = db.table("tournament_players").select("tournament_id").eq("player_id", player_id).execute().data
+    query = db.table("tournaments").select("id, name").in_("id", [l["tournament_id"] for l in links]).eq("deleted", False)
+    if league_id:
+        query = query.eq("league_id", league_id).is_("season_id", "null")
+    return {t["id"]: t["name"] for t in query.execute().data}
 
 
 def get_player_stats(player_id: str, league_id: str | None = None, last_n: int | None = None) -> dict:
     """Career stats of one player; only the current season of `league_id`, or only the last `last_n` matches."""
     player = db.table("players").select("id, name").eq("id", player_id).single().execute().data
-    links = db.table("tournament_players").select("tournament_id").eq("player_id", player_id).execute().data
-    # Soft-deleted tournaments don't count, like on the profile page. The current season = season_id IS NULL.
-    tournaments = db.table("tournaments").select("id").in_("id", [l["tournament_id"] for l in links]).eq("deleted", False)
-    if league_id:
-        tournaments = tournaments.eq("league_id", league_id).is_("season_id", "null")
-    tournament_ids = [t["id"] for t in tournaments.execute().data]
+    tournament_ids = list(_tournaments(player_id, league_id))
 
     scope = "career" if not (league_id or last_n) else ", ".join(
         s for s in [league_id and "current league season", last_n and f"last {last_n} matches"] if s)
@@ -118,6 +135,73 @@ def get_player_stats(player_id: str, league_id: str | None = None, last_n: int |
         "checkout_hits": hits,
         "checkout_attempts": attempts,
         "high_scores": {f"{band}+": count for band, count in bands.items()},
+    }
+
+
+def get_recent_matches(player_id: str, n: int = 5) -> dict:
+    """The player's newest completed matches, newest first, as on the profile page."""
+    player = db.table("players").select("id, name").eq("id", player_id).single().execute().data
+    tournaments = _tournaments(player_id)
+    if not tournaments:
+        return {"player": player["name"], "matches": []}
+    matches = (db.table("matches")
+               .select("id, tournament_id, winner_id, player1_id, player1_legs, player2_legs, is_playoff, game_type,"
+                       " completed_at, updated_at, m1:result->player1Stats->marks, d1:result->player1Stats->darts,"
+                       " m2:result->player2Stats->marks, d2:result->player2Stats->darts,"
+                       " player1:players!matches_player1_id_fkey(name), player2:players!matches_player2_id_fkey(name)")
+               .or_(f"player1_id.eq.{player_id},player2_id.eq.{player_id}")
+               .eq("status", "completed")
+               .in_("tournament_id", list(tournaments))
+               .order("updated_at", desc=True)
+               .limit(n)
+               .execute().data)
+    averages = {r["match_id"]: r["average"] for r in
+                db.table("match_player_stats").select("match_id, average").eq("player_id", player_id)
+                .in_("match_id", [m["id"] for m in matches]).execute().data}
+
+    rows = []
+    for m in matches:
+        me, other = (1, 2) if m["player1_id"] == player_id else (2, 1)
+        cricket = "cricket" in (m["game_type"] or "").lower()
+        darts = m[f"d{me}"] or 0
+        rows.append({
+            "date": (m["completed_at"] or m["updated_at"])[:10],
+            "tournament": tournaments[m["tournament_id"]],
+            "opponent": (m[f"player{other}"] or {}).get("name"),
+            "result": "won" if m["winner_id"] == player_id else "lost",
+            "legs": f"{m[f'player{me}_legs'] or 0}:{m[f'player{other}_legs'] or 0}",
+            "playoff": bool(m["is_playoff"]),
+            "game": "cricket" if cricket else "x01",
+            # X01: 3-dart average; Cricket: marks per round (MPR), both as on the profile page.
+            **({"mpr": round((m[f"m{me}"] or 0) / darts * 3, 2) if darts else None} if cricket
+               else {"average": float(averages[m["id"]]) if averages.get(m["id"]) is not None else None}),
+        })
+    return {"player": player["name"], "matches": rows}
+
+
+def get_league_standings(league_id: str) -> dict:
+    """The current season's league table, sorted like the app: points, then leg difference, then legs won."""
+    league = db.table("leagues").select("name, season_name, season_started_at").eq("id", league_id).single().execute().data
+    # Unnamed seasons are "Season 2026/27" from their start; one starting before July is last year's (leagueSeason.js).
+    start = date.fromisoformat(league["season_started_at"][:10]) if league["season_started_at"] else date.today()
+    year = start.year if start.month >= 7 else start.year - 1
+    rows = (db.table("league_leaderboard")
+            .select("total_points, tournaments_played, best_placement, avg_placement, legs_won, legs_lost, player:players(name)")
+            .eq("league_id", league_id).execute().data)
+    rows.sort(key=lambda r: (r["total_points"] or 0, (r["legs_won"] or 0) - (r["legs_lost"] or 0), r["legs_won"] or 0),
+              reverse=True)
+    return {
+        "league": league["name"],
+        "season": league["season_name"] or f"Season {year}/{(year + 1) % 100:02d}",
+        "standings": [{
+            "position": i,
+            "player": r["player"]["name"],
+            "points": r["total_points"] or 0,
+            "tournaments_played": r["tournaments_played"] or 0,
+            "best_placement": r["best_placement"],
+            "average_placement": round(float(r["avg_placement"]), 2) if r["avg_placement"] is not None else None,
+            "legs": f"{r['legs_won'] or 0}:{r['legs_lost'] or 0}",
+        } for i, r in enumerate(rows, 1)],
     }
 
 

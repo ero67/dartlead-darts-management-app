@@ -44,7 +44,47 @@ def get_player_stats(player_id: str, last_n: int | None = None) -> dict:
     return stats.get_player_stats(player_id, last_n=last_n)
 
 
-TOOLS = [find_player, get_player_stats]
+@tool(parse_docstring=True)
+def get_recent_matches(player_id: str, n: int = 5) -> dict:
+    """List a player's most recent completed matches, newest first: date, tournament, opponent, won or
+    lost, legs score, whether it was a playoff match, and the player's 3-dart average (X01) or marks per
+    round (Cricket). Use it for questions about specific matches ("who did he play last?", "did she win
+    her last match?"); use get_player_stats for totals and averages over many matches.
+
+    Args:
+        player_id: The id from find_player. Never guess it.
+        n: How many matches, newest first (default 5).
+    """
+    return stats.get_recent_matches(player_id, n)
+
+
+@tool(parse_docstring=True)
+def find_league(name: str) -> list[dict]:
+    """Look up DartLead leagues by name. Call this first whenever a question names a league, because
+    get_league_standings needs the league's id. Returns candidates best first with id, name and a match
+    score from 0 to 1. If several score about the same, ask which league is meant. An empty list means
+    there is no league with that name that the user can see.
+
+    Args:
+        name: The league's name as the user wrote it, or part of it.
+    """
+    return stats.find_league(name)
+
+
+@tool(parse_docstring=True)
+def get_league_standings(league_id: str) -> dict:
+    """Get a league's table for the current season, top first: position, player, points, tournaments
+    played, best and average placement, and legs won:lost. Players are ranked by points, then leg
+    difference, then legs won, as in the app. Use it for "who leads the league", a player's position,
+    or the points gap between players.
+
+    Args:
+        league_id: The id from find_league. Never guess it.
+    """
+    return stats.get_league_standings(league_id)
+
+
+TOOLS = [find_player, get_player_stats, get_recent_matches, find_league, get_league_standings]
 
 
 def main() -> None:
