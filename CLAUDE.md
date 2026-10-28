@@ -95,3 +95,5 @@ Optional `VITE_PUBLIC_APP_URL` (public website address) — required for the
 Android build, where outgoing links must not use the shell's local origin.
 Optional `VITE_DEMO_TOURNAMENT_ID` shows the demo tournament buttons on the
 landing page (see `docs/DEMO_LEAGUE.md`); without it they are hidden.
+Optional `VITE_ASSISTANT_URL` (the `assistant/` chat API, e.g. `http://localhost:8000`
+from `uv run serve`) shows the assistant chat to signed-in users; without it it is hidden.

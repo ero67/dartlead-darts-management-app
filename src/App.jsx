@@ -28,6 +28,7 @@ import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { LandingPage } from './components/LandingPage';
 import { PlayerProfile } from './components/PlayerProfile';
 import { OfflineBanner } from './components/OfflineBanner';
+import { AssistantChat } from './components/assistant/AssistantChat';
 import { PullToRefresh } from './components/PullToRefresh';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { NotFound } from './components/NotFound';
@@ -513,6 +514,7 @@ function AppContent() {
       <OfflineBanner />
       <Toaster />
       <ConfirmDialogHost labels={{ confirm: t('common.yes'), cancel: t('common.cancel') }} />
+      <AssistantChat />
 
       <Navigation
         currentView={location.pathname}

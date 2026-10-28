@@ -1566,5 +1566,64 @@
     "upcomingRounds": "Upcoming rounds",
     "defaultVenue": "Default venue",
     "defaultVenueHint": "Prefilled when you create a new round."
+  },
+  "assistant": {
+    "title": "Assistant",
+    "description": "Darts rules, using DartLead, and players' statistics.",
+    "open": "Open the assistant",
+    "newChat": "New conversation",
+    "placeholder": "Ask a question…",
+    "send": "Send",
+    "error": "Something went wrong. Please try again.",
+    "unavailable": "The assistant could not load. Reload the page and try again.",
+    "empty": "Ask about the rules, how DartLead works, or any player's and league's numbers.",
+    "suggestion1": "Who leads the Demo Liga?",
+    "suggestion2": "How is checkout percentage counted?",
+    "suggestion3": "Who has Igor Benko beaten most often?",
+    "suggestion4": "Can I finish a leg on a single 20?",
+    "trace": {
+      "working": "Working…",
+      "summary": "Worked in {{count}} steps",
+      "understood": "Understood as: {{question}}",
+      "route": "Looking in: {{sources}}",
+      "offTopic": "Not about darts or DartLead",
+      "read": "Read {{count}} sections of the docs",
+      "source": {
+        "rules": "rules",
+        "stats": "statistics",
+        "app": "app help"
+      },
+      "running": "Running {{tool}}",
+      "ran": "Ran {{tool}}",
+      "failed": "{{tool}} failed",
+      "tool": {
+        "find_player": {
+          "running": "Looking up player “{{name}}”",
+          "done": "Found {{found}}",
+          "none": "No player called “{{name}}”"
+        },
+        "get_player_stats": {
+          "running": "Loading statistics",
+          "done": "Statistics of {{player}}"
+        },
+        "get_recent_matches": {
+          "running": "Loading recent matches",
+          "done": "Recent matches of {{player}}"
+        },
+        "get_head_to_head": {
+          "running": "Loading head-to-head records",
+          "done": "Head-to-head records of {{player}}"
+        },
+        "find_league": {
+          "running": "Looking up league “{{name}}”",
+          "done": "Found {{found}}",
+          "none": "No league called “{{name}}”"
+        },
+        "get_league_standings": {
+          "running": "Loading the league table",
+          "done": "Table of {{league}}"
+        }
+      }
+    }
   }
 }

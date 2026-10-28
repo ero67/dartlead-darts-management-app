@@ -1566,5 +1566,64 @@
     "upcomingRounds": "Nadchádzajúce kolá",
     "defaultVenue": "Predvolené miesto",
     "defaultVenueHint": "Predvyplní sa pri vytváraní nového kola."
+  },
+  "assistant": {
+    "title": "Asistent",
+    "description": "Pravidlá šípok, používanie DartLead a štatistiky hráčov.",
+    "open": "Otvoriť asistenta",
+    "newChat": "Nová konverzácia",
+    "placeholder": "Opýtajte sa…",
+    "send": "Odoslať",
+    "error": "Niečo sa pokazilo. Skúste to znova.",
+    "unavailable": "Asistenta sa nepodarilo načítať. Obnovte stránku a skúste to znova.",
+    "empty": "Pýtajte sa na pravidlá, na to, ako funguje DartLead, alebo na čísla ktoréhokoľvek hráča či ligy.",
+    "suggestion1": "Kto vedie Demo Ligu?",
+    "suggestion2": "Ako sa počíta úspešnosť zakončenia?",
+    "suggestion3": "Koho porazil Igor Benko najčastejšie?",
+    "suggestion4": "Môžem ukončiť leg na jednoduchej 20?",
+    "trace": {
+      "working": "Pracujem…",
+      "summary": "Postup ({{count}})",
+      "understood": "Chápem ako: {{question}}",
+      "route": "Hľadám v: {{sources}}",
+      "offTopic": "Mimo témy šípok a DartLeadu",
+      "read": "Prečítané časti dokumentácie: {{count}}",
+      "source": {
+        "rules": "pravidlá",
+        "stats": "štatistiky",
+        "app": "návod k aplikácii"
+      },
+      "running": "Spúšťam {{tool}}",
+      "ran": "Hotovo: {{tool}}",
+      "failed": "Zlyhalo: {{tool}}",
+      "tool": {
+        "find_player": {
+          "running": "Hľadám hráča „{{name}}“",
+          "done": "Našiel som: {{found}}",
+          "none": "Hráč „{{name}}“ sa nenašiel"
+        },
+        "get_player_stats": {
+          "running": "Načítavam štatistiky",
+          "done": "Štatistiky: {{player}}"
+        },
+        "get_recent_matches": {
+          "running": "Načítavam posledné zápasy",
+          "done": "Posledné zápasy: {{player}}"
+        },
+        "get_head_to_head": {
+          "running": "Načítavam vzájomné zápasy",
+          "done": "Vzájomné zápasy: {{player}}"
+        },
+        "find_league": {
+          "running": "Hľadám ligu „{{name}}“",
+          "done": "Našiel som: {{found}}",
+          "none": "Liga „{{name}}“ sa nenašla"
+        },
+        "get_league_standings": {
+          "running": "Načítavam tabuľku ligy",
+          "done": "Tabuľka: {{league}}"
+        }
+      }
+    }
   }
 }
