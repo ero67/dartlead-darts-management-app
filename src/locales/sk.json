@@ -1622,7 +1622,13 @@
         "get_league_standings": {
           "running": "Načítavam tabuľku ligy",
           "done": "Tabuľka: {{league}}"
-        }
+        },
+        "get_me": {"running": "Overujem, kto ste", "done": "Overil som váš účet"},
+        "list_tournaments": {"running": "Načítavam turnaje", "done": "Nájdené turnaje: {{count}}"},
+        "find_tournament": {"running": "Hľadám turnaj „{{name}}“", "done": "Našiel som: {{found}}", "none": "Turnaj „{{name}}“ sa nenašiel"},
+        "get_tournament_summary": {"running": "Načítavam súhrn turnaja", "done": "Súhrn: {{tournament}}"},
+        "get_player_tournaments": {"running": "Načítavam históriu turnajov", "done": "Turnaje: {{player}}"},
+        "list_leagues": {"running": "Načítavam ligy", "done": "Nájdené ligy: {{count}}"}
       }
     }
   }

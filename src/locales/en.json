@@ -1622,7 +1622,13 @@
         "get_league_standings": {
           "running": "Loading the league table",
           "done": "Table of {{league}}"
-        }
+        },
+        "get_me": {"running": "Checking who you are", "done": "Checked your account"},
+        "list_tournaments": {"running": "Listing tournaments", "done": "Found {{count}} tournaments"},
+        "find_tournament": {"running": "Looking up tournament “{{name}}”", "done": "Found {{found}}", "none": "No tournament called “{{name}}”"},
+        "get_tournament_summary": {"running": "Loading the tournament summary", "done": "Summary of {{tournament}}"},
+        "get_player_tournaments": {"running": "Loading tournament history", "done": "Tournaments of {{player}}"},
+        "list_leagues": {"running": "Listing leagues", "done": "Found {{count}} leagues"}
       }
     }
   }
