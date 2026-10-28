@@ -20,7 +20,8 @@ def main() -> None:
         with propagate_attributes(trace_name="answer-question", tags=["phase-2", "rag-eval"]):
             result = chain.invoke(case["question"], config={"callbacks": [CallbackHandler()], "run_name": "answer-question"})
         found = [f"{d.metadata['source']} > {d.metadata.get('section')}" for d in result["docs"]]
-        answer = result["answer"]
+        # Models differ in typography (’ vs ', non-breaking hyphens); normalise so the regexes see one form.
+        answer = result["answer"].replace("’", "'").replace("‑", "-")
 
         # Retrieval: at least one of the expected sections is in the top k. Unknown cases have nothing to find.
         hit = case.get("unknown", False) or any(s in found for s in case["sections"])

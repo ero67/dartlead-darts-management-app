@@ -1,6 +1,6 @@
 [
   {"question": "What happens if I end my turn on 1?", "sections": ["rules-x01.md > Bust"], "must_include": ["bust"]},
-  {"question": "Do I need a double to start a leg?", "sections": ["rules-x01.md > Finishing a leg (double out)"], "must_include": ["not need|don't need|do not need|no double|straight in"]},
+  {"question": "Do I need a double to start a leg?", "sections": ["rules-x01.md > Finishing a leg (double out)"], "must_include": ["not need|don't need|do not need|no double|straight.in"]},
   {"question": "What is the highest score you can check out?", "sections": ["rules-x01.md > Which scores can be finished"], "must_include": ["170"]},
   {"question": "Which numbers count in cricket?", "sections": ["rules-cricket.md > Targets"], "must_include": ["15", "20", "bull"]},
   {"question": "How is MPR calculated?", "sections": ["rules-cricket.md > Statistics"], "must_include": ["marks", "dart"]},

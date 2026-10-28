@@ -1,10 +1,11 @@
 # Phase 2: answer a question from the retrieved doc chunks, with citations (the "G" in RAG).
+import os
 import sys
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
 
@@ -20,9 +21,14 @@ Sources:
 {context}"""
 
 prompt = ChatPromptTemplate.from_messages([("system", SYSTEM_PROMPT), ("human", "{question}")])
-# shortcut: Flash-Lite because the free tier allows only 20 Flash requests a day; move to Flash (paid tier
-# or OpenRouter) before Phase 5 and compare scores with evals/rag_cases.json.
-model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", name="write-answer")
+# OpenRouter speaks the OpenAI API, so any model it hosts can write the answer. The model only sees text,
+# so it is independent of the embedding model (which must stay the same as the index).
+model = ChatOpenAI(
+    model=os.environ["ANSWER_MODEL"],
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.environ["OPENROUTER_API_KEY"],
+    name="write-answer",
+)
 
 
 def format_sources(docs) -> str:
