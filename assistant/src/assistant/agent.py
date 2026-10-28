@@ -1,0 +1,130 @@
+# Phase 4: one graph for every question. The Phase 1 router picks the sources, the Phase 2 retriever adds
+# doc chunks, and the Phase 3 tools look up stats; one agent node writes the answer from all of it.
+#   START -> route -> off_topic -> END
+#                  -> retrieve -> agent <-> tools -> END   (retrieve only for rules/app, tools only for stats)
+import os
+import sys
+from typing import Annotated, TypedDict
+
+from langchain_core.documents import Document
+from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import chain
+from langchain_openai import ChatOpenAI
+from langfuse import get_client, propagate_attributes
+from langfuse.langchain import CallbackHandler
+from langgraph.errors import GraphRecursionError
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+
+from assistant.answer import format_sources  # importing loads .env
+from assistant.ask_stats import MAX_STEPS, run_tool
+from assistant.retrieve import retriever
+from assistant.router import chain as router
+from assistant.tools import TOOLS
+
+SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
+
+- Darts rules and how to use the app: answer ONLY from the numbered sources below and cite them like [1]
+  or [2][3]. If they do not cover it, say you don't know based on the DartLead docs, and do not guess.
+- Players' statistics: use the tools and only numbers they return; never invent or estimate a statistic.
+  If a name matches several players about equally, ask which one is meant. Numbers from tools get no
+  citation: [n] marks only facts taken from the numbered sources.
+Answer in the same language as the question. Be brief.
+
+Sources:
+{context}"""
+OFF_TOPIC_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
+The question is not about darts or DartLead. In one or two sentences, in the language of the question,
+say that you can help with darts rules, using the DartLead app, and players' statistics."""
+
+model = ChatOpenAI(model=os.environ["ANSWER_MODEL"], base_url="https://openrouter.ai/api/v1",
+                   api_key=os.environ["OPENROUTER_API_KEY"], name="write-answer")
+model_with_tools = model.bind_tools(TOOLS)
+
+
+class State(TypedDict):
+    messages: Annotated[list[AnyMessage], add_messages]  # appended by each node (reducer)
+    sources: list[str]  # the router's pick: rules, stats, app; empty = off topic
+    docs: list[Document]  # retrieved chunks for this question
+
+
+def route(state: State) -> dict:
+    # Docs are reset too, so a later question never answers from an earlier one's chunks.
+    return {"sources": router.invoke({"question": state["messages"][-1].content}).sources, "docs": []}
+
+
+def retrieve(state: State) -> dict:
+    return {"docs": retriever.invoke(state["messages"][-1].content)}
+
+
+def off_topic(state: State) -> dict:
+    return {"messages": [model.invoke([SystemMessage(OFF_TOPIC_PROMPT), state["messages"][-1]])]}
+
+
+def call_agent(state: State) -> dict:
+    context = format_sources(state["docs"]) if state["docs"] else "(none)"
+    # Tools only when the router saw a stats question: no tool tokens or detours for rules and app questions.
+    llm = model_with_tools if "stats" in state["sources"] else model
+    return {"messages": [llm.invoke([SystemMessage(SYSTEM_PROMPT.format(context=context)), *state["messages"]])]}
+
+
+def call_tools(state: State) -> dict:
+    return {"messages": [run_tool(call) for call in state["messages"][-1].tool_calls]}
+
+
+def after_route(state: State) -> str:
+    if not state["sources"]:
+        return "off_topic"
+    return "retrieve" if {"rules", "app"} & set(state["sources"]) else "agent"
+
+
+def after_agent(state: State) -> str:
+    return "tools" if state["messages"][-1].tool_calls else END
+
+
+builder = StateGraph(State)
+builder.add_node("route", route)
+builder.add_node("retrieve", retrieve)
+builder.add_node("off_topic", off_topic)
+builder.add_node("agent", call_agent)
+builder.add_node("tools", call_tools)
+builder.add_edge(START, "route")
+builder.add_conditional_edges("route", after_route, ["off_topic", "retrieve", "agent"])
+builder.add_edge("retrieve", "agent")
+builder.add_conditional_edges("agent", after_agent, ["tools", END])
+builder.add_edge("tools", "agent")
+builder.add_edge("off_topic", END)
+graph = builder.compile()
+
+
+@chain  # one Langfuse trace per question
+def ask(question: str) -> dict:
+    try:
+        # route + retrieve, then MAX_STEPS agent turns with the tool runs between them
+        state = graph.invoke({"messages": [HumanMessage(question)]}, {"recursion_limit": 2 * MAX_STEPS + 2})
+    except GraphRecursionError:
+        return {"answer": "Sorry, I could not work that out in a few steps.", "sources": [], "docs": [], "tools": []}
+    return {
+        "answer": state["messages"][-1].content,
+        "sources": state["sources"],
+        "docs": state["docs"],
+        "tools": [c["name"] for m in state["messages"] for c in getattr(m, "tool_calls", [])],
+    }
+
+
+def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")
+    questions = [" ".join(sys.argv[1:])] if sys.argv[1:] else [
+        "Can I finish on a single 20?",
+        "How do I show live results on a TV at the venue?",
+        "What is Igor Benko's checkout percentage?",
+        "Is Igor Benko's checkout percentage good, and how is it counted?",
+        "Kto vedie Demo Ligu?",
+        "What's the best pizza in Bratislava?",
+    ]
+    for question in questions:
+        with propagate_attributes(trace_name="ask", tags=["phase-4"]):
+            result = ask.invoke(question, config={"callbacks": [CallbackHandler()], "run_name": "ask"})
+        print(f"\nQ: {question}\n   sources: {result['sources']}  docs: {len(result['docs'])}  tools: {result['tools']}")
+        print(f"A: {result['answer']}")
+    get_client().shutdown()  # short-lived script: send queued traces before exiting
