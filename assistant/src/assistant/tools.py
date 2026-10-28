@@ -23,7 +23,9 @@ def find_player(name: str) -> list[dict]:
     An empty list means no player has that name.
 
     Args:
-        name: The player's name as the user wrote it: full name, first name or last name.
+        name: The player's name in its basic form (nominative): full name, first name or last name.
+            Slovak questions decline names, so convert them first: "Jána Nováka", "Jánovi Novákovi" and
+            "s Jánom Novákom" are all "Ján Novák"; "Zuzany Kollárovej" is "Zuzana Kollárová".
     """
     return stats.find_player(name)
 
@@ -59,6 +61,20 @@ def get_recent_matches(player_id: str, n: int = 5) -> dict:
 
 
 @tool(parse_docstring=True)
+def get_head_to_head(player_id: str, opponent_id: str | None = None) -> dict:
+    """Get a player's record against each opponent over all completed matches: matches, wins, losses,
+    legs won and lost, already counted. Use it for "who beat X the most", "who has X beaten most often",
+    or the record between two players. Read the counts from the result; do not count matches yourself.
+
+    Args:
+        player_id: The id from find_player. Never guess it.
+        opponent_id: Another player's id from find_player, to get only the record between these two.
+            Leave it out to get every opponent.
+    """
+    return stats.get_head_to_head(player_id, opponent_id)
+
+
+@tool(parse_docstring=True)
 def find_league(name: str) -> list[dict]:
     """Look up DartLead leagues by name. Call this first whenever a question names a league, because
     get_league_standings needs the league's id. Returns candidates best first with id, name and a match
@@ -84,7 +100,7 @@ def get_league_standings(league_id: str) -> dict:
     return stats.get_league_standings(league_id)
 
 
-TOOLS = [find_player, get_player_stats, get_recent_matches, find_league, get_league_standings]
+TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings]
 
 
 def main() -> None:

@@ -179,6 +179,40 @@ def get_recent_matches(player_id: str, n: int = 5) -> dict:
     return {"player": player["name"], "matches": rows}
 
 
+def get_head_to_head(player_id: str, opponent_id: str | None = None) -> dict:
+    """The player's record against each opponent over all completed matches, most played first.
+    Wins and legs count every game type, as in the app's head-to-head (leagueService.getHeadToHead)."""
+    player = db.table("players").select("id, name").eq("id", player_id).single().execute().data
+    tournaments = _tournaments(player_id)
+    if not tournaments:
+        return {"player": player["name"], "opponents": []}
+    # shortcut: one page (max 1000 matches per player), as in get_player_stats.
+    matches = (db.table("matches")
+               .select("player1_id, player2_id, winner_id, player1_legs, player2_legs,"
+                       " player1:players!matches_player1_id_fkey(name), player2:players!matches_player2_id_fkey(name)")
+               .or_(f"player1_id.eq.{player_id},player2_id.eq.{player_id}")
+               .eq("status", "completed")
+               .in_("tournament_id", list(tournaments))
+               .execute().data)
+
+    # Counted here, not by the model: summing dozens of rows is where models slip.
+    records: dict[str, dict] = {}
+    for m in matches:
+        me, other = (1, 2) if m["player1_id"] == player_id else (2, 1)
+        opponent = m[f"player{other}_id"]
+        if opponent is None or (opponent_id and opponent != opponent_id):
+            continue
+        r = records.setdefault(opponent, {"opponent": (m[f"player{other}"] or {}).get("name"),
+                                          "matches": 0, "wins": 0, "losses": 0, "legs_won": 0, "legs_lost": 0})
+        r["matches"] += 1
+        r["wins"] += m["winner_id"] == player_id
+        r["losses"] += m["winner_id"] == opponent
+        r["legs_won"] += m[f"player{me}_legs"] or 0
+        r["legs_lost"] += m[f"player{other}_legs"] or 0
+    return {"player": player["name"],
+            "opponents": sorted(records.values(), key=lambda r: (r["matches"], r["wins"]), reverse=True)}
+
+
 def get_league_standings(league_id: str) -> dict:
     """The current season's league table, sorted like the app: points, then leg difference, then legs won."""
     league = db.table("leagues").select("name, season_name, season_started_at").eq("id", league_id).single().execute().data
