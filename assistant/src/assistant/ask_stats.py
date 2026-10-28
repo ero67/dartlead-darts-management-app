@@ -1,13 +1,17 @@
-# Phase 3: the tool-calling loop. The model asks for tools, we run them and send the results back,
-# until it answers in text. Phase 4 rebuilds this loop as a LangGraph graph.
+# Phase 4: the tool-calling loop as a LangGraph graph. The model asks for tools, we run them and send
+# the results back, until it answers in text:  START -> model -> (tools -> model)* -> END
 import os
 import sys
+from typing import Annotated, TypedDict
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import chain
 from langchain_openai import ChatOpenAI
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
+from langgraph.errors import GraphRecursionError
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
 
 from assistant.tools import TOOLS  # importing loads .env
 
@@ -34,18 +38,44 @@ def run_tool(call: dict) -> ToolMessage:
         return ToolMessage(f"Error: {e}", tool_call_id=call["id"], status="error")
 
 
-@chain  # a Runnable, so one Langfuse trace holds every model turn and tool run of a question
+class State(TypedDict):
+    # add_messages is the reducer: a node's returned messages are appended, not swapped in.
+    messages: Annotated[list[AnyMessage], add_messages]
+
+
+def call_model(state: State) -> dict:
+    # Node: the system prompt is added per call, so the state holds only the conversation.
+    return {"messages": [model_with_tools.invoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])]}
+
+
+def call_tools(state: State) -> dict:
+    # Node: run every tool the last model turn asked for (a model may ask for several at once).
+    return {"messages": [run_tool(call) for call in state["messages"][-1].tool_calls]}
+
+
+def after_model(state: State) -> str:
+    # Conditional edge: only decides where to go next, never calls anything.
+    return "tools" if state["messages"][-1].tool_calls else END
+
+
+builder = StateGraph(State)
+builder.add_node("model", call_model)
+builder.add_node("tools", call_tools)
+builder.add_edge(START, "model")
+builder.add_conditional_edges("model", after_model, ["tools", END])
+builder.add_edge("tools", "model")  # the loop back
+graph = builder.compile()
+
+
+@chain  # one Langfuse trace per question, with the graph's nodes nested inside
 def ask_stats(question: str) -> dict:
-    messages = [SystemMessage(SYSTEM_PROMPT), HumanMessage(question)]
-    tools_used = []  # in call order, so the eval can check the model took the right path
-    for _ in range(MAX_STEPS):
-        reply = model_with_tools.invoke(messages)
-        messages.append(reply)
-        if not reply.tool_calls:
-            return {"answer": reply.content, "tools": tools_used}
-        tools_used += [call["name"] for call in reply.tool_calls]
-        messages += [run_tool(call) for call in reply.tool_calls]  # a model may ask for several at once
-    return {"answer": "Sorry, I could not work that out in a few steps.", "tools": tools_used}
+    try:
+        # Every node run is one step: MAX_STEPS model turns plus the tool runs between them.
+        state = graph.invoke({"messages": [HumanMessage(question)]}, {"recursion_limit": 2 * MAX_STEPS})
+    except GraphRecursionError:
+        return {"answer": "Sorry, I could not work that out in a few steps.", "tools": []}
+    tools_used = [c["name"] for m in state["messages"] for c in getattr(m, "tool_calls", [])]
+    return {"answer": state["messages"][-1].content, "tools": tools_used}
 
 
 def main() -> None:
