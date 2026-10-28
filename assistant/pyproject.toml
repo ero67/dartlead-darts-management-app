@@ -28,6 +28,7 @@ ask = "assistant.answer:main"
 eval-rag = "assistant.eval_rag:main"
 chunk-experiment = "assistant.chunk_experiment:main"
 player-stats = "assistant.stats:main"
+plan-tools = "assistant.tools:main"
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14.0"]
