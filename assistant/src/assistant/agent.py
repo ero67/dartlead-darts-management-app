@@ -33,12 +33,12 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
   If a name matches several players about equally, ask which one is meant. Numbers from tools get no
   citation and no bracket at all (never "[stats]" or "[tool]"): [n] marks only facts from the numbered sources.
 Format with Markdown where it helps: **bold** key numbers, short lists, a small table for comparisons.
-Answer in the same language as the question. Be brief.
+Answer in {language}, even when names or data are in another language. Be brief.
 
 Sources:
 {context}"""
 OFF_TOPIC_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
-The question is not about darts or DartLead. In one or two sentences, in the language of the question,
+The question is not about darts or DartLead. In one or two sentences, in {language},
 say that you can help with darts rules, using the DartLead app, and players' statistics."""
 REWRITE_PROMPT = """Rewrite the user's last message as a standalone question that can be understood without the
 conversation, in the language of the last message. Keep the names, numbers and details from earlier turns that
@@ -54,6 +54,7 @@ class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]  # the whole conversation, appended by each node (reducer)
     question: str  # this turn's question, standalone (rewritten from the last message)
     sources: list[str]  # the router's pick: rules, stats, app; empty = off topic
+    language: str  # the question's language, named by the router ("English", "Slovak")
     docs: list[Document]  # retrieved chunks for this question
 
 
@@ -73,7 +74,8 @@ def rewrite(state: State) -> dict:
 
 def route(state: State) -> dict:
     # Docs are reset too, so a later question never answers from an earlier one's chunks.
-    return {"sources": router.invoke({"question": state["question"]}).sources, "docs": []}
+    route = router.invoke({"question": state["question"]})
+    return {"sources": route.sources, "language": route.language, "docs": []}
 
 
 def retrieve(state: State) -> dict:
@@ -81,14 +83,16 @@ def retrieve(state: State) -> dict:
 
 
 def off_topic(state: State) -> dict:
-    return {"messages": [model.invoke([SystemMessage(OFF_TOPIC_PROMPT), state["messages"][-1]])]}
+    prompt = OFF_TOPIC_PROMPT.format(language=state["language"])
+    return {"messages": [model.invoke([SystemMessage(prompt), state["messages"][-1]])]}
 
 
 def call_agent(state: State) -> dict:
     context = format_sources(state["docs"]) if state["docs"] else "(none)"
     # Tools only when the router saw a stats question: no tool tokens or detours for rules and app questions.
     llm = model_with_tools if "stats" in state["sources"] else model
-    return {"messages": [llm.invoke([SystemMessage(SYSTEM_PROMPT.format(context=context)), *state["messages"]])]}
+    prompt = SYSTEM_PROMPT.format(context=context, language=state["language"])
+    return {"messages": [llm.invoke([SystemMessage(prompt), *state["messages"]])]}
 
 
 def call_tools(state: State) -> dict:

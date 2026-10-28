@@ -21,13 +21,16 @@ class Route(BaseModel):
         description="Every source needed to answer the question. Empty if no source can answer it (off topic)."
     )
     players: list[str] = Field(description="Names of darts players mentioned in the question, exactly as written.")
+    # Named here because the answer model drifts into the language of the data (Slovak names, Slovak tournaments).
+    language: str = Field(description="The language the question is written in, as an English name: English, Slovak, …")
 
 
 SYSTEM_PROMPT = """You route questions sent to the assistant of DartLead, an app for running darts tournaments and leagues.
 
 Sources:
 - rules: how darts is played (scoring, busts, checkouts, game formats)
-- stats: numbers about real players, matches or leagues stored in DartLead
+- stats: data stored in DartLead about real players, matches, tournaments or leagues, including the user's own
+  ("my tournaments", "my average", "which leagues are there", "who won the last round")
 - app: how to use the DartLead app itself
 
 Pick every source the answer needs. Pick none if the question is not about darts or DartLead."""

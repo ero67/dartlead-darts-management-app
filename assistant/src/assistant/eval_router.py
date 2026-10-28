@@ -12,6 +12,7 @@ CASES = Path(__file__).parents[2] / "evals" / "router_cases.json"
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")  # Slovak questions; Windows pipes default to cp1252
     cases = json.loads(CASES.read_text(encoding="utf-8"))
     failures = 0
     for case in cases:

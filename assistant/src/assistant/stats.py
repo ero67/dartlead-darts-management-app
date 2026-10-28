@@ -18,6 +18,7 @@ load_dotenv()
 # what a visitor without an account sees.
 _anon = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
 _client: ContextVar[Client] = ContextVar("supabase_client", default=_anon)
+_user_id: ContextVar[str | None] = ContextVar("user_id", default=None)  # who "me" / "my" means
 
 
 def db() -> Client:
@@ -25,15 +26,17 @@ def db() -> Client:
 
 
 @contextmanager
-def as_user(access_token: str):
+def as_user(access_token: str, user_id: str | None = None):
     """Run the stats queries inside this block as the signed-in user with that Supabase access token."""
     client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
     client.postgrest.auth(access_token)
-    token = _client.set(client)
+    tokens = _client.set(client), _user_id.set(user_id)
     try:
         yield
     finally:
-        _client.reset(token)
+        _client.reset(tokens[0])
+        _user_id.reset(tokens[1])
+
 
 HIGH_SCORE_BANDS = [80, 95, 133, 170, 180]  # same as src/utils/dartStats.js
 
@@ -257,6 +260,186 @@ def get_league_standings(league_id: str) -> dict:
             "legs": f"{r['legs_won'] or 0}:{r['legs_lost'] or 0}",
         } for i, r in enumerate(rows, 1)],
     }
+
+
+def get_me() -> dict:
+    """The signed-in user and the players linked to their account; scripts and evals have nobody signed in."""
+    user_id = _user_id.get()
+    if not user_id:
+        return {"signed_in": False}
+    players = db().table("players").select("id, name").eq("user_id", user_id).execute().data
+    managed = db().table("tournaments").select("id", count="exact").eq("user_id", user_id).eq("deleted", False).execute()
+    return {"signed_in": True, "players": players, "tournaments_managed": managed.count}
+
+
+def _date(row: dict) -> str | None:
+    return (row.get("starts_at") or row.get("created_at") or "")[:10] or None
+
+
+def _checkout_value(checkout) -> int:
+    # Newer results store a number, older ones a string like "T20 + T20 + D25" (getCheckoutValue in the app).
+    if isinstance(checkout, (int, float)):
+        return int(checkout)
+    if not isinstance(checkout, str):
+        return 0
+    total = 0
+    for part in (p.strip() for p in checkout.split("+")):
+        factor = {"T": 3, "D": 2, "S": 1}.get(part[:1])
+        digits = part[1:] if factor else part
+        total += int(digits) * (factor or 1) if digits.isdigit() else 0
+    return total
+
+
+def _podium(matches: list[dict]) -> dict[str, int]:
+    """player_id -> place 1-3 from a tournament's completed playoff matches, as on the tournament summary page:
+    the final decides 1 and 2, the 3rd-place match decides 3, without one both semi-final losers are 3rd."""
+    playoff = [m for m in matches if m["is_playoff"] and m["winner_id"]]
+    if not playoff:
+        return {}
+    last = max(m["playoff_round"] or 0 for m in playoff)
+    loser = lambda m: m["player2_id"] if m["winner_id"] == m["player1_id"] else m["player1_id"]  # noqa: E731
+    places = {}
+    third = [m for m in playoff if m["playoff_round"] == last and m["playoff_match_number"] == 2]
+    for m in (third or [m for m in playoff if m["playoff_round"] == last - 1]):
+        places[m["winner_id"] if third else loser(m)] = 3
+    for m in playoff:
+        if m["playoff_round"] == last and (m["playoff_match_number"] or 1) == 1:
+            places[m["winner_id"]], places[loser(m)] = 1, 2
+    return places
+
+
+_MATCH_FIELDS = ("id, tournament_id, player1_id, player2_id, winner_id, is_playoff, playoff_round, playoff_match_number,"
+                 " game_type, player1:players!matches_player1_id_fkey(name), player2:players!matches_player2_id_fkey(name),"
+                 + ", ".join(f"{a}{n}:result->player{n}Stats->{k}" for n in (1, 2) for a, k in
+                             [("s", "totalScore"), ("d", "totalDarts"), ("a", "average"), ("c", "checkouts"), ("o", "oneEighties")]))
+
+
+def _sides(m: dict):
+    """Both players' view of one match: (player_id, name, opponent name, their stats from the match result)."""
+    for me, other in ((1, 2), (2, 1)):
+        yield (m[f"player{me}_id"], (m[f"player{me}"] or {}).get("name"), (m[f"player{other}"] or {}).get("name"),
+               {k: m[f"{k}{me}"] for k in "sdaco"})
+
+
+def list_tournaments(mine: bool = False, player_id: str | None = None, league_id: str | None = None,
+                     status: str | None = None, limit: int = 10) -> dict:
+    """Tournaments newest first: the signed-in user's own (mine), one player's, one league's, or any."""
+    query = db().table("tournaments").select("id, name, status, starts_at, created_at, leagues(name)", count="exact").eq("deleted", False)
+    if mine:
+        if not _user_id.get():
+            return {"error": "Nobody is signed in, so there are no own tournaments to list."}
+        query = query.eq("user_id", _user_id.get())  # the dashboard's "My tournaments"
+    if player_id:
+        query = query.in_("id", list(_tournaments(player_id)))
+    if league_id:
+        query = query.eq("league_id", league_id)
+    if status:
+        query = query.eq("status", status)
+    result = query.order("created_at", desc=True).limit(limit).execute()
+    return {"total": result.count, "tournaments": [
+        {"id": t["id"], "name": t["name"], "date": _date(t), "status": t["status"], "league": (t["leagues"] or {}).get("name")}
+        for t in result.data]}
+
+
+def find_tournament(name: str, limit: int = 5) -> list[dict]:
+    """Tournaments whose name is close to `name`, best match first, with date and status to tell rounds apart."""
+    rows = db().table("tournaments").select("id, name, status, starts_at, created_at").eq("deleted", False).execute().data
+    by_id = {r["id"]: r for r in rows}
+    return [{**c, "date": _date(by_id[c["id"]]), "status": by_id[c["id"]]["status"]} for c in _rank(name, rows, limit)]
+
+
+def list_leagues(mine: bool = False) -> dict:
+    """Leagues the caller can see (RLS decides), or only the ones the signed-in user created."""
+    query = db().table("leagues").select("id, name, status, season_name").eq("deleted", False)
+    if mine:
+        if not _user_id.get():
+            return {"error": "Nobody is signed in, so there are no own leagues to list."}
+        query = query.eq("created_by", _user_id.get())
+    return {"leagues": query.order("name").execute().data}
+
+
+def get_tournament_summary(tournament_id: str) -> dict:
+    """A tournament's podium and awards, as on its summary page: best tournament average, best single-match
+    average, highest checkout and most 180s (X01; ties are all listed)."""
+    t = (db().table("tournaments").select("name, status, starts_at, created_at, game_type, leagues(name)")
+         .eq("id", tournament_id).single().execute().data)
+    players = db().table("tournament_players").select("player_id", count="exact").eq("tournament_id", tournament_id).execute().count
+    matches = (db().table("matches").select(_MATCH_FIELDS).eq("tournament_id", tournament_id)
+               .eq("status", "completed").execute().data)
+    names = {pid: name for m in matches for pid, name, _, _ in _sides(m)}
+    places = _podium(matches)
+    summary = {"tournament": t["name"], "date": _date(t), "status": t["status"], "game": t["game_type"] or "x01",
+               "league": (t["leagues"] or {}).get("name"), "players": players, "completed_matches": len(matches),
+               "podium": sorted(({"place": p, "player": names.get(pid)} for pid, p in places.items()), key=lambda r: r["place"])}
+    if "cricket" in (t["game_type"] or "").lower():
+        return {**summary, "awards": "Cricket tournament: the X01 averages, checkouts and 180s do not apply."}
+
+    totals, best_match, checkout, one_eighties = {}, [], {}, {}
+    for m in matches:
+        for pid, name, opponent, s in _sides(m):
+            if not pid:
+                continue
+            score, darts = totals.get(pid, (0, 0))
+            totals[pid] = (score + (s["s"] or 0), darts + (s["d"] or 0))
+            if (s["a"] or 0) > 0:
+                best_match.append({"player": name, "opponent": opponent, "average": round(float(s["a"]), 2)})
+            checkout[pid] = max([checkout.get(pid, 0), *(_checkout_value((c or {}).get("checkout")) for c in s["c"] or [])])
+            one_eighties[pid] = one_eighties.get(pid, 0) + (s["o"] or 0)
+
+    def leaders(values: dict) -> dict | None:
+        top = max(values.values(), default=0)
+        return {"value": top, "players": [names.get(p) for p, v in values.items() if v == top]} if top else None
+
+    averages = {p: round(s / d * 3, 2) for p, (s, d) in totals.items() if d}
+    best_match.sort(key=lambda r: r["average"], reverse=True)
+    return {**summary, "awards": {
+        "best_tournament_average": leaders(averages),
+        "tournament_averages_top5": [{"player": names.get(p), "average": a}
+                                     for p, a in sorted(averages.items(), key=lambda pa: pa[1], reverse=True)[:5]],
+        "best_match_average": [r for r in best_match if r["average"] == best_match[0]["average"]] if best_match else None,
+        "highest_checkout": leaders(checkout),
+        "most_180s": leaders(one_eighties),
+    }}
+
+
+def get_player_tournaments(player_id: str) -> dict:
+    """Every tournament the player played, newest first, with their placing (1-3 from the playoffs, or the league's
+    recorded placement), wins and losses, tournament average, best match average, highest checkout and 180s."""
+    player = db().table("players").select("id, name").eq("id", player_id).single().execute().data
+    tournaments = _tournaments(player_id)
+    if not tournaments:
+        return {"player": player["name"], "tournaments": []}
+    meta = {t["id"]: t for t in db().table("tournaments").select("id, starts_at, created_at, game_type, status")
+            .in_("id", list(tournaments)).execute().data}
+    matches = (db().table("matches").select(_MATCH_FIELDS).in_("tournament_id", list(tournaments))
+               .eq("status", "completed").execute().data)
+    # League rounds record a placement for every player; it fills in where the playoffs don't decide one.
+    league_places = {r["tournament_id"]: r["placement"] for r in
+                     db().table("league_tournament_results").select("tournament_id, placement").eq("player_id", player_id).execute().data}
+
+    rows = []
+    for tid, name in tournaments.items():
+        in_t = [m for m in matches if m["tournament_id"] == tid]
+        mine = [(m, s) for m in in_t for pid, _, _, s in _sides(m) if pid == player_id]
+        score = sum(s["s"] or 0 for _, s in mine)
+        darts = sum(s["d"] or 0 for _, s in mine)
+        cricket = "cricket" in (meta[tid]["game_type"] or "").lower()
+        rows.append({
+            "tournament": name, "tournament_id": tid, "date": _date(meta[tid]), "status": meta[tid]["status"],
+            "game": "cricket" if cricket else "x01",
+            "placement": _podium(in_t).get(player_id) or league_places.get(tid),
+            "wins": sum(m["winner_id"] == player_id for m, _ in mine),
+            "losses": sum(bool(m["winner_id"]) and m["winner_id"] != player_id for m, _ in mine),
+            **({} if cricket else {
+                "average": round(score / darts * 3, 2) if darts else None,
+                "best_match_average": max((round(float(s["a"]), 2) for _, s in mine if s["a"]), default=None),
+                "highest_checkout": max((_checkout_value((c or {}).get("checkout")) for _, s in mine for c in s["c"] or []),
+                                        default=None) or None,
+                "180s": sum(s["o"] or 0 for _, s in mine),
+            }),
+        })
+    rows.sort(key=lambda r: r["date"] or "", reverse=True)
+    return {"player": player["name"], "tournaments": rows}
 
 
 def main() -> None:

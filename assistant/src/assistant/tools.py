@@ -100,7 +100,83 @@ def get_league_standings(league_id: str) -> dict:
     return stats.get_league_standings(league_id)
 
 
-TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings]
+@tool
+def get_me() -> dict:
+    """Find out who the user is: whether they are signed in, the DartLead players linked to their account,
+    and how many tournaments they manage. Call this first whenever the question says "I", "me", "my" or
+    "mine" (my average, my best tournament, my tournaments). If no player is linked, ask the user for their
+    player name and use find_player.
+    """
+    return stats.get_me()
+
+
+@tool(parse_docstring=True)
+def list_tournaments(mine: bool = False, player_id: str | None = None, league_id: str | None = None,
+                     status: str | None = None) -> dict:
+    """List tournaments newest first (up to 10) with name, date, status and league, plus the total count.
+    Use it for "what tournaments do I have", "which tournaments did X play", "what is running now".
+
+    Args:
+        mine: Only tournaments the signed-in user created and manages ("my tournaments" for a manager).
+        player_id: Only tournaments this player played in (id from find_player or get_me).
+        league_id: Only the rounds of this league (id from find_league).
+        status: Only this status: "started" (running) or "completed".
+    """
+    return stats.list_tournaments(mine=mine, player_id=player_id, league_id=league_id, status=status)
+
+
+@tool(parse_docstring=True)
+def find_tournament(name: str) -> list[dict]:
+    """Look up tournaments by name. Call this first whenever a question names a tournament, because
+    get_tournament_summary needs its id. Returns candidates best first with id, name, date, status and a
+    match score; league rounds have similar names ("… – 3. kolo"), so use the date or round number to pick,
+    and ask the user if it is still unclear.
+
+    Args:
+        name: The tournament's name as the user wrote it, or part of it.
+    """
+    return stats.find_tournament(name)
+
+
+@tool(parse_docstring=True)
+def get_tournament_summary(tournament_id: str) -> dict:
+    """Get one tournament's result, as on its summary page: date, status, players, the podium (places 1-3)
+    and the X01 awards: best tournament average, the top 5 tournament averages, best single-match average
+    (with the opponent), highest checkout and most 180s. Ties list every player. Use it for "who won X",
+    "highest match average in X", "who threw the most 180s in X".
+
+    Args:
+        tournament_id: The id from find_tournament or list_tournaments. Never guess it.
+    """
+    return stats.get_tournament_summary(tournament_id)
+
+
+@tool(parse_docstring=True)
+def get_player_tournaments(player_id: str) -> dict:
+    """Get every tournament a player played, newest first: placing (1-3, or the league's recorded
+    placement), wins and losses, tournament average, best match average, highest checkout and 180s.
+    Use it for "my best tournament", "how did X do in each round", "which tournaments did X win".
+    "Best" can mean best placing or highest tournament average: say which one you used.
+
+    Args:
+        player_id: The id from find_player or get_me. Never guess it.
+    """
+    return stats.get_player_tournaments(player_id)
+
+
+@tool(parse_docstring=True)
+def list_leagues(mine: bool = False) -> dict:
+    """List the leagues the user can see, with name, status and season. Use it for "which leagues are
+    there" or when the user asks about "a league" without naming it.
+
+    Args:
+        mine: Only leagues the signed-in user created.
+    """
+    return stats.list_leagues(mine=mine)
+
+
+TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings,
+         get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, list_leagues]
 
 
 def main() -> None:

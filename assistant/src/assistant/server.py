@@ -58,12 +58,15 @@ def event(event_type: str, **data) -> str:
 
 
 def tool_output(content):
-    # Tools return dicts and lists, which LangChain turns into Python-literal text; parse them back for the
-    # trace (literal_eval only reads literals, it never runs code). Error messages stay text.
-    try:
-        return ast.literal_eval(content)
-    except (ValueError, SyntaxError, TypeError):
-        return content
+    # Tools return dicts and lists, which LangChain turns into text: JSON when it can, else a Python literal
+    # (single quotes, None). Parse either back for the trace; literal_eval only reads literals, it never runs code.
+    # Error messages stay text.
+    for parse in (json.loads, ast.literal_eval):
+        try:
+            return parse(content)
+        except (ValueError, SyntaxError, TypeError):
+            pass
+    return content
 
 
 async def answer_events(message: str, thread_id: str, user_id: str, token: str):
@@ -72,7 +75,7 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str):
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 2 * MAX_STEPS + 3,
               "callbacks": [CallbackHandler()], "run_name": "chat"}
     try:
-        with stats.as_user(token), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
+        with stats.as_user(token, user_id), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
                                                         tags=["phase-6", "api"]):
             # "updates": each node's output when it finishes; "messages": the reply's tokens as they are written.
             async for mode, payload in graph.astream({"messages": [HumanMessage(message)]}, config,
