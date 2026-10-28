@@ -35,15 +35,17 @@ def run_tool(call: dict) -> ToolMessage:
 
 
 @chain  # a Runnable, so one Langfuse trace holds every model turn and tool run of a question
-def ask_stats(question: str) -> str:
+def ask_stats(question: str) -> dict:
     messages = [SystemMessage(SYSTEM_PROMPT), HumanMessage(question)]
+    tools_used = []  # in call order, so the eval can check the model took the right path
     for _ in range(MAX_STEPS):
         reply = model_with_tools.invoke(messages)
         messages.append(reply)
         if not reply.tool_calls:
-            return reply.content
+            return {"answer": reply.content, "tools": tools_used}
+        tools_used += [call["name"] for call in reply.tool_calls]
         messages += [run_tool(call) for call in reply.tool_calls]  # a model may ask for several at once
-    return "Sorry, I could not work that out in a few steps."
+    return {"answer": "Sorry, I could not work that out in a few steps.", "tools": tools_used}
 
 
 def main() -> None:
@@ -57,6 +59,6 @@ def main() -> None:
     ]
     for question in questions:
         with propagate_attributes(trace_name="ask-stats", tags=["phase-3"]):
-            answer = ask_stats.invoke(question, config={"callbacks": [CallbackHandler()], "run_name": "ask-stats"})
-        print(f"\nQ: {question}\nA: {answer}")
+            result = ask_stats.invoke(question, config={"callbacks": [CallbackHandler()], "run_name": "ask-stats"})
+        print(f"\nQ: {question}\nA: {result['answer']}\n   tools: {result['tools']}")
     get_client().shutdown()  # short-lived script: send queued traces before exiting
