@@ -1,17 +1,20 @@
 # Phase 4: one graph for every question. The Phase 1 router picks the sources, the Phase 2 retriever adds
 # doc chunks, and the Phase 3 tools look up stats; one agent node writes the answer from all of it.
-#   START -> route -> off_topic -> END
-#                  -> retrieve -> agent <-> tools -> END   (retrieve only for rules/app, tools only for stats)
+# A checkpointer keeps each conversation, and rewrite turns follow-ups ("Novák") into standalone questions.
+#   START -> rewrite -> route -> off_topic -> END
+#                            -> retrieve -> agent <-> tools -> END   (retrieve only for rules/app, tools only for stats)
 import os
 import sys
+import uuid
 from typing import Annotated, TypedDict
 
 from langchain_core.documents import Document
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage
-from langchain_core.runnables import chain
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig, chain
 from langchain_openai import ChatOpenAI
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
@@ -36,25 +39,44 @@ Sources:
 OFF_TOPIC_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
 The question is not about darts or DartLead. In one or two sentences, in the language of the question,
 say that you can help with darts rules, using the DartLead app, and players' statistics."""
+REWRITE_PROMPT = """Rewrite the user's last message as a standalone question that can be understood without the
+conversation, in the language of the last message. Keep the names, numbers and details from earlier turns that
+it refers to. If it is already standalone, return it unchanged. Return only the question."""
 
 model = ChatOpenAI(model=os.environ["ANSWER_MODEL"], base_url="https://openrouter.ai/api/v1",
                    api_key=os.environ["OPENROUTER_API_KEY"], name="write-answer")
 model_with_tools = model.bind_tools(TOOLS)
+rewriter = model.with_config(run_name="rewrite-question")
 
 
 class State(TypedDict):
-    messages: Annotated[list[AnyMessage], add_messages]  # appended by each node (reducer)
+    messages: Annotated[list[AnyMessage], add_messages]  # the whole conversation, appended by each node (reducer)
+    question: str  # this turn's question, standalone (rewritten from the last message)
     sources: list[str]  # the router's pick: rules, stats, app; empty = off topic
     docs: list[Document]  # retrieved chunks for this question
 
 
+def rewrite(state: State) -> dict:
+    # The router and retriever see one question, not the conversation: "Novák" alone looks off topic.
+    *history, last = state["messages"]
+    if not history:
+        return {"question": last.content}  # first message: nothing to resolve, no extra model call
+    # Only text turns (tool calls and results are noise here). shortcut: the last 8 of them; summarise older
+    # turns if long chats need them.
+    turns = [m for m in history if isinstance(m, (HumanMessage, AIMessage)) and m.content][-8:]
+    transcript = "\n".join(f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}" for m in turns)
+    reply = rewriter.invoke([SystemMessage(REWRITE_PROMPT),
+                             HumanMessage(f"Conversation:\n{transcript}\n\nLast message: {last.content}")])
+    return {"question": reply.content.strip()}
+
+
 def route(state: State) -> dict:
     # Docs are reset too, so a later question never answers from an earlier one's chunks.
-    return {"sources": router.invoke({"question": state["messages"][-1].content}).sources, "docs": []}
+    return {"sources": router.invoke({"question": state["question"]}).sources, "docs": []}
 
 
 def retrieve(state: State) -> dict:
-    return {"docs": retriever.invoke(state["messages"][-1].content)}
+    return {"docs": retriever.invoke(state["question"])}
 
 
 def off_topic(state: State) -> dict:
@@ -83,32 +105,44 @@ def after_agent(state: State) -> str:
 
 
 builder = StateGraph(State)
+builder.add_node("rewrite", rewrite)
 builder.add_node("route", route)
 builder.add_node("retrieve", retrieve)
 builder.add_node("off_topic", off_topic)
 builder.add_node("agent", call_agent)
 builder.add_node("tools", call_tools)
-builder.add_edge(START, "route")
+builder.add_edge(START, "rewrite")
+builder.add_edge("rewrite", "route")
 builder.add_conditional_edges("route", after_route, ["off_topic", "retrieve", "agent"])
 builder.add_edge("retrieve", "agent")
 builder.add_conditional_edges("agent", after_agent, ["tools", END])
 builder.add_edge("tools", "agent")
 builder.add_edge("off_topic", END)
-graph = builder.compile()
+# The checkpointer saves the state after every node, per thread_id; the next question in that thread
+# starts from the saved messages. shortcut: in memory, so threads die with the process; use a
+# Postgres checkpointer (Supabase) when the service runs (Phase 6).
+graph = builder.compile(checkpointer=InMemorySaver())
 
 
 @chain  # one Langfuse trace per question
-def ask(question: str) -> dict:
+def ask(question: str, config: RunnableConfig) -> dict:
+    # Same thread_id = same conversation. Without one, every question starts a new conversation (as the evals want).
+    thread_id = config.get("configurable", {}).get("thread_id") or str(uuid.uuid4())
     try:
-        # route + retrieve, then MAX_STEPS agent turns with the tool runs between them
-        state = graph.invoke({"messages": [HumanMessage(question)]}, {"recursion_limit": 2 * MAX_STEPS + 2})
+        # rewrite + route + retrieve, then MAX_STEPS agent turns with the tool runs between them
+        state = graph.invoke({"messages": [HumanMessage(question)]},
+                             {"recursion_limit": 2 * MAX_STEPS + 3, "configurable": {"thread_id": thread_id}})
     except GraphRecursionError:
-        return {"answer": "Sorry, I could not work that out in a few steps.", "sources": [], "docs": [], "tools": []}
+        return {"answer": "Sorry, I could not work that out in a few steps.", "question": question,
+                "sources": [], "docs": [], "tools": []}
+    # This turn = everything from the last user message on; earlier turns' tool calls don't count.
+    start = max(i for i, m in enumerate(state["messages"]) if isinstance(m, HumanMessage))
     return {
         "answer": state["messages"][-1].content,
+        "question": state["question"],
         "sources": state["sources"],
         "docs": state["docs"],
-        "tools": [c["name"] for m in state["messages"] for c in getattr(m, "tool_calls", [])],
+        "tools": [c["name"] for m in state["messages"][start:] for c in getattr(m, "tool_calls", [])],
     }
 
 
@@ -128,3 +162,22 @@ def main() -> None:
         print(f"\nQ: {question}\n   sources: {result['sources']}  docs: {len(result['docs'])}  tools: {result['tools']}")
         print(f"A: {result['answer']}")
     get_client().shutdown()  # short-lived script: send queued traces before exiting
+
+
+def chat() -> None:
+    # One conversation in the terminal; it is also one Langfuse session, so its turns show together.
+    sys.stdin.reconfigure(encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
+    thread_id = str(uuid.uuid4())
+    print("DartLead assistant. Empty line to quit.")
+    try:
+        while question := input("\n> ").strip():
+            with propagate_attributes(trace_name="ask", session_id=thread_id, tags=["phase-4", "chat"]):
+                result = ask.invoke(question, config={"callbacks": [CallbackHandler()], "run_name": "ask",
+                                                      "configurable": {"thread_id": thread_id}})
+            if result["question"] != question:
+                print(f"  (understood as: {result['question']})")
+            print(result["answer"])
+    except EOFError:  # piped input ran out
+        pass
+    get_client().shutdown()  # send queued traces before exiting
