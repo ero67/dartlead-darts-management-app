@@ -3,10 +3,11 @@ import { useLocation } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { useAdmin } from '@/contexts/AdminContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
-import { ASSISTANT_URL } from '@/services/assistantService';
+import { ASSISTANT_URL, assistantService } from '@/services/assistantService';
 
 // Shown instead of the panel when its download fails (e.g. a tab still on old files after a deploy).
 function AssistantUnavailable({ isOpen, onOpenChange }) {
@@ -30,14 +31,22 @@ const AssistantPanel = lazy(() => import('./AssistantPanel')
 
 export function AssistantChat() {
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const location = useLocation();
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   // Stays mounted after the first open, so closing the panel keeps the conversation.
   const [hasOpened, setHasOpened] = useState(false);
+  const [settings, setSettings] = useState(null);
 
-  // Behind a flag (VITE_ASSISTANT_URL), for signed-in users, and never over the scoring keypad.
-  if (!ASSISTANT_URL || !user) return null;
+  useEffect(() => {
+    if (ASSISTANT_URL && user) assistantService.getSettings().then(setSettings);
+  }, [user]);
+
+  // Behind a flag (VITE_ASSISTANT_URL), for signed-in users the admin switch allows (everyone or admins
+  // only; the API checks the same), and never over the scoring keypad.
+  if (!ASSISTANT_URL || !user || !settings) return null;
+  if (settings.audience !== 'everyone' && !isAdmin) return null;
   const isHidden = location.pathname.startsWith('/match/');
 
   const handleOpen = () => {

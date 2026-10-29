@@ -13,7 +13,7 @@ import { WinChanceChart } from './match/WinChanceChart';
 import { AssistantLogo } from './assistant/AssistantLogo';
 import { BOT_LEVELS } from '../lib/botPlayer';
 import { tournamentService } from '../services/tournamentService';
-import { ASSISTANT_URL } from '../services/assistantService';
+import { ASSISTANT_URL, assistantService } from '../services/assistantService';
 
 const CONTACT_EMAIL = 'info@dartlead.app';
 const ANDROID_APK_URL = 'https://github.com/ero67/dartlead-darts-management-app/releases/download/android-latest/DartLead.apk';
@@ -92,8 +92,12 @@ export function LandingPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
 
+  // The assistant section shows only once admins open the assistant to everyone.
+  const [isAssistantPublic, setIsAssistantPublic] = useState(false);
+
   useEffect(() => {
     tournamentService.getPublicStats().then(setStats);
+    if (ASSISTANT_URL) assistantService.getSettings().then(s => setIsAssistantPublic(s?.audience === 'everyone'));
   }, []);
 
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
@@ -297,8 +301,8 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* Shown only where the assistant runs (VITE_ASSISTANT_URL), like the chat itself. */}
-        {ASSISTANT_URL && (
+        {/* Shown only where the assistant runs (VITE_ASSISTANT_URL) and is open to everyone. */}
+        {isAssistantPublic && (
           <section aria-labelledby="assistant-title">
             <Card className="relative grid items-center gap-8 overflow-hidden bg-gradient-to-br from-primary/10 to-card p-6 md:p-10 lg:grid-cols-2">
               <BoardMotif className="-left-40 -top-48 w-[28rem]" />

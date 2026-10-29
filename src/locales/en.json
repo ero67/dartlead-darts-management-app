@@ -1590,6 +1590,8 @@
     "send": "Send",
     "error": "Something went wrong. Please try again.",
     "unavailable": "The assistant could not load. Reload the page and try again.",
+    "limitReached": "You have used all of today's questions. Try again tomorrow.",
+    "notAvailable": "The assistant is not available for your account yet.",
     "empty": "Ask about the rules, how DartLead works, or any player's and league's numbers.",
     "suggestion1": "Who leads the Demo Liga?",
     "suggestion2": "How is checkout percentage counted?",

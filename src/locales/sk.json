@@ -1590,6 +1590,8 @@
     "send": "Odoslať",
     "error": "Niečo sa pokazilo. Skúste to znova.",
     "unavailable": "Asistenta sa nepodarilo načítať. Obnovte stránku a skúste to znova.",
+    "limitReached": "Dnešné otázky ste už vyčerpali. Skúste to znova zajtra.",
+    "notAvailable": "Asistent zatiaľ pre váš účet nie je dostupný.",
     "empty": "Pýtajte sa na pravidlá, na to, ako funguje DartLead, alebo na čísla ktoréhokoľvek hráča či ligy.",
     "suggestion1": "Kto vedie Demo Ligu?",
     "suggestion2": "Ako sa počíta úspešnosť zakončenia?",

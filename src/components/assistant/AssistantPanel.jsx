@@ -113,7 +113,8 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
       // A stream that ends without "done" (connection dropped) still stops the loader.
       updateMessage(replyId, m => (m.status === 'streaming' ? { ...m, status: 'done', isTraceOpen: false } : m));
     } catch (error) {
-      updateMessage(replyId, m => ({ ...m, status: 'error', isTraceOpen: false, error: error.message }));
+      const text = error.status === 429 ? t('assistant.limitReached') : error.status === 403 ? t('assistant.notAvailable') : error.message;
+      updateMessage(replyId, m => ({ ...m, status: 'error', isTraceOpen: false, error: text }));
     } finally {
       setIsSending(false);
     }

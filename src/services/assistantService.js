@@ -4,6 +4,30 @@ import { supabase } from '../lib/supabase';
 export const ASSISTANT_URL = import.meta.env.VITE_ASSISTANT_URL;
 
 export const assistantService = {
+  // Who sees the assistant ('admins' | 'everyone') and the daily question limits; one row, readable by anyone.
+  async getSettings() {
+    try {
+      const { data, error } = await supabase.from('assistant_settings').select('audience, daily_limit, admin_daily_limit').single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error loading assistant settings:', error);
+      return null;
+    }
+  },
+
+  // Admins only (RLS).
+  async updateSettings(changes) {
+    const { data, error } = await supabase
+      .from('assistant_settings')
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .eq('id', true)
+      .select('audience, daily_limit, admin_daily_limit')
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   // Sends one message and calls onEvent for every event of the run as it streams in (NDJSON, one JSON
   // object per line): step, sources, tool_start, tool_end, text, done, error.
   // The user's access token goes along, so the assistant only sees what this user may see.
@@ -19,7 +43,9 @@ export const assistantService = {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(typeof body.detail === 'string' ? body.detail : `Assistant error ${response.status}`);
+        // status 429 = daily limit reached, 403 = not available for this account (see use_assistant_question).
+        throw Object.assign(new Error(typeof body.detail === 'string' ? body.detail : `Assistant error ${response.status}`),
+          { status: response.status });
       }
 
       const reader = response.body.getReader();
