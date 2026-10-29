@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+import time
 
 from dotenv import load_dotenv
 
@@ -20,16 +21,30 @@ def to_langfuse(text: str) -> str:
     return re.sub(r"\{(\w+)\}", r"{{\1}}", text)
 
 
+_skip_until = 0.0  # monotonic time until which Langfuse is not asked again after a failed fetch
+
+
 def template(name: str, fallback: str, human: str | None = None) -> ChatPromptTemplate:
-    # Cached by the SDK for 60 s, so building this per call is cheap. On a fetch error the code text is used.
-    # No retries and a short timeout: a failed fetch is not cached, so with Langfuse down every prompt would
-    # otherwise wait ~7 s before falling back (several per question).
-    prompt = get_client().get_prompt(name, type="text", label=PROMPT_LABEL, fallback=to_langfuse(fallback),
-                                     max_retries=0, fetch_timeout_seconds=3)
-    # The callback handler links a generation to the prompt in this metadata. A fallback has no version to link.
-    metadata = None if prompt.is_fallback else {"langfuse_prompt": prompt}
+    # Langfuse is only a nicety: an outage, a missing key or a slow fetch must never block an answer. The SDK does not
+    # cache failures, so after one failed fetch the code text is used for a minute without asking again.
+    # shortcut: the one fetch per minute that probes Langfuse can still be slow in an outage; run it in a background
+    # thread with a timeout if that shows up in latency.
+    global _skip_until
+    prompt = None
+    if time.monotonic() >= _skip_until:
+        try:  # cached by the SDK for 60 s otherwise; a fallback client means the fetch failed
+            prompt = get_client().get_prompt(name, type="text", label=PROMPT_LABEL, fallback=to_langfuse(fallback),
+                                             max_retries=0, fetch_timeout_seconds=3)
+        except Exception:
+            pass
+        if prompt is None or prompt.is_fallback:
+            _skip_until = time.monotonic() + 60
+            prompt = None
+    text = prompt.get_langchain_prompt() if prompt else fallback  # code text is already in LangChain syntax
+    # The callback handler links a generation to the prompt in this metadata. The code text has no version to link.
+    metadata = {"langfuse_prompt": prompt} if prompt else None
     last = ("human", human) if human else MessagesPlaceholder("messages")
-    return ChatPromptTemplate(messages=[("system", prompt.get_langchain_prompt()), last], metadata=metadata)
+    return ChatPromptTemplate(messages=[("system", text), last], metadata=metadata)
 
 
 def main() -> None:
