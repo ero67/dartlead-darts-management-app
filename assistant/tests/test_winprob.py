@@ -32,6 +32,8 @@ def assert_close(got, expected):
 
 @pytest.mark.parametrize("case", CASES, ids=[f"{i}-{c['fn']}" for i, c in enumerate(CASES)])
 def test_matches_js(case):
+    if case["args"] is None:  # a constant
+        return assert_close(getattr(winprob, case["fn"]), case["expected"])
     args = list(case["args"])
     # A trailing object is the JS options bag: camelCase keys become keyword arguments.
     kwargs = {snake(k): v for k, v in args.pop().items()} if args and isinstance(args[-1], dict) and case["fn"] != "biggestUpset" else {}

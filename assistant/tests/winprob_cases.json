@@ -1,5 +1,30 @@
 [
  {
+  "fn": "AVG_SCALE",
+  "args": null,
+  "expected": 6
+ },
+ {
+  "fn": "HALF_LIFE",
+  "args": null,
+  "expected": 10
+ },
+ {
+  "fn": "PRIOR_DARTS",
+  "args": null,
+  "expected": 240
+ },
+ {
+  "fn": "FIELD_AVERAGE",
+  "args": null,
+  "expected": 41
+ },
+ {
+  "fn": "HISTORY_MATCHES",
+  "args": null,
+  "expected": 60
+ },
+ {
   "fn": "legWinProbability",
   "args": [
    40,
@@ -1566,6 +1591,37 @@
    [
     {
      "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 2,
+     "player2_legs": 5,
+     "legs_to_win": null,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": {
+   "winner_id": "b",
+   "loser_id": "a",
+   "score": "5:2",
+   "chance": 0.000005438572359572902
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
      "player1_id": "c",
      "player2_id": "d",
      "winner_id": "c",
@@ -1582,6 +1638,59 @@
     "c": 45,
     "d": 45,
     "e": 30
+   }
+  ],
+  "expected": null
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "x",
+     "player2_id": "y",
+     "winner_id": "x",
+     "player1_legs": 3,
+     "player2_legs": 1,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "x": 40,
+    "y": 42,
+    "z": 41
+   }
+  ],
+  "expected": {
+   "winner_id": "x",
+   "loser_id": "y",
+   "score": "3:1",
+   "chance": 0.3479725861204229
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "x",
+     "player2_id": "z",
+     "winner_id": "x",
+     "player1_legs": 3,
+     "player2_legs": 1,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "x": 40,
+    "y": 42,
+    "z": 41
    }
   ],
   "expected": null

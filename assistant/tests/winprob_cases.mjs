@@ -4,7 +4,7 @@
 // args are the JS positional arguments (a trailing object is the options, camelCase keys). For biggestUpset they are the
 // flat Python shape; the app-shaped matches the JS needs are built from them below.
 import { writeFileSync } from 'node:fs';
-import { chanceToWinFirst, legWinProbability, matchWinProbability, playerStrength, strengthHistory } from '../../src/lib/winProbability.js';
+import { AVG_SCALE, FIELD_AVERAGE, HALF_LIFE, HISTORY_MATCHES, PRIOR_DARTS, chanceToWinFirst, legWinProbability, matchWinProbability, playerStrength, strengthHistory } from '../../src/lib/winProbability.js';
 import { biggestUpset } from '../../src/utils/upsets.js';
 
 // mulberry32: a tiny seeded PRNG, so the history (and the JSON) is the same on every run.
@@ -26,6 +26,9 @@ const history = (n, seed) => {
 
 const cases = [];
 const add = (fn, args, expected) => cases.push({ fn, args, expected });
+
+// The model's constants (args null = read the attribute, not call it).
+for (const [k, v] of Object.entries({ AVG_SCALE, HALF_LIFE, PRIOR_DARTS, FIELD_AVERAGE, HISTORY_MATCHES })) add(k, null, v);
 
 for (const [a, b] of [[40, 40], [50, 49], [50, 40], [60, 30], [30, 60], [90, 20]]) add('legWinProbability', [a, b], legWinProbability(a, b));
 add('legWinProbability', [50, 40, 10], legWinProbability(50, 40, 10));
@@ -76,7 +79,12 @@ addUpset([flat('m1', 'a', 'b', 'b', 1, 3, 3, 'cricket')], S); // Cricket skipped
 addUpset([flat('m1', 'a', 'b', 'b', 1, 3, 3, 'x01', 'in_progress')], S); // not completed
 addUpset([flat('m1', 'a', 'b', 'b', 1, 3, 3)], { a: 60 }); // missing strength
 addUpset([flat('m1', 'a', 'b', 'b', 1, 3, null)], S); // legs to win from the score
+addUpset([flat('m1', 'a', 'b', 'b', 2, 5, null)], S); // legs to win from the score: max(2, 5) = 5, not the default 3
 addUpset([flat('m1', 'c', 'd', 'c', 3, 0, 3)], S); // 50% is not below 0.4
+// The default limit 0.4: an underdog at 0.348 (40 beats 42) is an upset, one at 0.422 (40 beats 41) is not.
+const D = { x: 40, y: 42, z: 41 };
+addUpset([flat('m1', 'x', 'y', 'x', 3, 1, 3)], D);
+addUpset([flat('m1', 'x', 'z', 'x', 3, 1, 3)], D);
 addUpset([flat('m1', 'a', 'b', 'b', 1, 3, 3)], S, 0.001); // stricter limit
 // A tie at max chance: the first of two identical upsets stays.
 addUpset([flat('m1', 'a', 'b', 'b', 1, 3, 3), flat('m2', 'a', 'b', 'b', 2, 3, 3)], S);
