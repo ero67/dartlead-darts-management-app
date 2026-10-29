@@ -9,6 +9,7 @@ import { AdminOverview } from './AdminOverview';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,20 @@ const foldName = (name) => (name || '').normalize('NFD').replace(/\p{Diacritic}/
 const pickMergeTarget = (records) => [...records].sort((a, b) =>
   Number(!!b.user_id) - Number(!!a.user_id) || b.matches - a.matches || b.tournaments - a.tournaments
 )[0];
+
+const BLOCK_REASONS = {
+  has_account: 'has an account',
+  has_matches: 'has matches',
+  hidden_matches: 'has matches in hidden tournaments',
+  in_tournament: 'is in a tournament',
+  in_bracket: 'is named in a bracket',
+  in_league: 'is in a league',
+  in_use: 'is still used',
+  not_deleted: 'is not deleted',
+  in_live_league: 'counts in a live league',
+};
+
+const toggleId = (setIds, id) => setIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : null);
 
@@ -79,6 +94,13 @@ export function AdminPanel() {
   const [merging, setMerging] = useState(false);
   const [mergeLog, setMergeLog] = useState([]);
   const mergeFormRef = React.useRef(null);
+
+  // Test data cleanup
+  const [hiddenTournaments, setHiddenTournaments] = useState([]);
+  const [purgeIds, setPurgeIds] = useState([]);
+  const [deletePlayerIds, setDeletePlayerIds] = useState([]);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupLog, setCleanupLog] = useState([]);
 
   // Link Account → Player Stats
   const [linkUser, setLinkUser] = useState(null);
@@ -480,6 +502,57 @@ export function AdminPanel() {
     }
   };
 
+  // ── Test data cleanup ────────────────────────────────────────────
+  const loadHiddenTournaments = async () => {
+    try {
+      setHiddenTournaments(await tournamentService.getDeletedTournaments());
+    } catch (err) {
+      console.error('Error loading deleted tournaments:', err);
+      setCleanupLog([`Failed to load deleted tournaments: ${err.message}`]);
+    }
+  };
+
+  const skippedLines = (skipped) => (skipped || []).map(s => `Skipped "${s.name}": ${BLOCK_REASONS[s.reason] || s.reason}`);
+
+  const handlePurgeTournaments = async () => {
+    if (!(await confirmDialog(
+      `Permanently delete ${purgeIds.length} hidden tournament(s) with all their matches, legs and stats?\n\nThis cannot be undone.`,
+      { destructive: true }
+    ))) return;
+    setCleaning(true);
+    try {
+      const result = await tournamentService.purgeTournaments(purgeIds);
+      setCleanupLog([`Deleted ${result.purged.length} tournament(s).`, ...skippedLines(result.skipped)]);
+      setPurgeIds([]);
+      await Promise.all([loadHiddenTournaments(), loadAllPlayers()]);
+    } catch (err) {
+      console.error('Error purging tournaments:', err);
+      setCleanupLog([`Delete failed: ${err.message}`]);
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const handleDeletePlayers = async () => {
+    const names = deletePlayerIds.map(id => allPlayers.find(p => p.id === id)?.name || id);
+    if (!(await confirmDialog(
+      `Permanently delete ${names.length} player(s)?\n\n${names.map(n => `  • "${n}"`).join('\n')}\n\nThis cannot be undone.`,
+      { destructive: true }
+    ))) return;
+    setCleaning(true);
+    try {
+      const result = await leagueService.deletePlayers(deletePlayerIds);
+      setCleanupLog([`Deleted ${result.deleted.length} player(s).`, ...skippedLines(result.skipped)]);
+      setDeletePlayerIds([]);
+      await loadAllPlayers();
+    } catch (err) {
+      console.error('Error deleting players:', err);
+      setCleanupLog([`Delete failed: ${err.message}`]);
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   // ── Link Account → Player Stats ──────────────────────────────────
   const handleSelectLinkUser = async (selectedUser) => {
     setLinkUser(selectedUser);
@@ -627,11 +700,15 @@ export function AdminPanel() {
     loadTournamentsForStatus();
     loadLeaguesForPoints();
     loadAllPlayers();
+    loadHiddenTournaments();
   }, []);
 
   const filteredPlayers = (search) => allPlayers.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
   const playerName = (id) => allPlayers.find(p => p.id === id)?.name || id;
   const mergeTarget = allPlayers.find(p => p.id === targetPlayerId);
+  const deletablePlayers = allPlayers.filter(p => !p.delete_block);
+  const hiddenMatchPlayers = allPlayers.filter(p => p.delete_block === 'hidden_matches').length;
+  const purgeable = hiddenTournaments.filter(t => !t.in_live_league);
   const mergeSources = sourcePlayerIds.map(id => allPlayers.find(p => p.id === id)).filter(Boolean);
   // players.user_id is unique, so two linked records are two different accounts.
   const mergeBothLinked = !!mergeTarget?.user_id && mergeSources.some(p => p.user_id);
@@ -1378,6 +1455,124 @@ export function AdminPanel() {
                   {logBox('Merge Log:', mergeLog)}
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Clean Up Test Data</CardTitle>
+              <CardDescription>
+                Deleting a tournament in the app only hides it, and its matches keep its test players alive. Remove the hidden tournaments first, then the players nothing points to any more. Every removal is written to the audit log. <span className="font-semibold text-destructive">This cannot be undone!</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>
+                    <Trophy className="size-4" />
+                    1. Hidden tournaments ({hiddenTournaments.length})
+                  </Label>
+                  {purgeable.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPurgeIds(purgeIds.length === purgeable.length ? [] : purgeable.map(t => t.id))}
+                    >
+                      {purgeIds.length === purgeable.length ? 'Select none' : 'Select all'}
+                    </Button>
+                  )}
+                </div>
+                {hiddenTournaments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hidden tournaments.</p>
+                ) : (
+                  <div className="flex max-h-[28rem] flex-col divide-y overflow-y-auto rounded-lg border">
+                    {hiddenTournaments.map(t => (
+                      <Label key={t.id} htmlFor={`purge-${t.id}`} className="items-start gap-3 p-3 font-normal">
+                        <Checkbox
+                          id={`purge-${t.id}`}
+                          checked={purgeIds.includes(t.id)}
+                          onCheckedChange={() => toggleId(setPurgeIds, t.id)}
+                          disabled={t.in_live_league || cleaning}
+                          className="mt-0.5"
+                        />
+                        <span className="flex flex-col gap-0.5">
+                          <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                            {t.name}
+                            {t.in_live_league && <Badge variant="outline">counts in a live league</Badge>}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(t.created_at)} · {t.status} · {t.players} players · {t.matches} completed matches · by {t.owner_name || 'unknown'}
+                          </span>
+                        </span>
+                      </Label>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  variant="destructive"
+                  className="self-start"
+                  onClick={handlePurgeTournaments}
+                  disabled={purgeIds.length === 0 || cleaning}
+                >
+                  {cleaning ? <Loader className="animate-spin" /> : <X />}
+                  Permanently delete {purgeIds.length || ''} tournament(s)
+                </Button>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>
+                    <Users className="size-4" />
+                    2. Players with nothing to keep ({deletablePlayers.length})
+                  </Label>
+                  {deletablePlayers.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeletePlayerIds(deletePlayerIds.length === deletablePlayers.length ? [] : deletablePlayers.map(p => p.id))}
+                    >
+                      {deletePlayerIds.length === deletablePlayers.length ? 'Select none' : 'Select all'}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  No account, no matches, and not in any visible tournament, bracket or league.
+                  {hiddenMatchPlayers > 0 && ` ${hiddenMatchPlayers} more player(s) only have matches in hidden tournaments and appear here once those are deleted.`}
+                  {' '}Short names like "Bandi" may be a real player's nickname: merge those instead.
+                </p>
+                {deletablePlayers.length > 0 && (
+                  <div className="flex max-h-[28rem] flex-col divide-y overflow-y-auto rounded-lg border">
+                    {deletablePlayers.map(p => (
+                      <Label key={p.id} htmlFor={`del-${p.id}`} className="items-start gap-3 p-3 font-normal">
+                        <Checkbox
+                          id={`del-${p.id}`}
+                          checked={deletePlayerIds.includes(p.id)}
+                          onCheckedChange={() => toggleId(setDeletePlayerIds, p.id)}
+                          disabled={cleaning}
+                          className="mt-0.5"
+                        />
+                        <span className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium">{p.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            added by {p.owner_name || 'unknown'}{p.created_at && ` on ${formatDate(p.created_at)}`}
+                          </span>
+                        </span>
+                      </Label>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  variant="destructive"
+                  className="self-start"
+                  onClick={handleDeletePlayers}
+                  disabled={deletePlayerIds.length === 0 || cleaning}
+                >
+                  {cleaning ? <Loader className="animate-spin" /> : <X />}
+                  Permanently delete {deletePlayerIds.length || ''} player(s)
+                </Button>
+              </div>
+
+              {logBox('Cleanup Log:', cleanupLog)}
             </CardContent>
           </Card>
         </TabsContent>
