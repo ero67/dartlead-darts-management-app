@@ -160,21 +160,24 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str, 
         yield event("error", message="Sorry, something went wrong. Please try again.")
 
 
-def use_question(user_id: str, token: str) -> str:
+def use_question(user_id: str, token: str) -> str | None:
     """Count this question against the user's daily limit and return its id, or refuse it (use_assistant_question
-    in Supabase checks who may use the assistant and the limit; admins get a higher one)."""
+    in Supabase checks who may use the assistant and the limit; admins get a higher one). The id is None on a
+    database without the refund migration; such a question simply cannot be given back."""
     with stats.as_user(token, user_id):
         quota = stats.db().rpc("use_assistant_question").execute().data
     if quota["allowed"]:
-        return quota["question_id"]
+        return quota.get("question_id")
     if quota["reason"] == "limit":
         raise HTTPException(429, f"You have used today's {quota['limit']} questions. Try again tomorrow.")
     raise HTTPException(403, "The assistant is not available for your account yet.")
 
 
-def refund_question(user_id: str, token: str, question_id: str) -> None:
+def refund_question(user_id: str, token: str, question_id: str | None) -> None:
     """Give a question back after a failed answer (refund_assistant_question allows it for 10 minutes, once).
     Never raises: the user must still get the error event."""
+    if question_id is None:
+        return
     try:
         with stats.as_user(token, user_id):
             stats.db().rpc("refund_assistant_question", {"p_question_id": question_id}).execute()
@@ -197,6 +200,7 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
 async def feedback(request: FeedbackRequest, authorization: str | None = Header(default=None)):
     await run_in_threadpool(verify, authorization)  # not use_question: a rating is not a question
     # shortcut: trace ownership not checked, store (trace_id, user_id) if scores ever drive anything automatic.
+    # create_score only queues the score (sent in the background): 204 means accepted, not stored; 502 is a client set-up error.
     try:
         await run_in_threadpool(get_client().create_score, trace_id=request.trace_id, name="user-feedback", value=request.value,
                                 data_type="BOOLEAN", comment=(request.comment or "").strip() or None)

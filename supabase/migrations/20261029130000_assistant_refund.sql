@@ -4,12 +4,13 @@
 -- returns its id as question_id. refund_assistant_question(id) deletes that row
 -- and takes one off today's count.
 --
--- Users cannot refund themselves: the API only holds the anon key plus the
--- user's own JWT, and nobody can read the log table (RLS on, no policies, no
--- grants), so the random question_id is a capability only the server sees. A
--- refund also needs the id to be the caller's own, under 10 minutes old, and
--- works once (the row is deleted). Log rows older than a day are deleted by the
--- user's next question, so the table stays small without a cron job.
+-- Nobody can read the log table (RLS on, no policies, no grants), so only the
+-- server ever sees the ids of the questions it asks. A user calling the RPC
+-- directly sees only the ids of their own direct calls, and refunding those nets
+-- zero. A refund also needs the id to be the caller's own, under 10 minutes old,
+-- and works once (the row is deleted). It lowers the count of the day the
+-- question was asked. Log rows older than a day are deleted by the user's next
+-- question, so the table stays small without a cron job.
 --
 -- Same name, arguments and grants as before for use_assistant_question().
 -- Idempotent: safe to run twice.
@@ -23,6 +24,10 @@ CREATE TABLE IF NOT EXISTS public.assistant_question_log (
 -- No policies: only the two functions below touch it.
 ALTER TABLE public.assistant_question_log ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.assistant_question_log FROM anon, authenticated;
+
+-- Covers the per-user cleanup and the cascade from auth.users.
+CREATE INDEX IF NOT EXISTS idx_assistant_question_log_user_created
+  ON public.assistant_question_log (user_id, created_at);
 
 CREATE OR REPLACE FUNCTION public.use_assistant_question()
   RETURNS jsonb
@@ -82,21 +87,21 @@ CREATE OR REPLACE FUNCTION public.refund_assistant_question(p_question_id uuid)
 AS $$
 DECLARE
   v_user    uuid := (SELECT auth.uid());
-  v_deleted integer;
+  v_created timestamptz;
 BEGIN
   DELETE FROM public.assistant_question_log
   WHERE id = p_question_id
     AND user_id = v_user
-    AND created_at > now() - interval '10 minutes';
-  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+    AND created_at > now() - interval '10 minutes'
+  RETURNING created_at INTO v_created;
 
-  IF v_deleted = 0 THEN
+  IF v_created IS NULL THEN
     RETURN false;
   END IF;
 
   UPDATE public.assistant_usage
   SET questions = greatest(questions - 1, 0)
-  WHERE user_id = v_user AND day = (now() AT TIME ZONE 'utc')::date;
+  WHERE user_id = v_user AND day = (v_created AT TIME ZONE 'utc')::date;
   RETURN true;
 END;
 $$;

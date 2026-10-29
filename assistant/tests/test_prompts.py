@@ -54,6 +54,20 @@ def test_fallback_is_not_linked(monkeypatch):
     assert not (prompts.template("agent", SYSTEM_PROMPT).metadata or {}).get("langfuse_prompt")
 
 
+@pytest.mark.parametrize("edit", [lambda text: text + "\nPlayer: {{player}}", lambda text: text.replace("{{context}}", "")])
+def test_edited_variables_use_code_text(monkeypatch, edit):
+    class Edited(FakeLangfuse):
+        def get_prompt(self, name, *, type, label, fallback, **_):
+            return super().get_prompt(name, type=type, label=label, fallback=edit(fallback))
+
+    monkeypatch.setattr(prompts, "get_client", lambda: Edited(fallback_only=False))
+    tpl = prompts.template("agent", SYSTEM_PROMPT)
+    messages = tpl.format_messages(context="X", language="Slovak", messages=[HumanMessage("hi")])
+    assert messages[0].content == SYSTEM_PROMPT.format(context="X", language="Slovak")
+    assert not (tpl.metadata or {}).get("langfuse_prompt")
+    assert prompts._skip_until == 0.0  # Langfuse is up, so it is asked again next time
+
+
 def test_router_template_has_question(monkeypatch):
     use_langfuse(monkeypatch, fallback_only=True)
     messages = prompts.template("router", ROUTER_PROMPT, human="{question}").format_messages(question="hi")

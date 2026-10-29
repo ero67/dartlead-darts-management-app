@@ -1,5 +1,6 @@
 # The assistant's four prompts live in Langfuse (text prompts, one label per environment) so they can be edited and
 # compared without a deploy. The text in the code stays as the fallback and as what `prompts push` uploads.
+import logging
 import os
 import re
 import sys
@@ -13,6 +14,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder  # no
 from langfuse import get_client  # noqa: E402
 
 PROMPT_LABEL = os.environ.get("PROMPT_LABEL", "production")
+log = logging.getLogger("assistant")
 
 
 def to_langfuse(text: str) -> str:
@@ -40,11 +42,20 @@ def template(name: str, fallback: str, human: str | None = None) -> ChatPromptTe
         if prompt is None or prompt.is_fallback:
             _skip_until = time.monotonic() + 60
             prompt = None
-    text = prompt.get_langchain_prompt() if prompt else fallback  # code text is already in LangChain syntax
-    # The callback handler links a generation to the prompt in this metadata. The code text has no version to link.
-    metadata = {"langfuse_prompt": prompt} if prompt else None
     last = ("human", human) if human else MessagesPlaceholder("messages")
-    return ChatPromptTemplate(messages=[("system", text), last], metadata=metadata)
+    # The code text is already in LangChain syntax.
+    fallback_tpl = ChatPromptTemplate(messages=[("system", fallback), last])
+    if prompt:
+        # The code only passes the variables of its own text: an edit that adds or drops one would break every answer
+        # (KeyError) or silently lose the context, so such a version is ignored. Langfuse is up, so no skip window.
+        tpl = ChatPromptTemplate(messages=[("system", prompt.get_langchain_prompt()), last],
+                                 # The callback handler links a generation to the prompt in this metadata.
+                                 metadata={"langfuse_prompt": prompt})
+        if set(tpl.input_variables) == set(fallback_tpl.input_variables):
+            return tpl
+        log.warning("Langfuse prompt '%s' v%s has variables %s, the code expects %s; using the code text", name,
+                    prompt.version, sorted(tpl.input_variables), sorted(fallback_tpl.input_variables))
+    return fallback_tpl  # no version to link
 
 
 def main() -> None:

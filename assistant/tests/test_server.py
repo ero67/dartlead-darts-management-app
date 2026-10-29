@@ -125,6 +125,16 @@ def test_refund_question_calls_rpc_as_user(fake_db):
     assert db.users == [("token", "user-1")]
 
 
+def test_database_without_refund_migration(use_graph, fake_db):
+    db = fake_db()
+    db.execute = lambda: type("Response", (), {"data": {"allowed": True, "used": 1, "limit": 5}})()  # no question_id
+    assert server.use_question("user-1", "token") is None  # the question is still allowed
+    db.calls.clear()
+    use_graph(FakeGraph(error=RuntimeError("boom")))
+    assert [e["type"] for e in run(question_id=None)] == ["error"]
+    assert db.calls == []  # nothing to give back, so no refund RPC
+
+
 class FakeLangfuse:
     """Stands in for get_client(): records create_score kwargs; raises `error` if given."""
 
