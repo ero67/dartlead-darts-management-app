@@ -9,7 +9,7 @@ import uuid
 from typing import Annotated, TypedDict
 
 from langchain_core.documents import Document
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig, chain
 from langchain_openai import ChatOpenAI
 from langfuse import get_client, propagate_attributes
@@ -21,6 +21,7 @@ from langgraph.graph.message import add_messages
 
 from assistant.answer import format_sources  # importing loads .env
 from assistant.ask_stats import MAX_STEPS, run_tool
+from assistant.prompts import template
 from assistant.retrieve import retriever
 from assistant.router import chain as router
 from assistant.tools import TOOLS
@@ -73,8 +74,8 @@ def rewrite(state: State) -> dict:
     # turns if long chats need them.
     turns = [m for m in history if isinstance(m, (HumanMessage, AIMessage)) and m.content][-8:]
     transcript = "\n".join(f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}" for m in turns)
-    reply = rewriter.invoke([SystemMessage(REWRITE_PROMPT),
-                             HumanMessage(f"Conversation:\n{transcript}\n\nLast message: {last.content}")])
+    human = HumanMessage(f"Conversation:\n{transcript}\n\nLast message: {last.content}")
+    reply = (template("rewrite", REWRITE_PROMPT) | rewriter).invoke({"messages": [human]})
     return {"question": reply.content.strip()}
 
 
@@ -89,16 +90,18 @@ def retrieve(state: State) -> dict:
 
 
 def off_topic(state: State) -> dict:
-    prompt = OFF_TOPIC_PROMPT.format(language=state["language"])
-    return {"messages": [model.invoke([SystemMessage(prompt), state["messages"][-1]])]}
+    reply = (template("off-topic", OFF_TOPIC_PROMPT) | model).invoke(
+        {"language": state["language"], "messages": [state["messages"][-1]]})
+    return {"messages": [reply]}
 
 
 def call_agent(state: State) -> dict:
     context = format_sources(state["docs"]) if state["docs"] else "(none)"
     # Tools only when the router saw a stats question: no tool tokens or detours for rules and app questions.
     llm = model_with_tools if "stats" in state["sources"] else model
-    prompt = SYSTEM_PROMPT.format(context=context, language=state["language"])
-    return {"messages": [llm.invoke([SystemMessage(prompt), *state["messages"]])]}
+    reply = (template("agent", SYSTEM_PROMPT) | llm).invoke(
+        {"context": context, "language": state["language"], "messages": state["messages"]})
+    return {"messages": [reply]}
 
 
 def call_tools(state: State) -> dict:

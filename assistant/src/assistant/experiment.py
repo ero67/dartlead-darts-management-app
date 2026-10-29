@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from assistant.agent import ask, graph  # importing loads .env
 from assistant.dataset import DATASET, load_cases
+from assistant.prompts import PROMPT_LABEL
 
 # A different model family from the answer model, so the judge does not favour its own style.
 # shortcut: Flash-Lite keeps a 61-case run at a few cents; move to a stronger judge if calibration shows misgrades.
@@ -142,7 +143,7 @@ def main() -> None:
     langfuse = get_client()
     kwargs = dict(name="dartlead-assistant", run_name=run_name, task=task, evaluators=[tool_path, retrieval, keywords, llm_judge],
                   run_evaluators=[averages], max_concurrency=2,  # free-tier router and embedding rate limits
-                  metadata={"answer_model": os.environ["ANSWER_MODEL"], "judge_model": JUDGE_MODEL})
+                  metadata={"answer_model": os.environ["ANSWER_MODEL"], "judge_model": JUDGE_MODEL, "prompt_label": PROMPT_LABEL})
     if only:  # a quick local run on chosen cases
         cases = [c for c in load_cases() if c["id"] in only]
         result = langfuse.run_experiment(data=[{"input": {"question": c["question"], "history": c.get("history", [])},
