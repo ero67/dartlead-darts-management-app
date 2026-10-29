@@ -208,7 +208,10 @@ def get_my_practice(game: Literal["x01", "checkout", "oneTwentyOne", "aroundTheC
 
     Practice is private: this works only for the signed-in user and only about themselves. If the question is
     about another player's practice, do not call it; say that practice is private. If the result says
-    signed_in is false, tell the user to sign in to see their practice.
+    signed_in is false, tell the user to sign in to see their practice. If games is empty, there were no practice
+    sessions in that period: say so and suggest a longer days, do not guess. Sessions too short to count (as in
+    the app's Personal bests) are left out of the mean, trend and best; sessions_counted below sessions says how
+    many were left out. first_session and last_session are the dates of the period's first and last session.
 
     Args:
         game: Only this game. Leave it out for every game that has sessions.

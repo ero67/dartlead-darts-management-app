@@ -10,7 +10,7 @@ class FakeTable:
     """Stands in for stats.db(): every query method returns itself, execute() returns the rows of the table."""
 
     def __init__(self, tables=None):
-        self.tables, self.calls, self.name = tables or {}, [], None
+        self.tables, self.calls, self.queries, self.name = tables or {}, [], [], None
 
     def table(self, name):
         self.calls.append(name)
@@ -18,7 +18,10 @@ class FakeTable:
         return self
 
     def __getattr__(self, method):  # select / eq / order / range / limit ...
-        return lambda *args, **kwargs: self
+        def record(*args, **kwargs):
+            self.queries.append((self.name, method, args))
+            return self
+        return record
 
     def execute(self):
         rows = self.tables.get(self.name, [])
@@ -26,7 +29,8 @@ class FakeTable:
 
 
 def session(avg, day, **extra):
-    return {"game": "x01", "finished_at": f"2026-10-{day:02d}T10:00:00+00:00", "stats": {"average": avg, **extra}}
+    return {"game": "x01", "finished_at": f"2026-10-{day:02d}T10:00:00+00:00",
+            "stats": {"average": avg, "totalDarts": 60, **extra}}
 
 
 def test_not_signed_in(monkeypatch):
@@ -41,6 +45,8 @@ def test_trend_halves_and_bests():
     x01 = stats._practice_summary(rows, None)["games"]["x01"]
     assert x01["trend"] == {"older_half": 41.0, "newer_half": 51.0}
     assert x01["best"] == 52
+    assert (x01["first_session"], x01["last_session"]) == ("2026-10-01", "2026-10-04")
+    assert (x01["sessions"], x01["sessions_counted"]) == (4, 4)
 
 
 def test_odd_count_middle_goes_to_newer_half():
@@ -55,14 +61,53 @@ def test_best_covers_sessions_outside_the_window():
     assert (x01["sessions"], x01["best"]) == (2, 80)
 
 
-def test_x01_best_ignores_sessions_under_nine_darts():
-    rows = [session(120, 1, totalDarts=3), session(45, 2, totalDarts=60)]
-    assert stats._practice_summary(rows, None)["games"]["x01"]["best"] == 45
+def test_x01_ignores_sessions_under_nine_darts():
+    rows = [session(120, 1, totalDarts=3), session(45, 2), session(47, 3)]
+    x01 = stats._practice_summary(rows, None)["games"]["x01"]
+    assert (x01["best"], x01["mean"], x01["sessions"], x01["sessions_counted"]) == (47, 46.0, 3, 2)
+    assert x01["trend"] == {"older_half": 45.0, "newer_half": 47.0}
+    assert (x01["first_session"], x01["last_session"]) == ("2026-10-01", "2026-10-03")  # still the window's dates
+
+
+def test_checkout_percent_needs_five_attempts():
+    rows = [session(45, 1, firstNineAverage=90, checkoutPercent=100, checkoutAttempts=1),
+            session(45, 2, firstNineAverage=50, checkoutPercent=20, checkoutAttempts=5),
+            session(45, 3, firstNineAverage=70, checkoutPercent=40, checkoutAttempts=10, totalDarts=3)]
+    practice = stats._practice_summary(rows, None)["games"]["x01"]["practice"]
+    assert practice == {"first_nine_average": 70.0, "checkout_percent": 30.0}  # 3-dart session out of first nine
+
+
+def test_one_attempt_checkout_session_is_not_a_best_or_a_trend():
+    def row(day, attempts, percent):
+        return {"game": "checkout", "finished_at": f"2026-10-{day:02d}T10:00:00+00:00",
+                "stats": {"attempts": attempts, "hitPercent": percent}}
+    rows = [row(1, 10, 30.0), row(2, 1, 100.0), row(3, 20, 40.0)]
+    checkout = stats._practice_summary(rows, None)["games"]["checkout"]
+    assert (checkout["best"], checkout["mean"], checkout["sessions"], checkout["sessions_counted"]) == (40.0, 35.0, 3, 2)
+    assert checkout["trend"] == {"older_half": 30.0, "newer_half": 40.0}
+
+
+def test_cricket_mpr_needs_nine_darts():
+    def row(day, darts, mpr):
+        return {"game": "cricket", "finished_at": f"2026-10-{day:02d}T10:00:00+00:00",
+                "stats": {"totalDarts": darts, "mpr": mpr}}
+    cricket = stats._practice_summary([row(1, 3, 9.0), row(2, 30, 2.5)], None)["games"]["cricket"]
+    assert (cricket["best"], cricket["sessions_counted"]) == (2.5, 1)
+
+
+def atc_row(day, avg, completed=21, total=21):
+    return {"game": "aroundTheClock", "finished_at": f"2026-10-{day:02d}T10:00:00+00:00",
+            "stats": {"avgDartsPerTarget": avg, "targetsCompleted": completed, "targetsTotal": total}}
+
+
+def test_unfinished_aroundtheclock_session_is_ignored():
+    rows = [atc_row(1, 1.0, completed=1), atc_row(2, 3.0), atc_row(3, 2.0)]  # a 1-target session of 21
+    atc = stats._practice_summary(rows, None)["games"]["aroundTheClock"]
+    assert (atc["best"], atc["mean"], atc["sessions"], atc["sessions_counted"]) == (2.0, 2.5, 3, 2)
 
 
 def test_aroundtheclock_lower_is_better():
-    rows = [{"game": "aroundTheClock", "finished_at": f"2026-10-0{d}T10:00:00+00:00", "stats": {"avgDartsPerTarget": v}}
-            for d, v in [(1, 3.0), (2, 2.5)]]
+    rows = [atc_row(d, v) for d, v in [(1, 3.0), (2, 2.5)]]
     atc = stats._practice_summary(rows, None)["games"]["aroundTheClock"]
     assert atc["lower_is_better"] is True and atc["best"] == 2.5
     assert stats._practice_summary([session(40, 1)], None)["games"]["x01"]["lower_is_better"] is False
@@ -89,7 +134,7 @@ def test_hardest_items_as_the_app_stores_them():
 
 
 def test_x01_vs_matches():
-    rows = [session(45, 1, firstNineAverage=50, checkoutPercent=20)]
+    rows = [session(45, 1, firstNineAverage=50, checkoutPercent=20, checkoutAttempts=6)]
     x01 = stats._practice_summary(rows, {"average": 55.1, "checkout_percent": 30.0})["games"]["x01"]
     assert x01["practice"] == {"first_nine_average": 50.0, "checkout_percent": 20.0}
     assert x01["matches"] == {"average": 55.1, "checkout_percent": 30.0}
@@ -98,7 +143,7 @@ def test_x01_vs_matches():
 
 def test_days_capped_at_a_year(monkeypatch):
     now = datetime.now(timezone.utc)
-    rows = [{"game": "x01", "finished_at": (now - timedelta(days=d)).isoformat(), "stats": {"average": 40}}
+    rows = [{"game": "x01", "finished_at": (now - timedelta(days=d)).isoformat(), "stats": {"average": 40, "totalDarts": 30}}
             for d in (300, 400)]
     monkeypatch.setattr(stats, "db", lambda: FakeTable({"practice_sessions": rows, "players": []}))
     token = stats._user_id.set("user-1")
@@ -108,6 +153,19 @@ def test_days_capped_at_a_year(monkeypatch):
         stats._user_id.reset(token)
     assert result["days"] == 365
     assert result["games"]["x01"]["sessions"] == 1  # the 400-day-old one is outside the window
+
+
+def test_queries_are_filtered_to_the_signed_in_user(monkeypatch):
+    rows = [{"game": "x01", "finished_at": datetime.now(timezone.utc).isoformat(), "stats": {"average": 40, "totalDarts": 30}}]
+    db = FakeTable({"practice_sessions": rows, "players": []})
+    monkeypatch.setattr(stats, "db", lambda: db)
+    token = stats._user_id.set("user-1")
+    try:
+        stats.get_my_practice()
+    finally:
+        stats._user_id.reset(token)
+    assert ("practice_sessions", "eq", ("user_id", "user-1")) in db.queries
+    assert ("players", "eq", ("user_id", "user-1")) in db.queries
 
 
 def history(n, start=datetime(2026, 10, 25, tzinfo=timezone.utc)):

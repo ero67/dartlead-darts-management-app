@@ -52,9 +52,12 @@ so it trains scoring and finishing together. Check **100+**, **140+** and
 
 ## Weak under pressure at the end of the leg
 
-Use **121** with **After a miss** set to **Drop one**: nine darts to finish
-the target, every round. Raise **Starting target** (61, 81, 101, 121) as it
-gets comfortable. Track **Success rate** and **Highest made**.
+Use the **121** game: every round is nine darts (three visits) to check out
+the target. Make it and the target goes up by one, so the finishes get harder
+as the player gets better. Pick a **Starting target** (61, 81, 101 or 121)
+that the player can finish most of the time, raise it as it gets comfortable,
+and use **Rounds** 10 or 20 so the **Success rate** means something. Track
+**Success rate** and **Highest made**.
 
 ## Cricket marks
 

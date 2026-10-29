@@ -319,7 +319,30 @@ def get_me() -> dict:
 # game -> (the stats key that is its main number, whether lower is better); the app's own headline per game.
 PRACTICE_METRICS = {"x01": ("average", False), "checkout": ("hitPercent", False), "oneTwentyOne": ("successPercent", False),
                     "aroundTheClock": ("avgDartsPerTarget", True), "cricket": ("mpr", False)}
-MIN_BEST_DARTS = 9  # the app's personal bests ignore X01 sessions shorter than this
+# Minimum data for a session to count, mirroring src/lib/practiceSummary.js (its Personal bests): X01 average and
+# first nine from 9 darts (:5, :35), X01 checkout % from 5 attempts (:41), checkout hit rate from 10 attempts
+# (:6, :48), cricket MPR from 9 darts (:7, :72), Around the Clock only when every target was reached (:63).
+# 121 has no minimum there.
+MIN_X01_DARTS = 9
+MIN_X01_CHECKOUT_ATTEMPTS = 5
+MIN_CHECKOUT_ATTEMPTS = 10
+MIN_CRICKET_DARTS = 9
+
+
+def _counts(game: str, s: dict) -> bool:
+    if game == "x01":
+        return (s.get("totalDarts") or 0) >= MIN_X01_DARTS
+    if game == "checkout":
+        return (s.get("attempts") or 0) >= MIN_CHECKOUT_ATTEMPTS
+    if game == "cricket":
+        return (s.get("totalDarts") or 0) >= MIN_CRICKET_DARTS
+    if game == "aroundTheClock":
+        return bool(s.get("targetsCompleted")) and s.get("targetsCompleted") == s.get("targetsTotal")
+    return True
+
+
+def _day(timestamp: str) -> str:
+    return _when(timestamp).astimezone(timezone.utc).date().isoformat()
 
 
 def _when(timestamp: str) -> datetime:
@@ -346,15 +369,16 @@ def _practice_summary(rows: list[dict], linked_player_stats: dict | None, since:
 
         def value(session, key=key, game=game):
             s = session["stats"] or {}
-            short = game == "x01" and s.get("totalDarts", MIN_BEST_DARTS) < MIN_BEST_DARTS
-            return None if short else s.get(key)
+            return s.get(key) if _counts(game, s) else None
 
         window = [s for s in sessions if since is None or _when(s["finished_at"]) >= since]
         values = [v for v in map(value, window) if v is not None]
         everything = [v for v in map(value, sessions) if v is not None]
         half = len(values) // 2  # an odd one out (the middle session) counts as newer
         games[game] = {
-            "sessions": len(window), "metric": key, "lower_is_better": lower, "mean": _mean(values),
+            "sessions": len(window), "sessions_counted": len(values),  # the rest was too short to count
+            "first_session": _day(window[0]["finished_at"]) if window else None,
+            "last_session": _day(window[-1]["finished_at"]) if window else None, "metric": key, "lower_is_better": lower, "mean": _mean(values),
             "trend": {"older_half": _mean(values[:half]), "newer_half": _mean(values[half:])} if len(values) >= 2 else None,
             "best": (min if lower else max)(everything, default=None),
         }
@@ -370,9 +394,11 @@ def _practice_summary(rows: list[dict], linked_player_stats: dict | None, since:
             top = sorted(counts.items(), key=lambda kv: -kv[1])[:3]  # stable: ties keep first-seen order
             games[game]["weak_spots"] = [{"target": t, "count": c} for t, c in top]
         if game == "x01":
-            games[game]["practice"] = {
-                name: _mean([v for s in window if (v := (s["stats"] or {}).get(src)) is not None])
-                for name, src in [("first_nine_average", "firstNineAverage"), ("checkout_percent", "checkoutPercent")]}
+            games[game]["practice"] = {  # same minimums as the app's bests
+                "first_nine_average": _mean([v for s in window if _counts("x01", s["stats"] or {})
+                                             and (v := s["stats"].get("firstNineAverage")) is not None]),
+                "checkout_percent": _mean([v for s in window if ((s["stats"] or {}).get("checkoutAttempts") or 0)
+                                           >= MIN_X01_CHECKOUT_ATTEMPTS and (v := s["stats"].get("checkoutPercent")) is not None])}
             if linked_player_stats:
                 games[game]["matches"] = {k: linked_player_stats.get(k) for k in ("average", "checkout_percent")}
     return {"games": games}
