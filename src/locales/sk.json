@@ -1597,6 +1597,15 @@
     "suggestion2": "Ako sa počíta úspešnosť zakončenia?",
     "suggestion3": "Koho porazil Igor Benko najčastejšie?",
     "suggestion4": "Môžem ukončiť leg na jednoduchej 20?",
+    "feedback": {
+      "helpful": "Užitočná odpoveď",
+      "notHelpful": "Neužitočná odpoveď",
+      "whatWasWrong": "Čo bolo zlé?",
+      "send": "Odoslať",
+      "skip": "Preskočiť",
+      "thanks": "Ďakujeme za spätnú väzbu",
+      "failed": "Spätnú väzbu sa nepodarilo odoslať. Skúste to znova."
+    },
     "trace": {
       "working": "Pracujem…",
       "summary": "Postup ({{count}})",

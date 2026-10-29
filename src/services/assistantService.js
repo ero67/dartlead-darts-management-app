@@ -66,4 +66,26 @@ export const assistantService = {
       throw error;
     }
   },
+
+  // Thumbs up (value 1) or down (0) on one answer, with an optional comment. Becomes a Langfuse score on that trace.
+  async sendFeedback({ traceId, value, comment }) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sign in to use the assistant.');
+
+      const response = await fetch(`${ASSISTANT_URL}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ trace_id: traceId, value, comment: comment || null }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw Object.assign(new Error(typeof body.detail === 'string' ? body.detail : `Assistant error ${response.status}`),
+          { status: response.status });
+      }
+    } catch (error) {
+      console.error('Error sending assistant feedback:', error);
+      throw error;
+    }
+  },
 };

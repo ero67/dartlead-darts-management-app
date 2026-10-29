@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { ArrowUp, SquarePen } from 'lucide-react';
+import { ArrowUp, SquarePen, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { toast } from 'sonner';
 import { Streamdown } from 'streamdown';
 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Badge } from '@/components/ui/badge';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group';
 import { Message, MessageContent } from '@/components/ui/message';
 import {
@@ -40,7 +42,7 @@ function applyEvent(message, event) {
     case 'text':
       return { ...message, text: message.text + event.delta };
     case 'done':
-      return { ...message, status: 'done', isTraceOpen: false };
+      return { ...message, status: 'done', isTraceOpen: false, traceId: event.trace_id };
     case 'error':
       return { ...message, status: 'error', isTraceOpen: false, error: event.message };
     default:
@@ -53,7 +55,63 @@ function applyEvent(message, event) {
 const PSEUDO_CITATION = /\s?\[(?!\d+\])[^\]\n]{1,40}\](?!\()/g;
 const CITES_A_SOURCE = /\[\d+\]/;
 
-function AssistantReply({ message, onTraceOpenChange }) {
+// Thumbs under a finished answer; 👎 first asks what was wrong (optional). The chosen thumb stays lit while sending and after.
+function AssistantFeedback({ message, onSend }) {
+  const { t } = useLanguage();
+  const [isCommenting, setIsCommenting] = useState(false);
+  const [comment, setComment] = useState('');
+  const { feedback, isSendingFeedback } = message;
+  const isSent = feedback !== null && !isSendingFeedback;
+  const isLocked = feedback !== null; // sending or sent: no second vote
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (!isLocked) onSend(0, comment.trim());
+    }
+  };
+  const thumb = (value, Icon, label, onClick) => (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      aria-label={label}
+      aria-pressed={feedback === value || (value === 0 && isCommenting && feedback === null)}
+      className={feedback === value || (value === 0 && isCommenting && feedback === null) ? 'bg-accent text-foreground' : 'text-muted-foreground'}
+      onClick={onClick}
+      disabled={isLocked}
+    >
+      <Icon />
+    </Button>
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1">
+        {thumb(1, ThumbsUp, t('assistant.feedback.helpful'), () => onSend(1, ''))}
+        {thumb(0, ThumbsDown, t('assistant.feedback.notHelpful'), () => setIsCommenting(true))}
+        {isSent && <span className="ml-1 text-xs text-muted-foreground animate-in fade-in">{t('assistant.feedback.thanks')}</span>}
+      </div>
+      {isCommenting && !isSent && (
+        <div className="flex flex-wrap items-center gap-2 animate-in fade-in">
+          <Input
+            className="h-8 min-w-0 flex-1 basis-40 text-sm"
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t('assistant.feedback.whatWasWrong')}
+            aria-label={t('assistant.feedback.whatWasWrong')}
+            maxLength={500}
+            disabled={isLocked}
+          />
+          <Button size="sm" onClick={() => onSend(0, comment.trim())} disabled={isLocked}>{t('assistant.feedback.send')}</Button>
+          <Button size="sm" variant="ghost" onClick={() => onSend(0, '')} disabled={isLocked}>{t('assistant.feedback.skip')}</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssistantReply({ message, onTraceOpenChange, onFeedback }) {
   const { t } = useLanguage();
   const isStreaming = message.status === 'streaming';
   const text = message.text.replace(PSEUDO_CITATION, '');
@@ -78,6 +136,7 @@ function AssistantReply({ message, onTraceOpenChange }) {
           ))}
         </div>
       )}
+      {message.status === 'done' && message.traceId && <AssistantFeedback message={message} onSend={onFeedback} />}
     </div>
   );
 }
@@ -106,7 +165,7 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
     setMessages(prev => [
       ...prev,
       { id: crypto.randomUUID(), role: 'user', text },
-      { id: replyId, role: 'assistant', text: '', steps: [], sources: [], status: 'streaming', isTraceOpen: true },
+      { id: replyId, role: 'assistant', text: '', steps: [], sources: [], status: 'streaming', isTraceOpen: true, traceId: undefined, feedback: null, isSendingFeedback: false },
     ]);
     try {
       await assistantService.streamChat({ message: text, threadId, onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
@@ -117,6 +176,18 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
       updateMessage(replyId, m => ({ ...m, status: 'error', isTraceOpen: false, error: text }));
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Lights the chosen thumb at once; a failed send puts it back so the user can try again.
+  const handleFeedback = async (id, traceId, value, comment) => {
+    updateMessage(id, m => ({ ...m, feedback: value, isSendingFeedback: true }));
+    try {
+      await assistantService.sendFeedback({ traceId, value, comment });
+      updateMessage(id, m => ({ ...m, isSendingFeedback: false }));
+    } catch {
+      updateMessage(id, m => ({ ...m, feedback: null, isSendingFeedback: false }));
+      toast.error(t('assistant.feedback.failed'));
     }
   };
 
@@ -180,7 +251,11 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
                           </MessageContent>
                         </Message>
                       ) : (
-                        <AssistantReply message={m} onTraceOpenChange={(open) => updateMessage(m.id, x => ({ ...x, isTraceOpen: open }))} />
+                        <AssistantReply
+                          message={m}
+                          onTraceOpenChange={(open) => updateMessage(m.id, x => ({ ...x, isTraceOpen: open }))}
+                          onFeedback={(value, comment) => handleFeedback(m.id, m.traceId, value, comment)}
+                        />
                       )}
                     </div>
                   </MessageScrollerItem>

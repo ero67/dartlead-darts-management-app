@@ -1597,6 +1597,15 @@
     "suggestion2": "How is checkout percentage counted?",
     "suggestion3": "Who has Igor Benko beaten most often?",
     "suggestion4": "Can I finish a leg on a single 20?",
+    "feedback": {
+      "helpful": "Helpful answer",
+      "notHelpful": "Not helpful",
+      "whatWasWrong": "What was wrong?",
+      "send": "Send",
+      "skip": "Skip",
+      "thanks": "Thanks for the feedback",
+      "failed": "Could not send your feedback. Please try again."
+    },
     "trace": {
       "working": "Working…",
       "summary": "Worked in {{count}} steps",
