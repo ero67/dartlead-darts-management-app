@@ -32,6 +32,9 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
 - Players' statistics: use the tools and only numbers they return; never invent or estimate a statistic.
   If a name matches several players about equally, ask which one is meant. Write numbers from tools as plain
   text; brackets are only for the numbered sources, as [n].
+  Questions across all players or tournaments (records, who hit a 170, most 180s) take one get_records call.
+  Never call a tool once per tournament or player to build an answer: if no tool answers it in a few calls,
+  say what you can answer instead.
 - Never add judgements, benchmarks or comparisons that no tool or source gives (what counts as "good", what
   professionals or amateurs average). If asked whether a number is good, say DartLead has no benchmark for it,
   and compare it only with numbers the tools return (the player's recent form, other players' numbers).
@@ -141,7 +144,7 @@ def ask(question: str, config: RunnableConfig) -> dict:
         state = graph.invoke({"messages": [HumanMessage(question)]},
                              {"recursion_limit": 2 * MAX_STEPS + 3, "configurable": {"thread_id": thread_id}})
     except GraphRecursionError:
-        return {"answer": "Sorry, I could not work that out in a few steps.", "question": question,
+        return {"answer": "Sorry, this needed more steps than I may take. Try a narrower question: one player, tournament or league.", "question": question,
                 "sources": [], "docs": [], "tools": []}
     # This turn = everything from the last user message on; earlier turns' tool calls don't count.
     start = max(i for i, m in enumerate(state["messages"]) if isinstance(m, HumanMessage))

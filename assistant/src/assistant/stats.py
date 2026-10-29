@@ -402,6 +402,75 @@ def get_tournament_summary(tournament_id: str) -> dict:
     }}
 
 
+def _all_rows(build) -> list[dict]:
+    # PostgREST returns at most 1000 rows per request; app-wide questions page with .range() (a fresh query each time).
+    rows, start = [], 0
+    while True:
+        page = build().range(start, start + 999).execute().data
+        rows += page
+        if len(page) < 1000:
+            return rows
+        start += 1000
+
+
+def get_records(stat: str, min_checkout: int | None = None, league_id: str | None = None, limit: int = 10) -> dict:
+    """Records across every tournament the caller can see (or one league's), from the match results the summary
+    pages use: checkouts (highest per player, or how often each player finished min_checkout or more), 180s,
+    best single-match averages, best overall averages (players with 5+ X01 matches). X01 only."""
+    query = db().table("tournaments").select("id, name, starts_at, created_at").eq("deleted", False)
+    if league_id:
+        query = query.eq("league_id", league_id)
+    tournaments = {t["id"]: t for t in query.execute().data}
+    if not tournaments:
+        return {"stat": stat, "records": []}
+    matches = _all_rows(lambda: db().table("matches").select(_MATCH_FIELDS).in_("tournament_id", list(tournaments))
+                        .eq("status", "completed").order("id"))
+
+    names, checkouts, one_eighties, totals, match_averages = {}, {}, {}, {}, []
+    for m in matches:
+        if "cricket" in (m["game_type"] or "").lower():
+            continue
+        t = tournaments[m["tournament_id"]]
+        for pid, name, opponent, s in _sides(m):
+            if not pid:
+                continue
+            names[pid] = name
+            checkouts.setdefault(pid, []).extend(_checkout_value((c or {}).get("checkout")) for c in s["c"] or [])
+            one_eighties[pid] = one_eighties.get(pid, 0) + (s["o"] or 0)
+            score, darts, played = totals.get(pid, (0, 0, 0))
+            totals[pid] = (score + (s["s"] or 0), darts + (s["d"] or 0), played + 1)
+            if s["a"]:
+                match_averages.append({"player": name, "opponent": opponent, "average": round(float(s["a"]), 2),
+                                       "tournament": t["name"], "date": _date(t)})
+
+    if stat == "checkouts" and min_checkout:
+        hits = {p: [v for v in vals if v >= min_checkout] for p, vals in checkouts.items()}
+        rows = [{"player": names[p], "times": len(v), "highest": max(v)} for p, v in hits.items() if v]
+        rows.sort(key=lambda r: (r["times"], r["highest"]), reverse=True)
+    elif stat == "checkouts":
+        rows = sorted(({"player": names[p], "highest": max(v), "checkouts": len(v)} for p, v in checkouts.items() if v),
+                      key=lambda r: r["highest"], reverse=True)
+    elif stat == "180s":
+        rows = sorted(({"player": names[p], "180s": n} for p, n in one_eighties.items() if n), key=lambda r: r["180s"], reverse=True)
+    elif stat == "match_average":
+        rows = sorted(match_averages, key=lambda r: r["average"], reverse=True)
+    elif stat == "average":
+        rows = sorted(({"player": names[p], "average": round(s / d * 3, 2), "matches": n}
+                       for p, (s, d, n) in totals.items() if d and n >= 5), key=lambda r: r["average"], reverse=True)
+    else:
+        return {"error": f"Unknown stat {stat!r}; use checkouts, 180s, match_average or average."}
+    # Records count per player record, as the profile pages do; when two records share a name (a duplicate in the
+    # data), say so, or "Jozef Dániel: 9" hides the other Jozef Dániel's 3.
+    same_name = {}
+    for name in names.values():
+        same_name[name] = same_name.get(name, 0) + 1
+    for row in rows[:limit]:
+        if same_name.get(row["player"], 0) > 1:
+            row["note"] = f"{same_name[row['player']]} separate player records share this name; counted separately"
+    return {"stat": stat, "min_checkout": min_checkout, "league_id": league_id, "tournaments": len(tournaments),
+            "players_with_records": len(rows), "records": rows[:limit]}
+
+
 def get_player_tournaments(player_id: str) -> dict:
     """Every tournament the player played, newest first, with their placing (1-3 from the playoffs, or the league's
     recorded placement), wins and losses, tournament average, best match average, highest checkout and 180s."""

@@ -63,7 +63,7 @@ def index_docs() -> None:
         for c, v in zip(chunks, vectors)
     }
     # Service role key: the only key allowed to write doc_chunks (RLS blocks everyone else).
-    db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+    db = create_client(os.environ.get("DOCS_SUPABASE_URL", os.environ["SUPABASE_URL"]), os.environ["SUPABASE_SERVICE_ROLE_KEY"])
     # shortcut: select returns at most 1000 rows by default; page through it if the docs ever grow past that.
     existing = {r["id"] for r in db.table("doc_chunks").select("id").execute().data}
     to_insert = [{"id": i, **row} for i, row in rows.items() if i not in existing]

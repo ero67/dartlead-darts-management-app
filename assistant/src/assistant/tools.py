@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+from typing import Literal
 
 from langchain_core.tools import tool
 from langchain_core.utils.function_calling import convert_to_openai_tool
@@ -143,7 +144,8 @@ def get_tournament_summary(tournament_id: str) -> dict:
     """Get one tournament's result, as on its summary page: date, status, players, the podium (places 1-3)
     and the X01 awards: best tournament average, the top 5 tournament averages, best single-match average
     (with the opponent), highest checkout and most 180s. Ties list every player. Use it for "who won X",
-    "highest match average in X", "who threw the most 180s in X".
+    "highest match average in X", "who threw the most 180s in X". It covers ONE tournament: for records across
+    tournaments or players use get_records, never this tool once per tournament.
 
     Args:
         tournament_id: The id from find_tournament or list_tournaments. Never guess it.
@@ -165,6 +167,24 @@ def get_player_tournaments(player_id: str) -> dict:
 
 
 @tool(parse_docstring=True)
+def get_records(stat: Literal["checkouts", "180s", "match_average", "average"], min_checkout: int | None = None,
+                league_id: str | None = None, limit: int = 10) -> dict:
+    """Get records across every tournament (or one league), counted from all completed X01 matches, best first.
+    Use it for app-wide questions: "who has hit a 170", "who has the most 180s", "highest match average ever",
+    "best average in the league". One call answers them; never loop over tournaments instead.
+
+    Args:
+        stat: "checkouts" (highest checkout per player), "180s" (total per player), "match_average" (best
+            single-match averages, with opponent and tournament) or "average" (overall average, 5+ matches).
+        min_checkout: With stat "checkouts": only checkouts of at least this value, and how many times each player
+            hit one (e.g. 170 for "who hit a 170", 100 for "ton-plus checkouts").
+        league_id: Only this league's tournaments (id from find_league). Leave it out for every tournament.
+        limit: How many rows to return (default 10).
+    """
+    return stats.get_records(stat, min_checkout=min_checkout, league_id=league_id, limit=limit)
+
+
+@tool(parse_docstring=True)
 def list_leagues(mine: bool = False) -> dict:
     """List the leagues the user can see, with name, status and season. Use it for "which leagues are
     there" or when the user asks about "a league" without naming it.
@@ -176,7 +196,7 @@ def list_leagues(mine: bool = False) -> dict:
 
 
 TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings,
-         get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, list_leagues]
+         get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, get_records, list_leagues]
 
 
 def main() -> None:

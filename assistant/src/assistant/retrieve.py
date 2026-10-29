@@ -12,7 +12,9 @@ from supabase import create_client
 from assistant.ingest import embeddings, to_pgvector  # importing ingest loads .env first
 
 # The public key is enough: RLS lets everyone read doc_chunks and no one but the indexer write.
-db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"])
+# The docs index can live in another project than the stats (DOCS_*): e.g. stats from production, docs from staging.
+db = create_client(os.environ.get("DOCS_SUPABASE_URL", os.environ["SUPABASE_URL"]),
+                   os.environ.get("DOCS_SUPABASE_ANON_KEY", os.environ["SUPABASE_ANON_KEY"]))
 
 
 class DocChunksRetriever(BaseRetriever):

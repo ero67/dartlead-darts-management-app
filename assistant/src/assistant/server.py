@@ -104,7 +104,7 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str):
                                         output=tool_output(m.content))
         yield event("done")
     except GraphRecursionError:
-        yield event("error", message="Sorry, I could not work that out in a few steps.")
+        yield event("error", message="Sorry, this needed more steps than I may take. Try a narrower question: one player, tournament or league.")
     except Exception:
         log.exception("chat failed")
         yield event("error", message="Sorry, something went wrong. Please try again.")

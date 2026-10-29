@@ -73,7 +73,7 @@ def ask_stats(question: str) -> dict:
         # Every node run is one step: MAX_STEPS model turns plus the tool runs between them.
         state = graph.invoke({"messages": [HumanMessage(question)]}, {"recursion_limit": 2 * MAX_STEPS})
     except GraphRecursionError:
-        return {"answer": "Sorry, I could not work that out in a few steps.", "tools": []}
+        return {"answer": "Sorry, this needed more steps than I may take. Try a narrower question: one player, tournament or league.", "tools": []}
     tools_used = [c["name"] for m in state["messages"] for c in getattr(m, "tool_calls", [])]
     return {"answer": state["messages"][-1].content, "tools": tools_used}
 
