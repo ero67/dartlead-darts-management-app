@@ -19,8 +19,9 @@ from assistant.dataset import DATASET, load_cases
 from assistant.prompts import PROMPT_LABEL
 
 # A different model family from the answer model, so the judge does not favour its own style.
-# shortcut: Flash-Lite keeps a 61-case run at a few cents; move to a stronger judge if calibration shows misgrades.
-JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "google/gemini-3.5-flash-lite")
+# Flash, not Flash-Lite: on 14 hand-graded answers (2026-10-29) Flash agreed 14/14, Lite 13/14 (Lite missed an
+# invented number). About $0.28 per full run vs $0.03.
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "google/gemini-3.5-flash")
 
 
 def task(*, item, **_):
