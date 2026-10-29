@@ -1972,6 +1972,20 @@ export const tournamentService = {
     }
   },
 
+  // Admin-only: tournaments that were deleted in the app (hidden, still stored).
+  async getDeletedTournaments() {
+    const { data, error } = await supabase.rpc('admin_deleted_tournaments');
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  // Admin-only: removes hidden tournaments for good, with their matches.
+  async purgeTournaments(tournamentIds) {
+    const { data, error } = await supabase.rpc('purge_tournaments', { ids: tournamentIds });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
   // Delete tournament (soft delete - sets deleted flag to true)
   async deleteTournament(tournamentId) {
     try {

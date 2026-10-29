@@ -1216,6 +1216,14 @@ export const leagueService = {
     }
   },
 
+  // Admin-only RPC: deletes the players nothing real points to and returns
+  // { deleted: [names], skipped: [{ name, reason }] } for the rest.
+  async deletePlayers(playerIds) {
+    const { data, error } = await supabase.rpc('delete_players', { ids: playerIds });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
   // ── League-wide statistics (top 10 lists) ──────────────────────────
   // Aggregates stats across all completed matches of all tournaments in
   // the league.  Returns { most180s, bestCheckouts, bestMatchAverages, fewestDartsLegs }.
