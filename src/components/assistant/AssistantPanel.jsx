@@ -48,22 +48,28 @@ function applyEvent(message, event) {
   }
 }
 
+// The model keeps citing its tools ("[stats]", "[záznam z DartLead]") despite the prompt; only [n] cites a doc.
+// Drop any other short bracket that is not a markdown link "[text](url)".
+const PSEUDO_CITATION = /\s?\[(?!\d+\])[^\]\n]{1,40}\](?!\()/g;
+const CITES_A_SOURCE = /\[\d+\]/;
+
 function AssistantReply({ message, onTraceOpenChange }) {
   const { t } = useLanguage();
   const isStreaming = message.status === 'streaming';
+  const text = message.text.replace(PSEUDO_CITATION, '');
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <AssistantTrace steps={message.steps} isStreaming={isStreaming} isOpen={message.isTraceOpen} onOpenChange={onTraceOpenChange} />
-      {message.text && (
+      {text && (
         <Streamdown className="text-sm leading-relaxed [&_table]:text-xs" isAnimating={isStreaming}>
-          {message.text}
+          {text}
         </Streamdown>
       )}
       {message.status === 'error' && (
         <p className="text-sm text-destructive">{message.error || t('assistant.error')}</p>
       )}
-      {/* The numbered doc sections the reply cites as [1], [2]… */}
-      {message.status === 'done' && message.sources.length > 0 && (
+      {/* The numbered doc sections the reply cites as [1], [2]…; none when the reply cites nothing */}
+      {message.status === 'done' && message.sources.length > 0 && CITES_A_SOURCE.test(text) && (
         <div className="flex flex-wrap gap-1.5 animate-in fade-in duration-500">
           {message.sources.map((s, i) => (
             <Badge key={i} variant="outline" className="font-normal text-muted-foreground" title={s.source}>

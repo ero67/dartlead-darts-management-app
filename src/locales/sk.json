@@ -1628,6 +1628,7 @@
         "find_tournament": {"running": "Hľadám turnaj „{{name}}“", "done": "Našiel som: {{found}}", "none": "Turnaj „{{name}}“ sa nenašiel"},
         "get_tournament_summary": {"running": "Načítavam súhrn turnaja", "done": "Súhrn: {{tournament}}"},
         "get_player_tournaments": {"running": "Načítavam históriu turnajov", "done": "Turnaje: {{player}}"},
+        "get_records": {"running": "Hľadám rekordy naprieč turnajmi", "done": "Prehľadané rekordy v turnajoch: {{count}}"},
         "list_leagues": {"running": "Načítavam ligy", "done": "Nájdené ligy: {{count}}"}
       }
     }
