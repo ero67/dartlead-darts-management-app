@@ -130,8 +130,8 @@ builder.add_conditional_edges("agent", after_agent, ["tools", END])
 builder.add_edge("tools", "agent")
 builder.add_edge("off_topic", END)
 # The checkpointer saves the state after every node, per thread_id; the next question in that thread
-# starts from the saved messages. shortcut: in memory, so threads die with the process; use a
-# Postgres checkpointer (Supabase) when the service runs (Phase 6).
+# starts from the saved messages. In memory here, for the CLI and evals; the API compiles the same
+# builder with a Postgres checkpointer (server.py), so conversations survive restarts.
 graph = builder.compile(checkpointer=InMemorySaver())
 
 

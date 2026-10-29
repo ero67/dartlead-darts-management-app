@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+.venv
+.cache
+docs
+evals
+**/__pycache__

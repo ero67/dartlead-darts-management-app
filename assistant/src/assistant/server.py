@@ -2,9 +2,11 @@
 # the user's Supabase access token, runs the Phase 4 graph as that user, and streams the run as NDJSON events
 # (one JSON object per line): steps, tool calls, sources, and the reply text as it is written.
 import ast
+import asyncio
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,19 +14,57 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
 from langfuse import propagate_attributes
 from langfuse.langchain import CallbackHandler
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from supabase import create_client
 
 from assistant import stats  # importing loads .env
-from assistant.agent import MAX_STEPS, graph
+from assistant.agent import MAX_STEPS, builder
+from assistant.agent import graph as memory_graph
 
 log = logging.getLogger("assistant")
 auth = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"]).auth
 ANSWER_NODES = {"agent", "off_topic"}  # nodes whose text is the reply; rewrite and route stay internal
+KEEP_DAYS = 30  # conversations untouched this long are deleted at start-up (the privacy policy says so)
+graph = memory_graph
 
-app = FastAPI(title="DartLead assistant")
+
+async def forget_old_conversations(pool: AsyncConnectionPool, saver: AsyncPostgresSaver) -> int:
+    async with pool.connection() as conn:
+        rows = await (await conn.execute(
+            "SELECT thread_id FROM checkpoints GROUP BY thread_id"
+            " HAVING max((checkpoint->>'ts')::timestamptz) < now() - make_interval(days => %s)", (KEEP_DAYS,))).fetchall()
+    for row in rows:
+        await saver.adelete_thread(row["thread_id"])
+    return len(rows)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Conversations live in Postgres (schema "assistant", see the assistant_access migration), so they
+    # survive restarts and scale-to-zero. Without CHECKPOINT_DATABASE_URL they stay in memory (local runs).
+    global graph
+    url = os.environ.get("CHECKPOINT_DATABASE_URL")
+    if not url:
+        log.warning("CHECKPOINT_DATABASE_URL is not set: conversations are kept in memory only")
+        yield
+        return
+    # The session pooler (port 5432) keeps one server connection per client one, so prepared statements work.
+    async with AsyncConnectionPool(url, min_size=1, max_size=5, open=False, check=AsyncConnectionPool.check_connection,
+                                   kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row}) as pool:
+        saver = AsyncPostgresSaver(pool)
+        await saver.setup()  # creates or migrates the checkpoint tables; safe on every start
+        log.warning("deleted %d old conversations", await forget_old_conversations(pool, saver))
+        graph = builder.compile(checkpointer=saver)
+        yield
+    graph = memory_graph
+
+
+app = FastAPI(title="DartLead assistant", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get("ASSISTANT_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
@@ -110,10 +150,22 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str):
         yield event("error", message="Sorry, something went wrong. Please try again.")
 
 
+def use_question(user_id: str, token: str) -> None:
+    """Count this question against the user's daily limit, or refuse it (use_assistant_question in Supabase
+    checks who may use the assistant and the limit; admins get a higher one)."""
+    with stats.as_user(token, user_id):
+        quota = stats.db().rpc("use_assistant_question").execute().data
+    if quota["allowed"]:
+        return
+    if quota["reason"] == "limit":
+        raise HTTPException(429, f"You have used today's {quota['limit']} questions. Try again tomorrow.")
+    raise HTTPException(403, "The assistant is not available for your account yet.")
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest, authorization: str | None = Header(default=None)):
     user_id, token = await run_in_threadpool(verify, authorization)
-    # shortcut: no per-user rate limit yet (Phase 6, before real users).
+    await run_in_threadpool(use_question, user_id, token)
     # The user id is part of the thread key, so nobody can continue someone else's conversation.
     thread_id = f"{user_id}:{request.thread_id}"
     return StreamingResponse(answer_events(request.message, thread_id, user_id, token),
@@ -123,4 +175,6 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
 def main() -> None:
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("PORT", "8000")))
+    # HOST=0.0.0.0 in the container. psycopg's async mode cannot run on Windows' default (Proactor) loop.
+    config = uvicorn.Config(app, host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "8000")))
+    asyncio.run(uvicorn.Server(config).serve(), loop_factory=asyncio.SelectorEventLoop)
