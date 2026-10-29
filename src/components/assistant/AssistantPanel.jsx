@@ -89,7 +89,7 @@ function AssistantFeedback({ message, onSend }) {
       <div className="flex items-center gap-1">
         {thumb(1, ThumbsUp, t('assistant.feedback.helpful'), () => onSend(1, ''))}
         {thumb(0, ThumbsDown, t('assistant.feedback.notHelpful'), () => setIsCommenting(true))}
-        {isSent && <span className="ml-1 text-xs text-muted-foreground animate-in fade-in">{t('assistant.feedback.thanks')}</span>}
+        {isSent && <span role="status" className="ml-1 text-xs text-muted-foreground animate-in fade-in">{t('assistant.feedback.thanks')}</span>}
       </div>
       {isCommenting && !isSent && (
         <div className="flex flex-wrap items-center gap-2 animate-in fade-in">
