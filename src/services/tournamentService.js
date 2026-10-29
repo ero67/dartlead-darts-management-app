@@ -1,6 +1,7 @@
 import { supabase, generateId } from '../lib/supabase.js'
 import { isCricketGame } from '../lib/cricket.js'
 import { sortStandings } from '../utils/standings.js'
+import { fetchAllRows } from '../lib/fetchAllRows.js'
 
 // Group matches in their intended play order. The DB rows carry match_order
 // (migration 20260910190000); rows from before it fall back to insert order.
@@ -15,6 +16,12 @@ const sortByPlayOrder = (rows) => [...(rows || [])].sort((a, b) => {
   if (at !== bt) return at - bt;
   return String(a.id).localeCompare(String(b.id));
 });
+
+// Roster lookups match names ignoring case and outer spaces ("mauro" finds
+// "Mauro"): exact matching is what created duplicate player rows. Use with
+// .ilike('name', ...); escapes LIKE wildcards so the name matches literally.
+const nameLikePattern = (name) => (name || '').trim().replace(/[\\%_]/g, '\\$&');
+const nameKey = (name) => (name || '').trim().toLowerCase();
 
 // Helper function to calculate group standings
 function calculateGroupStandings(group, criteriaOrder = null, gameType = 'x01') {
@@ -199,18 +206,21 @@ export const tournamentService = {
 
       const idByName = new Map()
       if (candidateNames.length > 0) {
-        const { data: rowsByName, error: byNameError } = await supabase
+        // The whole roster, so names can be compared ignoring case
+        const rowsByName = await fetchAllRows(() => supabase
           .from('players')
           .select('id, name')
-          .in('name', candidateNames)
           .eq('owner_id', currentUser.id)
-        if (byNameError) throw byNameError
-        ;(rowsByName || []).forEach(row => idByName.set(row.name, row.id))
+          .order('created_at')
+          .order('id'))
+        rowsByName.forEach(row => {
+          if (!idByName.has(nameKey(row.name))) idByName.set(nameKey(row.name), row.id)
+        })
       }
 
       for (const player of incomingPlayers) {
         const name = (player.name || '').trim()
-        let playerId = knownIds.has(player.id) ? player.id : idByName.get(name)
+        let playerId = knownIds.has(player.id) ? player.id : idByName.get(nameKey(name))
 
         if (!playerId) {
           playerId = generateId()
@@ -224,7 +234,7 @@ export const tournamentService = {
 
           if (playerError) throw playerError
           // Guard against the same name appearing twice in the input
-          idByName.set(name, playerId)
+          idByName.set(nameKey(name), playerId)
         }
 
         playerIdMap.set(player.id, playerId)
@@ -1093,8 +1103,10 @@ export const tournamentService = {
       const { data: existingPlayer, error: playerError } = await supabase
         .from('players')
         .select('id')
-        .eq('name', playerName)
+        .ilike('name', nameLikePattern(playerName))
         .eq('owner_id', currentUser.id)
+        .order('created_at')
+        .limit(1)
         .maybeSingle();
 
       if (playerError) throw playerError;
@@ -1331,8 +1343,10 @@ export const tournamentService = {
         const { data: playerByName } = await supabase
           .from('players')
           .select('id, user_id')
-          .eq('name', reg.player_name)
+          .ilike('name', nameLikePattern(reg.player_name))
           .eq('owner_id', user.id)
+          .order('created_at')
+          .limit(1)
           .maybeSingle();
 
         if (playerByName) {
@@ -1550,8 +1564,10 @@ export const tournamentService = {
         const { data: byName } = await supabase
           .from('players')
           .select('id, user_id')
-          .eq('name', playerName)
+          .ilike('name', nameLikePattern(playerName))
           .eq('owner_id', currentUser.id)
+          .order('created_at')
+          .limit(1)
           .maybeSingle();
 
         if (byName) {

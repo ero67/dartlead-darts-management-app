@@ -24,6 +24,16 @@ import { confirmDialog } from '../lib/confirmDialog';
 const NONE = '__none';
 const fromSelect = (v) => (v === NONE ? '' : v);
 
+// Case and accents folded, so "Peter Dieneš" and "peter dienes" group together.
+const foldName = (name) => (name || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+// Suggested record to keep: the one with an account, else the most played.
+const pickMergeTarget = (records) => [...records].sort((a, b) =>
+  Number(!!b.user_id) - Number(!!a.user_id) || b.matches - a.matches || b.tournaments - a.tournaments
+)[0];
+
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : null);
+
 const ADMIN_TABS = [
   { key: 'overview', label: 'Overview', icon: Trophy },
   { key: 'users', label: 'Users & roles', icon: Users },
@@ -68,6 +78,7 @@ export function AdminPanel() {
   const [targetPlayerId, setTargetPlayerId] = useState('');
   const [merging, setMerging] = useState(false);
   const [mergeLog, setMergeLog] = useState([]);
+  const mergeFormRef = React.useRef(null);
 
   // Link Account → Player Stats
   const [linkUser, setLinkUser] = useState(null);
@@ -407,6 +418,21 @@ export function AdminPanel() {
     setSourcePlayerIds(prev => prev.filter(id => id !== playerId));
   };
 
+  const duplicateGroups = React.useMemo(() => {
+    const groups = new Map();
+    allPlayers.forEach(p => groups.set(foldName(p.name), [...(groups.get(foldName(p.name)) || []), p]));
+    return [...groups.values()].filter(group => group.length > 1);
+  }, [allPlayers]);
+
+  // Only fills in the merge form; the admin still reviews and confirms.
+  const handleReviewMerge = (records) => {
+    const target = pickMergeTarget(records);
+    setTargetPlayerId(target.id);
+    setSourcePlayerIds(records.filter(p => p.id !== target.id).map(p => p.id));
+    setMergeLog([]);
+    mergeFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleMergePlayers = async () => {
     if (sourcePlayerIds.length === 0 || !targetPlayerId) {
       setMessage({ type: 'error', text: 'Select at least one source and a target player.' });
@@ -418,11 +444,13 @@ export function AdminPanel() {
     }
     const sourceNames = sourcePlayerIds.map(id => allPlayers.find(p => p.id === id)?.name || id);
     const targetName = allPlayers.find(p => p.id === targetPlayerId)?.name || targetPlayerId;
+    const linkedSource = mergeSources.find(p => p.user_id);
 
     if (!(await confirmDialog(
       `⚠️ MERGE ${sourcePlayerIds.length} PLAYER(S)\n\n` +
       `All data from:\n${sourceNames.map(n => `  • "${n}"`).join('\n')}\n\n` +
       `will be moved to "${targetName}".\n` +
+      (linkedSource && !mergeTarget?.user_id ? `The account link of "${linkedSource.name}" moves to "${targetName}".\n` : '') +
       `The source player(s) will be DELETED permanently.\n\nThis cannot be undone. Continue?`
     , { destructive: true }))) return;
 
@@ -603,6 +631,42 @@ export function AdminPanel() {
 
   const filteredPlayers = (search) => allPlayers.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
   const playerName = (id) => allPlayers.find(p => p.id === id)?.name || id;
+  const mergeTarget = allPlayers.find(p => p.id === targetPlayerId);
+  const mergeSources = sourcePlayerIds.map(id => allPlayers.find(p => p.id === id)).filter(Boolean);
+  // players.user_id is unique, so two linked records are two different accounts.
+  const mergeBothLinked = !!mergeTarget?.user_id && mergeSources.some(p => p.user_id);
+
+  const accountBadge = (p) => (p.user_id ? (
+    <Badge variant="outline" className="gap-1 border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+      <LinkIcon className="size-3" />
+      {p.account_name || p.account_email || 'Linked account'}
+    </Badge>
+  ) : (
+    <Badge variant="outline" className="text-muted-foreground">No account</Badge>
+  ));
+
+  const playerRecord = (p, className) => (
+    <div key={p.id} className={cn('flex flex-col gap-0.5', className)}>
+      <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+        {p.name}
+        {accountBadge(p)}
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {p.matches ?? 0} matches · {p.tournaments ?? 0} tournaments · added by {p.owner_name || 'unknown'}{p.created_at && ` on ${formatDate(p.created_at)}`}
+      </div>
+      {p.user_id && (
+        <div className="text-xs text-muted-foreground">
+          {p.account_email} · {p.last_sign_in_at ? `last signed in ${formatDate(p.last_sign_in_at)}` : 'never signed in'}
+        </div>
+      )}
+    </div>
+  );
+
+  const playerOption = (p) => (
+    <SelectItem key={p.id} value={p.id}>
+      {p.name} · {p.matches ?? 0} matches{p.user_id ? ' · has account' : ''}
+    </SelectItem>
+  );
 
   const messageBox = message.text && (
     <Alert
@@ -1175,7 +1239,7 @@ export function AdminPanel() {
             <CardHeader>
               <CardTitle>Merge Players</CardTitle>
               <CardDescription>
-                Merge duplicate player records. All tournament data, matches, statistics and league results from the <strong>source</strong> player will be transferred to the <strong>target</strong> player. The source player will be deleted. <span className="font-semibold text-destructive">This cannot be undone!</span>
+                Merge duplicate player records. All tournament data, matches, statistics, brackets and league results from the <strong>source</strong> player move to the <strong>target</strong> player in one step, and the source record is deleted. A linked account always stays with the merged player. <span className="font-semibold text-destructive">This cannot be undone!</span>
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -1186,7 +1250,32 @@ export function AdminPanel() {
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-col gap-2">
+                  {duplicateGroups.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <Label>
+                        <Users className="size-4" />
+                        Possible duplicates ({duplicateGroups.length})
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Records with the same name, ignoring case and accents. Check that each group really is one person; "Review merge" only fills in the form below.
+                      </p>
+                      <div className="flex max-h-[28rem] flex-col divide-y overflow-y-auto rounded-lg border">
+                        {duplicateGroups.map(group => (
+                          <div key={group[0].id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col gap-2">
+                              {group.map(p => playerRecord(p))}
+                            </div>
+                            <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-center" onClick={() => handleReviewMerge(group)}>
+                              <GitMerge />
+                              Review merge
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={mergeFormRef} className="flex flex-col gap-2">
                     <Label htmlFor="playerSearch">
                       <Search className="size-4" />
                       Filter Players
@@ -1213,9 +1302,7 @@ export function AdminPanel() {
                           <SelectItem value={NONE}>-- Add source player --</SelectItem>
                           {filteredPlayers(playerSearch)
                             .filter(p => p.id !== targetPlayerId && !sourcePlayerIds.includes(p.id))
-                            .map(p => (
-                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                            ))}
+                            .map(playerOption)}
                         </SelectContent>
                       </Select>
                       {sourcePlayerIds.length > 0 && (
@@ -1238,33 +1325,34 @@ export function AdminPanel() {
                           <SelectItem value={NONE}>-- Select target player --</SelectItem>
                           {filteredPlayers(playerSearch)
                             .filter(p => !sourcePlayerIds.includes(p.id))
-                            .map(p => (
-                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                            ))}
+                            .map(playerOption)}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
                   {/* Preview */}
-                  {sourcePlayerIds.length > 0 && targetPlayerId && (
+                  {mergeSources.length > 0 && mergeTarget && (
                     <div className="flex flex-col gap-3 rounded-lg border bg-muted p-4">
-                      <div className="flex flex-wrap items-center justify-center gap-3">
-                        <div className="flex flex-col items-end gap-1.5">
-                          {sourcePlayerIds.map(id => (
-                            <Badge key={id} variant="outline" className="bg-red-100 text-red-800 line-through dark:bg-red-950 dark:text-red-200">
-                              {allPlayers.find(p => p.id === id)?.name}
-                            </Badge>
-                          ))}
+                      <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                        <div className="flex flex-col gap-3">
+                          {mergeSources.map(p => playerRecord(p, 'rounded-md border border-red-200 bg-background p-2 dark:border-red-900'))}
                         </div>
-                        <ArrowRight className="size-4 text-muted-foreground" />
-                        <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200">
-                          {allPlayers.find(p => p.id === targetPlayerId)?.name}
-                        </Badge>
+                        <ArrowRight className="hidden size-5 text-muted-foreground md:block" />
+                        {playerRecord(mergeTarget, 'rounded-md border border-green-300 bg-background p-2 dark:border-green-800')}
                       </div>
                       <p className="text-center text-xs text-muted-foreground">
-                        All matches, stats, tournament entries, and league data from {sourcePlayerIds.length} player(s) will be transferred.
+                        All matches, stats, brackets, tournament entries and league data from {mergeSources.length} record(s) move to "{mergeTarget.name}" ({mergeSources.reduce((sum, p) => sum + p.matches, mergeTarget.matches)} matches in total).
+                        {!mergeTarget.user_id && mergeSources.some(p => p.user_id) && ' The account link moves along with it.'}
                       </p>
+                      {mergeBothLinked && (
+                        <Alert variant="destructive">
+                          <AlertCircle />
+                          <AlertDescription>
+                            More than one of these records is linked to an account. A player can only have one account: unlink the wrong one first (Link Account section above).
+                          </AlertDescription>
+                        </Alert>
+                      )}
                     </div>
                   )}
 
@@ -1272,7 +1360,7 @@ export function AdminPanel() {
                     className="w-full"
                     variant={sourcePlayerIds.length > 0 && targetPlayerId ? 'destructive' : 'default'}
                     onClick={handleMergePlayers}
-                    disabled={sourcePlayerIds.length === 0 || !targetPlayerId || merging}
+                    disabled={sourcePlayerIds.length === 0 || !targetPlayerId || merging || mergeBothLinked}
                   >
                     {merging ? (
                       <>
