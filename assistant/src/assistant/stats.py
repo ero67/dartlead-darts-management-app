@@ -13,7 +13,7 @@ from difflib import SequenceMatcher
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-from assistant.winprob import HISTORY_MATCHES, player_strength
+from assistant.winprob import HISTORY_MATCHES, biggest_upset, leg_win_probability, match_win_probability, player_strength
 
 load_dotenv()
 # Every query runs as the caller: the chat service sets a client carrying the user's JWT (as_user), so RLS
@@ -698,6 +698,99 @@ def get_player_tournaments(player_id: str) -> dict:
         })
     rows.sort(key=lambda r: r["date"] or "", reverse=True)
     return {"player": player["name"], "tournaments": rows}
+
+
+def _is_cricket(game_type: str | None) -> bool:
+    return "cricket" in (game_type or "").lower()
+
+
+def _preview(players: list[dict], histories: dict, legs_to_win: int, legs: tuple[int, int], game_type: str | None,
+             status: str | None, winner_id: str | None = None) -> dict:
+    """The win chance before (or during) a match from already-fetched histories, as PreMatchCard.jsx shows it:
+    strengths from player_strength, none for a player without an X01 match (the app gives them no entry)."""
+    predictable = status != "completed" and not _is_cricket(game_type)
+    strengths = [player_strength(histories[p["id"]]) if predictable and histories.get(p["id"]) else None for p in players]
+    result = {"players": [{**p, "strength": s, "matches_counted": len(histories.get(p["id"], [])) if predictable else None}
+                          for p, s in zip(players, strengths)],
+              "match_win_probability": None, "leg_win_probability": None,
+              "legs_to_win": legs_to_win, "legs": list(legs), "note": None}
+    if status == "completed":
+        winner = next((p["name"] for p in players if p["id"] == winner_id), None)
+        result["note"] = (f"The match is finished: {players[0]['name']} {legs[0]}:{legs[1]} {players[1]['name']}, "
+                          f"{winner or 'no winner recorded'}{' won' if winner else ''}. There is no prediction for a finished match.")
+    elif not predictable:
+        result["note"] = "This is a Cricket match: the win-chance model is X01-only, so there is no probability."
+    elif None in strengths:
+        missing = " and ".join(p["name"] for p, s in zip(players, strengths) if s is None)
+        result["note"] = f"No completed X01 matches on record for {missing}, so there is no win chance."
+    else:
+        result["match_win_probability"] = match_win_probability(*strengths, legs_to_win=legs_to_win, legs_a=legs[0], legs_b=legs[1])
+        result["leg_win_probability"] = leg_win_probability(*strengths)
+    return result
+
+
+def get_match_preview(match_id: str | None = None, player_id: str | None = None, opponent_id: str | None = None,
+                      legs_to_win: int = 3) -> dict:
+    """Win chance, form and head-to-head for a match (by id, using its current legs) or for two players."""
+    status = winner_id = game_type = None
+    legs = (0, 0)
+    if match_id:
+        m = (db().table("matches")
+             .select("player1_id, player2_id, winner_id, status, player1_legs, player2_legs, legs_to_win, game_type,"
+                     " player1:players!matches_player1_id_fkey(name), player2:players!matches_player2_id_fkey(name)")
+             .eq("id", match_id).single().execute().data)
+        if not (m["player1_id"] and m["player2_id"]):
+            return {"error": "This match does not have both players yet, so there is nothing to preview."}
+        players = [{"id": m[f"player{n}_id"], "name": (m[f"player{n}"] or {}).get("name")} for n in (1, 2)]
+        status, winner_id, game_type = m["status"], m["winner_id"], m["game_type"]
+        legs, legs_to_win = (m["player1_legs"] or 0, m["player2_legs"] or 0), m["legs_to_win"] or legs_to_win
+    elif player_id and opponent_id:
+        names = {p["id"]: p["name"] for p in db().table("players").select("id, name").in_("id", [player_id, opponent_id]).execute().data}
+        if len(names) != 2:
+            return {"error": "Unknown player id: use find_player to get both ids."}
+        players = [{"id": i, "name": names[i]} for i in (player_id, opponent_id)]
+    else:
+        return {"error": "Give either a match_id or both player_id and opponent_id."}
+
+    ids = [p["id"] for p in players]
+    # Current form, like the pre-match card (no `before`); a finished or Cricket match needs no strengths.
+    needs_strengths = status != "completed" and not _is_cricket(game_type)
+    histories = recent_match_totals(ids) if needs_strengths else {}
+    result = _preview(players, histories, legs_to_win, legs, game_type, status, winner_id)
+    h2h = get_head_to_head(ids[0], ids[1])["opponents"]
+    return {**result, "head_to_head": h2h[0] if h2h else {"matches": 0},
+            "recent": {i: get_recent_matches(i, 5)["matches"] for i in ids}}
+
+
+def _recap(matches: list[dict], strengths: dict[str, float]) -> dict:
+    """Total 180s and the biggest upset of a round's completed matches, from rows shaped like _MATCH_FIELDS plus the
+    match columns; `strengths` are as they were before the round (the app's TournamentSummary does the same)."""
+    names = {pid: name for m in matches for pid, name, _, _ in _sides(m)}
+    # The app sums result.playerNStats.oneEighties per player and match (TournamentSummary.jsx).
+    one_eighties = sum(s["o"] or 0 for m in matches for _, _, _, s in _sides(m))
+    upset = biggest_upset(matches, strengths)
+    return {"total_180s": one_eighties,
+            "biggest_upset": upset and {"winner": names[upset["winner_id"]], "loser": names[upset["loser_id"]],
+                                        "score": upset["score"], "chance": upset["chance"]}}
+
+
+def get_round_recap(tournament_id: str) -> dict:
+    """The facts for a short post about one tournament (round): its summary, total 180s, the biggest upset and, for a
+    league round, the top 3 of the league table."""
+    t = (db().table("tournaments").select("starts_at, created_at, league_id, game_type")
+         .eq("id", tournament_id).single().execute().data)
+    summary = get_tournament_summary(tournament_id)
+    matches = (db().table("matches")
+               .select(_MATCH_FIELDS + ", status, player1_legs, player2_legs, legs_to_win, completed_at")
+               .eq("tournament_id", tournament_id).eq("status", "completed").execute().data)
+    facts = {"total_180s": None, "biggest_upset": None}  # X01 numbers: nothing to say for a Cricket round
+    if not _is_cricket(t["game_type"]):
+        ids = list({pid for m in matches for pid in (m["player1_id"], m["player2_id"]) if pid})
+        before = t["starts_at"] or t["created_at"]
+        histories = recent_match_totals(ids, before=before) if ids else {}
+        facts = _recap(matches, {i: player_strength(h) for i, h in histories.items() if h})
+    standings = get_league_standings(t["league_id"])["standings"][:3] if t["league_id"] else None
+    return {"summary": summary, **facts, "league_top3": standings}
 
 
 def main() -> None:

@@ -236,9 +236,44 @@ def get_player_form(player_id: str, matches: int = 20) -> dict:
     return stats.get_player_form(player_id, matches)
 
 
+@tool(parse_docstring=True)
+def get_match_preview(match_id: str | None = None, player_id: str | None = None, opponent_id: str | None = None,
+                      legs_to_win: int = 3) -> dict:
+    """Preview a match with the app's own win chance (the % the app shows before a match), each player's form
+    rating, the head-to-head record and each player's last 5 results. Use it for "who is favourite", "what are
+    the chances", "preview this match". Say the percentage as the app's win chance and read it from the result
+    (match_win_probability is player 1's chance, a number from 0 to 1, so 0.63 is 63%; the other player has the
+    rest); never give your own estimate. If the user is on a match page, pass its match_id. For a match in
+    progress the chance uses the current legs. When match_win_probability is null, read note and say why:
+    a finished match, a Cricket match (the model is X01-only) or a player with no X01 matches.
+
+    Args:
+        match_id: The match's id, when the user is on a match page or you were given one. Leave it out for two players.
+        player_id: With opponent_id, the first player's id from find_player.
+        opponent_id: With player_id, the second player's id from find_player.
+        legs_to_win: Legs needed to win, only when you pass two players (default 3); a match id carries its own.
+    """
+    return stats.get_match_preview(match_id, player_id, opponent_id, legs_to_win)
+
+
+@tool(parse_docstring=True)
+def get_round_recap(tournament_id: str) -> dict:
+    """Get the facts for a short league group-chat post about one round (tournament): its summary (podium, best
+    averages, highest checkout, most 180s), the total number of 180s, the round's biggest upset (the winner with
+    the lowest win chance beforehand, under 40%, with the score and that chance) and, for a league round, the top 3
+    of the league table. Use it for "write a recap / summary post of round X". The facts here are all you may use:
+    do not add results, numbers or players that are not in the result. The league top 3 is the table as it is now.
+    A null biggest_upset means no match was an upset; say nothing about one.
+
+    Args:
+        tournament_id: The id from find_tournament or list_tournaments. Never guess it.
+    """
+    return stats.get_round_recap(tournament_id)
+
+
 TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings,
          get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, get_records, list_leagues,
-         get_my_practice, get_player_form]
+         get_my_practice, get_player_form, get_match_preview, get_round_recap]
 
 
 def main() -> None:
