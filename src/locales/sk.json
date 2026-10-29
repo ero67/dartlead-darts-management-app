@@ -600,6 +600,20 @@
       "Slovensky a anglicky",
       "Tmavý režim do šera podnikov"
     ],
+    "assistant": {
+      "eyebrow": "Novinka · AI asistent",
+      "title": "Opýtajte sa svojej ligy na čokoľvek.",
+      "sub": "Chat priamo v DartLeade, ktorý odpovedá z vašich vlastných turnajov a líg: kto vedie, kto hodil najviac 180-ok, ako sa darí jednému hráčovi proti druhému. Pozná aj pravidlá šípok a poradí s aplikáciou.",
+      "points": [
+        "Odpovedá zo zapísaných zápasov, nie odhadom",
+        "Ukáže kroky, ktorými k odpovedi prišiel",
+        "Rozumie po slovensky aj po anglicky"
+      ],
+      "note": "Pre prihlásených používateľov.",
+      "previewQuestion": "Kto má najviac 180-ok v lige?",
+      "previewStep": "Prehľadal rekordy ligy: 180-ky",
+      "previewAnswer": "Vedie Peter H. so 14, pred Evou T. a Jakubom S."
+    },
     "demoEyebrow": "Ukážka",
     "demoTitle": "Pozrite si to so skutočnými dátami.",
     "demoSub": "Otvorte ukončený ukážkový turnaj: skupiny, pavúk, štatistiky a grafy šancí na výhru. Bez registrácie.",

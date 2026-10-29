@@ -600,6 +600,20 @@
       "Slovak and English",
       "Dark mode for dim venues"
     ],
+    "assistant": {
+      "eyebrow": "New · AI assistant",
+      "title": "Ask your league anything.",
+      "sub": "A chat built into DartLead that answers from your own tournaments and leagues: who leads, who hit the most 180s, how one player does against another. It also knows the darts rules and how the app works.",
+      "points": [
+        "Answers from recorded matches, not guesses",
+        "Shows the steps behind every answer",
+        "Understands Slovak and English"
+      ],
+      "note": "Available to signed-in users.",
+      "previewQuestion": "Who has the most 180s in the league?",
+      "previewStep": "Searched the league records: 180s",
+      "previewAnswer": "Peter H. leads with 14, ahead of Eva T. and Jakub S."
+    },
     "demoEyebrow": "Demo",
     "demoTitle": "See it with real data.",
     "demoSub": "Open a finished demo tournament: groups, bracket, statistics and win-chance charts. No sign-up.",
