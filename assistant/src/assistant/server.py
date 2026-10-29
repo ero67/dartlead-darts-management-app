@@ -12,7 +12,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
-from langfuse import propagate_attributes
+from langfuse import Langfuse, propagate_attributes
 from langfuse.langchain import CallbackHandler
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
@@ -109,11 +109,12 @@ def tool_output(content):
     return content
 
 
-async def answer_events(message: str, thread_id: str, user_id: str, token: str):
+async def answer_events(message: str, thread_id: str, user_id: str, token: str, question_id: str, trace_id: str):
     """Yield the run as NDJSON events, running every stats query as the user:
-    step (rewrite, route) -> sources -> tool_start / tool_end -> text (deltas) -> done | error."""
+    step (rewrite, route) -> sources -> tool_start / tool_end -> text (deltas) -> done | error.
+    done carries the Langfuse trace id (feedback scores attach to it); a failed answer gives the question back."""
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 2 * MAX_STEPS + 3,
-              "callbacks": [CallbackHandler()], "run_name": "chat"}
+              "callbacks": [CallbackHandler(trace_context={"trace_id": trace_id})], "run_name": "chat"}
     try:
         with stats.as_user(token, user_id), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
                                                         tags=["phase-6", "api"]):
@@ -142,33 +143,46 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str):
                         for m in update["messages"]:
                             yield event("tool_end", id=m.tool_call_id, name=m.name, status=m.status,
                                         output=tool_output(m.content))
-        yield event("done")
+        yield event("done", trace_id=trace_id)
     except GraphRecursionError:
+        await run_in_threadpool(refund_question, user_id, token, question_id)
         yield event("error", message="Sorry, this needed more steps than I may take. Try a narrower question: one player, tournament or league.")
     except Exception:
         log.exception("chat failed")
+        await run_in_threadpool(refund_question, user_id, token, question_id)
         yield event("error", message="Sorry, something went wrong. Please try again.")
 
 
-def use_question(user_id: str, token: str) -> None:
-    """Count this question against the user's daily limit, or refuse it (use_assistant_question in Supabase
-    checks who may use the assistant and the limit; admins get a higher one)."""
+def use_question(user_id: str, token: str) -> str:
+    """Count this question against the user's daily limit and return its id, or refuse it (use_assistant_question
+    in Supabase checks who may use the assistant and the limit; admins get a higher one)."""
     with stats.as_user(token, user_id):
         quota = stats.db().rpc("use_assistant_question").execute().data
     if quota["allowed"]:
-        return
+        return quota["question_id"]
     if quota["reason"] == "limit":
         raise HTTPException(429, f"You have used today's {quota['limit']} questions. Try again tomorrow.")
     raise HTTPException(403, "The assistant is not available for your account yet.")
 
 
+def refund_question(user_id: str, token: str, question_id: str) -> None:
+    """Give a question back after a failed answer (refund_assistant_question allows it for 10 minutes, once).
+    Never raises: the user must still get the error event."""
+    try:
+        with stats.as_user(token, user_id):
+            stats.db().rpc("refund_assistant_question", {"p_question_id": question_id}).execute()
+    except Exception:
+        log.exception("could not refund question %s", question_id)
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest, authorization: str | None = Header(default=None)):
     user_id, token = await run_in_threadpool(verify, authorization)
-    await run_in_threadpool(use_question, user_id, token)
+    question_id = await run_in_threadpool(use_question, user_id, token)
+    trace_id = Langfuse.create_trace_id()
     # The user id is part of the thread key, so nobody can continue someone else's conversation.
     thread_id = f"{user_id}:{request.thread_id}"
-    return StreamingResponse(answer_events(request.message, thread_id, user_id, token),
+    return StreamingResponse(answer_events(request.message, thread_id, user_id, token, question_id, trace_id),
                              media_type="application/x-ndjson; charset=utf-8")
 
 
