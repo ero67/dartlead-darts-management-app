@@ -7,13 +7,13 @@ import sys
 import unicodedata
 from contextlib import contextmanager
 from contextvars import ContextVar
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-from assistant.winprob import HISTORY_MATCHES
+from assistant.winprob import HISTORY_MATCHES, player_strength
 
 load_dotenv()
 # Every query runs as the caller: the chat service sets a client carrying the user's JWT (as_user), so RLS
@@ -314,6 +314,125 @@ def get_me() -> dict:
     players = db().table("players").select("id, name").eq("user_id", user_id).execute().data
     managed = db().table("tournaments").select("id", count="exact").eq("user_id", user_id).eq("deleted", False).execute()
     return {"signed_in": True, "players": players, "tournaments_managed": managed.count}
+
+
+# game -> (the stats key that is its main number, whether lower is better); the app's own headline per game.
+PRACTICE_METRICS = {"x01": ("average", False), "checkout": ("hitPercent", False), "oneTwentyOne": ("successPercent", False),
+                    "aroundTheClock": ("avgDartsPerTarget", True), "cricket": ("mpr", False)}
+MIN_BEST_DARTS = 9  # the app's personal bests ignore X01 sessions shorter than this
+
+
+def _when(timestamp: str) -> datetime:
+    return datetime.fromisoformat(timestamp)
+
+
+def _mean(values: list) -> float | None:
+    return round(sum(values) / len(values), 1) if values else None
+
+
+def _practice_summary(rows: list[dict], linked_player_stats: dict | None, since: datetime | None = None) -> dict:
+    """Per game: the main number's mean, older-half vs newer-half trend and best, from practice_sessions rows.
+    `rows` are all of the user's finished sessions; the mean, trend and weak spots cover those since `since`,
+    `best` covers every row."""
+    by_game: dict[str, list[dict]] = {}
+    for r in sorted((r for r in rows if r.get("finished_at")), key=lambda r: _when(r["finished_at"])):
+        by_game.setdefault(r["game"], []).append(r)
+
+    games = {}
+    for game, sessions in by_game.items():
+        if game not in PRACTICE_METRICS:
+            continue
+        key, lower = PRACTICE_METRICS[game]
+
+        def value(session, key=key, game=game):
+            s = session["stats"] or {}
+            short = game == "x01" and s.get("totalDarts", MIN_BEST_DARTS) < MIN_BEST_DARTS
+            return None if short else s.get(key)
+
+        window = [s for s in sessions if since is None or _when(s["finished_at"]) >= since]
+        values = [v for v in map(value, window) if v is not None]
+        everything = [v for v in map(value, sessions) if v is not None]
+        half = len(values) // 2  # an odd one out (the middle session) counts as newer
+        games[game] = {
+            "sessions": len(window), "metric": key, "lower_is_better": lower, "mean": _mean(values),
+            "trend": {"older_half": _mean(values[:half]), "newer_half": _mean(values[half:])} if len(values) >= 2 else None,
+            "best": (min if lower else max)(everything, default=None),
+        }
+        if game in ("checkout", "aroundTheClock"):
+            counts: dict = {}
+            for session in window:
+                for item in (session["stats"] or {}).get("hardest") or []:
+                    # the app stores {target, misses} (checkout) or {target, darts} (Around the Clock); a number is a plain target
+                    if isinstance(item, dict):
+                        item = None if item.get("darts", 2) <= 1 else item.get("target")  # one dart = no trouble
+                    if item is not None:
+                        counts[item] = counts.get(item, 0) + 1
+            top = sorted(counts.items(), key=lambda kv: -kv[1])[:3]  # stable: ties keep first-seen order
+            games[game]["weak_spots"] = [{"target": t, "count": c} for t, c in top]
+        if game == "x01":
+            games[game]["practice"] = {
+                name: _mean([v for s in window if (v := (s["stats"] or {}).get(src)) is not None])
+                for name, src in [("first_nine_average", "firstNineAverage"), ("checkout_percent", "checkoutPercent")]}
+            if linked_player_stats:
+                games[game]["matches"] = {k: linked_player_stats.get(k) for k in ("average", "checkout_percent")}
+    return {"games": games}
+
+
+def get_my_practice(game: str | None = None, days: int = 30) -> dict:
+    """The signed-in user's own practice sessions (RLS shows nobody else's), summarised per game."""
+    user_id = _user_id.get()
+    if not user_id:
+        return {"signed_in": False}
+    days = min(max(days, 1), 365)
+
+    def build():
+        query = db().table("practice_sessions").select("game, stats, finished_at").eq("user_id", user_id)
+        return (query.eq("game", game) if game else query).order("finished_at").order("client_id")
+
+    # One query without a date filter, windowed in Python, so `best` can cover every session.
+    rows = _all_rows(build)
+    linked = None
+    if any(r["game"] == "x01" for r in rows):  # their match numbers sit beside the practice ones
+        players = db().table("players").select("id").eq("user_id", user_id).limit(1).execute().data
+        linked = get_player_stats(players[0]["id"]) if players else None
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    return {"signed_in": True, "days": days, **_practice_summary(rows, linked, since)}
+
+
+def _form(history: list[dict], matches: int) -> dict:
+    """X01 form from a newest-first history (recent_match_totals rows): the app's strength rating now and
+    `matches` matches ago, the average and record over the last `matches`, and calendar-month averages."""
+    recent = history[:matches]
+    if not recent:
+        return {"matches": 0}
+    current = player_strength(history[:HISTORY_MATCHES])
+    before = player_strength(history[matches:matches + HISTORY_MATCHES]) if len(history) > matches else None
+
+    months: dict[str, list[int]] = {}  # month -> [score, darts, matches]
+    for m in history:
+        if m.get("at"):
+            total = months.setdefault(_when(m["at"]).astimezone(timezone.utc).strftime("%Y-%m"), [0, 0, 0])
+            total[0] += m["score"]
+            total[1] += m["darts"]
+            total[2] += 1
+    return {
+        "window": matches, "matches": len(recent),
+        "wins": sum(m["won"] for m in recent), "losses": sum(not m["won"] for m in recent),
+        "average": round(sum(m["score"] for m in recent) / sum(m["darts"] for m in recent) * 3, 1),
+        "form": {"current": round(current, 1), "before": None if before is None else round(before, 1),
+                 "change": None if before is None else round(current - before, 1)},
+        "monthly_averages": [{"month": k, "average": round(s / d * 3, 1), "matches": n}
+                             for k, (s, d, n) in sorted(months.items())[-6:]],
+    }
+
+
+def get_player_form(player_id: str, matches: int = 20) -> dict:
+    """A player's X01 form trend over their last `matches` matches (at most 60)."""
+    matches = min(max(matches, 1), 60)
+    player = db().table("players").select("id, name").eq("id", player_id).single().execute().data
+    # Extra history so the rating from `matches` matches ago has its full weight window too.
+    history = recent_match_totals([player_id], matches + HISTORY_MATCHES).get(player_id, [])
+    return {"player": player["name"], "player_id": player_id, **_form(history, matches)}
 
 
 def _date(row: dict) -> str | None:

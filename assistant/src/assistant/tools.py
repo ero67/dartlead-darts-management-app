@@ -195,8 +195,47 @@ def list_leagues(mine: bool = False) -> dict:
     return stats.list_leagues(mine=mine)
 
 
+@tool(parse_docstring=True)
+def get_my_practice(game: Literal["x01", "checkout", "oneTwentyOne", "aroundTheClock", "cricket"] | None = None,
+                    days: int = 30) -> dict:
+    """Get the signed-in user's OWN practice sessions (Practice in the app), summarised per game: how many
+    sessions, the main number's mean, its trend (older half vs newer half of the period) and the all-time
+    best. Main numbers: x01 average, checkout hitPercent, oneTwentyOne successPercent, aroundTheClock
+    avgDartsPerTarget (lower is better, see lower_is_better) and cricket mpr. Checkout and Around the Clock also
+    list weak_spots (targets missed most, with how many sessions they showed up in); x01 puts the practice
+    numbers next to the match numbers of the user's linked player. Use it for "how is my practice going",
+    "what should I practise".
+
+    Practice is private: this works only for the signed-in user and only about themselves. If the question is
+    about another player's practice, do not call it; say that practice is private. If the result says
+    signed_in is false, tell the user to sign in to see their practice.
+
+    Args:
+        game: Only this game. Leave it out for every game that has sessions.
+        days: How many days back the mean, trend and weak spots cover (default 30, at most 365). The best
+            always covers all sessions.
+    """
+    return stats.get_my_practice(game, days)
+
+
+@tool(parse_docstring=True)
+def get_player_form(player_id: str, matches: int = 20) -> dict:
+    """Get how a player's X01 form has moved, with the same strength rating the app uses for its form and win
+    chances: the rating now, the rating `matches` matches ago and the change, the plain average and win-loss
+    record over the last `matches` matches, and the player's average per calendar month (up to 6, newest last).
+    Use it for "is X improving", "how is X's form", "has X got better this year". It is X01 only, and a player
+    with fewer matches than `matches` has no earlier rating (null), so say there is not enough history.
+
+    Args:
+        player_id: The id from find_player or get_me. Never guess it.
+        matches: How many recent matches the comparison spans (default 20, at most 60).
+    """
+    return stats.get_player_form(player_id, matches)
+
+
 TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings,
-         get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, get_records, list_leagues]
+         get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, get_records, list_leagues,
+         get_my_practice, get_player_form]
 
 
 def main() -> None:
