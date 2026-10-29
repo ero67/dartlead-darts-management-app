@@ -1,0 +1,1704 @@
+[
+ {
+  "fn": "legWinProbability",
+  "args": [
+   40,
+   40
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "legWinProbability",
+  "args": [
+   50,
+   49
+  ],
+  "expected": 0.5415704832167999
+ },
+ {
+  "fn": "legWinProbability",
+  "args": [
+   50,
+   40
+  ],
+  "expected": 0.8411308951190849
+ },
+ {
+  "fn": "legWinProbability",
+  "args": [
+   60,
+   30
+  ],
+  "expected": 0.9933071490757153
+ },
+ {
+  "fn": "legWinProbability",
+  "args": [
+   30,
+   60
+  ],
+  "expected": 0.0066928509242848554
+ },
+ {
+  "fn": "legWinProbability",
+  "args": [
+   90,
+   20
+  ],
+  "expected": 0.9999914251344262
+ },
+ {
+  "fn": "legWinProbability",
+  "args": [
+   50,
+   40,
+   10
+  ],
+  "expected": 0.7310585786300049
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   40,
+   40,
+   {
+    "legsToWin": 1
+   }
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   40,
+   40,
+   {
+    "legsToWin": 2
+   }
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   40,
+   40,
+   {
+    "legsToWin": 3
+   }
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   40,
+   40,
+   {
+    "legsToWin": 5
+   }
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   40,
+   40,
+   {
+    "legsToWin": 7
+   }
+  ],
+  "expected": 0.5
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   41,
+   40,
+   {
+    "legsToWin": 1
+   }
+  ],
+  "expected": 0.5415704832167999
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   41,
+   40,
+   {
+    "legsToWin": 2
+   }
+  ],
+  "expected": 0.5622120484991757
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   41,
+   40,
+   {
+    "legsToWin": 3
+   }
+  ],
+  "expected": 0.5775862100798038
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   41,
+   40,
+   {
+    "legsToWin": 5
+   }
+  ],
+  "expected": 0.6013653316687239
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   41,
+   40,
+   {
+    "legsToWin": 7
+   }
+  ],
+  "expected": 0.6202422835337079
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   50,
+   40,
+   {
+    "legsToWin": 1
+   }
+  ],
+  "expected": 0.8411308951190849
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   50,
+   40,
+   {
+    "legsToWin": 2
+   }
+  ],
+  "expected": 0.9323013419268812
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   50,
+   40,
+   {
+    "legsToWin": 3
+   }
+  ],
+  "expected": 0.9688505836844985
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   50,
+   40,
+   {
+    "legsToWin": 5
+   }
+  ],
+  "expected": 0.9927451210571219
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   50,
+   40,
+   {
+    "legsToWin": 7
+   }
+  ],
+  "expected": 0.9982028997693622
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   70,
+   40,
+   {
+    "legsToWin": 1
+   }
+  ],
+  "expected": 0.9933071490757153
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   70,
+   40,
+   {
+    "legsToWin": 2
+   }
+  ],
+  "expected": 0.9998662168420377
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   70,
+   40,
+   {
+    "legsToWin": 3
+   }
+  ],
+  "expected": 0.999997032004692
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   70,
+   40,
+   {
+    "legsToWin": 5
+   }
+  ],
+  "expected": 0.9999999983453252
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   70,
+   40,
+   {
+    "legsToWin": 7
+   }
+  ],
+  "expected": 0.9999999999990036
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   45,
+   40
+  ],
+  "expected": 0.8330077067703815
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   45,
+   40,
+   {
+    "legsToWin": 4,
+    "legsA": 2,
+    "legsB": 1
+   }
+  ],
+  "expected": 0.9140596860645231
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   40,
+   45,
+   {
+    "legsToWin": 4,
+    "legsA": 3,
+    "legsB": 3
+   }
+  ],
+  "expected": 0.3029407160345927
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   45,
+   40,
+   {
+    "legsToWin": 3,
+    "scale": 12
+   }
+  ],
+  "expected": 0.6871897950840333
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   null,
+   40
+  ],
+  "expected": null
+ },
+ {
+  "fn": "matchWinProbability",
+  "args": [
+   45,
+   0
+  ],
+  "expected": null
+ },
+ {
+  "fn": "chanceToWinFirst",
+  "args": [
+   0.5,
+   0,
+   3
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "chanceToWinFirst",
+  "args": [
+   0.5,
+   3,
+   0
+  ],
+  "expected": 0
+ },
+ {
+  "fn": "chanceToWinFirst",
+  "args": [
+   0.5,
+   -1,
+   2
+  ],
+  "expected": 1
+ },
+ {
+  "fn": "chanceToWinFirst",
+  "args": [
+   0.7,
+   1,
+   1
+  ],
+  "expected": 0.7
+ },
+ {
+  "fn": "chanceToWinFirst",
+  "args": [
+   0.7,
+   3,
+   3
+  ],
+  "expected": 0.8369199999999999
+ },
+ {
+  "fn": "chanceToWinFirst",
+  "args": [
+   0.3,
+   4,
+   2
+  ],
+  "expected": 0.03078
+ },
+ {
+  "fn": "chanceToWinFirst",
+  "args": [
+   0.9,
+   7,
+   7
+  ],
+  "expected": 0.9999007145136
+ },
+ {
+  "fn": "playerStrength",
+  "args": [
+   []
+  ],
+  "expected": 41
+ },
+ {
+  "fn": "playerStrength",
+  "args": [
+   [
+    {
+     "score": 747,
+     "darts": 59,
+     "at": "2026-10-28T00:00:00.000Z"
+    }
+   ]
+  ],
+  "expected": 40.40468227424749
+ },
+ {
+  "fn": "playerStrength",
+  "args": [
+   [
+    {
+     "score": 513,
+     "darts": 58,
+     "at": "2026-10-28T00:00:00.000Z"
+    },
+    {
+     "score": 448,
+     "darts": 48,
+     "at": "2026-10-27T00:00:00.000Z"
+    },
+    {
+     "score": 885,
+     "darts": 60,
+     "at": "2026-10-26T00:00:00.000Z"
+    },
+    {
+     "score": 514,
+     "darts": 49,
+     "at": "2026-10-25T00:00:00.000Z"
+    },
+    {
+     "score": 628,
+     "darts": 40,
+     "at": "2026-10-24T00:00:00.000Z"
+    },
+    {
+     "score": 350,
+     "darts": 37,
+     "at": "2026-10-23T00:00:00.000Z"
+    },
+    {
+     "score": 852,
+     "darts": 58,
+     "at": "2026-10-22T00:00:00.000Z"
+    },
+    {
+     "score": 1224,
+     "darts": 61,
+     "at": "2026-10-21T00:00:00.000Z"
+    },
+    {
+     "score": 737,
+     "darts": 42,
+     "at": "2026-10-20T00:00:00.000Z"
+    },
+    {
+     "score": 709,
+     "darts": 41,
+     "at": "2026-10-19T00:00:00.000Z"
+    },
+    {
+     "score": 991,
+     "darts": 51,
+     "at": "2026-10-18T00:00:00.000Z"
+    },
+    {
+     "score": 433,
+     "darts": 51,
+     "at": "2026-10-17T00:00:00.000Z"
+    },
+    {
+     "score": 811,
+     "darts": 65,
+     "at": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "score": 1246,
+     "darts": 67,
+     "at": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "score": 822,
+     "darts": 46,
+     "at": "2026-10-14T00:00:00.000Z"
+    },
+    {
+     "score": 477,
+     "darts": 36,
+     "at": "2026-10-13T00:00:00.000Z"
+    },
+    {
+     "score": 484,
+     "darts": 58,
+     "at": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "score": 441,
+     "darts": 30,
+     "at": "2026-10-11T00:00:00.000Z"
+    },
+    {
+     "score": 1048,
+     "darts": 64,
+     "at": "2026-10-10T00:00:00.000Z"
+    },
+    {
+     "score": 1073,
+     "darts": 57,
+     "at": "2026-10-09T00:00:00.000Z"
+    },
+    {
+     "score": 853,
+     "darts": 53,
+     "at": "2026-10-08T00:00:00.000Z"
+    },
+    {
+     "score": 426,
+     "darts": 32,
+     "at": "2026-10-07T00:00:00.000Z"
+    },
+    {
+     "score": 995,
+     "darts": 51,
+     "at": "2026-10-06T00:00:00.000Z"
+    },
+    {
+     "score": 668,
+     "darts": 46,
+     "at": "2026-10-05T00:00:00.000Z"
+    },
+    {
+     "score": 781,
+     "darts": 49,
+     "at": "2026-10-04T00:00:00.000Z"
+    },
+    {
+     "score": 1204,
+     "darts": 61,
+     "at": "2026-10-03T00:00:00.000Z"
+    },
+    {
+     "score": 745,
+     "darts": 56,
+     "at": "2026-10-02T00:00:00.000Z"
+    },
+    {
+     "score": 1007,
+     "darts": 57,
+     "at": "2026-10-01T00:00:00.000Z"
+    },
+    {
+     "score": 1026,
+     "darts": 48,
+     "at": "2026-09-30T00:00:00.000Z"
+    },
+    {
+     "score": 1159,
+     "darts": 65,
+     "at": "2026-09-29T00:00:00.000Z"
+    }
+   ]
+  ],
+  "expected": 42.323624216601615
+ },
+ {
+  "fn": "playerStrength",
+  "args": [
+   [
+    {
+     "score": 843,
+     "darts": 66,
+     "at": "2026-10-28T00:00:00.000Z"
+    },
+    {
+     "score": 358,
+     "darts": 38,
+     "at": "2026-10-27T00:00:00.000Z"
+    },
+    {
+     "score": 589,
+     "darts": 39,
+     "at": "2026-10-26T00:00:00.000Z"
+    },
+    {
+     "score": 703,
+     "darts": 33,
+     "at": "2026-10-25T00:00:00.000Z"
+    },
+    {
+     "score": 947,
+     "darts": 54,
+     "at": "2026-10-24T00:00:00.000Z"
+    },
+    {
+     "score": 795,
+     "darts": 60,
+     "at": "2026-10-23T00:00:00.000Z"
+    },
+    {
+     "score": 1181,
+     "darts": 59,
+     "at": "2026-10-22T00:00:00.000Z"
+    },
+    {
+     "score": 930,
+     "darts": 51,
+     "at": "2026-10-21T00:00:00.000Z"
+    },
+    {
+     "score": 684,
+     "darts": 46,
+     "at": "2026-10-20T00:00:00.000Z"
+    },
+    {
+     "score": 1224,
+     "darts": 59,
+     "at": "2026-10-19T00:00:00.000Z"
+    },
+    {
+     "score": 1009,
+     "darts": 69,
+     "at": "2026-10-18T00:00:00.000Z"
+    },
+    {
+     "score": 810,
+     "darts": 43,
+     "at": "2026-10-17T00:00:00.000Z"
+    },
+    {
+     "score": 735,
+     "darts": 40,
+     "at": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "score": 658,
+     "darts": 51,
+     "at": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "score": 407,
+     "darts": 48,
+     "at": "2026-10-14T00:00:00.000Z"
+    },
+    {
+     "score": 761,
+     "darts": 49,
+     "at": "2026-10-13T00:00:00.000Z"
+    },
+    {
+     "score": 576,
+     "darts": 60,
+     "at": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "score": 851,
+     "darts": 62,
+     "at": "2026-10-11T00:00:00.000Z"
+    },
+    {
+     "score": 672,
+     "darts": 43,
+     "at": "2026-10-10T00:00:00.000Z"
+    },
+    {
+     "score": 533,
+     "darts": 32,
+     "at": "2026-10-09T00:00:00.000Z"
+    },
+    {
+     "score": 646,
+     "darts": 41,
+     "at": "2026-10-08T00:00:00.000Z"
+    },
+    {
+     "score": 737,
+     "darts": 35,
+     "at": "2026-10-07T00:00:00.000Z"
+    },
+    {
+     "score": 1319,
+     "darts": 64,
+     "at": "2026-10-06T00:00:00.000Z"
+    },
+    {
+     "score": 476,
+     "darts": 44,
+     "at": "2026-10-05T00:00:00.000Z"
+    },
+    {
+     "score": 839,
+     "darts": 56,
+     "at": "2026-10-04T00:00:00.000Z"
+    },
+    {
+     "score": 594,
+     "darts": 32,
+     "at": "2026-10-03T00:00:00.000Z"
+    },
+    {
+     "score": 570,
+     "darts": 68,
+     "at": "2026-10-02T00:00:00.000Z"
+    },
+    {
+     "score": 1000,
+     "darts": 49,
+     "at": "2026-10-01T00:00:00.000Z"
+    },
+    {
+     "score": 897,
+     "darts": 57,
+     "at": "2026-09-30T00:00:00.000Z"
+    },
+    {
+     "score": 841,
+     "darts": 69,
+     "at": "2026-09-29T00:00:00.000Z"
+    },
+    {
+     "score": 789,
+     "darts": 60,
+     "at": "2026-09-28T00:00:00.000Z"
+    },
+    {
+     "score": 849,
+     "darts": 48,
+     "at": "2026-09-27T00:00:00.000Z"
+    },
+    {
+     "score": 346,
+     "darts": 30,
+     "at": "2026-09-26T00:00:00.000Z"
+    },
+    {
+     "score": 942,
+     "darts": 50,
+     "at": "2026-09-25T00:00:00.000Z"
+    },
+    {
+     "score": 595,
+     "darts": 64,
+     "at": "2026-09-24T00:00:00.000Z"
+    },
+    {
+     "score": 808,
+     "darts": 48,
+     "at": "2026-09-23T00:00:00.000Z"
+    },
+    {
+     "score": 1140,
+     "darts": 69,
+     "at": "2026-09-22T00:00:00.000Z"
+    },
+    {
+     "score": 729,
+     "darts": 41,
+     "at": "2026-09-21T00:00:00.000Z"
+    },
+    {
+     "score": 746,
+     "darts": 60,
+     "at": "2026-09-20T00:00:00.000Z"
+    },
+    {
+     "score": 1268,
+     "darts": 68,
+     "at": "2026-09-19T00:00:00.000Z"
+    },
+    {
+     "score": 794,
+     "darts": 37,
+     "at": "2026-09-18T00:00:00.000Z"
+    },
+    {
+     "score": 963,
+     "darts": 45,
+     "at": "2026-09-17T00:00:00.000Z"
+    },
+    {
+     "score": 967,
+     "darts": 67,
+     "at": "2026-09-16T00:00:00.000Z"
+    },
+    {
+     "score": 320,
+     "darts": 34,
+     "at": "2026-09-15T00:00:00.000Z"
+    },
+    {
+     "score": 296,
+     "darts": 30,
+     "at": "2026-09-14T00:00:00.000Z"
+    },
+    {
+     "score": 554,
+     "darts": 56,
+     "at": "2026-09-13T00:00:00.000Z"
+    },
+    {
+     "score": 1374,
+     "darts": 66,
+     "at": "2026-09-12T00:00:00.000Z"
+    },
+    {
+     "score": 741,
+     "darts": 57,
+     "at": "2026-09-11T00:00:00.000Z"
+    },
+    {
+     "score": 777,
+     "darts": 45,
+     "at": "2026-09-10T00:00:00.000Z"
+    },
+    {
+     "score": 768,
+     "darts": 66,
+     "at": "2026-09-09T00:00:00.000Z"
+    },
+    {
+     "score": 994,
+     "darts": 55,
+     "at": "2026-09-08T00:00:00.000Z"
+    },
+    {
+     "score": 1072,
+     "darts": 54,
+     "at": "2026-09-07T00:00:00.000Z"
+    },
+    {
+     "score": 1194,
+     "darts": 67,
+     "at": "2026-09-06T00:00:00.000Z"
+    },
+    {
+     "score": 584,
+     "darts": 34,
+     "at": "2026-09-05T00:00:00.000Z"
+    },
+    {
+     "score": 652,
+     "darts": 63,
+     "at": "2026-09-04T00:00:00.000Z"
+    },
+    {
+     "score": 744,
+     "darts": 41,
+     "at": "2026-09-03T00:00:00.000Z"
+    },
+    {
+     "score": 975,
+     "darts": 45,
+     "at": "2026-09-02T00:00:00.000Z"
+    },
+    {
+     "score": 577,
+     "darts": 66,
+     "at": "2026-09-01T00:00:00.000Z"
+    },
+    {
+     "score": 824,
+     "darts": 60,
+     "at": "2026-08-31T00:00:00.000Z"
+    },
+    {
+     "score": 998,
+     "darts": 66,
+     "at": "2026-08-30T00:00:00.000Z"
+    },
+    {
+     "score": 544,
+     "darts": 31,
+     "at": "2026-08-29T00:00:00.000Z"
+    },
+    {
+     "score": 630,
+     "darts": 31,
+     "at": "2026-08-28T00:00:00.000Z"
+    },
+    {
+     "score": 856,
+     "darts": 54,
+     "at": "2026-08-27T00:00:00.000Z"
+    },
+    {
+     "score": 881,
+     "darts": 47,
+     "at": "2026-08-26T00:00:00.000Z"
+    },
+    {
+     "score": 545,
+     "darts": 45,
+     "at": "2026-08-25T00:00:00.000Z"
+    },
+    {
+     "score": 1449,
+     "darts": 67,
+     "at": "2026-08-24T00:00:00.000Z"
+    },
+    {
+     "score": 406,
+     "darts": 43,
+     "at": "2026-08-23T00:00:00.000Z"
+    },
+    {
+     "score": 560,
+     "darts": 60,
+     "at": "2026-08-22T00:00:00.000Z"
+    },
+    {
+     "score": 790,
+     "darts": 63,
+     "at": "2026-08-21T00:00:00.000Z"
+    },
+    {
+     "score": 797,
+     "darts": 48,
+     "at": "2026-08-20T00:00:00.000Z"
+    }
+   ]
+  ],
+  "expected": 44.89958716869245
+ },
+ {
+  "fn": "playerStrength",
+  "args": [
+   [
+    {
+     "score": 513,
+     "darts": 58,
+     "at": "2026-10-28T00:00:00.000Z"
+    },
+    {
+     "score": 448,
+     "darts": 48,
+     "at": "2026-10-27T00:00:00.000Z"
+    },
+    {
+     "score": 885,
+     "darts": 60,
+     "at": "2026-10-26T00:00:00.000Z"
+    },
+    {
+     "score": 514,
+     "darts": 49,
+     "at": "2026-10-25T00:00:00.000Z"
+    },
+    {
+     "score": 628,
+     "darts": 40,
+     "at": "2026-10-24T00:00:00.000Z"
+    },
+    {
+     "score": 350,
+     "darts": 37,
+     "at": "2026-10-23T00:00:00.000Z"
+    },
+    {
+     "score": 852,
+     "darts": 58,
+     "at": "2026-10-22T00:00:00.000Z"
+    },
+    {
+     "score": 1224,
+     "darts": 61,
+     "at": "2026-10-21T00:00:00.000Z"
+    },
+    {
+     "score": 737,
+     "darts": 42,
+     "at": "2026-10-20T00:00:00.000Z"
+    },
+    {
+     "score": 709,
+     "darts": 41,
+     "at": "2026-10-19T00:00:00.000Z"
+    },
+    {
+     "score": 991,
+     "darts": 51,
+     "at": "2026-10-18T00:00:00.000Z"
+    },
+    {
+     "score": 433,
+     "darts": 51,
+     "at": "2026-10-17T00:00:00.000Z"
+    },
+    {
+     "score": 811,
+     "darts": 65,
+     "at": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "score": 1246,
+     "darts": 67,
+     "at": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "score": 822,
+     "darts": 46,
+     "at": "2026-10-14T00:00:00.000Z"
+    },
+    {
+     "score": 477,
+     "darts": 36,
+     "at": "2026-10-13T00:00:00.000Z"
+    },
+    {
+     "score": 484,
+     "darts": 58,
+     "at": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "score": 441,
+     "darts": 30,
+     "at": "2026-10-11T00:00:00.000Z"
+    },
+    {
+     "score": 1048,
+     "darts": 64,
+     "at": "2026-10-10T00:00:00.000Z"
+    },
+    {
+     "score": 1073,
+     "darts": 57,
+     "at": "2026-10-09T00:00:00.000Z"
+    },
+    {
+     "score": 853,
+     "darts": 53,
+     "at": "2026-10-08T00:00:00.000Z"
+    },
+    {
+     "score": 426,
+     "darts": 32,
+     "at": "2026-10-07T00:00:00.000Z"
+    },
+    {
+     "score": 995,
+     "darts": 51,
+     "at": "2026-10-06T00:00:00.000Z"
+    },
+    {
+     "score": 668,
+     "darts": 46,
+     "at": "2026-10-05T00:00:00.000Z"
+    },
+    {
+     "score": 781,
+     "darts": 49,
+     "at": "2026-10-04T00:00:00.000Z"
+    },
+    {
+     "score": 1204,
+     "darts": 61,
+     "at": "2026-10-03T00:00:00.000Z"
+    },
+    {
+     "score": 745,
+     "darts": 56,
+     "at": "2026-10-02T00:00:00.000Z"
+    },
+    {
+     "score": 1007,
+     "darts": 57,
+     "at": "2026-10-01T00:00:00.000Z"
+    },
+    {
+     "score": 1026,
+     "darts": 48,
+     "at": "2026-09-30T00:00:00.000Z"
+    },
+    {
+     "score": 1159,
+     "darts": 65,
+     "at": "2026-09-29T00:00:00.000Z"
+    }
+   ],
+   {
+    "halfLife": 5,
+    "priorDarts": 100,
+    "fieldAverage": 45
+   }
+  ],
+  "expected": 41.00495508068597
+ },
+ {
+  "fn": "strengthHistory",
+  "args": [
+   [
+    {
+     "score": 513,
+     "darts": 58,
+     "at": "2026-10-28T00:00:00.000Z"
+    },
+    {
+     "score": 448,
+     "darts": 48,
+     "at": "2026-10-27T00:00:00.000Z"
+    },
+    {
+     "score": 885,
+     "darts": 60,
+     "at": "2026-10-26T00:00:00.000Z"
+    },
+    {
+     "score": 514,
+     "darts": 49,
+     "at": "2026-10-25T00:00:00.000Z"
+    },
+    {
+     "score": 628,
+     "darts": 40,
+     "at": "2026-10-24T00:00:00.000Z"
+    },
+    {
+     "score": 350,
+     "darts": 37,
+     "at": "2026-10-23T00:00:00.000Z"
+    },
+    {
+     "score": 852,
+     "darts": 58,
+     "at": "2026-10-22T00:00:00.000Z"
+    },
+    {
+     "score": 1224,
+     "darts": 61,
+     "at": "2026-10-21T00:00:00.000Z"
+    },
+    {
+     "score": 737,
+     "darts": 42,
+     "at": "2026-10-20T00:00:00.000Z"
+    },
+    {
+     "score": 709,
+     "darts": 41,
+     "at": "2026-10-19T00:00:00.000Z"
+    },
+    {
+     "score": 991,
+     "darts": 51,
+     "at": "2026-10-18T00:00:00.000Z"
+    },
+    {
+     "score": 433,
+     "darts": 51,
+     "at": "2026-10-17T00:00:00.000Z"
+    },
+    {
+     "score": 811,
+     "darts": 65,
+     "at": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "score": 1246,
+     "darts": 67,
+     "at": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "score": 822,
+     "darts": 46,
+     "at": "2026-10-14T00:00:00.000Z"
+    },
+    {
+     "score": 477,
+     "darts": 36,
+     "at": "2026-10-13T00:00:00.000Z"
+    },
+    {
+     "score": 484,
+     "darts": 58,
+     "at": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "score": 441,
+     "darts": 30,
+     "at": "2026-10-11T00:00:00.000Z"
+    },
+    {
+     "score": 1048,
+     "darts": 64,
+     "at": "2026-10-10T00:00:00.000Z"
+    },
+    {
+     "score": 1073,
+     "darts": 57,
+     "at": "2026-10-09T00:00:00.000Z"
+    },
+    {
+     "score": 853,
+     "darts": 53,
+     "at": "2026-10-08T00:00:00.000Z"
+    },
+    {
+     "score": 426,
+     "darts": 32,
+     "at": "2026-10-07T00:00:00.000Z"
+    },
+    {
+     "score": 995,
+     "darts": 51,
+     "at": "2026-10-06T00:00:00.000Z"
+    },
+    {
+     "score": 668,
+     "darts": 46,
+     "at": "2026-10-05T00:00:00.000Z"
+    },
+    {
+     "score": 781,
+     "darts": 49,
+     "at": "2026-10-04T00:00:00.000Z"
+    },
+    {
+     "score": 1204,
+     "darts": 61,
+     "at": "2026-10-03T00:00:00.000Z"
+    },
+    {
+     "score": 745,
+     "darts": 56,
+     "at": "2026-10-02T00:00:00.000Z"
+    },
+    {
+     "score": 1007,
+     "darts": 57,
+     "at": "2026-10-01T00:00:00.000Z"
+    },
+    {
+     "score": 1026,
+     "darts": 48,
+     "at": "2026-09-30T00:00:00.000Z"
+    },
+    {
+     "score": 1159,
+     "darts": 65,
+     "at": "2026-09-29T00:00:00.000Z"
+    }
+   ],
+   5
+  ],
+  "expected": [
+   {
+    "at": "2026-10-24T00:00:00.000Z",
+    "strength": 45.337942186955004
+   },
+   {
+    "at": "2026-10-25T00:00:00.000Z",
+    "strength": 44.474590484600725
+   },
+   {
+    "at": "2026-10-26T00:00:00.000Z",
+    "strength": 44.39633654504615
+   },
+   {
+    "at": "2026-10-27T00:00:00.000Z",
+    "strength": 43.45131903505296
+   },
+   {
+    "at": "2026-10-28T00:00:00.000Z",
+    "strength": 42.323624216601615
+   }
+  ]
+ },
+ {
+  "fn": "strengthHistory",
+  "args": [
+   [
+    {
+     "score": 1062,
+     "darts": 57,
+     "at": "2026-10-28T00:00:00.000Z"
+    },
+    {
+     "score": 632,
+     "darts": 38,
+     "at": "2026-10-27T00:00:00.000Z"
+    },
+    {
+     "score": 536,
+     "darts": 33,
+     "at": "2026-10-26T00:00:00.000Z"
+    }
+   ],
+   5
+  ],
+  "expected": [
+   {
+    "at": "2026-10-26T00:00:00.000Z",
+    "strength": 41.934065934065934
+   },
+   {
+    "at": "2026-10-27T00:00:00.000Z",
+    "strength": 42.86509682104071
+   },
+   {
+    "at": "2026-10-28T00:00:00.000Z",
+    "strength": 44.83836981242858
+   }
+  ]
+ },
+ {
+  "fn": "strengthHistory",
+  "args": [
+   [],
+   5
+  ],
+  "expected": []
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "a",
+     "player1_legs": 3,
+     "player2_legs": 1,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": null
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": {
+   "winner_id": "b",
+   "loser_id": "a",
+   "score": "3:1",
+   "chance": 0.0003878576458143934
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "b",
+     "player2_id": "a",
+     "winner_id": "b",
+     "player1_legs": 3,
+     "player2_legs": 2,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": {
+   "winner_id": "b",
+   "loser_id": "a",
+   "score": "3:2",
+   "chance": 0.0003878576458143652
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    },
+    {
+     "id": "m2",
+     "player1_id": "a",
+     "player2_id": "e",
+     "winner_id": "e",
+     "player1_legs": 0,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": {
+   "winner_id": "e",
+   "loser_id": "a",
+   "score": "3:0",
+   "chance": 0.0000029679953079675414
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "cricket",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": null
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "in_progress"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": null
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60
+   }
+  ],
+  "expected": null
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": null,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": {
+   "winner_id": "b",
+   "loser_id": "a",
+   "score": "3:1",
+   "chance": 0.0003878576458143934
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "c",
+     "player2_id": "d",
+     "winner_id": "c",
+     "player1_legs": 3,
+     "player2_legs": 0,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": null
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   },
+   0.001
+  ],
+  "expected": {
+   "winner_id": "b",
+   "loser_id": "a",
+   "score": "3:1",
+   "chance": 0.0003878576458143934
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    },
+    {
+     "id": "m2",
+     "player1_id": "a",
+     "player2_id": "b",
+     "winner_id": "b",
+     "player1_legs": 2,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": {
+   "winner_id": "b",
+   "loser_id": "a",
+   "score": "3:1",
+   "chance": 0.0003878576458143934
+  }
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [
+    {
+     "id": "m1",
+     "player1_id": "c",
+     "player2_id": "d",
+     "winner_id": "d",
+     "player1_legs": 1,
+     "player2_legs": 3,
+     "legs_to_win": 3,
+     "game_type": "x01",
+     "status": "completed"
+    }
+   ],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   },
+   0.5
+  ],
+  "expected": null
+ },
+ {
+  "fn": "biggestUpset",
+  "args": [
+   [],
+   {
+    "a": 60,
+    "b": 40,
+    "c": 45,
+    "d": 45,
+    "e": 30
+   }
+  ],
+  "expected": null
+ }
+]

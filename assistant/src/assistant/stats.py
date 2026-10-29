@@ -2,15 +2,18 @@
 # The numbers follow getPlayerProfile in src/services/tournamentService.js, so the assistant agrees with the app.
 import json
 import os
+import re
 import sys
 import unicodedata
 from contextlib import contextmanager
 from contextvars import ContextVar
-from datetime import date
+from datetime import date, datetime
 from difflib import SequenceMatcher
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
+
+from assistant.winprob import HISTORY_MATCHES
 
 load_dotenv()
 # Every query runs as the caller: the chat service sets a client carrying the user's JWT (as_user), so RLS
@@ -200,6 +203,47 @@ def get_recent_matches(player_id: str, n: int = 5) -> dict:
                else {"average": float(averages[m["id"]]) if averages.get(m["id"]) is not None else None}),
         })
     return {"player": player["name"], "matches": rows}
+
+
+def _totals_from_rows(rows: list[dict], ids: list[str], per_player: int) -> dict[str, list[dict]]:
+    # Rows are newest first with s1/d1/s2/d2 = each side's total score and darts. Matches without darts are dropped.
+    totals: dict[str, list[dict]] = {i: [] for i in ids}
+
+    def add(pid, opponent_id, score, darts, row):
+        mine = totals.get(pid)
+        if mine is not None and len(mine) < per_player and (darts or 0) > 0:
+            mine.append({"score": score or 0, "darts": darts, "at": row["completed_at"],
+                         "won": row["winner_id"] == pid, "opponent_id": opponent_id})
+
+    for r in rows:
+        add(r["player1_id"], r["player2_id"], r["s1"], r["d1"], r)
+        add(r["player2_id"], r["player1_id"], r["s2"], r["d2"], r)
+    return totals
+
+
+def recent_match_totals(player_ids: list[str], per_player: int = HISTORY_MATCHES, before: str | None = None) -> dict[str, list[dict]]:
+    """Each player's recent completed X01 matches, newest first, as {score, darts, at, won, opponent_id}.
+
+    Mirrors matchService.getRecentMatchTotals: the input for winprob.player_strength, form and head-to-head."""
+    ids = list(dict.fromkeys(i for i in player_ids if re.fullmatch(r"[0-9a-fA-F-]{36}", i or "")))
+    if not ids:
+        return {}
+    listed = ",".join(ids)
+    query = (db().table("matches")
+             .select("player1_id, player2_id, winner_id, completed_at, s1:result->player1Stats->totalScore,"
+                     " d1:result->player1Stats->totalDarts, s2:result->player2Stats->totalScore,"
+                     " d2:result->player2Stats->totalDarts")
+             .eq("status", "completed")
+             .eq("game_type", "x01")  # strength is X01-only; Cricket rows would also eat the limit
+             .or_(f"player1_id.in.({listed}),player2_id.in.({listed})"))
+    try:  # an unparseable `before` is ignored, as in the app
+        query = query.lt("completed_at", datetime.fromisoformat(before).isoformat()) if before else query
+    except ValueError:
+        pass
+    # shortcut: one global newest-first limit, so a very active player can crowd out others' older matches;
+    # per-player limits need an RPC.
+    rows = query.order("completed_at", desc=True, nullsfirst=False).limit(min(per_player * len(ids), 3000)).execute().data
+    return _totals_from_rows(rows, ids, per_player)
 
 
 def get_head_to_head(player_id: str, opponent_id: str | None = None) -> dict:
