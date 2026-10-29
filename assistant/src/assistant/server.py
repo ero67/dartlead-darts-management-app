@@ -7,12 +7,13 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
-from langfuse import Langfuse, propagate_attributes
+from langfuse import Langfuse, get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
@@ -76,6 +77,12 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     thread_id: str = Field(min_length=1, max_length=100)  # made by the widget, one per conversation
+
+
+class FeedbackRequest(BaseModel):
+    trace_id: str = Field(pattern=r"^[0-9a-f]{32}$")  # the id the done event carried
+    value: Literal[0, 1]  # 1 = thumbs up, 0 = thumbs down
+    comment: str | None = Field(default=None, max_length=500)
 
 
 def verify(authorization: str | None) -> tuple[str, str]:
@@ -184,6 +191,19 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
     thread_id = f"{user_id}:{request.thread_id}"
     return StreamingResponse(answer_events(request.message, thread_id, user_id, token, question_id, trace_id),
                              media_type="application/x-ndjson; charset=utf-8")
+
+
+@app.post("/feedback", status_code=204)
+async def feedback(request: FeedbackRequest, authorization: str | None = Header(default=None)):
+    await run_in_threadpool(verify, authorization)  # not use_question: a rating is not a question
+    # shortcut: trace ownership not checked, store (trace_id, user_id) if scores ever drive anything automatic.
+    try:
+        await run_in_threadpool(get_client().create_score, trace_id=request.trace_id, name="user-feedback", value=request.value,
+                                data_type="BOOLEAN", comment=(request.comment or "").strip() or None)
+    except Exception:
+        log.exception("could not store feedback")
+        raise HTTPException(502, "Could not save your feedback. Please try again.")
+    return Response(status_code=204)
 
 
 def main() -> None:

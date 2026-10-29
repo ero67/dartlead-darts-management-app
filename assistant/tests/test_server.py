@@ -5,6 +5,7 @@ import logging
 from contextlib import contextmanager
 
 import pytest
+from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessageChunk
 from langgraph.errors import GraphRecursionError
 
@@ -122,3 +123,73 @@ def test_refund_question_calls_rpc_as_user(fake_db):
     server.refund_question("user-1", "token", QUESTION_ID)
     assert db.calls == [("refund_assistant_question", {"p_question_id": QUESTION_ID})]
     assert db.users == [("token", "user-1")]
+
+
+class FakeLangfuse:
+    """Stands in for get_client(): records create_score kwargs; raises `error` if given."""
+
+    def __init__(self, error=None):
+        self.error, self.scores = error, []
+
+    def create_score(self, **kwargs):
+        if self.error:
+            raise self.error
+        self.scores.append(kwargs)
+
+
+@pytest.fixture
+def feedback(monkeypatch):
+    """A TestClient for /feedback with sign-in accepted and Langfuse faked; returns (post, langfuse, questions)."""
+    langfuse, questions = FakeLangfuse(), []
+    monkeypatch.setattr(server, "verify", lambda authorization: ("user-1", "token"))
+    monkeypatch.setattr(server, "get_client", lambda: langfuse)
+    monkeypatch.setattr(server, "use_question", lambda *args: questions.append(args))
+    client = TestClient(server.app)
+
+    def post(**body):
+        return client.post("/feedback", json={"trace_id": TRACE_ID, "value": 1, **body}, headers={"Authorization": "Bearer token"})
+
+    return post, langfuse, questions
+
+
+def test_feedback_needs_sign_in():
+    response = TestClient(server.app).post("/feedback", json={"trace_id": TRACE_ID, "value": 1})
+    assert response.status_code == 401
+
+
+def test_feedback_rejects_bad_trace_id(feedback):
+    post, langfuse, _ = feedback
+    assert post(trace_id="abc").status_code == 422
+    assert langfuse.scores == []
+
+
+def test_feedback_rejects_long_comment(feedback):
+    post, langfuse, _ = feedback
+    assert post(comment="x" * 501).status_code == 422
+    assert langfuse.scores == []
+
+
+def test_feedback_scores_trace(feedback):
+    post, langfuse, _ = feedback
+    response = post(value=0, comment="wrong number")
+    assert response.status_code == 204
+    assert langfuse.scores == [{"trace_id": TRACE_ID, "name": "user-feedback", "value": 0, "data_type": "BOOLEAN",
+                                "comment": "wrong number"}]
+
+
+def test_feedback_blank_comment_is_none(feedback):
+    post, langfuse, _ = feedback
+    assert post(comment="   ").status_code == 204
+    assert langfuse.scores[0]["comment"] is None
+
+
+def test_feedback_does_not_use_a_question(feedback):
+    post, _, questions = feedback
+    post()
+    assert questions == []
+
+
+def test_feedback_langfuse_failure_is_502(feedback):
+    post, langfuse, _ = feedback
+    langfuse.error = RuntimeError("langfuse is down")
+    assert post().status_code == 502
