@@ -30,14 +30,14 @@ def task(*, item, **_):
         ask.invoke(turn, config=config)
     result = ask.invoke(data["question"], config=config)
     messages = graph.get_state(config).values["messages"]
-    turn_start = max(i for i, m in enumerate(messages) if isinstance(m, HumanMessage))
     return {
         "answer": result["answer"],
         "tools": result["tools"],
         "sections": [f"{d.metadata['source']} > {d.metadata.get('section')}" for d in result["docs"]],
-        # The evidence the answer may rely on: retrieved chunks and this turn's tool results.
+        # The evidence the answer may rely on: retrieved chunks and every tool result in the conversation
+        # (a follow-up can answer from an earlier turn's results without calling a tool again).
         "evidence": [d.page_content for d in result["docs"]]
-                    + [f"{m.name} -> {m.content}" for m in messages[turn_start:] if isinstance(m, ToolMessage)],
+                    + [f"{m.name} -> {m.content}" for m in messages if isinstance(m, ToolMessage)],
     }
 
 
@@ -94,15 +94,17 @@ Compare the ASSISTANT ANSWER with the REFERENCE ANSWER and the EVIDENCE the assi
   extra correct detail is fine. When the expected behaviour is not "answer", give 5 if it did that behaviour and
   invented nothing (a polite redirect to what it can help with counts as not knowing); lower only if it guessed.
 - behavior_ok, for the EXPECTED BEHAVIOUR: answer = it answers; ask = it asks a clarifying question instead of
-  guessing; refuse = it politely declines an off-topic request; dont_know = it says it does not know or the docs do
-  not cover it, inventing nothing; not_found = it says it cannot find what was named.
+  guessing; answer_or_ask = either answers (covering every reasonable reading) or asks which is meant; refuse = it politely declines an off-topic request; dont_know = it says it does not know or the docs do
+  not cover it, inventing nothing; not_found = it says it cannot find what was named (offering similar items that
+  do exist, or asking which one is meant, is fine).
 - grounded: false if the answer states facts, numbers, benchmarks or opinions-as-facts that neither the evidence
   nor the reference supports (for example "elite players average 40%"). Asking a question or declining is grounded.
 - language_ok: the answer is in the same language as the user's question (names may stay as they are).
 Be strict about numbers and invented facts, lenient about wording and formatting."""
 
+# max_tokens: a verdict is ~200 tokens; without a cap a looping judge once wrote 65,521 tokens ($0.16 for one call).
 judge = ChatOpenAI(model=JUDGE_MODEL, base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"],
-                   name="judge").with_structured_output(Verdict)
+                   name="judge", max_tokens=1000).with_structured_output(Verdict)
 
 
 def llm_judge(*, input, output, expected_output, **_):
