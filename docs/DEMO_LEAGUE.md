@@ -72,3 +72,6 @@ everything again. The player rows are reused.
 - **Logged-out visitors.** Tournament pages and the TV view work without
   login. League pages (leaderboard, statistics) need a login, because league
   tables are readable only by authenticated users.
+
+> After re-seeding with `--reset`, the new league needs `is_demo = true` so the AI assistant keeps leaving it out:
+> `UPDATE public.leagues SET is_demo = true WHERE id = '<new id>';`
