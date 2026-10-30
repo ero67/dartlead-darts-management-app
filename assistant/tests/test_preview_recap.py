@@ -109,7 +109,8 @@ def stub_recap(monkeypatch, league_id="l1", game_type="x01"):
     tournament = {"starts_at": "2026-10-20T09:00:00+00:00", "created_at": "2026-10-01T09:00:00+00:00",
                   "league_id": league_id, "game_type": game_type}
     # a is far stronger than b: b beating a is the upset; c vs a is expected
-    matches = [rmatch("a", "b", "b", (1, 3), o1=1, o2=2), rmatch("a", "c", "a", (3, 0), o1=1)]
+    matches = [rmatch("a", "b", "b", (1, 3), o1=1, o2=2, completed_at="2026-10-20T10:30:00+00:00"),
+               rmatch("a", "c", "a", (3, 0), o1=1, completed_at="2026-10-20T09:15:00+00:00")]
     monkeypatch.setattr(stats, "db", lambda: FakeTable({"tournaments": tournament, "matches": matches}))
     monkeypatch.setattr(stats, "get_tournament_summary", lambda tid: {"tournament": "Round 3", "podium": []})
     seen = []
@@ -122,7 +123,7 @@ def stub_recap(monkeypatch, league_id="l1", game_type="x01"):
 def test_recap_with_league(monkeypatch):
     seen = stub_recap(monkeypatch)
     r = stats.get_round_recap("t1")
-    assert seen == [{"before": "2026-10-20T09:00:00+00:00"}]  # strengths as they were before the round
+    assert seen == [{"before": "2026-10-20T09:15:00+00:00"}]  # the earliest completed_at, like the app's firstResultAt
     assert [e["position"] for e in r["league_top3"]] == [1, 2, 3]
     assert r["summary"]["tournament"] == "Round 3"
     assert r["total_180s"] == 4
@@ -137,11 +138,22 @@ def test_recap_without_league(monkeypatch):
     assert r["total_180s"] == 4 and r["biggest_upset"] is not None and r["summary"]
 
 
-def test_recap_falls_back_to_created_at(monkeypatch):
+def test_recap_first_result_wins_over_a_later_starts_at(monkeypatch):
     seen = stub_recap(monkeypatch)
+    stats.db().tables["tournaments"]["starts_at"] = "2026-10-20T18:00:00+00:00"  # later than the first result
+    stats.get_round_recap("t1")
+    assert seen == [{"before": "2026-10-20T09:15:00+00:00"}]
+
+
+def test_recap_falls_back_without_completed_matches(monkeypatch):
+    seen = stub_recap(monkeypatch)
+    for m in stats.db().tables["matches"]:
+        m["completed_at"] = None
+    stats.get_round_recap("t1")
+    assert seen == [{"before": "2026-10-20T09:00:00+00:00"}]  # starts_at
     stats.db().tables["tournaments"]["starts_at"] = None
     stats.get_round_recap("t1")
-    assert seen == [{"before": "2026-10-01T09:00:00+00:00"}]
+    assert seen[-1] == {"before": "2026-10-01T09:00:00+00:00"}  # created_at
 
 
 def test_recap_cricket_has_no_upset_or_180s(monkeypatch):

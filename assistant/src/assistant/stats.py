@@ -786,7 +786,10 @@ def get_round_recap(tournament_id: str) -> dict:
     facts = {"total_180s": None, "biggest_upset": None}  # X01 numbers: nothing to say for a Cricket round
     if not _is_cricket(t["game_type"]):
         ids = list({pid for m in matches for pid in (m["player1_id"], m["player2_id"]) if pid})
-        before = t["starts_at"] or t["created_at"]
+        # Strengths as they were before the round's first result, like firstResultAt in the app's TournamentSummary;
+        # starts_at / created_at only when nothing is completed yet.
+        before = min((m["completed_at"] for m in matches if m["completed_at"]), key=_when, default=None) \
+            or t["starts_at"] or t["created_at"]
         histories = recent_match_totals(ids, before=before) if ids else {}
         facts = _recap(matches, {i: player_strength(h) for i, h in histories.items() if h})
     standings = get_league_standings(t["league_id"])["standings"][:3] if t["league_id"] else None
