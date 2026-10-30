@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+import time
 import unicodedata
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -27,6 +28,30 @@ _user_id: ContextVar[str | None] = ContextVar("user_id", default=None)  # who "m
 
 def db() -> Client:
     return _client.get()
+
+
+DEMO_CACHE_SECONDS = 600
+_demo_cache: tuple[float, dict[str, set[str]]] | None = None
+
+
+def _demo() -> dict[str, set[str]]:
+    """Ids of the demo leagues (leagues.is_demo), their tournaments and their fictional players. Searches, lists and
+    records leave these out, so a demo name never reaches an answer. Tools given an id (the demo league's own page)
+    still work. Cached: it costs three queries and only changes when a demo league is seeded."""
+    global _demo_cache
+    if _demo_cache and time.monotonic() < _demo_cache[0]:
+        return _demo_cache[1]
+    leagues = {l["id"] for l in db().table("leagues").select("id").eq("is_demo", True).execute().data}
+    tournaments = {t["id"] for t in db().table("tournaments").select("id").in_("league_id", list(leagues)).execute().data} if leagues else set()
+    players = ({p["player_id"] for p in db().table("tournament_players").select("player_id").in_("tournament_id", list(tournaments)).execute().data}
+               if tournaments else set())
+    demo = {"leagues": leagues, "tournaments": tournaments, "players": players}
+    _demo_cache = (time.monotonic() + DEMO_CACHE_SECONDS, demo)
+    return demo
+
+
+def _not_demo(query, column: str, ids: set[str]):
+    return query.not_.in_(column, list(ids)) if ids else query
 
 
 @contextmanager
@@ -75,12 +100,13 @@ def find_player(name: str, limit: int = 5) -> list[dict]:
     """Players whose name is close to `name`, best match first. More than one result means: ask which one."""
     # shortcut: ranks every player name in Python (PostgREST returns at most 1000 rows); move to a
     # pg_trgm RPC when there are more players than that.
-    return _rank(name, db().table("players").select("id, name").execute().data, limit)
+    hidden = _demo()["players"]
+    return _rank(name, [p for p in db().table("players").select("id, name").execute().data if p["id"] not in hidden], limit)
 
 
 def find_league(name: str, limit: int = 5) -> list[dict]:
     """Leagues the caller can see whose name is close to `name`, best match first."""
-    return _rank(name, db().table("leagues").select("id, name").eq("deleted", False).execute().data, limit)
+    return _rank(name, db().table("leagues").select("id, name").eq("deleted", False).eq("is_demo", False).execute().data, limit)
 
 
 def _tournaments(player_id: str, league_id: str | None = None) -> dict[str, str]:
@@ -528,6 +554,8 @@ def list_tournaments(mine: bool = False, player_id: str | None = None, league_id
         query = query.in_("id", list(_tournaments(player_id)))
     if league_id:
         query = query.eq("league_id", league_id)
+    if not (player_id or league_id):
+        query = _not_demo(query, "id", _demo()["tournaments"])
     if status:
         query = query.eq("status", status)
     result = query.order("created_at", desc=True).limit(limit).execute()
@@ -539,14 +567,16 @@ def list_tournaments(mine: bool = False, player_id: str | None = None, league_id
 def find_tournament(name: str, limit: int = 5) -> list[dict]:
     """Tournaments whose name is close to `name`, best match first, with date, status and league_id to tell rounds
     (and same-named leagues) apart."""
-    rows = db().table("tournaments").select("id, name, status, starts_at, created_at, league_id").eq("deleted", False).execute().data
+    hidden = _demo()["tournaments"]
+    rows = [t for t in db().table("tournaments").select("id, name, status, starts_at, created_at, league_id").eq("deleted", False).execute().data
+            if t["id"] not in hidden]
     by_id = {r["id"]: r for r in rows}
     return [{**c, "date": _date(by_id[c["id"]]), "status": by_id[c["id"]]["status"], "league_id": by_id[c["id"]]["league_id"]} for c in _rank(name, rows, limit)]
 
 
 def list_leagues(mine: bool = False) -> dict:
     """Leagues the caller can see (RLS decides), or only the ones the signed-in user created."""
-    query = db().table("leagues").select("id, name, status, season_name").eq("deleted", False)
+    query = db().table("leagues").select("id, name, status, season_name").eq("deleted", False).eq("is_demo", False)
     if mine:
         if not _user_id.get():
             return {"error": "Nobody is signed in, so there are no own leagues to list."}
@@ -614,8 +644,7 @@ def get_records(stat: str, min_checkout: int | None = None, league_id: str | Non
     pages use: checkouts (highest per player, or how often each player finished min_checkout or more), 180s,
     best single-match averages, best overall averages (players with 5+ X01 matches). X01 only."""
     query = db().table("tournaments").select("id, name, starts_at, created_at").eq("deleted", False)
-    if league_id:
-        query = query.eq("league_id", league_id)
+    query = query.eq("league_id", league_id) if league_id else _not_demo(query, "id", _demo()["tournaments"])
     tournaments = {t["id"]: t for t in query.execute().data}
     if not tournaments:
         return {"stat": stat, "records": []}
