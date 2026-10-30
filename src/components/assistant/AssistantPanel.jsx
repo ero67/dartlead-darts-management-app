@@ -157,12 +157,14 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
 
   // Real names for the suggestions and the chip, fetched while the panel is open and again on a new page.
+  // Home and other routes show no chip, so once the chat has messages nothing uses the names: skip the fetch.
+  const needsNames = isOpen && (CHIP_KINDS.includes(page?.kind) || messages.length === 0);
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!needsNames) return undefined;
     let isCurrent = true;
     assistantService.getSuggestionNames(page).then(names => { if (isCurrent) setLoaded({ page, names }); });
     return () => { isCurrent = false; };
-  }, [isOpen, page]);
+  }, [needsNames, page]);
   const names = loaded.page === page ? loaded.names : {};
   const suggestions = suggestionsFor(page, names);
   const chipName = !CHIP_KINDS.includes(page?.kind) ? null : names.label || t(`assistant.pageChip.${page.kind}`);

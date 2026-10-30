@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { leagueService } from './leagueService';
-import { matchService, tournamentService } from './tournamentService';
+import { matchService } from './tournamentService';
 
 // The assistant service (assistant/ folder, FastAPI). Unset = the assistant is hidden.
 export const ASSISTANT_URL = import.meta.env.VITE_ASSISTANT_URL;
@@ -11,16 +11,32 @@ async function topTwo(leagueId) {
   return first?.player?.name && second?.player?.name ? { a: first.player.name, b: second.player.name } : {};
 }
 
-// The final's winner and loser, from the bracket with the fresh playoff match rows laid over it
-// (as TournamentSummary does); none until the final is played.
-function finalists(tournament) {
-  const rounds = tournament.playoffs?.rounds;
-  const bracketFinal = rounds?.[rounds.length - 1]?.matches?.find(m => !m.isThirdPlaceMatch);
-  const final = { ...bracketFinal, ...tournament.playoffMatches.find(m => m.id === bracketFinal?.id) };
-  const winnerId = final.result?.winner;
-  if (final.status !== 'completed' || !winnerId) return {};
-  const [winner, loser] = winnerId === final.player1?.id ? [final.player1, final.player2] : [final.player2, final.player1];
+// The final's winner and loser as { a, b }: the final from the bracket (playoffs JSON), with its live
+// matches row laid over it (the JSON can be stale, as TournamentSummary knows); {} until it is played.
+async function finalists(playoffs) {
+  const rounds = playoffs?.rounds;
+  const bracket = rounds?.[rounds.length - 1]?.matches?.find(m => !m.isThirdPlaceMatch);
+  if (!bracket) return {};
+  const { data: row, error } = await supabase
+    .from('matches')
+    .select('status, winner_id, player1:players!matches_player1_id_fkey(id, name), player2:players!matches_player2_id_fkey(id, name)')
+    .eq('id', bracket.id)
+    .maybeSingle();
+  if (error) throw error;
+  const status = row?.status ?? bracket.status;
+  const winnerId = row?.winner_id ?? bracket.result?.winner;
+  const player1 = row?.player1 || bracket.player1;
+  const player2 = row?.player2 || bracket.player2;
+  if (status !== 'completed' || !winnerId) return {};
+  const [winner, loser] = winnerId === player1?.id ? [player1, player2] : [player2, player1];
   return winner?.name && loser?.name ? { a: winner.name, b: loser.name } : {};
+}
+
+// The opponent this player met most often in their recent X01 matches (Cricket is not in the totals), or undefined.
+function mostFrequentOpponent(history = []) {
+  const counts = new Map();
+  history.forEach(m => m.opponentId && counts.set(m.opponentId, (counts.get(m.opponentId) || 0) + 1));
+  return [...counts].sort((x, y) => y[1] - x[1])[0]?.[0];
 }
 
 export const assistantService = {
@@ -59,18 +75,21 @@ export const assistantService = {
           return { ...top, label: leagues.find(l => l.id === page.id)?.name };
         }
         case 'tournament': {
-          const tournament = await tournamentService.getTournament(page.id);
-          return { ...finalists(tournament), label: tournament.name };
+          const { data: tournament, error } = await supabase.from('tournaments').select('name, playoffs').eq('id', page.id).eq('deleted', false).maybeSingle();
+          if (error) throw error;
+          // The name survives a failed final lookup.
+          const top = await finalists(tournament?.playoffs).catch(() => ({}));
+          return { ...top, label: tournament?.name };
         }
         case 'player': {
-          const [profile, totals] = await Promise.all([tournamentService.getPlayerProfile(page.id), matchService.getRecentMatchTotals([page.id], 60)]);
-          const counts = new Map();
-          (totals.get(page.id) || []).forEach(m => m.opponentId && counts.set(m.opponentId, (counts.get(m.opponentId) || 0) + 1));
-          const [opponentId] = [...counts].sort((x, y) => y[1] - x[1])[0] || [];
-          // The profile's last 10 matches usually name them; otherwise their own profile does.
-          const opponent = opponentId && (profile.recentMatches.find(m => m.opponentId === opponentId)?.opponentName
-            ?? (await tournamentService.getPlayerProfile(opponentId)).player?.name);
-          return { label: profile.player?.name, player: profile.player?.name, ...(opponent && { opponent }) };
+          // The name survives a failed history lookup: no opponent then, so the plain question.
+          const totals = await matchService.getRecentMatchTotals([page.id], 60).catch(() => null);
+          const opponentId = mostFrequentOpponent(totals?.get(page.id));
+          const { data, error } = await supabase.from('players').select('id, name').in('id', [page.id, opponentId].filter(Boolean));
+          if (error) throw error;
+          const nameOf = (id) => data.find(p => p.id === id)?.name;
+          const opponent = opponentId && nameOf(opponentId);
+          return { label: nameOf(page.id), player: nameOf(page.id), ...(opponent && { opponent }) };
         }
         case 'practice':
           return {};
