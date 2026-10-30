@@ -1585,6 +1585,7 @@
     "title": "Asistent",
     "description": "Pravidlá šípok, používanie DartLead a štatistiky hráčov.",
     "open": "Otvoriť asistenta",
+    "headerLabel": "AI asistent",
     "newChat": "Nová konverzácia",
     "placeholder": "Opýtajte sa…",
     "send": "Odoslať",

@@ -1585,6 +1585,7 @@
     "title": "Assistant",
     "description": "Darts rules, using DartLead, and players' statistics.",
     "open": "Open the assistant",
+    "headerLabel": "AI assistant",
     "newChat": "New conversation",
     "placeholder": "Ask a question…",
     "send": "Send",

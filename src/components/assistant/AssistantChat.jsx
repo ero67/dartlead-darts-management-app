@@ -1,13 +1,11 @@
-import React, { lazy, Suspense, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useAdmin } from '@/contexts/AdminContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAssistant } from '@/contexts/AssistantContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
-import { ASSISTANT_URL, assistantService } from '@/services/assistantService';
 
 // Shown instead of the panel when its download fails (e.g. a tab still on old files after a deploy).
 function AssistantUnavailable({ isOpen, onOpenChange }) {
@@ -30,38 +28,23 @@ const AssistantPanel = lazy(() => import('./AssistantPanel')
   }));
 
 export function AssistantChat() {
-  const { user } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { canUseAssistant, hasOpened, isOpen, setIsOpen, openAssistant } = useAssistant();
   const location = useLocation();
   const { t } = useLanguage();
-  const [isOpen, setIsOpen] = useState(false);
-  // Stays mounted after the first open, so closing the panel keeps the conversation.
-  const [hasOpened, setHasOpened] = useState(false);
-  const [settings, setSettings] = useState(null);
 
-  useEffect(() => {
-    if (ASSISTANT_URL && user) assistantService.getSettings().then(setSettings);
-  }, [user]);
-
-  // Behind a flag (VITE_ASSISTANT_URL), for signed-in users the admin switch allows (everyone or admins
-  // only; the API checks the same), and never over the scoring keypad.
-  if (!ASSISTANT_URL || !user || !settings) return null;
-  if (settings.audience !== 'everyone' && !isAdmin) return null;
+  if (!canUseAssistant) return null;
+  // Never over the scoring keypad.
   const isHidden = location.pathname.startsWith('/match/');
-
-  const handleOpen = () => {
-    setHasOpened(true);
-    setIsOpen(true);
-  };
 
   return (
     <>
+      {/* Below lg the mobile header has this button: nothing floats over the page on a phone. */}
       {!isHidden && (
         <Button
           size="icon"
-          className="fixed right-4 bottom-[calc(1rem+var(--safe-area-inset-bottom,0px))] z-40 size-12 rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95 animate-in fade-in zoom-in-75 duration-300"
+          className="fixed right-4 bottom-[calc(1rem+var(--safe-area-inset-bottom,0px))] z-40 hidden size-12 rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95 animate-in fade-in zoom-in-75 duration-300 lg:inline-flex"
           aria-label={t('assistant.open')}
-          onClick={handleOpen}
+          onClick={openAssistant}
         >
           <MessageCircle className="size-5" />
         </Button>

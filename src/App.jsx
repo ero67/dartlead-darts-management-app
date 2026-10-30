@@ -13,6 +13,7 @@ import { LeagueProvider, useLeague } from './contexts/LeagueContext';
 import { LiveMatchProvider } from './contexts/LiveMatchContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdminProvider, useAdmin } from './contexts/AdminContext';
+import { AssistantProvider } from './contexts/AssistantContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { OfflineProvider } from './contexts/OfflineContext';
@@ -653,7 +654,9 @@ function App() {
                 <TournamentProvider>
                   <LiveMatchProvider>
                     <ErrorBoundary>
-                      <AppContent />
+                      <AssistantProvider>
+                        <AppContent />
+                      </AssistantProvider>
                     </ErrorBoundary>
                   </LiveMatchProvider>
                 </TournamentProvider>
