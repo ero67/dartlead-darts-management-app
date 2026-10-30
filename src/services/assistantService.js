@@ -94,9 +94,14 @@ export const assistantService = {
         case 'practice':
           return {};
         default: {
-          // Home and other routes: the top two of the newest active league.
-          const league = (await leagueService.getLeagues()).find(l => l.status === 'active');
-          return league ? await topTwo(league.id) : {};
+          // Home and other routes: the top two of the newest active league that has two ranked players
+          // (a just-created league has none); at most 3 leagues, one after the other.
+          const leagues = (await leagueService.getLeagues()).filter(l => l.status === 'active').slice(0, 3);
+          for (const league of leagues) {
+            const top = await topTwo(league.id).catch(() => ({}));
+            if (top.a) return top;
+          }
+          return {};
         }
       }
     } catch (error) {
