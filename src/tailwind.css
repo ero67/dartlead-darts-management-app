@@ -50,6 +50,23 @@
   10% { opacity: 0.9; }
   60%, 100% { opacity: 0; transform: scale(2.6); }
 }
+@keyframes spark-pop {
+  0% { opacity: 0; transform: scale(0) rotate(-135deg); }
+  60% { opacity: 1; transform: scale(1.35) rotate(12deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes spark-spin {
+  0% { transform: scale(1) rotate(0); }
+  30% { transform: scale(1.4) rotate(60deg); }
+  100% { transform: scale(1) rotate(90deg); }
+}
+/* A quarter turn per dart: the spark has four points, so the loop back to 0deg can't be seen. */
+@keyframes spark-turn {
+  0% { transform: scale(1) rotate(0); }
+  10% { transform: scale(0.75) rotate(0); }
+  30% { transform: scale(1.35) rotate(60deg); }
+  55%, 100% { transform: scale(1) rotate(90deg); }
+}
 @keyframes shimmer {
   from { background-position: 100% 0; }
   to { background-position: -150% 0; }
