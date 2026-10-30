@@ -104,9 +104,10 @@ Compare the ASSISTANT ANSWER with the REFERENCE ANSWER and the EVIDENCE the assi
 - language_ok: the answer is in the same language as the user's question (names may stay as they are).
 Be strict about numbers and invented facts, lenient about wording and formatting."""
 
-# max_tokens: a verdict is ~200 tokens; without a cap a looping judge once wrote 65,521 tokens ($0.16 for one call).
+# max_tokens counts the judge's reasoning tokens too (Flash spent 982 of 1000 on reasoning in one call, so the verdict
+# was cut off): 4000 leaves room for both. Keep a cap: a looping judge once wrote 65,521 tokens ($0.16 for one call).
 judge = ChatOpenAI(model=JUDGE_MODEL, base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"],
-                   name="judge", max_tokens=1000).with_structured_output(Verdict)
+                   name="judge", max_tokens=4000).with_structured_output(Verdict)
 
 
 def llm_judge(*, input, output, expected_output, **_):

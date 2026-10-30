@@ -13,7 +13,8 @@ from difflib import SequenceMatcher
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-from assistant.winprob import HISTORY_MATCHES, biggest_upset, leg_win_probability, match_win_probability, player_strength
+from assistant.winprob import (HISTORY_MATCHES, biggest_upset, format_chance, leg_win_probability, match_win_probability,
+                               player_strength)
 
 load_dotenv()
 # Every query runs as the caller: the chat service sets a client carrying the user's JWT (as_user), so RLS
@@ -425,14 +426,19 @@ def get_my_practice(game: str | None = None, days: int = 30) -> dict:
     return {"signed_in": True, "days": days, **_practice_summary(rows, linked, since)}
 
 
+MIN_EARLIER_MATCHES = 20  # matches older than the window that a "rating then" and a change need
+
+
 def _form(history: list[dict], matches: int) -> dict:
-    """X01 form from a newest-first history (recent_match_totals rows): the app's strength rating now and
-    `matches` matches ago, the average and record over the last `matches`, and calendar-month averages."""
+    """X01 form from a newest-first history (recent_match_totals rows): the app's form rating now and
+    `matches` matches ago (only with enough earlier matches), the average and record over the last `matches`, and calendar-month averages."""
     recent = history[:matches]
     if not recent:
         return {"matches": 0}
     current = player_strength(history[:HISTORY_MATCHES])
-    before = player_strength(history[matches:matches + HISTORY_MATCHES]) if len(history) > matches else None
+    # A short earlier history is dominated by the 240-dart prior at the field average and would show a false jump.
+    before = (player_strength(history[matches:matches + HISTORY_MATCHES])
+              if len(history) >= matches + MIN_EARLIER_MATCHES else None)
 
     months: dict[str, list[int]] = {}  # month -> [score, darts, matches]
     for m in history:
@@ -531,10 +537,11 @@ def list_tournaments(mine: bool = False, player_id: str | None = None, league_id
 
 
 def find_tournament(name: str, limit: int = 5) -> list[dict]:
-    """Tournaments whose name is close to `name`, best match first, with date and status to tell rounds apart."""
-    rows = db().table("tournaments").select("id, name, status, starts_at, created_at").eq("deleted", False).execute().data
+    """Tournaments whose name is close to `name`, best match first, with date, status and league_id to tell rounds
+    (and same-named leagues) apart."""
+    rows = db().table("tournaments").select("id, name, status, starts_at, created_at, league_id").eq("deleted", False).execute().data
     by_id = {r["id"]: r for r in rows}
-    return [{**c, "date": _date(by_id[c["id"]]), "status": by_id[c["id"]]["status"]} for c in _rank(name, rows, limit)]
+    return [{**c, "date": _date(by_id[c["id"]]), "status": by_id[c["id"]]["status"], "league_id": by_id[c["id"]]["league_id"]} for c in _rank(name, rows, limit)]
 
 
 def list_leagues(mine: bool = False) -> dict:
@@ -707,12 +714,13 @@ def _is_cricket(game_type: str | None) -> bool:
 def _preview(players: list[dict], histories: dict, legs_to_win: int, legs: tuple[int, int], game_type: str | None,
              status: str | None, winner_id: str | None = None) -> dict:
     """The win chance before (or during) a match from already-fetched histories, as PreMatchCard.jsx shows it:
-    strengths from player_strength, none for a player without an X01 match (the app gives them no entry)."""
+    form ratings from player_strength, none for a player without an X01 match (the app gives them no entry).
+    Each player gets win_chance and leg_win_chance as display strings, formatted as the card does ("63%", "<1%")."""
     predictable = status != "completed" and not _is_cricket(game_type)
     strengths = [player_strength(histories[p["id"]]) if predictable and histories.get(p["id"]) else None for p in players]
-    result = {"players": [{**p, "strength": s, "matches_counted": len(histories.get(p["id"], [])) if predictable else None}
-                          for p, s in zip(players, strengths)],
-              "match_win_probability": None, "leg_win_probability": None,
+    result = {"players": [{**p, "form_rating": None if s is None else round(s, 1),
+                           "matches_counted": len(histories.get(p["id"], [])) if predictable else None,
+                           "win_chance": None, "leg_win_chance": None} for p, s in zip(players, strengths)],
               "legs_to_win": legs_to_win, "legs": list(legs), "note": None}
     if status == "completed":
         winner = next((p["name"] for p in players if p["id"] == winner_id), None)
@@ -724,14 +732,20 @@ def _preview(players: list[dict], histories: dict, legs_to_win: int, legs: tuple
         missing = " and ".join(p["name"] for p, s in zip(players, strengths) if s is None)
         result["note"] = f"No completed X01 matches on record for {missing}, so there is no win chance."
     else:
-        result["match_win_probability"] = match_win_probability(*strengths, legs_to_win=legs_to_win, legs_a=legs[0], legs_b=legs[1])
-        result["leg_win_probability"] = leg_win_probability(*strengths)
+        match = match_win_probability(*strengths, legs_to_win=legs_to_win, legs_a=legs[0], legs_b=legs[1])
+        leg = leg_win_probability(*strengths)
+        for player, (m, l) in zip(result["players"], ((match, leg), (1 - match, 1 - leg))):
+            player["win_chance"], player["leg_win_chance"] = format_chance(m), format_chance(l)
     return result
+
+
+MAX_LEGS_TO_WIN = 25
 
 
 def get_match_preview(match_id: str | None = None, player_id: str | None = None, opponent_id: str | None = None,
                       legs_to_win: int = 3) -> dict:
-    """Win chance, form and head-to-head for a match (by id, using its current legs) or for two players."""
+    """Win chance, form rating and head-to-head for a match (by id, using its current legs) or for two players.
+    head_to_head counts wins and legs from the first player's side (players[0])."""
     status = winner_id = game_type = None
     legs = (0, 0)
     if match_id:
@@ -752,6 +766,7 @@ def get_match_preview(match_id: str | None = None, player_id: str | None = None,
     else:
         return {"error": "Give either a match_id or both player_id and opponent_id."}
 
+    legs_to_win = min(max(legs_to_win, 1), MAX_LEGS_TO_WIN)  # the negative binomial sum runs legs_to_win times
     ids = [p["id"] for p in players]
     # Current form, like the pre-match card (no `before`); a finished or Cricket match needs no strengths.
     needs_strengths = status != "completed" and not _is_cricket(game_type)
@@ -771,13 +786,13 @@ def _recap(matches: list[dict], strengths: dict[str, float]) -> dict:
     upset = biggest_upset(matches, strengths)
     return {"total_180s": one_eighties,
             "biggest_upset": upset and {"winner": names[upset["winner_id"]], "loser": names[upset["loser_id"]],
-                                        "score": upset["score"], "chance": upset["chance"]}}
+                                        "score": upset["score"], "chance": format_chance(upset["chance"])}}
 
 
 def get_round_recap(tournament_id: str) -> dict:
-    """The facts for a short post about one tournament (round): its summary, total 180s, the biggest upset and, for a
-    league round, the top 3 of the league table."""
-    t = (db().table("tournaments").select("starts_at, created_at, league_id, game_type")
+    """The facts for a short post about one tournament (round): its summary, total 180s, the biggest upset (its chance
+    as a display string) and, for a round of the league's current season, the top 3 of the league table."""
+    t = (db().table("tournaments").select("starts_at, created_at, league_id, season_id, game_type")
          .eq("id", tournament_id).single().execute().data)
     summary = get_tournament_summary(tournament_id)
     matches = (db().table("matches")
@@ -792,7 +807,9 @@ def get_round_recap(tournament_id: str) -> dict:
             or t["starts_at"] or t["created_at"]
         histories = recent_match_totals(ids, before=before) if ids else {}
         facts = _recap(matches, {i: player_strength(h) for i, h in histories.items() if h})
-    standings = get_league_standings(t["league_id"])["standings"][:3] if t["league_id"] else None
+    # The table is the league's current season; a round from an archived season (season_id set) gets none.
+    current = t["league_id"] and t["season_id"] is None
+    standings = get_league_standings(t["league_id"])["standings"][:3] if current else None
     return {"summary": summary, **facts, "league_top3": standings}
 
 

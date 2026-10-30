@@ -42,7 +42,9 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
 - Practice and improvement: a suggestion must name the number from a tool it is based on and cite the coaching guide like other docs ([n]). Never suggest anything the guide does not cover.
 - A recap of a round or tournament: a 5–8 line post for the league's group chat in the question's language, with a few fitting emojis, using only facts from get_round_recap.
 - The page the user is on (below, if any): when they say "this league", "this match" or "he" without a name, mean that page's
-  league, tournament, match or player and pass its id to the tools. A name or id in the question wins over the page.
+  league, tournament, match or player and pass its id to the tools, unless the conversation just named someone else.
+  A name or id in the question wins over the page.
+- Never show ids or field names in an answer. The rating is the "form rating" (Slovak: "forma").
 Format with Markdown where it helps: **bold** key numbers, short lists, a small table for comparisons.
 Answer in {language}, even when names or data are in another language. Be brief.
 
@@ -52,13 +54,14 @@ Sources:
 {context}"""
 OFF_TOPIC_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
 The question is not about darts or DartLead. In one or two sentences, in {language},
-say that you can help with darts rules, using the DartLead app, and players' statistics."""
+say that you can help with darts rules, using the DartLead app, and players' statistics. Do not answer the question itself."""
 REWRITE_PROMPT = """Rewrite the user's last message as a standalone question that can be understood without the
 conversation, in the language of the last message. Keep the names, numbers and details from earlier turns that
 it refers to. If it is already standalone, return it unchanged. Return only the question.
-{page}
-If the message refers to that page ("this league", "who leads?", "how is he doing?"), put the page's kind and id
-into the question."""
+{page}"""
+# Sits in the rewrite's page text, so a turn on no page carries no dangling sentence.
+REWRITE_PAGE_RULE = ('If the message refers to that page, say so in the question ("in this league", "this player"), unless the '
+                     'conversation just named someone else. Never write an id.')
 
 model = ChatOpenAI(model=os.environ["ANSWER_MODEL"], base_url="https://openrouter.ai/api/v1",
                    api_key=os.environ["OPENROUTER_API_KEY"], name="write-answer")
@@ -81,10 +84,14 @@ def page_line(page: dict | None) -> str:
     return "The user is on a practice page." if page["kind"] == "practice" else f"The user is viewing the {page['kind']} with id {page['id']}."
 
 
+def rewrite_page(page: dict | None) -> str:
+    return f"{page_line(page)}\n{REWRITE_PAGE_RULE}" if page else ""
+
+
 def rewrite(state: State) -> dict:
     # The router and retriever see one question, not the conversation: "Novák" alone looks off topic.
     *history, last = state["messages"]
-    page = page_line(state.get("page"))
+    page = rewrite_page(state.get("page"))
     if not history and not page:
         return {"question": last.content}  # first message on no page: nothing to resolve, no extra model call
     # Only text turns (tool calls and results are noise here). shortcut: the last 8 of them; summarise older

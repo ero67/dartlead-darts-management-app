@@ -1809,5 +1809,103 @@
    }
   ],
   "expected": null
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0
+  ],
+  "expected": "<1%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.001
+  ],
+  "expected": "<1%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.00499
+  ],
+  "expected": "<1%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.005
+  ],
+  "expected": "1%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.0149
+  ],
+  "expected": "1%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.015
+  ],
+  "expected": "2%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.025
+  ],
+  "expected": "3%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.125
+  ],
+  "expected": "13%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.5
+  ],
+  "expected": "50%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.635
+  ],
+  "expected": "64%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.9949
+  ],
+  "expected": "99%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.995
+  ],
+  "expected": "100%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   0.999
+  ],
+  "expected": "100%"
+ },
+ {
+  "fn": "formatChance",
+  "args": [
+   1
+  ],
+  "expected": "100%"
  }
 ]

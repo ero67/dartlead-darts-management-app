@@ -5,7 +5,7 @@
 // flat Python shape; the app-shaped matches the JS needs are built from them below.
 import { writeFileSync } from 'node:fs';
 import { AVG_SCALE, FIELD_AVERAGE, HALF_LIFE, HISTORY_MATCHES, PRIOR_DARTS, chanceToWinFirst, legWinProbability, matchWinProbability, playerStrength, strengthHistory } from '../../src/lib/winProbability.js';
-import { biggestUpset } from '../../src/utils/upsets.js';
+import { biggestUpset, formatChance } from '../../src/utils/upsets.js';
 
 // mulberry32: a tiny seeded PRNG, so the history (and the JSON) is the same on every run.
 const rng = (seed) => () => {
@@ -91,6 +91,9 @@ addUpset([flat('m1', 'a', 'b', 'b', 1, 3, 3), flat('m2', 'a', 'b', 'b', 2, 3, 3)
 // A tie exactly at maxChance is not an upset (chance < maxChance).
 addUpset([flat('m1', 'c', 'd', 'd', 1, 3, 3)], S, 0.5);
 addUpset([], S);
+
+// formatChance: whole percent, "<1%" under 0.5%, halves round up (Math.round) where Python's round() goes to even.
+for (const p of [0, 0.001, 0.00499, 0.005, 0.0149, 0.015, 0.025, 0.125, 0.5, 0.635, 0.9949, 0.995, 0.999, 1]) add('formatChance', [p], formatChance(p));
 
 writeFileSync(new URL('./winprob_cases.json', import.meta.url), JSON.stringify(cases, null, 1) + '\n');
 console.log(`wrote ${cases.length} cases`);

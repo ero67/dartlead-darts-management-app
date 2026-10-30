@@ -51,11 +51,16 @@ def test_preview_by_players(monkeypatch):
     stub_preview(monkeypatch)
     r = stats.get_match_preview(player_id="a", opponent_id="b")
     s1, s2 = winprob.player_strength(HISTORIES["a"]), winprob.player_strength(HISTORIES["b"])
-    assert [p["strength"] for p in r["players"]] == [s1, s2]
+    assert [p["form_rating"] for p in r["players"]] == [round(s1, 1), round(s2, 1)]
+    assert all("strength" not in p for p in r["players"])
     assert [p["matches_counted"] for p in r["players"]] == [10, 10]
-    assert r["match_win_probability"] == winprob.match_win_probability(s1, s2, legs_to_win=3)
-    assert r["leg_win_probability"] == winprob.leg_win_probability(s1, s2)
-    assert r["match_win_probability"] > 0.5 and r["note"] is None
+    p1 = winprob.match_win_probability(s1, s2, legs_to_win=3)
+    leg = winprob.leg_win_probability(s1, s2)
+    # Both players' strings, formatted like the card (formatChance); the model does not work out 1 - p.
+    assert [p["win_chance"] for p in r["players"]] == [winprob.format_chance(p1), winprob.format_chance(1 - p1)]
+    assert [p["leg_win_chance"] for p in r["players"]] == [winprob.format_chance(leg), winprob.format_chance(1 - leg)]
+    assert p1 > 0.5 and r["note"] is None
+    assert "match_win_probability" not in r and "leg_win_probability" not in r
     assert r["head_to_head"]["matches"] == 2 and set(r["recent"]) == {"a", "b"}
 
 
@@ -64,36 +69,52 @@ def test_preview_by_match_in_progress(monkeypatch):
     r = stats.get_match_preview(match_id="m1")
     s1, s2 = winprob.player_strength(HISTORIES["a"]), winprob.player_strength(HISTORIES["b"])
     assert r["legs"] == [2, 1]
-    assert r["match_win_probability"] == winprob.match_win_probability(s1, s2, legs_to_win=3, legs_a=2, legs_b=1)
+    p1 = winprob.match_win_probability(s1, s2, legs_to_win=3, legs_a=2, legs_b=1)
+    assert [p["win_chance"] for p in r["players"]] == [winprob.format_chance(p1), winprob.format_chance(1 - p1)]
 
 
 def test_preview_missing_history(monkeypatch):
     stub_preview(monkeypatch, histories={"a": history(60)})
     r = stats.get_match_preview(player_id="a", opponent_id="b")
-    assert r["match_win_probability"] is None and r["leg_win_probability"] is None
+    assert all(p["win_chance"] is None and p["leg_win_chance"] is None for p in r["players"])
     assert "Boris" in r["note"] and "Anna" not in r["note"]
-    assert r["players"][1]["strength"] is None and r["players"][0]["strength"] is not None
+    assert r["players"][1]["form_rating"] is None and r["players"][0]["form_rating"] is not None
 
 
 def test_preview_completed_match(monkeypatch):
     stub_preview(monkeypatch, match_row(status="completed", winner_id="b", player1_legs=1, player2_legs=3))
     monkeypatch.setattr(stats, "recent_match_totals", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no history needed")))
     r = stats.get_match_preview(match_id="m1")
-    assert r["match_win_probability"] is None
+    assert all(p["win_chance"] is None for p in r["players"])
     assert "Boris" in r["note"] and "1:3" in r["note"]
 
 
 def test_preview_cricket_match(monkeypatch):
     stub_preview(monkeypatch, match_row(game_type="cricket"))
     r = stats.get_match_preview(match_id="m1")
-    assert r["match_win_probability"] is None and r["leg_win_probability"] is None
+    assert all(p["win_chance"] is None and p["leg_win_chance"] is None for p in r["players"])
     assert "X01" in r["note"]
+
+
+def test_preview_clamps_legs_to_win(monkeypatch):
+    stub_preview(monkeypatch)
+    r = stats.get_match_preview(player_id="a", opponent_id="b", legs_to_win=10**9)  # would spin a worker thread
+    assert r["legs_to_win"] == stats.MAX_LEGS_TO_WIN == 25 and r["players"][0]["win_chance"]
+    assert stats.get_match_preview(player_id="a", opponent_id="b", legs_to_win=-4)["legs_to_win"] == 1
 
 
 def test_preview_needs_players(monkeypatch):
     stub_preview(monkeypatch)
     assert "error" in stats.get_match_preview()
     assert "error" in stats.get_match_preview(player_id="a")
+
+
+def test_find_tournament_returns_league_id(monkeypatch):
+    rows = [{"id": "t1", "name": "Demo Liga - 4. kolo", "status": "completed", "starts_at": "2026-10-20T09:00:00+00:00",
+             "created_at": "2026-10-01T09:00:00+00:00", "league_id": "l1"}]
+    monkeypatch.setattr(stats, "db", lambda: FakeTable({"tournaments": rows}))
+    (found,) = stats.find_tournament("Demo Liga")
+    assert found["league_id"] == "l1" and found["date"] == "2026-10-20" and found["status"] == "completed"
 
 
 # --- recap -------------------------------------------------------------------------------------------------------
@@ -105,9 +126,9 @@ def rmatch(p1, p2, winner, legs, o1=0, o2=0, **extra):
             "c1": None, "c2": None, **extra}
 
 
-def stub_recap(monkeypatch, league_id="l1", game_type="x01"):
+def stub_recap(monkeypatch, league_id="l1", game_type="x01", season_id=None):
     tournament = {"starts_at": "2026-10-20T09:00:00+00:00", "created_at": "2026-10-01T09:00:00+00:00",
-                  "league_id": league_id, "game_type": game_type}
+                  "league_id": league_id, "season_id": season_id, "game_type": game_type}
     # a is far stronger than b: b beating a is the upset; c vs a is expected
     matches = [rmatch("a", "b", "b", (1, 3), o1=1, o2=2, completed_at="2026-10-20T10:30:00+00:00"),
                rmatch("a", "c", "a", (3, 0), o1=1, completed_at="2026-10-20T09:15:00+00:00")]
@@ -128,7 +149,14 @@ def test_recap_with_league(monkeypatch):
     assert r["summary"]["tournament"] == "Round 3"
     assert r["total_180s"] == 4
     upset = r["biggest_upset"]
-    assert (upset["winner"], upset["loser"], upset["score"]) == ("B", "A", "3:1") and upset["chance"] < 0.4
+    assert (upset["winner"], upset["loser"], upset["score"]) == ("B", "A", "3:1")
+    assert upset["chance"].endswith("%") and float(upset["chance"].strip("<%")) < 40  # a display string
+
+
+def test_recap_of_an_archived_season_has_no_current_table(monkeypatch):
+    stub_recap(monkeypatch, season_id="s-old")
+    r = stats.get_round_recap("t1")
+    assert r["league_top3"] is None and r["total_180s"] == 4
 
 
 def test_recap_without_league(monkeypatch):

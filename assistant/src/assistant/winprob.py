@@ -1,4 +1,4 @@
-# Port of src/lib/winProbability.js and biggestUpset in src/utils/upsets.js; the JS is the source of truth,
+# Port of src/lib/winProbability.js and biggestUpset / formatChance in src/utils/upsets.js; the JS is the source of truth,
 # regenerate tests/winprob_cases.json when it changes (node assistant/tests/winprob_cases.mjs). No I/O here.
 import math
 
@@ -71,3 +71,8 @@ def biggest_upset(matches: list[dict], strengths: dict[str, float], max_chance: 
             best = {"winner_id": p1_id if is_p1 else p2_id, "loser_id": p2_id if is_p1 else p1_id,
                     "score": f"{legs[0]}:{legs[1]}" if is_p1 else f"{legs[1]}:{legs[0]}", "chance": chance}
     return best
+
+
+def format_chance(p: float) -> str:
+    # formatChance in src/utils/upsets.js: whole percent, "<1%" below 0.5%. floor(x + .5) is Math.round; round() goes to even.
+    return "<1%" if p < 0.005 else f"{math.floor(p * 100 + 0.5)}%"

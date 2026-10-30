@@ -176,10 +176,10 @@ def history(n, start=datetime(2026, 10, 25, tzinfo=timezone.utc)):
 
 def test_form_change_and_months():
     h = history(25)
-    form = stats._form(h, 20)
+    form = stats._form(h, 5)  # 20 earlier matches: just enough for a "before"
     assert form["form"]["current"] == round(winprob.player_strength(h), 1)
-    assert form["form"]["before"] == round(winprob.player_strength(h[20:]), 1)  # 20 matches ago
-    assert form["form"]["change"] == round(winprob.player_strength(h) - winprob.player_strength(h[20:]), 1)
+    assert form["form"]["before"] == round(winprob.player_strength(h[5:]), 1)  # 5 matches ago
+    assert form["form"]["change"] == round(winprob.player_strength(h) - winprob.player_strength(h[5:]), 1)
     months = form["monthly_averages"]
     assert [m["month"] for m in months] == ["2026-08", "2026-09", "2026-10"]  # newest last
     aug = [m for m in h if m["at"].startswith("2026-08")]
@@ -197,6 +197,23 @@ def test_monthly_averages_keep_the_newest_six():
 def test_form_without_enough_history():
     assert stats._form([], 20) == {"matches": 0}
     assert stats._form(history(5), 20)["form"]["before"] is None
+
+
+def flat(n, avg=60):
+    return [{"score": avg * 2, "darts": 6, "at": f"2026-10-{25 - i % 25:02d}T10:00:00+00:00", "won": True, "opponent_id": "x"}
+            for i in range(n)]
+
+
+@pytest.mark.parametrize("n", [21, 30, 39])
+def test_form_needs_twenty_earlier_matches(n):
+    # A short remainder is mostly the 240-dart prior at 41, so a flat 60-average player would show about +10.
+    form = stats._form(flat(n), 20)["form"]
+    assert form["before"] is None and form["change"] is None and form["current"] is not None
+
+
+def test_flat_player_with_enough_history_has_no_change():
+    form = stats._form(flat(40), 20)["form"]
+    assert form["before"] is not None and abs(form["change"]) < 1.5
 
 
 def test_form_caps_matches_at_60(monkeypatch):

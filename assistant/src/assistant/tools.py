@@ -129,8 +129,8 @@ def list_tournaments(mine: bool = False, player_id: str | None = None, league_id
 @tool(parse_docstring=True)
 def find_tournament(name: str) -> list[dict]:
     """Look up tournaments by name. Call this first whenever a question names a tournament, because
-    get_tournament_summary needs its id. Returns candidates best first with id, name, date, status and a
-    match score; league rounds have similar names ("… – 3. kolo"), so use the date or round number to pick,
+    get_tournament_summary needs its id. Returns candidates best first with id, name, date, status, league_id and a
+    match score (two leagues can share a name: league_id tells their rounds apart); league rounds have similar names ("… – 3. kolo"), so use the date or round number to pick,
     and ask the user if it is still unclear.
 
     Args:
@@ -210,8 +210,10 @@ def get_my_practice(game: Literal["x01", "checkout", "oneTwentyOne", "aroundTheC
     about another player's practice, do not call it; say that practice is private. If the result says
     signed_in is false, tell the user to sign in to see their practice. If games is empty, there were no practice
     sessions in that period: say so and suggest a longer days, do not guess. Sessions too short to count (as in
-    the app's Personal bests) are left out of the mean, trend and best; sessions_counted below sessions says how
-    many were left out. first_session and last_session are the dates of the period's first and last session.
+    the app's Personal bests) are left out of the mean, trend and best: sessions is how many sessions the game had
+    in the period and sessions_counted is how many of them count towards the numbers. A game whose sessions are
+    all older than the period stays in games with sessions 0 (its best still covers everything). first_session and
+    last_session are the dates of the period's first and last session.
 
     Args:
         game: Only this game. Leave it out for every game that has sessions.
@@ -223,11 +225,12 @@ def get_my_practice(game: Literal["x01", "checkout", "oneTwentyOne", "aroundTheC
 
 @tool(parse_docstring=True)
 def get_player_form(player_id: str, matches: int = 20) -> dict:
-    """Get how a player's X01 form has moved, with the same strength rating the app uses for its form and win
+    """Get how a player's X01 form has moved, with the same form rating the app uses for its form and win
     chances: the rating now, the rating `matches` matches ago and the change, the plain average and win-loss
     record over the last `matches` matches, and the player's average per calendar month (up to 6, newest last).
-    Use it for "is X improving", "how is X's form", "has X got better this year". It is X01 only, and a player
-    with fewer matches than `matches` has no earlier rating (null), so say there is not enough history.
+    Use it for "is X improving", "how is X's form", "has X got better this year". It is X01 only. before and
+    change are null when there are not at least 20 earlier matches to compare with: say there is not enough
+    history to compare, and use the plain average and the monthly averages instead.
 
     Args:
         player_id: The id from find_player or get_me. Never guess it.
@@ -241,11 +244,12 @@ def get_match_preview(match_id: str | None = None, player_id: str | None = None,
                       legs_to_win: int = 3) -> dict:
     """Preview a match with the app's own win chance (the % the app shows before a match), each player's form
     rating, the head-to-head record and each player's last 5 results. Use it for "who is favourite", "what are
-    the chances", "preview this match". Say the percentage as the app's win chance and read it from the result
-    (match_win_probability is player 1's chance, a number from 0 to 1, so 0.63 is 63%; the other player has the
-    rest); never give your own estimate. If the user is on a match page, pass its match_id. For a match in
-    progress the chance uses the current legs. When match_win_probability is null, read note and say why:
-    a finished match, a Cricket match (the model is X01-only) or a player with no X01 matches.
+    the chances", "preview this match". Each player in players has win_chance (their chance of winning the match)
+    and leg_win_chance, already formatted like the app ("63%", "<1%"): give these strings as they are, never
+    work out or estimate a chance yourself. head_to_head wins and legs are the first player's (players[0]).
+    If the user is on a match page, pass its match_id. For a match in progress the chance uses the current legs.
+    When win_chance is null, read note and say why: a finished match, a Cricket match (the model is X01-only)
+    or a player with no X01 matches.
 
     Args:
         match_id: The match's id, when the user is on a match page or you were given one. Leave it out for two players.
@@ -260,7 +264,8 @@ def get_match_preview(match_id: str | None = None, player_id: str | None = None,
 def get_round_recap(tournament_id: str) -> dict:
     """Get the facts for a short league group-chat post about one round (tournament): its summary (podium, best
     averages, highest checkout, most 180s), the total number of 180s, the round's biggest upset (the winner with
-    the lowest win chance beforehand, under 40%, with the score and that chance) and, for a league round, the top 3
+    the lowest win chance beforehand, under 40%, with the score and that chance as a string such as "23%": give it
+    as it is) and, for a league round, the top 3
     of the league table. Use it for "write a recap / summary post of round X". The facts here are all you may use:
     do not add results, numbers or players that are not in the result. The league top 3 is the table as it is now.
     A null biggest_upset means no match was an upset; say nothing about one.
