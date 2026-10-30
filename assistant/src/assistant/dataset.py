@@ -17,6 +17,11 @@ def load_cases() -> list[dict]:
     return json.loads(CASES.read_text(encoding="utf-8"))
 
 
+def case_input(case: dict) -> dict:
+    # One place for what an item's input carries, so synced items and local runs cannot drift apart.
+    return {"question": case["question"], "history": case.get("history", []), "page": case.get("page")}
+
+
 def main() -> None:
     langfuse = get_client()
     cases = load_cases()
@@ -26,7 +31,7 @@ def main() -> None:
         langfuse.create_dataset_item(
             dataset_name=DATASET,
             id=c["id"],
-            input={"question": c["question"], "history": c.get("history", [])},
+            input=case_input(c),
             expected_output=c["expected"],
             metadata={"type": c["type"], "source": c["source"]},
         )

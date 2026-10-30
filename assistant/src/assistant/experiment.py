@@ -14,8 +14,8 @@ from langfuse import Evaluation, get_client
 from langfuse.langchain import CallbackHandler
 from pydantic import BaseModel, Field
 
-from assistant.agent import ask, graph  # importing loads .env
-from assistant.dataset import DATASET, load_cases
+from assistant.agent import ask, graph, page_line  # importing loads .env
+from assistant.dataset import DATASET, case_input, load_cases
 from assistant.prompts import PROMPT_LABEL
 
 # A different model family from the answer model, so the judge does not favour its own style.
@@ -111,6 +111,8 @@ judge = ChatOpenAI(model=JUDGE_MODEL, base_url="https://openrouter.ai/api/v1", a
 
 def llm_judge(*, input, output, expected_output, **_):
     history = "".join(f"Earlier user message: {h}\n" for h in input.get("history", []))
+    if page := page_line(input.get("page")):  # the agent knew the page, so "who leads?" is not ambiguous to the judge
+        history += f"Page the user was on (not typed by them): {page}\n"
     evidence = "\n---\n".join(output["evidence"])[:8000] or "(none)"
     verdict = judge.invoke([SystemMessage(JUDGE_PROMPT), HumanMessage(
         f"{history}QUESTION: {input['question']}\nEXPECTED BEHAVIOUR: {expected_output['behavior']}\n"
@@ -147,7 +149,7 @@ def main() -> None:
                   metadata={"answer_model": os.environ["ANSWER_MODEL"], "judge_model": JUDGE_MODEL, "prompt_label": PROMPT_LABEL})
     if only:  # a quick local run on chosen cases
         cases = [c for c in load_cases() if c["id"] in only]
-        result = langfuse.run_experiment(data=[{"input": {"question": c["question"], "history": c.get("history", [])},
+        result = langfuse.run_experiment(data=[{"input": case_input(c),
                                                 "expected_output": c["expected"], "metadata": {"type": c["type"], "id": c["id"]}}
                                                for c in cases], **kwargs)
     else:
