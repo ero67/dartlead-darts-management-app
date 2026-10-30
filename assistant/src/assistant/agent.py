@@ -39,8 +39,14 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
 - Never add judgements, benchmarks or comparisons that no tool or source gives (what counts as "good", what
   professionals or amateurs average). If asked whether a number is good, say DartLead has no benchmark for it,
   and compare it only with numbers the tools return (the player's recent form, other players' numbers).
+- Practice and improvement: a suggestion must name the number from a tool it is based on and cite the coaching guide like other docs ([n]). Never suggest anything the guide does not cover.
+- A recap of a round or tournament: a 5–8 line post for the league's group chat in the question's language, with a few fitting emojis, using only facts from get_round_recap.
+- The page the user is on (below, if any): when they say "this league", "this match" or "he" without a name, mean that page's
+  league, tournament, match or player and pass its id to the tools. A name or id in the question wins over the page.
 Format with Markdown where it helps: **bold** key numbers, short lists, a small table for comparisons.
 Answer in {language}, even when names or data are in another language. Be brief.
+
+{page}
 
 Sources:
 {context}"""
@@ -49,7 +55,10 @@ The question is not about darts or DartLead. In one or two sentences, in {langua
 say that you can help with darts rules, using the DartLead app, and players' statistics."""
 REWRITE_PROMPT = """Rewrite the user's last message as a standalone question that can be understood without the
 conversation, in the language of the last message. Keep the names, numbers and details from earlier turns that
-it refers to. If it is already standalone, return it unchanged. Return only the question."""
+it refers to. If it is already standalone, return it unchanged. Return only the question.
+{page}
+If the message refers to that page ("this league", "who leads?", "how is he doing?"), put the page's kind and id
+into the question."""
 
 model = ChatOpenAI(model=os.environ["ANSWER_MODEL"], base_url="https://openrouter.ai/api/v1",
                    api_key=os.environ["OPENROUTER_API_KEY"], name="write-answer")
@@ -63,19 +72,28 @@ class State(TypedDict):
     sources: list[str]  # the router's pick: rules, stats, app; empty = off topic
     language: str  # the question's language, named by the router ("English", "Slovak")
     docs: list[Document]  # retrieved chunks for this question
+    page: dict | None  # the page the user is on, sent with every message: no reducer, so each turn overwrites it
+
+
+def page_line(page: dict | None) -> str:
+    if not page:
+        return ""
+    return "The user is on a practice page." if page["kind"] == "practice" else f"The user is viewing the {page['kind']} with id {page['id']}."
 
 
 def rewrite(state: State) -> dict:
     # The router and retriever see one question, not the conversation: "Novák" alone looks off topic.
     *history, last = state["messages"]
-    if not history:
-        return {"question": last.content}  # first message: nothing to resolve, no extra model call
+    page = page_line(state.get("page"))
+    if not history and not page:
+        return {"question": last.content}  # first message on no page: nothing to resolve, no extra model call
     # Only text turns (tool calls and results are noise here). shortcut: the last 8 of them; summarise older
     # turns if long chats need them.
     turns = [m for m in history if isinstance(m, (HumanMessage, AIMessage)) and m.content][-8:]
     transcript = "\n".join(f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content}" for m in turns)
-    human = HumanMessage(f"Conversation:\n{transcript}\n\nLast message: {last.content}")
-    reply = (template("rewrite", REWRITE_PROMPT) | rewriter).invoke({"messages": [human]})
+    conversation = f"Conversation:\n{transcript}\n\n" if transcript else ""
+    human = HumanMessage(f"{conversation}Last message: {last.content}")
+    reply = (template("rewrite", REWRITE_PROMPT) | rewriter).invoke({"page": page, "messages": [human]})
     return {"question": reply.content.strip()}
 
 
@@ -100,7 +118,7 @@ def call_agent(state: State) -> dict:
     # Tools only when the router saw a stats question: no tool tokens or detours for rules and app questions.
     llm = model_with_tools if "stats" in state["sources"] else model
     reply = (template("agent", SYSTEM_PROMPT) | llm).invoke(
-        {"context": context, "language": state["language"], "messages": state["messages"]})
+        {"context": context, "language": state["language"], "page": page_line(state.get("page")), "messages": state["messages"]})
     return {"messages": [reply]}
 
 
@@ -139,12 +157,12 @@ graph = builder.compile(checkpointer=InMemorySaver())
 
 
 @chain  # one Langfuse trace per question
-def ask(question: str, config: RunnableConfig) -> dict:
+def ask(question: str, config: RunnableConfig, page: dict | None = None) -> dict:
     # Same thread_id = same conversation. Without one, every question starts a new conversation (as the evals want).
     thread_id = config.get("configurable", {}).get("thread_id") or str(uuid.uuid4())
     try:
         # rewrite + route + retrieve, then MAX_STEPS agent turns with the tool runs between them
-        state = graph.invoke({"messages": [HumanMessage(question)]},
+        state = graph.invoke({"messages": [HumanMessage(question)], "page": page},
                              {"recursion_limit": 2 * MAX_STEPS + 3, "configurable": {"thread_id": thread_id}})
     except GraphRecursionError:
         return {"answer": "Sorry, this needed more steps than I may take. Try a narrower question: one player, tournament or league.", "question": question,

@@ -30,7 +30,7 @@ def task(*, item, **_):
     config = {"configurable": {"thread_id": str(uuid.uuid4())}, "callbacks": [CallbackHandler()]}
     for turn in data.get("history", []):
         ask.invoke(turn, config=config)
-    result = ask.invoke(data["question"], config=config)
+    result = ask.invoke(data["question"], config=config, page=data.get("page"))
     messages = graph.get_state(config).values["messages"]
     return {
         "answer": result["answer"],

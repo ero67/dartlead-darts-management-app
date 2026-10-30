@@ -203,3 +203,66 @@ def test_feedback_langfuse_failure_is_502(feedback):
     post, langfuse, _ = feedback
     langfuse.error = RuntimeError("langfuse is down")
     assert post().status_code == 502
+
+
+# --- the page the user is on ---------------------------------------------------------------------------------
+
+LEAGUE_ID = "0b1f6d5e-9c1a-4d2b-8e3f-123456789abc"
+
+
+class RecordingGraph(FakeGraph):
+    def __init__(self):
+        super().__init__([text_chunk()])
+        self.inputs = []
+
+    async def astream(self, graph_input, *args, **kwargs):
+        self.inputs.append(graph_input)
+        async for item in super().astream(graph_input):
+            yield item
+
+
+@pytest.fixture
+def chat(monkeypatch, use_graph):
+    """A TestClient for /chat with sign-in accepted; returns (post, graph) where graph records its inputs."""
+    graph = RecordingGraph()
+    use_graph(graph)
+    monkeypatch.setattr(server, "verify", lambda authorization: ("user-1", "token"))
+    monkeypatch.setattr(server, "use_question", lambda *args: QUESTION_ID)
+    monkeypatch.setattr(server, "refund_question", lambda *args: None)
+    client = TestClient(server.app)
+
+    def post(**body):
+        return client.post("/chat", json={"message": "Who leads?", "thread_id": "t1", **body}, headers={"Authorization": "Bearer token"})
+
+    return post, graph
+
+
+@pytest.mark.parametrize("page", [
+    {"kind": "shop", "id": LEAGUE_ID},
+    {"kind": "league"},
+    {"kind": "league", "id": "abc"},
+    {"kind": "practice", "id": "abc"},
+])
+def test_chat_rejects_bad_page(chat, page):
+    post, graph = chat
+    assert post(page=page).status_code == 422
+    assert graph.inputs == []
+
+
+def test_chat_accepts_practice_page_without_id(chat):
+    post, graph = chat
+    assert post(page={"kind": "practice"}).status_code == 200
+    assert graph.inputs[0]["page"] == {"kind": "practice", "id": None}
+
+
+def test_page_reaches_graph(chat):
+    post, graph = chat
+    assert post(page={"kind": "league", "id": LEAGUE_ID.upper()}).status_code == 200
+    assert graph.inputs[0]["page"] == {"kind": "league", "id": LEAGUE_ID.upper()}
+
+
+def test_no_page_is_none_in_graph_input(chat):
+    # None overwrites the page of an earlier turn in the same thread.
+    post, graph = chat
+    assert post().status_code == 200
+    assert graph.inputs[0]["page"] is None

@@ -37,9 +37,9 @@ def test_to_langfuse_doubles_variables():
 def test_fallback_formats_like_code(monkeypatch):
     use_langfuse(monkeypatch, fallback_only=True)
     messages = prompts.template("agent", SYSTEM_PROMPT).format_messages(
-        context="X", language="Slovak", messages=[HumanMessage("hi")])
+        context="X", language="Slovak", page="", messages=[HumanMessage("hi")])
     assert [m.type for m in messages] == ["system", "human"]
-    assert messages[0].content == SYSTEM_PROMPT.format(context="X", language="Slovak")
+    assert messages[0].content == SYSTEM_PROMPT.format(context="X", language="Slovak", page="")
     assert messages[1].content == "hi"
 
 
@@ -62,8 +62,8 @@ def test_edited_variables_use_code_text(monkeypatch, edit):
 
     monkeypatch.setattr(prompts, "get_client", lambda: Edited(fallback_only=False))
     tpl = prompts.template("agent", SYSTEM_PROMPT)
-    messages = tpl.format_messages(context="X", language="Slovak", messages=[HumanMessage("hi")])
-    assert messages[0].content == SYSTEM_PROMPT.format(context="X", language="Slovak")
+    messages = tpl.format_messages(context="X", language="Slovak", page="", messages=[HumanMessage("hi")])
+    assert messages[0].content == SYSTEM_PROMPT.format(context="X", language="Slovak", page="")
     assert not (tpl.metadata or {}).get("langfuse_prompt")
     assert prompts._skip_until == 0.0  # Langfuse is up, so it is asked again next time
 
@@ -96,6 +96,6 @@ def test_failed_fetch_skips_langfuse_for_a_minute(monkeypatch, client):
     second = prompts.template("agent", SYSTEM_PROMPT)
     assert client.calls == 1  # the second call did not ask Langfuse
     for tpl in (first, second):
-        messages = tpl.format_messages(context="X", language="Slovak", messages=[HumanMessage("hi")])
-        assert messages[0].content == SYSTEM_PROMPT.format(context="X", language="Slovak")
+        messages = tpl.format_messages(context="X", language="Slovak", page="", messages=[HumanMessage("hi")])
+        assert messages[0].content == SYSTEM_PROMPT.format(context="X", language="Slovak", page="")
         assert not (tpl.metadata or {}).get("langfuse_prompt")

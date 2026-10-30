@@ -19,7 +19,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from starlette.concurrency import run_in_threadpool
 from supabase import create_client
 
@@ -74,9 +74,26 @@ app.add_middleware(
 )
 
 
+UUID_RE = r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
+class PageContext(BaseModel):
+    """The page the user is on, so "who leads?" on a league page means that league."""
+
+    kind: Literal["league", "tournament", "match", "player", "practice"]
+    id: str | None = Field(default=None, pattern=UUID_RE)  # practice is the user's own, so it has none
+
+    @model_validator(mode="after")
+    def needs_id(self):
+        if self.kind != "practice" and self.id is None:
+            raise ValueError(f"a {self.kind} page needs an id")
+        return self
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     thread_id: str = Field(min_length=1, max_length=100)  # made by the widget, one per conversation
+    page: PageContext | None = None
 
 
 class FeedbackRequest(BaseModel):
@@ -116,7 +133,8 @@ def tool_output(content):
     return content
 
 
-async def answer_events(message: str, thread_id: str, user_id: str, token: str, question_id: str, trace_id: str):
+async def answer_events(message: str, thread_id: str, user_id: str, token: str, question_id: str, trace_id: str,
+                        page: dict | None = None):
     """Yield the run as NDJSON events, running every stats query as the user:
     step (rewrite, route) -> sources -> tool_start / tool_end -> text (deltas) -> done | error.
     done carries the Langfuse trace id (feedback scores attach to it); a failed answer gives the question back."""
@@ -126,7 +144,7 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str, 
         with stats.as_user(token, user_id), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
                                                         tags=["phase-6", "api"]):
             # "updates": each node's output when it finishes; "messages": the reply's tokens as they are written.
-            async for mode, payload in graph.astream({"messages": [HumanMessage(message)]}, config,
+            async for mode, payload in graph.astream({"messages": [HumanMessage(message)], "page": page}, config,
                                                      stream_mode=["updates", "messages"]):
                 if mode == "messages":
                     chunk, meta = payload
@@ -192,7 +210,8 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
     trace_id = Langfuse.create_trace_id()
     # The user id is part of the thread key, so nobody can continue someone else's conversation.
     thread_id = f"{user_id}:{request.thread_id}"
-    return StreamingResponse(answer_events(request.message, thread_id, user_id, token, question_id, trace_id),
+    return StreamingResponse(answer_events(request.message, thread_id, user_id, token, question_id, trace_id,
+                                         request.page.model_dump() if request.page else None),
                              media_type="application/x-ndjson; charset=utf-8")
 
 
