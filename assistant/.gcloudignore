@@ -1,0 +1,13 @@
+# What `gcloud run deploy --source` must not upload. Secrets come from Secret Manager, never from the source.
+.gcloudignore
+.git
+.env
+.env.*
+.venv/
+.cache/
+.pytest_cache/
+docs/
+evals/
+tests/
+__pycache__/
+*.pyc

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, Settings, Search, Trophy, Save, GitMerge, ArrowRight, Link as LinkIcon, Unlink } from 'lucide-react';
+import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, Settings, Search, Trophy, Save, GitMerge, ArrowRight, Link as LinkIcon, Unlink, MessageCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ManagerBilling } from './ManagerBilling';
 import { AdminOverview } from './AdminOverview';
+import { AssistantSettings } from './assistant/AssistantSettings';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,8 @@ const ADMIN_TABS = [
   { key: 'overview', label: 'Overview', icon: Trophy },
   { key: 'users', label: 'Users & roles', icon: Users },
   { key: 'billing', label: 'Billing', icon: Crown },
-  { key: 'data', label: 'Data fixes', icon: Settings }
+  { key: 'data', label: 'Data fixes', icon: Settings },
+  { key: 'assistant', label: 'AI assistant', icon: MessageCircle }
 ];
 
 export function AdminPanel() {
@@ -1104,6 +1106,10 @@ export function AdminPanel() {
 
         <TabsContent value="billing">
           <ManagerBilling />
+        </TabsContent>
+
+        <TabsContent value="assistant">
+          <AssistantSettings />
         </TabsContent>
 
         <TabsContent value="data" className="flex flex-col gap-6">

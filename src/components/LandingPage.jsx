@@ -7,10 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { BoardMotif, CheckoutRoute, FormDots, LegPips, LiveDot } from './shared/DartsAccents';
 import { WinChanceChart } from './match/WinChanceChart';
+import { AssistantLogo } from './assistant/AssistantLogo';
 import { BOT_LEVELS } from '../lib/botPlayer';
 import { tournamentService } from '../services/tournamentService';
+import { ASSISTANT_URL, assistantService } from '../services/assistantService';
 
 const CONTACT_EMAIL = 'info@dartlead.app';
 const ANDROID_APK_URL = 'https://github.com/ero67/dartlead-darts-management-app/releases/download/android-latest/DartLead.apk';
@@ -56,6 +59,12 @@ const PREVIEW_STANDINGS = [
   { name: 'Adam N.', won: 0, diff: '-5', avg: '58.3' },
 ];
 
+const PREVIEW_180S = [
+  { name: 'Peter H.', count: 14 },
+  { name: 'Eva T.', count: 9 },
+  { name: 'Jakub S.', count: 6 },
+];
+
 // 1,725 -> "1,700+", 172 -> "170+", 4 -> "4": a claim that stays true for a while.
 function formatStat(n, language) {
   const rounded = n >= 1000 ? Math.floor(n / 100) * 100 : n >= 100 ? Math.floor(n / 10) * 10 : n;
@@ -83,8 +92,12 @@ export function LandingPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
 
+  // The assistant section shows only once admins open the assistant to everyone.
+  const [isAssistantPublic, setIsAssistantPublic] = useState(false);
+
   useEffect(() => {
     tournamentService.getPublicStats().then(setStats);
+    if (ASSISTANT_URL) assistantService.getSettings().then(s => setIsAssistantPublic(s?.audience === 'everyone'));
   }, []);
 
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
@@ -99,6 +112,7 @@ export function LandingPage() {
     description: t(`landing.steps.${key}Desc`),
   }));
   const included = t('landing.included');
+  const assistantPoints = t('landing.assistant.points');
   const faq = ['account', 'offline', 'devices', 'pay', 'data'];
 
   return (
@@ -286,6 +300,58 @@ export function LandingPage() {
             </Feature>
           </div>
         </section>
+
+        {/* Shown only where the assistant runs (VITE_ASSISTANT_URL) and is open to everyone. */}
+        {isAssistantPublic && (
+          <section aria-labelledby="assistant-title">
+            <Card className="relative grid items-center gap-8 overflow-hidden bg-gradient-to-br from-primary/10 to-card p-6 md:p-10 lg:grid-cols-2">
+              <BoardMotif className="-left-40 -top-48 w-[28rem]" />
+              <div className="relative flex flex-col gap-4">
+                <Eyebrow>{t('landing.assistant.eyebrow')}</Eyebrow>
+                <SectionTitle id="assistant-title">{t('landing.assistant.title')}</SectionTitle>
+                <p className="text-muted-foreground">{t('landing.assistant.sub')}</p>
+                <ul className="flex flex-col gap-2">
+                  {Array.isArray(assistantPoints) && assistantPoints.map(point => (
+                    <li key={point} className="flex items-start gap-2.5">
+                      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200">
+                        <Check className="size-3" />
+                      </span>
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-muted-foreground">{t('landing.assistant.note')}</p>
+              </div>
+
+              {/* A frozen conversation built from the chat's own pieces. Sample names, not data. */}
+              <div aria-hidden="true" className="relative flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+                <div className="flex items-center gap-2.5 border-b px-4 py-3">
+                  <AssistantLogo mode="intro" className="size-7" />
+                  <span className="font-semibold">{t('assistant.title')}</span>
+                </div>
+                <div className="flex flex-col gap-3 p-4 text-sm">
+                  <Bubble align="end">
+                    <BubbleContent>{t('landing.assistant.previewQuestion')}</BubbleContent>
+                  </Bubble>
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="size-3.5 text-primary" />
+                    {t('landing.assistant.previewStep')}
+                  </span>
+                  <p className="leading-relaxed">{t('landing.assistant.previewAnswer')}</p>
+                  <ol className="flex flex-col rounded-lg border">
+                    {PREVIEW_180S.map((row, index) => (
+                      <li key={row.name} className="flex items-center gap-3 border-b px-3 py-1.5 last:border-b-0">
+                        <span className={`w-4 font-display text-lg font-bold ${index === 0 ? 'text-primary' : 'text-muted-foreground'}`}>{index + 1}</span>
+                        <span className="min-w-0 flex-1 truncate font-medium">{row.name}</span>
+                        <span className="font-display text-lg font-bold">{row.count}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            </Card>
+          </section>
+        )}
 
         <section aria-labelledby="how-title" className="flex flex-col gap-7">
           <div className="flex max-w-2xl flex-col gap-2">

@@ -1,0 +1,19 @@
+[
+  {"question": "What happens if I end my turn on 1?", "sections": ["rules-x01.md > Bust"], "must_include": ["bust"]},
+  {"question": "Do I need a double to start a leg?", "sections": ["rules-x01.md > Finishing a leg (double out)"], "must_include": ["not need|don't need|do not need|no double|straight.in"]},
+  {"question": "What is the highest score you can check out?", "sections": ["rules-x01.md > Which scores can be finished"], "must_include": ["170"]},
+  {"question": "Which numbers count in cricket?", "sections": ["rules-cricket.md > Targets"], "must_include": ["15", "20", "bull"]},
+  {"question": "How is MPR calculated?", "sections": ["rules-cricket.md > Statistics"], "must_include": ["marks", "dart"]},
+  {"question": "How is checkout percentage counted?", "sections": ["rules-x01.md > Statistics"], "must_include": ["attempt"]},
+  {"question": "How do I create the next round in my league?", "sections": ["app-leagues.md > Tournaments (rounds) in a league", "app-tournaments.md > Duplicating a tournament or creating the next round"], "must_include": ["create next round"]},
+  {"question": "How can players sign up for a tournament themselves?", "sections": ["app-tournaments.md > Self-registration for players"], "must_include": ["registration link"]},
+  {"question": "Can people without an account see my league?", "sections": ["app-leagues.md > League visibility: public or signed-in users only"], "must_include": ["public"]},
+  {"question": "How do I show live results on a TV at the venue?", "sections": ["app-tournaments.md > TV display"], "must_include": ["TV mode"]},
+  {"question": "Can I undo deleting a tournament?", "sections": ["app-tournaments.md > Deleting a tournament"], "must_include": ["cannot|can't|not be undone"]},
+  {"question": "Where are my practice sessions saved if I don't have an account?", "sections": ["app-practice.md > Where practice sessions are saved"], "must_include": ["device"]},
+  {"question": "How does Around the Clock work?", "sections": ["app-practice.md > Around the Clock"], "must_include": ["20", "bull"]},
+  {"question": "Ako funguje Around the Clock?", "sections": ["app-practice.md > Around the Clock"], "must_include": ["20"]},
+  {"question": "Môžem hrať X01 proti botovi?", "sections": ["app-practice.md > Practice X01 against a bot"], "must_include": ["bot"]},
+  {"question": "Who invented darts?", "unknown": true},
+  {"question": "What is the world record three-dart average?", "unknown": true}
+]

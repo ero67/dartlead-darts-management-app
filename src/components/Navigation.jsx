@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Menu, Home, Trophy, Users, Target, LogOut, User, Moon, Sun, Shield, Crown, Badge as BadgeIcon, Monitor, Globe, ChevronsUpDown, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useAdmin } from '../contexts/AdminContext';
+import { useAssistant } from '../contexts/AssistantContext';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LANGUAGES } from '../lib/languages';
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { AssistantLogo } from './assistant/AssistantLogo';
 import { DeviceSettings } from './DeviceSettings';
 import logoIcon from '../assets/logo-icon-128.webp';
 import { getUserDisplayName, getUserInitials } from '../utils/userDisplayName';
@@ -29,6 +31,7 @@ const DRAWER_ROW = 'max-lg:h-11 max-lg:gap-3 max-lg:text-base max-lg:[&>svg]:siz
 // panel icon was too small for players to find the menu at all.
 export function MobileHeader() {
   const { toggleSidebar, openMobile } = useSidebar();
+  const { canUseAssistant, openAssistant } = useAssistant();
   const { t } = useLanguage();
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/95 px-2 backdrop-blur lg:hidden">
@@ -36,8 +39,21 @@ export function MobileHeader() {
         <Menu className="size-6" />
         {t('navigation.menu')}
       </Button>
-      <img src={logoIcon} alt="" className="size-8 rounded-lg object-cover" />
+      {/* The assistant pill carries the same target, and two side by side leave no room on a phone. */}
+      {!canUseAssistant && <img src={logoIcon} alt="" className="size-8 rounded-lg object-cover" />}
       <span className="text-lg font-semibold">DartLead</span>
+      {canUseAssistant && (
+        <Button
+          variant="ghost"
+          className="ml-auto h-10 gap-2 rounded-full border border-primary/50 bg-primary/10 pr-3 pl-1.5 font-semibold hover:bg-primary/20 max-[359px]:pr-1.5"
+          aria-label={t('assistant.open')}
+          onClick={openAssistant}
+        >
+          <AssistantLogo mode="intro" className="size-7" />
+          {/* The header has no room for the label on the narrowest phones. */}
+          <span className="max-[359px]:hidden">{t('assistant.headerLabel')}</span>
+        </Button>
+      )}
     </header>
   );
 }

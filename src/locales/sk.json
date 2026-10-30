@@ -600,6 +600,20 @@
       "Slovensky a anglicky",
       "Tmavý režim do šera podnikov"
     ],
+    "assistant": {
+      "eyebrow": "Novinka · AI asistent",
+      "title": "Opýtajte sa svojej ligy na čokoľvek.",
+      "sub": "Chat priamo v DartLeade, ktorý odpovedá z vašich vlastných turnajov a líg: kto vedie, kto hodil najviac 180-ok, ako sa darí jednému hráčovi proti druhému. Pozná aj pravidlá šípok a poradí s aplikáciou.",
+      "points": [
+        "Odpovedá zo zapísaných zápasov, nie odhadom",
+        "Ukáže kroky, ktorými k odpovedi prišiel",
+        "Rozumie po slovensky aj po anglicky"
+      ],
+      "note": "Pre prihlásených používateľov.",
+      "previewQuestion": "Kto má najviac 180-ok v lige?",
+      "previewStep": "Prehľadal rekordy ligy: 180-ky",
+      "previewAnswer": "Vedie Peter H. so 14, pred Evou T. a Jakubom S."
+    },
     "demoEyebrow": "Ukážka",
     "demoTitle": "Pozrite si to so skutočnými dátami.",
     "demoSub": "Otvorte ukončený ukážkový turnaj: skupiny, pavúk, štatistiky a grafy šancí na výhru. Bez registrácie.",
@@ -1566,5 +1580,112 @@
     "upcomingRounds": "Nadchádzajúce kolá",
     "defaultVenue": "Predvolené miesto",
     "defaultVenueHint": "Predvyplní sa pri vytváraní nového kola."
+  },
+  "assistant": {
+    "title": "Asistent",
+    "description": "Pravidlá šípok, používanie DartLead a štatistiky hráčov.",
+    "open": "Otvoriť asistenta",
+    "headerLabel": "AI asistent",
+    "newChat": "Nová konverzácia",
+    "placeholder": "Opýtajte sa…",
+    "send": "Odoslať",
+    "error": "Niečo sa pokazilo. Skúste to znova.",
+    "unavailable": "Asistenta sa nepodarilo načítať. Obnovte stránku a skúste to znova.",
+    "limitReached": "Dnešné otázky ste už vyčerpali. Skúste to znova zajtra.",
+    "notAvailable": "Asistent zatiaľ pre váš účet nie je dostupný.",
+    "empty": "Pýtajte sa na pravidlá, na to, ako funguje DartLead, alebo na čísla ktoréhokoľvek hráča či ligy.",
+    "suggestions": {
+      "h2h": "{{a}} vs {{b}}: kto vedie vo vzájomných zápasoch?",
+      "top180": "Top 3 hráči podľa počtu 180-iek",
+      "highestCheckout": "Kto má najvyšší checkout v aplikácii?",
+      "finishSingle20": "Môžem ukončiť leg na jednoduchej 20?",
+      "leaguesInApp": "Ktoré ligy sú v aplikácii?",
+      "practiceHow": "Ako mi ide tréning?",
+      "practiceImprove": "Čo by som mal trénovať, aby som sa zlepšil?",
+      "practiceTrouble": "Ktoré ciele mi robia najväčší problém?",
+      "practiceAroundTheClock": "Ako funguje Around the Clock?",
+      "leagueLeader": "Kto vedie túto ligu?",
+      "leagueTop180": "Top 3 podľa počtu 180-iek v tejto lige",
+      "leagueTop180Plain": "Kto má najvyšší checkout v tejto lige?",
+      "tournamentWinner": "Kto vedie v tomto turnaji?",
+      "tournamentCheckout": "Kto tu mal najvyšší checkout?",
+      "tournamentRecap": "Napíš rekapituláciu tohto turnaja",
+      "tournamentsRunning": "Ktoré turnaje práve prebiehajú?",
+      "playerVsOpponent": "Ako si vedie {{player}} proti: {{opponent}}?",
+      "playerRecord": "Aká je bilancia tohto hráča?",
+      "playerImproving": "Zlepšuje sa tento hráč?",
+      "playerAverage": "Aký má tento hráč priemer?"
+    },
+    "pageChip": {
+      "lookingAt": "Pozerám na: {{name}}",
+      "league": "Liga",
+      "tournament": "Turnaj",
+      "player": "Hráč",
+      "practice": "Tvoj tréning"
+    },
+    "feedback": {
+      "helpful": "Užitočná odpoveď",
+      "notHelpful": "Neužitočná odpoveď",
+      "whatWasWrong": "Čo bolo zlé?",
+      "send": "Odoslať",
+      "skip": "Preskočiť",
+      "thanks": "Ďakujeme za spätnú väzbu",
+      "failed": "Spätnú väzbu sa nepodarilo odoslať. Skúste to znova."
+    },
+    "trace": {
+      "working": "Pracujem…",
+      "summary": "Postup ({{count}})",
+      "understood": "Chápem ako: {{question}}",
+      "route": "Hľadám v: {{sources}}",
+      "offTopic": "Mimo témy šípok a DartLeadu",
+      "read": "Prečítané časti dokumentácie: {{count}}",
+      "source": {
+        "rules": "pravidlá",
+        "stats": "štatistiky",
+        "app": "návod k aplikácii"
+      },
+      "running": "Spúšťam {{tool}}",
+      "ran": "Hotovo: {{tool}}",
+      "failed": "Zlyhalo: {{tool}}",
+      "tool": {
+        "find_player": {
+          "running": "Hľadám hráča „{{name}}“",
+          "done": "Našiel som: {{found}}",
+          "none": "Hráč „{{name}}“ sa nenašiel"
+        },
+        "get_player_stats": {
+          "running": "Načítavam štatistiky",
+          "done": "Štatistiky: {{player}}"
+        },
+        "get_recent_matches": {
+          "running": "Načítavam posledné zápasy",
+          "done": "Posledné zápasy: {{player}}"
+        },
+        "get_head_to_head": {
+          "running": "Načítavam vzájomné zápasy",
+          "done": "Vzájomné zápasy: {{player}}"
+        },
+        "find_league": {
+          "running": "Hľadám ligu „{{name}}“",
+          "done": "Našiel som: {{found}}",
+          "none": "Liga „{{name}}“ sa nenašla"
+        },
+        "get_league_standings": {
+          "running": "Načítavam tabuľku ligy",
+          "done": "Tabuľka: {{league}}"
+        },
+        "get_me": {"running": "Overujem, kto ste", "done": "Overil som váš účet"},
+        "list_tournaments": {"running": "Načítavam turnaje", "done": "Nájdené turnaje: {{count}}"},
+        "find_tournament": {"running": "Hľadám turnaj „{{name}}“", "done": "Našiel som: {{found}}", "none": "Turnaj „{{name}}“ sa nenašiel"},
+        "get_tournament_summary": {"running": "Načítavam súhrn turnaja", "done": "Súhrn: {{tournament}}"},
+        "get_player_tournaments": {"running": "Načítavam históriu turnajov", "done": "Turnaje: {{player}}"},
+        "get_records": {"running": "Hľadám rekordy naprieč turnajmi", "done": "Prehľadané rekordy v turnajoch: {{count}}"},
+        "list_leagues": {"running": "Načítavam ligy", "done": "Nájdené ligy: {{count}}"},
+        "get_my_practice": {"running": "Načítavam tvoj tréning", "done": "Pozrel som tvoj tréning"},
+        "get_player_form": {"running": "Načítavam formu", "done": "Forma: {{player}}"},
+        "get_match_preview": {"running": "Pripravujem náhľad zápasu", "done": "Náhľad zápasu"},
+        "get_round_recap": {"running": "Zbieram fakty o kole", "done": "Fakty: {{tournament}}"}
+      }
+    }
   }
 }

@@ -1,0 +1,52 @@
+[project]
+name = "assistant"
+version = "0.1.0"
+description = "DartLead assistant: RAG over rules and tools over live stats (LangChain + LangGraph)"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.162.0",
+    "langchain>=1.4.7",
+    "langchain-classic>=1.0.8",
+    "langchain-google-genai>=4.4.2",
+    "langchain-openai>=1.7.3",
+    "langchain-text-splitters>=1.1.3",
+    "langfuse>=5.0.4",
+    "langgraph>=1.2.18",
+    "langgraph-checkpoint-postgres>=3.2.0",
+    "psycopg[binary,pool]>=3.3.6",
+    "python-dotenv>=1.2.4",
+    "supabase>=2.33.0",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+hello = "assistant.hello:main"
+classify = "assistant.router:main"
+eval-router = "assistant.eval_router:main"
+show-chunks = "assistant.ingest:main"
+embed-demo = "assistant.embed_demo:main"
+index-docs = "assistant.ingest:index_docs"
+search = "assistant.retrieve:main"
+ask = "assistant.answer:main"
+eval-rag = "assistant.eval_rag:main"
+chunk-experiment = "assistant.chunk_experiment:main"
+player-stats = "assistant.stats:main"
+plan-tools = "assistant.tools:main"
+ask-stats = "assistant.ask_stats:main"
+eval-stats = "assistant.eval_stats:main"
+ask-agent = "assistant.agent:main"
+chat = "assistant.agent:chat"
+serve = "assistant.server:main"
+sync-dataset = "assistant.dataset:main"
+experiment = "assistant.experiment:main"
+prompts = "assistant.prompts:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

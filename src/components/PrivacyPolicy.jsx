@@ -39,6 +39,7 @@ function PolicyEn({ supportEmail }) {
           <Item label="Device data">a random device identifier and the optional device name / board number you enter, used to show which board a match is running on; IP address as processed by hosting and database providers. The Android app additionally stores your preferences (theme, language, vibration strength) on the device only.</Item>
           <Item label="Usage data">app interaction events, error logs, and performance metrics to keep the service reliable.</Item>
           <Item label="Cookies/local storage">used for authentication sessions, language/theme preferences, and in-progress match state.</Item>
+          <Item label="AI assistant">if you use the assistant chat: your questions, its answers and the steps it took (which statistics it looked up), and how many questions you asked each day, to apply the daily limit. A conversation is kept for 30 days after its last question so follow-up questions work, then deleted.</Item>
         </List>
       </Section>
       <Section title="3. How we use the data">
@@ -53,6 +54,7 @@ function PolicyEn({ supportEmail }) {
       <Section title="4. How we share data">
         <List>
           <Item label="Service providers">We use Supabase for authentication, database, and realtime updates; hosting/CDN providers may process IP addresses and basic request data.</Item>
+          <Item label="AI assistant">Your questions, and the statistics needed to answer them, are sent to AI model providers: OpenRouter, which forwards them to the company hosting the model, and Google (Gemini). Each run is recorded in Langfuse (EU) so we can check the quality of answers. The assistant only sees what your account can see. Do not type personal information into it that you do not want processed this way.</Item>
           <Item label="Tournament visibility">Tournament results, standings, match statistics and player profiles (the player name you use) are public: anyone with the link can see them, without signing in. League pages, leaderboards and member lists are public too, unless the organiser makes the league visible to signed-in users only. Registration requests are visible only to you and the organisers.</Item>
           <Item label="Legal">We may disclose information if required by law or to protect the safety, rights, or property of users or the service.</Item>
           <Item>We do not sell personal data.</Item>
@@ -76,7 +78,7 @@ function PolicyEn({ supportEmail }) {
         <P>The service is not directed to children under 16. Do not create accounts for minors without appropriate consent where required.</P>
       </Section>
       <Section title="9. International transfers">
-        <P>Data is stored by Supabase in the European Union (Stockholm region) and served through Vercel. Where a provider processes data outside the EU we rely on their safeguards (such as standard contractual clauses).</P>
+        <P>Data is stored by Supabase in the European Union (Stockholm region) and served through Vercel. Where a provider processes data outside the EU we rely on their safeguards (such as standard contractual clauses). The AI assistant&apos;s model providers may process questions outside the EU, including in the United States.</P>
       </Section>
       <Section title="10. Account deletion">
         <P>Deleting your account removes your login (email, password, Google identity), display name, tournament and league registrations, scorer permissions and subscription records. Tournaments, leagues and match results you took part in or organised are kept, because they are the organiser&apos;s record of the event; your player name stays visible in those results but is no longer linked to any account. Deletion is immediate and cannot be undone. Step-by-step instructions: <DeleteLink>Delete account</DeleteLink>.</P>
@@ -102,6 +104,7 @@ function PolicySk({ supportEmail }) {
           <Item label="Údaje o zariadení">náhodný identifikátor zariadenia a voliteľný názov zariadenia alebo číslo terča, ktoré zadáte, aby bolo vidieť, na ktorom terči zápas beží; IP adresa v rozsahu, v akom ju spracúvajú poskytovatelia hostingu a databázy. Aplikácia pre Android navyše ukladá vaše nastavenia (téma, jazyk, sila vibrácií) iba vo vašom zariadení.</Item>
           <Item label="Údaje o používaní">udalosti pri používaní aplikácie, záznamy o chybách a údaje o výkone, aby služba fungovala spoľahlivo.</Item>
           <Item label="Cookies a lokálne úložisko">slúžia na prihlásenie, nastavenie jazyka a témy a na uloženie rozohraného zápasu.</Item>
+          <Item label="AI asistent">ak používate chat s asistentom: vaše otázky, jeho odpovede a kroky, ktoré urobil (aké štatistiky vyhľadal), a počet vašich otázok za deň, aby sme mohli uplatniť denný limit. Konverzáciu uchovávame 30 dní od poslednej otázky, aby fungovali doplňujúce otázky, potom ju vymažeme.</Item>
         </List>
       </Section>
       <Section title="3. Na čo údaje používame">
@@ -116,6 +119,7 @@ function PolicySk({ supportEmail }) {
       <Section title="4. Komu údaje poskytujeme">
         <List>
           <Item label="Poskytovatelia služieb">Na prihlásenie, databázu a aktualizácie v reálnom čase používame Supabase; poskytovatelia hostingu a CDN môžu spracúvať IP adresy a základné údaje o požiadavkách.</Item>
+          <Item label="AI asistent">Vaše otázky a štatistiky potrebné na odpoveď posielame poskytovateľom AI modelov: OpenRouter, ktorý ich odovzdá spoločnosti prevádzkujúcej model, a Google (Gemini). Každý beh zaznamenávame v Langfuse (EÚ), aby sme mohli kontrolovať kvalitu odpovedí. Asistent vidí len to, čo vidí váš účet. Nezadávajte doň osobné údaje, ktoré nechcete takto spracúvať.</Item>
           <Item label="Viditeľnosť turnajov">Výsledky turnajov, tabuľky, štatistiky zápasov a profily hráčov (meno hráča, ktoré používate) sú verejné: vidí ich každý, kto má odkaz, aj bez prihlásenia. Stránky líg, rebríčky a zoznamy členov sú tiež verejné, pokiaľ ich organizátor nesprístupní len prihláseným používateľom. Žiadosti o registráciu vidíte iba vy a organizátori.</Item>
           <Item label="Zákonné dôvody">Údaje môžeme poskytnúť, ak to vyžaduje zákon alebo ak je to potrebné na ochranu bezpečnosti, práv či majetku používateľov alebo služby.</Item>
           <Item>Osobné údaje nepredávame.</Item>
@@ -139,7 +143,7 @@ function PolicySk({ supportEmail }) {
         <P>Služba nie je určená deťom mladším ako 16 rokov. Nezakladajte účty maloletým bez súhlasu, ak ho predpisy vyžadujú.</P>
       </Section>
       <Section title="9. Prenos údajov do zahraničia">
-        <P>Údaje ukladá Supabase v Európskej únii (región Štokholm) a aplikáciu doručuje Vercel. Ak niektorý poskytovateľ spracúva údaje mimo EÚ, spoliehame sa na jeho záruky (napríklad štandardné zmluvné doložky).</P>
+        <P>Údaje ukladá Supabase v Európskej únii (región Štokholm) a aplikáciu doručuje Vercel. Ak niektorý poskytovateľ spracúva údaje mimo EÚ, spoliehame sa na jeho záruky (napríklad štandardné zmluvné doložky). Poskytovatelia AI modelov pre asistenta môžu otázky spracúvať aj mimo EÚ, napríklad v Spojených štátoch.</P>
       </Section>
       <Section title="10. Zmazanie účtu">
         <P>Zmazaním účtu sa odstráni vaše prihlásenie (e-mail, heslo, prepojenie s Google), zobrazované meno, registrácie do turnajov a líg, oprávnenia zapisovateľa a záznamy o predplatnom. Turnaje, ligy a výsledky zápasov, ktorých ste sa zúčastnili alebo ktoré ste organizovali, zostávajú, pretože sú záznamom organizátora o podujatí; vaše meno hráča v týchto výsledkoch zostane viditeľné, ale už nebude prepojené so žiadnym účtom. Zmazanie je okamžité a nedá sa vrátiť späť. Postup krok za krokom: <DeleteLink>Zmazanie účtu</DeleteLink>.</P>
@@ -159,7 +163,7 @@ export function PrivacyPolicy() {
     <div className="mx-auto flex max-w-3xl flex-col gap-8 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">{isSk ? 'Zásady ochrany osobných údajov' : 'Privacy Policy'}</h1>
-        <p className="text-sm text-muted-foreground">{isSk ? 'Posledná aktualizácia: 27. októbra 2026' : 'Last updated: October 27, 2026'}</p>
+        <p className="text-sm text-muted-foreground">{isSk ? 'Posledná aktualizácia: 29. októbra 2026' : 'Last updated: October 29, 2026'}</p>
       </div>
       {isSk ? <PolicySk supportEmail={supportEmail} /> : <PolicyEn supportEmail={supportEmail} />}
     </div>

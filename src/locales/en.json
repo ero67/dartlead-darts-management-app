@@ -600,6 +600,20 @@
       "Slovak and English",
       "Dark mode for dim venues"
     ],
+    "assistant": {
+      "eyebrow": "New · AI assistant",
+      "title": "Ask your league anything.",
+      "sub": "A chat built into DartLead that answers from your own tournaments and leagues: who leads, who hit the most 180s, how one player does against another. It also knows the darts rules and how the app works.",
+      "points": [
+        "Answers from recorded matches, not guesses",
+        "Shows the steps behind every answer",
+        "Understands Slovak and English"
+      ],
+      "note": "Available to signed-in users.",
+      "previewQuestion": "Who has the most 180s in the league?",
+      "previewStep": "Searched the league records: 180s",
+      "previewAnswer": "Peter H. leads with 14, ahead of Eva T. and Jakub S."
+    },
     "demoEyebrow": "Demo",
     "demoTitle": "See it with real data.",
     "demoSub": "Open a finished demo tournament: groups, bracket, statistics and win-chance charts. No sign-up.",
@@ -1566,5 +1580,112 @@
     "upcomingRounds": "Upcoming rounds",
     "defaultVenue": "Default venue",
     "defaultVenueHint": "Prefilled when you create a new round."
+  },
+  "assistant": {
+    "title": "Assistant",
+    "description": "Darts rules, using DartLead, and players' statistics.",
+    "open": "Open the assistant",
+    "headerLabel": "AI assistant",
+    "newChat": "New conversation",
+    "placeholder": "Ask a question…",
+    "send": "Send",
+    "error": "Something went wrong. Please try again.",
+    "unavailable": "The assistant could not load. Reload the page and try again.",
+    "limitReached": "You have used all of today's questions. Try again tomorrow.",
+    "notAvailable": "The assistant is not available for your account yet.",
+    "empty": "Ask about the rules, how DartLead works, or any player's and league's numbers.",
+    "suggestions": {
+      "h2h": "{{a}} vs {{b}}: who leads their head-to-head?",
+      "top180": "Top 3 players by 180s",
+      "highestCheckout": "Who has the highest checkout in the app?",
+      "finishSingle20": "Can I finish a leg on single 20?",
+      "leaguesInApp": "Which leagues are there?",
+      "practiceHow": "How is my practice going?",
+      "practiceImprove": "What should I practise to improve?",
+      "practiceTrouble": "Which targets give me the most trouble?",
+      "practiceAroundTheClock": "How does Around the Clock work?",
+      "leagueLeader": "Who leads this league?",
+      "leagueTop180": "Top 3 by 180s in this league",
+      "leagueTop180Plain": "Who has the highest checkout in this league?",
+      "tournamentWinner": "Who is leading this tournament?",
+      "tournamentCheckout": "Who had the highest checkout here?",
+      "tournamentRecap": "Write a recap of this tournament",
+      "tournamentsRunning": "Which tournaments are running now?",
+      "playerVsOpponent": "How does {{player}} do against {{opponent}}?",
+      "playerRecord": "What is this player's win-loss record?",
+      "playerImproving": "Is this player improving?",
+      "playerAverage": "What is this player's average?"
+    },
+    "pageChip": {
+      "lookingAt": "Looking at: {{name}}",
+      "league": "League",
+      "tournament": "Tournament",
+      "player": "Player",
+      "practice": "Your practice"
+    },
+    "feedback": {
+      "helpful": "Helpful answer",
+      "notHelpful": "Not helpful",
+      "whatWasWrong": "What was wrong?",
+      "send": "Send",
+      "skip": "Skip",
+      "thanks": "Thanks for the feedback",
+      "failed": "Could not send your feedback. Please try again."
+    },
+    "trace": {
+      "working": "Working…",
+      "summary": "Worked in {{count}} steps",
+      "understood": "Understood as: {{question}}",
+      "route": "Looking in: {{sources}}",
+      "offTopic": "Not about darts or DartLead",
+      "read": "Read {{count}} sections of the docs",
+      "source": {
+        "rules": "rules",
+        "stats": "statistics",
+        "app": "app help"
+      },
+      "running": "Running {{tool}}",
+      "ran": "Ran {{tool}}",
+      "failed": "{{tool}} failed",
+      "tool": {
+        "find_player": {
+          "running": "Looking up player “{{name}}”",
+          "done": "Found {{found}}",
+          "none": "No player called “{{name}}”"
+        },
+        "get_player_stats": {
+          "running": "Loading statistics",
+          "done": "Statistics of {{player}}"
+        },
+        "get_recent_matches": {
+          "running": "Loading recent matches",
+          "done": "Recent matches of {{player}}"
+        },
+        "get_head_to_head": {
+          "running": "Loading head-to-head records",
+          "done": "Head-to-head records of {{player}}"
+        },
+        "find_league": {
+          "running": "Looking up league “{{name}}”",
+          "done": "Found {{found}}",
+          "none": "No league called “{{name}}”"
+        },
+        "get_league_standings": {
+          "running": "Loading the league table",
+          "done": "Table of {{league}}"
+        },
+        "get_me": {"running": "Checking who you are", "done": "Checked your account"},
+        "list_tournaments": {"running": "Listing tournaments", "done": "Found {{count}} tournaments"},
+        "find_tournament": {"running": "Looking up tournament “{{name}}”", "done": "Found {{found}}", "none": "No tournament called “{{name}}”"},
+        "get_tournament_summary": {"running": "Loading the tournament summary", "done": "Summary of {{tournament}}"},
+        "get_player_tournaments": {"running": "Loading tournament history", "done": "Tournaments of {{player}}"},
+        "get_records": {"running": "Searching records across tournaments", "done": "Searched records in {{count}} tournaments"},
+        "list_leagues": {"running": "Listing leagues", "done": "Found {{count}} leagues"},
+        "get_my_practice": {"running": "Loading your practice", "done": "Looked at your practice"},
+        "get_player_form": {"running": "Loading form", "done": "Form of {{player}}"},
+        "get_match_preview": {"running": "Preparing the match preview", "done": "Previewed the match"},
+        "get_round_recap": {"running": "Collecting the round facts", "done": "Facts of {{tournament}}"}
+      }
+    }
   }
 }

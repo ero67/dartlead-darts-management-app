@@ -1,0 +1,19 @@
+[
+  {"question": "Do I need a double to finish a leg?", "sources": ["rules"], "players": []},
+  {"question": "What happens if I bust on the bull?", "sources": ["rules"], "players": []},
+  {"question": "What is Peter's checkout percentage this season?", "sources": ["stats"], "players": ["Peter"]},
+  {"question": "Who is leading the Panovce league?", "sources": ["stats"], "players": []},
+  {"question": "Compare Jano Kováč and Peter over their last 10 matches", "sources": ["stats"], "players": ["Jano Kováč", "Peter"]},
+  {"question": "How do I create the next round in my league?", "sources": ["app"], "players": []},
+  {"question": "How can I add a player to my tournament?", "sources": ["app"], "players": []},
+  {"question": "Peter needs 40 to win - is D20 the standard checkout, and how often does he hit doubles?", "sources": ["rules", "stats"], "players": ["Peter"]},
+  {"question": "What's the weather in Košice tomorrow?", "sources": [], "players": []},
+  {"question": "Koľko 180-tiek hodil Peter v tejto sezóne?", "sources": ["stats"], "players": ["Peter"]},
+  {"question": "What is the average checkout percentage of all players in the Panovce league?", "sources": ["stats"], "players": []},
+  {"question": "Kto má väčšiu šancu na víťazstvo Erik alebo Jozef ?", "sources": ["stats"], "players": ["Erik", "Jozef"]},
+  {"question": "How many matches has Peter played this season?", "sources": ["stats"], "players": ["Peter"]},
+  {"question": "What is the average score per leg for Peter this season?", "sources": ["stats"], "players": ["Peter"]},
+  {"question": "What is the highest score Peter has achieved in a single match this season?", "sources": ["stats"], "players": ["Peter"]},
+  {"question": "Who has the best win-loss record in the Panovce league?", "sources": ["stats"], "players": []},
+  {"question": "How do I update my profile information in the app?", "sources": ["app"], "players": []}
+]
