@@ -1654,7 +1654,11 @@
         "get_tournament_summary": {"running": "Loading the tournament summary", "done": "Summary of {{tournament}}"},
         "get_player_tournaments": {"running": "Loading tournament history", "done": "Tournaments of {{player}}"},
         "get_records": {"running": "Searching records across tournaments", "done": "Searched records in {{count}} tournaments"},
-        "list_leagues": {"running": "Listing leagues", "done": "Found {{count}} leagues"}
+        "list_leagues": {"running": "Listing leagues", "done": "Found {{count}} leagues"},
+        "get_my_practice": {"running": "Loading your practice", "done": "Looked at your practice"},
+        "get_player_form": {"running": "Loading form", "done": "Form of {{player}}"},
+        "get_match_preview": {"running": "Preparing the match preview", "done": "Previewed the match"},
+        "get_round_recap": {"running": "Collecting the round facts", "done": "Facts of {{tournament}}"}
       }
     }
   }

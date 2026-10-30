@@ -40,7 +40,8 @@ function stepTitle(step, t) {
   const { name, args = {}, output, status } = step;
   if (status === 'error') return t('assistant.trace.failed', { tool: name });
   const known = ['find_player', 'get_player_stats', 'get_recent_matches', 'get_head_to_head', 'find_league', 'get_league_standings',
-    'get_me', 'list_tournaments', 'find_tournament', 'get_tournament_summary', 'get_player_tournaments', 'get_records', 'list_leagues'];
+    'get_me', 'list_tournaments', 'find_tournament', 'get_tournament_summary', 'get_player_tournaments', 'get_records', 'list_leagues',
+    'get_my_practice', 'get_player_form', 'get_match_preview', 'get_round_recap'];
   if (!known.includes(name)) return t(status === 'running' ? 'assistant.trace.running' : 'assistant.trace.ran', { tool: name });
   if (status === 'running') return t(`assistant.trace.tool.${name}.running`, { name: args.name });
   if (name === 'find_player' || name === 'find_league' || name === 'find_tournament') {
@@ -50,7 +51,7 @@ function stepTitle(step, t) {
   return t(`assistant.trace.tool.${name}.done`, {
     player: output?.player,
     league: output?.league,
-    tournament: output?.tournament,
+    tournament: output?.tournament ?? output?.summary?.tournament,
     // list_tournaments has a total; get_records counts the tournaments it searched; list_leagues lists leagues.
     count: output?.total ?? (typeof output?.tournaments === 'number' ? output.tournaments : output?.leagues?.length) ?? 0,
   });

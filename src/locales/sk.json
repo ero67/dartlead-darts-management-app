@@ -1654,7 +1654,11 @@
         "get_tournament_summary": {"running": "Načítavam súhrn turnaja", "done": "Súhrn: {{tournament}}"},
         "get_player_tournaments": {"running": "Načítavam históriu turnajov", "done": "Turnaje: {{player}}"},
         "get_records": {"running": "Hľadám rekordy naprieč turnajmi", "done": "Prehľadané rekordy v turnajoch: {{count}}"},
-        "list_leagues": {"running": "Načítavam ligy", "done": "Nájdené ligy: {{count}}"}
+        "list_leagues": {"running": "Načítavam ligy", "done": "Nájdené ligy: {{count}}"},
+        "get_my_practice": {"running": "Načítavam tvoj tréning", "done": "Pozrel som tvoj tréning"},
+        "get_player_form": {"running": "Načítavam formu", "done": "Forma: {{player}}"},
+        "get_match_preview": {"running": "Pripravujem náhľad zápasu", "done": "Náhľad zápasu"},
+        "get_round_recap": {"running": "Zbieram fakty o kole", "done": "Fakty: {{tournament}}"}
       }
     }
   }
