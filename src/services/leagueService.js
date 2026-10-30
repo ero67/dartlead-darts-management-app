@@ -1493,6 +1493,7 @@ export const leagueService = {
       name: league.name,
       description: league.description,
       status: league.status,
+      isDemo: Boolean(league.is_demo),
       // Co-managers (league_managers join); the creator is implicit via createdBy
       managerIds: (league.league_managers || []).map(m => m.user_id),
       createdBy: league.created_by,
