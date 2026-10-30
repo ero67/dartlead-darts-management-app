@@ -13,3 +13,25 @@ export function pageFromPath(pathname) {
   if (matchPath('/practice', pathname) || matchPath('/practice/*', pathname)) return { kind: 'practice' };
   return null;
 }
+
+const s = (name, params) => ({ key: `assistant.suggestions.${name}`, params });
+
+// Exactly four suggestions ({ key, params } for t()) for the page the user is on. `names` comes from
+// getSuggestionNames; a missing name picks the plain question, never a template with a hole in it.
+export function suggestionsFor(page, names = {}) {
+  const h2h = names.a && names.b ? s('h2h', { a: names.a, b: names.b }) : null;
+  switch (page?.kind) {
+    case 'practice':
+      return [s('practiceHow'), s('practiceImprove'), s('practiceTrouble'), s('practiceAroundTheClock')];
+    case 'league':
+      return [h2h || s('leagueTop180Plain'), s('leagueLeader'), s('leagueTop180'), s('leaguesInApp')];
+    case 'tournament':
+      return [h2h || s('tournamentWinner'), s('tournamentCheckout'), s('tournamentRecap'), s('tournamentsRunning')];
+    case 'player': {
+      const versus = names.player && names.opponent ? s('playerVsOpponent', { player: names.player, opponent: names.opponent }) : null;
+      return [versus || s('playerRecord'), s('playerImproving'), s('playerAverage'), s('top180')];
+    }
+    default:
+      return [h2h || s('leaguesInApp'), s('top180'), s('highestCheckout'), s('finishSingle20')];
+  }
+}

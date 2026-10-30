@@ -1,7 +1,27 @@
 import { supabase } from '../lib/supabase';
+import { leagueService } from './leagueService';
+import { matchService, tournamentService } from './tournamentService';
 
 // The assistant service (assistant/ folder, FastAPI). Unset = the assistant is hidden.
 export const ASSISTANT_URL = import.meta.env.VITE_ASSISTANT_URL;
+
+// The two top names of a league table, as { a, b } (none when it has fewer than two).
+async function topTwo(leagueId) {
+  const [first, second] = await leagueService.getLeaderboard(leagueId);
+  return first?.player?.name && second?.player?.name ? { a: first.player.name, b: second.player.name } : {};
+}
+
+// The final's winner and loser, from the bracket with the fresh playoff match rows laid over it
+// (as TournamentSummary does); none until the final is played.
+function finalists(tournament) {
+  const rounds = tournament.playoffs?.rounds;
+  const bracketFinal = rounds?.[rounds.length - 1]?.matches?.find(m => !m.isThirdPlaceMatch);
+  const final = { ...bracketFinal, ...tournament.playoffMatches.find(m => m.id === bracketFinal?.id) };
+  const winnerId = final.result?.winner;
+  if (final.status !== 'completed' || !winnerId) return {};
+  const [winner, loser] = winnerId === final.player1?.id ? [final.player1, final.player2] : [final.player2, final.player1];
+  return winner?.name && loser?.name ? { a: winner.name, b: loser.name } : {};
+}
 
 export const assistantService = {
   // Who sees the assistant ('admins' | 'everyone') and the daily question limits; one row, readable by anyone.
@@ -26,6 +46,44 @@ export const assistantService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  // Real names for the suggestions and the "Looking at" chip of this page: { a, b } (head-to-head),
+  // { player, opponent } and `label` (the league, tournament or player name). Any of them may be
+  // missing, and a failure is just {}: the plain suggestions still work.
+  async getSuggestionNames(page) {
+    try {
+      switch (page?.kind) {
+        case 'league': {
+          const [leagues, top] = await Promise.all([leagueService.getLeagues(), topTwo(page.id)]);
+          return { ...top, label: leagues.find(l => l.id === page.id)?.name };
+        }
+        case 'tournament': {
+          const tournament = await tournamentService.getTournament(page.id);
+          return { ...finalists(tournament), label: tournament.name };
+        }
+        case 'player': {
+          const [profile, totals] = await Promise.all([tournamentService.getPlayerProfile(page.id), matchService.getRecentMatchTotals([page.id], 60)]);
+          const counts = new Map();
+          (totals.get(page.id) || []).forEach(m => m.opponentId && counts.set(m.opponentId, (counts.get(m.opponentId) || 0) + 1));
+          const [opponentId] = [...counts].sort((x, y) => y[1] - x[1])[0] || [];
+          // The profile's last 10 matches usually name them; otherwise their own profile does.
+          const opponent = opponentId && (profile.recentMatches.find(m => m.opponentId === opponentId)?.opponentName
+            ?? (await tournamentService.getPlayerProfile(opponentId)).player?.name);
+          return { label: profile.player?.name, player: profile.player?.name, ...(opponent && { opponent }) };
+        }
+        case 'practice':
+          return {};
+        default: {
+          // Home and other routes: the top two of the newest active league.
+          const league = (await leagueService.getLeagues()).find(l => l.status === 'active');
+          return league ? await topTwo(league.id) : {};
+        }
+      }
+    } catch (error) {
+      console.error('Error loading assistant suggestion names:', error);
+      return {};
+    }
   },
 
   // Sends one message and calls onEvent for every event of the run as it streams in (NDJSON, one JSON

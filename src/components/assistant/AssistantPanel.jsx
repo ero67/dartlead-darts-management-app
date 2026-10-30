@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ArrowUp, SquarePen, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ArrowUp, Eye, SquarePen, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Streamdown } from 'streamdown';
 
@@ -22,10 +22,11 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AssistantTrace } from './AssistantTrace';
 import { AssistantLogo } from './AssistantLogo';
-import { pageFromPath } from './assistantPage';
+import { pageFromPath, suggestionsFor } from './assistantPage';
 import { assistantService } from '@/services/assistantService';
 
-const SUGGESTIONS = ['assistant.suggestion1', 'assistant.suggestion2', 'assistant.suggestion3', 'assistant.suggestion4'];
+// Pages whose name the "Looking at" chip shows (practice has no name to fetch).
+const CHIP_KINDS = ['league', 'tournament', 'player', 'practice'];
 
 // One stream event -> the assistant message it belongs to (see /chat in assistant/src/assistant/server.py).
 function applyEvent(message, event) {
@@ -146,11 +147,25 @@ function AssistantReply({ message, onTraceOpenChange, onFeedback }) {
 export function AssistantPanel({ isOpen, onOpenChange }) {
   const { t } = useLanguage();
   const { pathname } = useLocation();
+  const page = useMemo(() => pageFromPath(pathname), [pathname]);
+  // The names for one page; a result is only used while `page` is still that page.
+  const [loaded, setLoaded] = useState({ page: null, names: {} });
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   // One thread per conversation; the service keeps its history under this id.
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
+
+  // Real names for the suggestions and the chip, fetched while the panel is open and again on a new page.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let isCurrent = true;
+    assistantService.getSuggestionNames(page).then(names => { if (isCurrent) setLoaded({ page, names }); });
+    return () => { isCurrent = false; };
+  }, [isOpen, page]);
+  const names = loaded.page === page ? loaded.names : {};
+  const suggestions = suggestionsFor(page, names);
+  const chipName = !CHIP_KINDS.includes(page?.kind) ? null : names.label || t(`assistant.pageChip.${page.kind}`);
 
   const updateMessage = (id, change) => setMessages(prev => prev.map(m => (m.id === id ? change(m) : m)));
 
@@ -172,7 +187,7 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
     ]);
     try {
       // The page at send time, not at open time: the panel stays open while the user navigates.
-      await assistantService.streamChat({ message: text, threadId, page: pageFromPath(pathname), onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
+      await assistantService.streamChat({ message: text, threadId, page, onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
       // A stream that ends without "done" (connection dropped) still stops the loader.
       updateMessage(replyId, m => (m.status === 'streaming' ? { ...m, status: 'done', isTraceOpen: false } : m));
     } catch (error) {
@@ -229,15 +244,16 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
                     <p className="max-w-xs text-sm text-muted-foreground">{t('assistant.empty')}</p>
                     {/* Clickable prompts: one click sends the question */}
                     <div className="flex w-full flex-col gap-2">
-                      {SUGGESTIONS.map((key, i) => (
+                      {/* keyed by position: when names arrive the text changes in place, the entrance animation does not replay */}
+                      {suggestions.map(({ key, params }, i) => (
                         <Button
-                          key={key}
+                          key={i}
                           variant="outline"
                           className="h-auto justify-start whitespace-normal py-2 text-left font-normal animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-500"
                           style={{ animationDelay: `${150 + i * 80}ms` }}
-                          onClick={() => send(t(key))}
+                          onClick={() => send(t(key, params))}
                         >
-                          {t(key)}
+                          {t(key, params)}
                         </Button>
                       ))}
                     </div>
@@ -271,6 +287,12 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
         </MessageScrollerProvider>
 
         <div className="border-t p-3">
+          {chipName && (
+            <Badge variant="outline" className="mb-2 max-w-full border-dashed font-normal text-muted-foreground" aria-label={t('assistant.pageChip.lookingAt', { name: chipName })}>
+              <Eye />
+              <span className="truncate">{t('assistant.pageChip.lookingAt', { name: chipName })}</span>
+            </Badge>
+          )}
           <InputGroup>
             <InputGroupTextarea
               value={draft}
