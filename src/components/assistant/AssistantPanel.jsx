@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ArrowUp, SquarePen, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Streamdown } from 'streamdown';
@@ -21,6 +22,7 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AssistantTrace } from './AssistantTrace';
 import { AssistantLogo } from './AssistantLogo';
+import { pageFromPath } from './assistantPage';
 import { assistantService } from '@/services/assistantService';
 
 const SUGGESTIONS = ['assistant.suggestion1', 'assistant.suggestion2', 'assistant.suggestion3', 'assistant.suggestion4'];
@@ -143,6 +145,7 @@ function AssistantReply({ message, onTraceOpenChange, onFeedback }) {
 
 export function AssistantPanel({ isOpen, onOpenChange }) {
   const { t } = useLanguage();
+  const { pathname } = useLocation();
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -168,7 +171,8 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
       { id: replyId, role: 'assistant', text: '', steps: [], sources: [], status: 'streaming', isTraceOpen: true, traceId: undefined, feedback: null, isSendingFeedback: false },
     ]);
     try {
-      await assistantService.streamChat({ message: text, threadId, onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
+      // The page at send time, not at open time: the panel stays open while the user navigates.
+      await assistantService.streamChat({ message: text, threadId, page: pageFromPath(pathname), onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
       // A stream that ends without "done" (connection dropped) still stops the loader.
       updateMessage(replyId, m => (m.status === 'streaming' ? { ...m, status: 'done', isTraceOpen: false } : m));
     } catch (error) {
