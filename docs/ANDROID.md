@@ -127,7 +127,8 @@ GitHub → repository → Settings → Secrets and variables → Actions:
 | `ANDROID_KEY_ALIAS`         | key alias (e.g. `dartlead`)                      |
 | `ANDROID_KEY_PASSWORD`      | key password                                    |
 
-Optional variables `VITE_SUPABASE_URL` and `VITE_PUBLIC_APP_URL` override the
+Optional variables `VITE_SUPABASE_URL`, `VITE_PUBLIC_APP_URL` and
+`VITE_ASSISTANT_URL` (the assistant API on Cloud Run) override the
 defaults baked into the workflow.
 
 ### Signing key

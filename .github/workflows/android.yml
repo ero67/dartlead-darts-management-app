@@ -19,7 +19,7 @@
 #     ANDROID_KEY_ALIAS          (with the keystore)
 #     ANDROID_KEY_PASSWORD       (with the keystore)
 #   Variables (optional, defaults below)
-#     VITE_SUPABASE_URL, VITE_PUBLIC_APP_URL
+#     VITE_SUPABASE_URL, VITE_PUBLIC_APP_URL, VITE_ASSISTANT_URL
 #
 # Without the keystore secrets the APK is signed with a throw-away debug key,
 # which means each build must be uninstalled before the next one installs.
@@ -63,6 +63,7 @@ jobs:
           SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://hdorqfkaiigjlwobupnq.supabase.co' }}
           SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           PUBLIC_APP_URL: ${{ vars.VITE_PUBLIC_APP_URL || 'https://dartlead.app' }}
+          ASSISTANT_URL: ${{ vars.VITE_ASSISTANT_URL || 'https://dartlead-assistant-363705065168.europe-north1.run.app' }}
         run: |
           if [ -z "$SUPABASE_ANON_KEY" ]; then
             echo "::error::Missing repository secret VITE_SUPABASE_ANON_KEY (Settings → Secrets and variables → Actions)."
@@ -72,6 +73,7 @@ jobs:
             echo "VITE_SUPABASE_URL=$SUPABASE_URL"
             echo "VITE_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
             echo "VITE_PUBLIC_APP_URL=$PUBLIC_APP_URL"
+            echo "VITE_ASSISTANT_URL=$ASSISTANT_URL"
           } > .env.production.local
 
       - name: Build web bundle and sync into Android
