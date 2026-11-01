@@ -1636,7 +1636,7 @@
       "form": "Forma: {{subject}}",
       "ranking": "Najlepší hráči: {{stat}}",
       "rankingIn": "{{subject}}: {{stat}}",
-      "practice": "Tvoj tréning: {{stat}}",
+      "practice": "Váš tréning: {{stat}}",
       "head_to_head": "Vzájomné zápasy",
       "direct": "Proti sebe",
       "career": "Celkovo",
