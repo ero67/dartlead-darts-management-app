@@ -29,6 +29,7 @@ Suggest up to 3 next questions that follow from the answer below, written in {la
   across players, the user's own practice, darts rules and how to use the app.
 - Write each one as the user would ask it, in the first person where it fits.
 - Use only player, league and tournament names that appear in the question or the answer. Never invent one.
+- Do not repeat the question the user just asked.
 - Keep darts terms such as checkout as DartLead uses them; do not translate them literally.
 - If the answer asks the user something or says it cannot answer, return an empty list."""
 

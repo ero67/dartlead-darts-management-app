@@ -698,7 +698,8 @@ def get_records(stat: str, min_checkout: int | None = None, league_id: str | Non
 
 MIN_CHART_POINTS = 3  # fewer than this is a sentence, not a chart
 FORM_CHART_MATCHES = 20
-RANKING_CHART_ROWS = 8
+RANKING_CHART_ROWS = 8  # the most bars that stay readable; also the default
+PRACTICE_CHART_POINTS = 30  # a heavy user's hundreds of sessions would bloat the event, the model context and the checkpoint
 _RANKING_FIELD = {"180s": "180s", "average": "average", "match_average": "average", "checkouts": "highest"}
 
 
@@ -716,7 +717,7 @@ def practice_series(game: str, days: int = 90) -> dict:
     points = [{"label": _day(r["finished_at"]), "value": v} for r in rows
               if r.get("finished_at") and _when(r["finished_at"]) >= since
               and _counts(game, r["stats"] or {}) and (v := (r["stats"] or {}).get(key)) is not None]
-    return {"metric": key, "lower_is_better": lower, "points": points}
+    return {"metric": key, "lower_is_better": lower, "points": points[-PRACTICE_CHART_POINTS:]}
 
 
 def _league_name(league_id: str) -> str:
@@ -737,7 +738,7 @@ def _head_to_head_chart(player_id: str, opponent_id: str) -> dict:
 
 
 def chart(kind: str, player_id: str | None = None, opponent_id: str | None = None, stat: str | None = None,
-          league_id: str | None = None, game: str | None = None, days: int = 90) -> dict:
+          league_id: str | None = None, game: str | None = None, days: int = 90, limit: int = RANKING_CHART_ROWS) -> dict:
     """Data for one chart: form (a player's match average over time), ranking (top players by a stat), practice
     (the user's sessions of one game) or head_to_head (two players side by side)."""
     if kind == "head_to_head":
@@ -756,16 +757,17 @@ def chart(kind: str, player_id: str | None = None, opponent_id: str | None = Non
                   for m in reversed(history)]
     elif kind == "ranking":
         shape = "bars"
+        limit = min(max(limit, MIN_CHART_POINTS), RANKING_CHART_ROWS)
         if stat == "points":
             if not league_id:
                 return {"error": "Ranking by points needs league_id."}
             table = get_league_standings(league_id)
             subject = table["league"]
-            points = [{"label": r["player"], "value": r["points"]} for r in table["standings"][:RANKING_CHART_ROWS]]
+            points = [{"label": r["player"], "value": r["points"]} for r in table["standings"][:limit]]
         else:
             if not stat:
                 return {"error": "ranking needs a stat."}
-            records = get_records(stat, league_id=league_id, limit=RANKING_CHART_ROWS)
+            records = get_records(stat, league_id=league_id, limit=limit)
             if "error" in records:
                 return records
             subject = _league_name(league_id) if league_id else None

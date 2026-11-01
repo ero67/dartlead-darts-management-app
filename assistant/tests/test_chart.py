@@ -72,6 +72,23 @@ def test_ranking_180s_top_8(monkeypatch):
     assert result["points"][0] == {"label": "P0", "value": 20}
 
 
+def test_ranking_limit_is_the_asked_count(monkeypatch):
+    monkeypatch.setattr(stats, "get_records", records([{"player": f"P{i}", "180s": 20 - i} for i in range(12)]))
+    assert len(stats.chart("ranking", stat="180s", limit=5)["points"]) == 5
+
+
+def test_ranking_limit_is_clamped(monkeypatch):
+    monkeypatch.setattr(stats, "get_records", records([{"player": f"P{i}", "180s": 20 - i} for i in range(12)]))
+    assert len(stats.chart("ranking", stat="180s", limit=20)["points"]) == 8
+    assert len(stats.chart("ranking", stat="180s", limit=1)["points"]) == 3
+
+
+def test_ranking_points_limit(monkeypatch):
+    table = {"league": "Pub League", "standings": [{"player": f"P{i}", "points": 30 - i} for i in range(10)]}
+    monkeypatch.setattr(stats, "get_league_standings", lambda league_id: table)
+    assert len(stats.chart("ranking", stat="points", league_id="l1", limit=4)["points"]) == 4
+
+
 def test_ranking_checkouts_uses_highest(monkeypatch):
     monkeypatch.setattr(stats, "get_records", records([{"player": f"P{i}", "highest": 100 + i, "checkouts": 1} for i in range(3)]))
     assert [p["value"] for p in stats.chart("ranking", stat="checkouts")["points"]] == [100, 101, 102]
@@ -133,6 +150,16 @@ def test_practice_leaves_out_short_old_and_unfinished_sessions(monkeypatch):
         stats._user_id.reset(token)
     assert (result["kind"], result["chart"], result["stat"], result["lower_is_better"]) == ("line", "practice", "average", False)
     assert [p["value"] for p in result["points"]] == [41, 42, 43]
+
+
+def test_practice_keeps_only_the_newest_points(monkeypatch):
+    total = stats.PRACTICE_CHART_POINTS + 10
+    token = practice_rows(monkeypatch, [session("x01", i, 80 - i, totalDarts=30) for i in range(total)])
+    try:
+        values = [p["value"] for p in stats.chart("practice", game="x01", days=365)["points"]]
+    finally:
+        stats._user_id.reset(token)
+    assert values == list(range(10, total))
 
 
 def test_practice_around_the_clock_is_lower_is_better(monkeypatch):
@@ -202,4 +229,5 @@ def test_show_chart_passes_its_arguments(monkeypatch):
     result = show_chart.invoke({"kind": "head_to_head", "player_id": A, "opponent_id": B})
     assert result == {"ok": True}
     assert seen["args"] == ("head_to_head",)
-    assert seen["kwargs"] == {"player_id": A, "opponent_id": B, "stat": None, "league_id": None, "game": None, "days": 90}
+    assert seen["kwargs"] == {"player_id": A, "opponent_id": B, "stat": None, "league_id": None, "game": None, "days": 90,
+                               "limit": 8}
