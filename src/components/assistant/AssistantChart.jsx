@@ -98,7 +98,7 @@ export function AssistantChart({ chart }) {
     );
   } else if (kind === 'versus') {
     const [a, b] = chart.players ?? [];
-    summary = rows.map((r) => `${statName(r.stat)} ${a} ${round(num(r.a))}, ${b} ${round(num(r.b))}`).join('; ');
+    summary = rows.map((r) => `${statName(r.stat)} (${t(`assistant.chart.${r.scope}`)}) ${a} ${round(num(r.a))}, ${b} ${round(num(r.b))}`).join('; ');
     body = (
       <div className="flex flex-col gap-3">
         <div className="flex justify-between gap-3 text-xs font-medium">
