@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from assistant import stats
+from assistant.tools import TOOLS, show_chart
 
 A, B = "a" * 36, "b" * 36
 
@@ -189,3 +190,16 @@ def test_head_to_head_never_met_is_an_error(monkeypatch):
                                   {"kind": "pie"}])
 def test_missing_argument_is_an_error(args):
     assert "error" in stats.chart(**args)
+
+
+def test_show_chart_is_a_tool():
+    assert "show_chart" in {t.name for t in TOOLS}
+
+
+def test_show_chart_passes_its_arguments(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(stats, "chart", lambda *args, **kwargs: seen.update(args=args, kwargs=kwargs) or {"ok": True})
+    result = show_chart.invoke({"kind": "head_to_head", "player_id": A, "opponent_id": B})
+    assert result == {"ok": True}
+    assert seen["args"] == ("head_to_head",)
+    assert seen["kwargs"] == {"player_id": A, "opponent_id": B, "stat": None, "league_id": None, "game": None, "days": 90}

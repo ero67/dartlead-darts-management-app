@@ -276,9 +276,36 @@ def get_round_recap(tournament_id: str) -> dict:
     return stats.get_round_recap(tournament_id)
 
 
+@tool(parse_docstring=True)
+def show_chart(kind: Literal["form", "ranking", "practice", "head_to_head"], player_id: str | None = None,
+               opponent_id: str | None = None, stat: Literal["180s", "average", "match_average", "checkouts", "points"] | None = None,
+               league_id: str | None = None, game: Literal["x01", "checkout", "oneTwentyOne", "aroundTheClock", "cricket"] | None = None,
+               days: int = 90) -> dict:
+    """Show a chart under the answer. Use it only for a trend over time, a ranking of at least three items, or a
+    comparison of two players, and at most once per answer. For a single number or a plain fact, do not use it.
+
+    It returns the numbers it draws (points), so you need no other tool for those numbers, and the answer should
+    use them. If the result has an error, a chart is not possible: just answer in text. Write the answer as if no
+    chart exists, and never mention a chart or graph.
+
+    Args:
+        kind: "form" (a player's match average over their last 20 X01 matches; needs player_id), "ranking" (the top 8
+            players by stat; needs stat, league_id optional), "practice" (the signed-in user's own sessions of one
+            game; needs game) or "head_to_head" (two players side by side; needs player_id and opponent_id).
+        player_id: With form or head_to_head, the player's id from find_player. Never guess it.
+        opponent_id: With head_to_head, the other player's id from find_player.
+        stat: With ranking: "180s", "average", "match_average", "checkouts", or "points" (a league's table; needs league_id).
+        league_id: With ranking, the league's id from find_league, to rank that league only. Required for "points".
+        game: With practice, the game. Use "x01" unless the question names another game.
+        days: With practice, how many days back (default 90).
+    """
+    return stats.chart(kind, player_id=player_id, opponent_id=opponent_id, stat=stat, league_id=league_id, game=game,
+                       days=days)
+
+
 TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings,
          get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, get_records, list_leagues,
-         get_my_practice, get_player_form, get_match_preview, get_round_recap]
+         get_my_practice, get_player_form, get_match_preview, get_round_recap, show_chart]
 
 
 def main() -> None:
