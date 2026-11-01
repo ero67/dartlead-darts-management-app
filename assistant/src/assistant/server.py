@@ -136,10 +136,12 @@ def tool_output(content):
 async def answer_events(message: str, thread_id: str, user_id: str, token: str, question_id: str, trace_id: str,
                         page: dict | None = None):
     """Yield the run as NDJSON events, running every stats query as the user:
-    step (rewrite, route) -> sources -> tool_start / tool_end -> text (deltas) -> done | error.
+    step (rewrite, route) -> sources -> tool_start / tool_end (-> chart, the first successful show_chart) -> text (deltas)
+    -> done | error.
     done carries the Langfuse trace id (feedback scores attach to it); a failed answer gives the question back."""
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 2 * MAX_STEPS + 3,
               "callbacks": [CallbackHandler(trace_context={"trace_id": trace_id})], "run_name": "chat"}
+    chart_sent = False
     try:
         with stats.as_user(token, user_id), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
                                                         tags=["phase-6", "api"]):
@@ -166,8 +168,12 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str, 
                             yield event("tool_start", id=call["id"], name=call["name"], args=call["args"])
                     elif node == "tools":
                         for m in update["messages"]:
-                            yield event("tool_end", id=m.tool_call_id, name=m.name, status=m.status,
-                                        output=tool_output(m.content))
+                            output = tool_output(m.content)
+                            yield event("tool_end", id=m.tool_call_id, name=m.name, status=m.status, output=output)
+                            if (m.name == "show_chart" and m.status != "error" and not chart_sent
+                                    and isinstance(output, dict) and "error" not in output):
+                                chart_sent = True
+                                yield event("chart", **output)
         yield event("done", trace_id=trace_id)
     except GraphRecursionError:
         await run_in_threadpool(refund_question, user_id, token, question_id)

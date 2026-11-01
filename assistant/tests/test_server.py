@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.messages import AIMessageChunk
+from langchain_core.messages import AIMessageChunk, ToolMessage
 from langgraph.errors import GraphRecursionError
 
 from assistant import server, stats
@@ -106,6 +106,48 @@ def test_error_after_partial_text_refunds(use_graph, refunds):
     events = run()
     assert [e["type"] for e in events] == ["text", "error"]
     assert len(refunds) == 1
+
+
+CHART = {"kind": "line", "chart": "form", "stat": "average", "subject": "Erik", "unit": "avg",
+         "lower_is_better": False, "points": [{"x": "a", "y": 1}, {"x": "b", "y": 2}, {"x": "c", "y": 3}]}
+
+
+def tool_update(name, output, status="success", id="call-1"):
+    message = ToolMessage(content=json.dumps(output), name=name, tool_call_id=id, status=status)
+    return "updates", {"tools": {"messages": [message]}}
+
+
+def chart_events(items, use_graph):
+    use_graph(FakeGraph(items))
+    return [e for e in run() if e["type"] == "chart"]
+
+
+def test_chart_event_follows_tool_end(use_graph, refunds):
+    use_graph(FakeGraph([tool_update("show_chart", CHART), text_chunk()]))
+    events = run()
+    assert [e["type"] for e in events] == ["tool_end", "chart", "text", "done"]
+    assert events[1]["points"] == CHART["points"]
+    assert events[1]["chart"] == "form"
+
+
+def test_only_the_first_chart_is_sent(use_graph):
+    items = [tool_update("show_chart", CHART, id="a"), tool_update("show_chart", CHART, id="b")]
+    assert len(chart_events(items, use_graph)) == 1
+
+
+def test_a_failed_first_chart_lets_the_next_through(use_graph):
+    second = {**CHART, "subject": "Second"}
+    items = [tool_update("show_chart", {"error": "no data"}, id="a"), tool_update("show_chart", second, id="b")]
+    charts = chart_events(items, use_graph)
+    assert [c["subject"] for c in charts] == ["Second"]
+
+
+def test_tool_status_error_sends_no_chart(use_graph):
+    assert chart_events([tool_update("show_chart", CHART, status="error")], use_graph) == []
+
+
+def test_other_tools_send_no_chart(use_graph):
+    assert chart_events([tool_update("get_records", CHART)], use_graph) == []
 
 
 def test_failed_refund_keeps_error_event(use_graph, fake_db, caplog):
