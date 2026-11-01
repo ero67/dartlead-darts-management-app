@@ -20,6 +20,7 @@ import {
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AssistantChart } from './AssistantChart';
 import { AssistantTrace } from './AssistantTrace';
 import { AssistantLogo } from './AssistantLogo';
 import { pageFromPath, suggestionsFor } from './assistantPage';
@@ -44,10 +45,14 @@ function applyEvent(message, event) {
       };
     case 'text':
       return { ...message, text: message.text + event.delta };
+    case 'chart':
+      return { ...message, chart: event };
     case 'done':
       return { ...message, status: 'done', isTraceOpen: false, traceId: event.trace_id };
     case 'error':
       return { ...message, status: 'error', isTraceOpen: false, error: event.message };
+    case 'followups':
+      return { ...message, followups: event.questions };
     default:
       return message;
   }
@@ -114,7 +119,7 @@ function AssistantFeedback({ message, onSend }) {
   );
 }
 
-function AssistantReply({ message, onTraceOpenChange, onFeedback }) {
+function AssistantReply({ message, followups, isSending, onTraceOpenChange, onFeedback, onFollowup }) {
   const { t } = useLanguage();
   const isStreaming = message.status === 'streaming';
   const text = message.text.replace(PSEUDO_CITATION, '');
@@ -126,6 +131,7 @@ function AssistantReply({ message, onTraceOpenChange, onFeedback }) {
           {text}
         </Streamdown>
       )}
+      {text && message.chart && <AssistantChart chart={message.chart} />}
       {message.status === 'error' && (
         <p className="text-sm text-destructive">{message.error || t('assistant.error')}</p>
       )}
@@ -140,6 +146,21 @@ function AssistantReply({ message, onTraceOpenChange, onFeedback }) {
         </div>
       )}
       {message.status === 'done' && message.traceId && <AssistantFeedback message={message} onSend={onFeedback} />}
+      {message.status === 'done' && followups?.length > 0 && (
+        <div className="flex flex-col gap-2 animate-in fade-in duration-500">
+          {followups.map((question, i) => (
+            <Button
+              key={i}
+              variant="outline"
+              className="h-auto justify-start whitespace-normal py-2 text-left font-normal"
+              disabled={isSending}
+              onClick={() => onFollowup(question)}
+            >
+              {question}
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -194,7 +215,8 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
       updateMessage(replyId, m => (m.status === 'streaming' ? { ...m, status: 'done', isTraceOpen: false } : m));
     } catch (error) {
       const text = error.status === 429 ? t('assistant.limitReached') : error.status === 403 ? t('assistant.notAvailable') : error.message;
-      updateMessage(replyId, m => ({ ...m, status: 'error', isTraceOpen: false, error: text }));
+      // The stream stays open after "done" for the follow-ups; a drop then must not turn a finished answer into an error.
+      updateMessage(replyId, m => (m.status === 'done' ? m : { ...m, status: 'error', isTraceOpen: false, error: text }));
     } finally {
       setIsSending(false);
     }
@@ -275,8 +297,11 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
                       ) : (
                         <AssistantReply
                           message={m}
+                          followups={m.id === messages[messages.length - 1].id ? m.followups : undefined}
+                          isSending={isSending}
                           onTraceOpenChange={(open) => updateMessage(m.id, x => ({ ...x, isTraceOpen: open }))}
                           onFeedback={(value, comment) => handleFeedback(m.id, m.traceId, value, comment)}
+                          onFollowup={send}
                         />
                       )}
                     </div>

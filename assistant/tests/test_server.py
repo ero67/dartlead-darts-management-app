@@ -2,11 +2,12 @@
 import asyncio
 import json
 import logging
+import time
 from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.messages import AIMessageChunk
+from langchain_core.messages import AIMessageChunk, ToolMessage
 from langgraph.errors import GraphRecursionError
 
 from assistant import server, stats
@@ -106,6 +107,48 @@ def test_error_after_partial_text_refunds(use_graph, refunds):
     events = run()
     assert [e["type"] for e in events] == ["text", "error"]
     assert len(refunds) == 1
+
+
+CHART = {"kind": "line", "chart": "form", "stat": "average", "subject": "Erik", "unit": "avg",
+         "lower_is_better": False, "points": [{"x": "a", "y": 1}, {"x": "b", "y": 2}, {"x": "c", "y": 3}]}
+
+
+def tool_update(name, output, status="success", id="call-1"):
+    message = ToolMessage(content=json.dumps(output), name=name, tool_call_id=id, status=status)
+    return "updates", {"tools": {"messages": [message]}}
+
+
+def chart_events(items, use_graph):
+    use_graph(FakeGraph(items))
+    return [e for e in run() if e["type"] == "chart"]
+
+
+def test_chart_event_follows_tool_end(use_graph, refunds):
+    use_graph(FakeGraph([tool_update("show_chart", CHART), text_chunk()]))
+    events = run()
+    assert [e["type"] for e in events] == ["tool_end", "chart", "text", "done"]
+    assert events[1]["points"] == CHART["points"]
+    assert events[1]["chart"] == "form"
+
+
+def test_only_the_first_chart_is_sent(use_graph):
+    items = [tool_update("show_chart", CHART, id="a"), tool_update("show_chart", CHART, id="b")]
+    assert len(chart_events(items, use_graph)) == 1
+
+
+def test_a_failed_first_chart_lets_the_next_through(use_graph):
+    second = {**CHART, "subject": "Second"}
+    items = [tool_update("show_chart", {"error": "no data"}, id="a"), tool_update("show_chart", second, id="b")]
+    charts = chart_events(items, use_graph)
+    assert [c["subject"] for c in charts] == ["Second"]
+
+
+def test_tool_status_error_sends_no_chart(use_graph):
+    assert chart_events([tool_update("show_chart", CHART, status="error")], use_graph) == []
+
+
+def test_other_tools_send_no_chart(use_graph):
+    assert chart_events([tool_update("get_records", CHART)], use_graph) == []
 
 
 def test_failed_refund_keeps_error_event(use_graph, fake_db, caplog):
@@ -266,3 +309,74 @@ def test_no_page_is_none_in_graph_input(chat):
     post, graph = chat
     assert post().status_code == 200
     assert graph.inputs[0]["page"] is None
+
+
+# --- follow-up questions -------------------------------------------------------------------------------------
+
+def route_update(language="English"):
+    return "updates", {"route": {"sources": [], "language": language, "docs": []}}
+
+
+@pytest.fixture
+def suggest(monkeypatch):
+    """Replaces followups.suggest with a stub answering one question; returns the list of its calls."""
+    calls = []
+    monkeypatch.setattr(server.followups, "suggest", lambda *args: calls.append(args) or ["What about Anna?"])
+    return calls
+
+
+def types(items, use_graph, error=None):
+    use_graph(FakeGraph(items, error=error))
+    return [e["type"] for e in run()]
+
+
+def test_followups_come_after_done(use_graph, suggest):
+    use_graph(FakeGraph([route_update(), text_chunk("He leads.")]))
+    events = run()
+    assert [e["type"] for e in events] == ["step", "text", "done", "followups"]
+    assert events[-1]["questions"] == ["What about Anna?"]
+    assert suggest[0][:3] == ("hello", "He leads.", "English")
+    config = suggest[0][3]
+    assert config["run_name"] == "suggest-followups"
+    assert config["callbacks"]
+
+
+def test_no_followups_event_when_the_list_is_empty(use_graph, monkeypatch):
+    monkeypatch.setattr(server.followups, "suggest", lambda *args: [])
+    assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
+
+
+def test_rewritten_question_reaches_suggest(use_graph, suggest):
+    types([("updates", {"rewrite": {"question": "Who leads the league?"}}), route_update(), text_chunk()], use_graph)
+    assert suggest[0][0] == "Who leads the league?"
+
+
+def test_off_topic_run_makes_no_call(use_graph, suggest):
+    assert types([route_update(), ("updates", {"off_topic": {}}), text_chunk()], use_graph) == ["step", "text", "done"]
+    assert suggest == []
+
+
+def test_failed_answer_makes_no_call(use_graph, suggest, refunds):
+    assert types([route_update(), text_chunk()], use_graph, error=RuntimeError("boom")) == ["step", "text", "error"]
+    assert suggest == []
+
+
+def test_no_text_makes_no_call(use_graph, suggest):
+    assert types([route_update()], use_graph) == ["step", "done"]
+    assert suggest == []
+
+
+def test_raising_suggest_ends_cleanly(use_graph, refunds, monkeypatch):
+    def boom(*args):
+        raise RuntimeError("gemini is down")
+
+    monkeypatch.setattr(server.followups, "suggest", boom)
+    assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
+    assert refunds == []
+
+
+def test_slow_suggest_times_out(use_graph, refunds, monkeypatch):
+    monkeypatch.setattr(server, "FOLLOWUP_TIMEOUT", 0.01)
+    monkeypatch.setattr(server.followups, "suggest", lambda *args: time.sleep(0.2) or ["late"])  # a missed timeout would add an event
+    assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
+    assert refunds == []

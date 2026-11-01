@@ -1,4 +1,4 @@
-# The assistant's four prompts live in Langfuse (text prompts, one label per environment) so they can be edited and
+# The assistant's five prompts live in Langfuse (text prompts, one label per environment) so they can be edited and
 # compared without a deploy. The text in the code stays as the fallback and as what `prompts push` uploads.
 import logging
 import os
@@ -61,6 +61,7 @@ def template(name: str, fallback: str, human: str | None = None) -> ChatPromptTe
 def main() -> None:
     # uv run prompts push [--label X]: upload the prompts in the code as new versions carrying the label.
     from assistant.agent import OFF_TOPIC_PROMPT, REWRITE_PROMPT, SYSTEM_PROMPT  # imported here: they need the model env
+    from assistant.followups import FOLLOWUPS_PROMPT
     from assistant.router import SYSTEM_PROMPT as ROUTER_PROMPT
 
     args = sys.argv[1:]
@@ -69,7 +70,7 @@ def main() -> None:
     label = args[args.index("--label") + 1] if "--label" in args else PROMPT_LABEL
     langfuse = get_client()
     for name, text in {"agent": SYSTEM_PROMPT, "off-topic": OFF_TOPIC_PROMPT, "rewrite": REWRITE_PROMPT,
-                       "router": ROUTER_PROMPT}.items():
+                       "router": ROUTER_PROMPT, "followups": FOLLOWUPS_PROMPT}.items():
         created = langfuse.create_prompt(name=name, prompt=to_langfuse(text), labels=[label], type="text")
         print(f"{name}: version {created.version}, label {label}")
     langfuse.flush()

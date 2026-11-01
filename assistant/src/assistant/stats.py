@@ -696,6 +696,100 @@ def get_records(stat: str, min_checkout: int | None = None, league_id: str | Non
             "players_with_records": len(rows), "records": rows[:limit]}
 
 
+MIN_CHART_POINTS = 3  # fewer than this is a sentence, not a chart
+FORM_CHART_MATCHES = 20
+RANKING_CHART_ROWS = 8  # the most bars that stay readable; also the default
+PRACTICE_CHART_POINTS = 30  # a heavy user's hundreds of sessions would bloat the event, the model context and the checkpoint
+_RANKING_FIELD = {"180s": "180s", "average": "average", "match_average": "average", "checkouts": "highest"}
+
+
+def practice_series(game: str, days: int = 90) -> dict:
+    """One practice game's main number per finished session in the window, oldest first, counted like the summary."""
+    user_id = _user_id.get()
+    if not user_id:
+        return {"error": "The user is not signed in, so there are no practice sessions to chart."}
+    if game not in PRACTICE_METRICS:
+        return {"error": f"Unknown game {game!r}; use {', '.join(PRACTICE_METRICS)}."}
+    key, lower = PRACTICE_METRICS[game]
+    since = datetime.now(timezone.utc) - timedelta(days=min(max(days, 1), 365))
+    rows = _all_rows(lambda: db().table("practice_sessions").select("game, stats, finished_at")
+                     .eq("user_id", user_id).eq("game", game).order("finished_at").order("client_id"))
+    points = [{"label": _day(r["finished_at"]), "value": v} for r in rows
+              if r.get("finished_at") and _when(r["finished_at"]) >= since
+              and _counts(game, r["stats"] or {}) and (v := (r["stats"] or {}).get(key)) is not None]
+    return {"metric": key, "lower_is_better": lower, "points": points[-PRACTICE_CHART_POINTS:]}
+
+
+def _league_name(league_id: str) -> str:
+    return db().table("leagues").select("name").eq("id", league_id).single().execute().data["name"]
+
+
+def _head_to_head_chart(player_id: str, opponent_id: str) -> dict:
+    record = next(iter(get_head_to_head(player_id, opponent_id)["opponents"]), None)
+    if record is None:
+        return {"error": "These two players have not met in a completed match, so there is nothing to compare."}
+    a, b = get_player_stats(player_id), get_player_stats(opponent_id)
+    rows = [{"stat": "wins", "scope": "direct", "a": record["wins"], "b": record["losses"]},
+            {"stat": "legs", "scope": "direct", "a": record["legs_won"], "b": record["legs_lost"]}]
+    for stat in ("average", "checkout_percent", "180s"):
+        if a.get(stat) is not None and b.get(stat) is not None:  # a player without darts has no such number
+            rows.append({"stat": stat, "scope": "career", "a": a[stat], "b": b[stat]})
+    return {"kind": "versus", "chart": "head_to_head", "players": [a["player"], b["player"]], "rows": rows}
+
+
+def chart(kind: str, player_id: str | None = None, opponent_id: str | None = None, stat: str | None = None,
+          league_id: str | None = None, game: str | None = None, days: int = 90, limit: int = RANKING_CHART_ROWS) -> dict:
+    """Data for one chart: form (a player's match average over time), ranking (top players by a stat), practice
+    (the user's sessions of one game) or head_to_head (two players side by side)."""
+    if kind == "head_to_head":
+        if not (player_id and opponent_id) or player_id == opponent_id:
+            return {"error": "head_to_head needs two different players: player_id and opponent_id."}
+        return _head_to_head_chart(player_id, opponent_id)
+
+    lower, unit, subject = False, None, None
+    if kind == "form":
+        if not player_id:
+            return {"error": "form needs player_id."}
+        subject = db().table("players").select("name").eq("id", player_id).single().execute().data["name"]
+        history = recent_match_totals([player_id], FORM_CHART_MATCHES).get(player_id, [])
+        stat, shape = "average", "line"
+        points = [{"label": _day(m["at"]) if m["at"] else "", "value": round(m["score"] / m["darts"] * 3, 1)}
+                  for m in reversed(history)]
+    elif kind == "ranking":
+        shape = "bars"
+        limit = min(max(limit, MIN_CHART_POINTS), RANKING_CHART_ROWS)
+        if stat == "points":
+            if not league_id:
+                return {"error": "Ranking by points needs league_id."}
+            table = get_league_standings(league_id)
+            subject = table["league"]
+            points = [{"label": r["player"], "value": r["points"]} for r in table["standings"][:limit]]
+        else:
+            if not stat:
+                return {"error": "ranking needs a stat."}
+            records = get_records(stat, league_id=league_id, limit=limit)
+            if "error" in records:
+                return records
+            subject = _league_name(league_id) if league_id else None
+            field = _RANKING_FIELD[stat]
+            points = [{"label": r["player"], "value": r[field]} for r in records["records"]]
+    elif kind == "practice":
+        if not game:
+            return {"error": "practice needs game."}
+        series = practice_series(game, days)
+        if "error" in series:
+            return series
+        stat, lower, points, shape = series["metric"], series["lower_is_better"], series["points"], "line"
+        unit = "%" if stat.endswith("Percent") else None
+    else:
+        return {"error": f"Unknown chart kind {kind!r}; use form, ranking, practice or head_to_head."}
+
+    if len(points) < MIN_CHART_POINTS:
+        return {"error": f"Only {len(points)} data points, too few for a chart; answer in text."}
+    return {"kind": shape, "chart": kind, "stat": stat, "subject": subject, "unit": unit, "lower_is_better": lower,
+            "points": points}
+
+
 def get_player_tournaments(player_id: str) -> dict:
     """Every tournament the player played, newest first, with their placing (1-3 from the playoffs, or the league's
     recorded placement), wins and losses, tournament average, best match average, highest checkout and 180s."""
