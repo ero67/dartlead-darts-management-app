@@ -11,6 +11,7 @@ from assistant.prompts import template  # noqa: E402
 MAX_QUESTIONS = 3
 MAX_LENGTH = 80  # a chip on a phone screen
 MAX_ANSWER = 4000
+TIMEOUT = 3  # seconds, for the model call and for the server's wait; a hung call must not hold a worker thread
 
 
 class Followups(BaseModel):
@@ -28,7 +29,7 @@ Suggest up to 3 short next questions that follow from the answer below, written 
 - Write each one as the user would ask it, in the first person where it fits.
 - If the answer asks the user something or says it cannot answer, return none."""
 
-model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", name="suggest-followups")
+model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", name="suggest-followups", timeout=TIMEOUT, max_retries=1)
 structured = model.with_structured_output(Followups)
 
 

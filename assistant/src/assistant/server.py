@@ -30,7 +30,7 @@ from assistant.agent import graph as memory_graph
 log = logging.getLogger("assistant")
 auth = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"]).auth
 ANSWER_NODES = {"agent", "off_topic"}  # nodes whose text is the reply; rewrite and route stay internal
-FOLLOWUP_TIMEOUT = 3  # seconds; the suggestions are an extra, the user is already reading the answer
+FOLLOWUP_TIMEOUT = followups.TIMEOUT  # the suggestions are an extra, the user is already reading the answer
 KEEP_DAYS = 30  # conversations untouched this long are deleted at start-up (the privacy policy says so)
 graph = memory_graph
 
@@ -137,7 +137,8 @@ def tool_output(content):
 async def suggest_followups(question: str, answer: str, language: str, config: dict) -> list[str]:
     """Next-question suggestions, or [] when the model fails or is too slow: they must never break an answer."""
     try:
-        return await asyncio.wait_for(asyncio.to_thread(followups.suggest, question, answer, language, config), FOLLOWUP_TIMEOUT)
+        own_run = {**config, "run_name": "suggest-followups"}  # else it is a second root named "chat" in the trace
+        return await asyncio.wait_for(asyncio.to_thread(followups.suggest, question, answer, language, own_run), FOLLOWUP_TIMEOUT)
     except Exception:
         log.warning("could not suggest follow-ups", exc_info=True)
         return []

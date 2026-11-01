@@ -336,6 +336,9 @@ def test_followups_come_after_done(use_graph, suggest):
     assert [e["type"] for e in events] == ["step", "text", "done", "followups"]
     assert events[-1]["questions"] == ["What about Anna?"]
     assert suggest[0][:3] == ("hello", "He leads.", "English")
+    config = suggest[0][3]
+    assert config["run_name"] == "suggest-followups"
+    assert config["callbacks"]
 
 
 def test_no_followups_event_when_the_list_is_empty(use_graph, monkeypatch):
@@ -374,6 +377,6 @@ def test_raising_suggest_ends_cleanly(use_graph, refunds, monkeypatch):
 
 def test_slow_suggest_times_out(use_graph, refunds, monkeypatch):
     monkeypatch.setattr(server, "FOLLOWUP_TIMEOUT", 0.01)
-    monkeypatch.setattr(server.followups, "suggest", lambda *args: time.sleep(0.2))
+    monkeypatch.setattr(server.followups, "suggest", lambda *args: time.sleep(0.2) or ["late"])  # a missed timeout would add an event
     assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
     assert refunds == []
