@@ -23,13 +23,14 @@ from pydantic import BaseModel, Field, model_validator
 from starlette.concurrency import run_in_threadpool
 from supabase import create_client
 
-from assistant import stats  # importing loads .env
+from assistant import followups, stats  # importing loads .env
 from assistant.agent import MAX_STEPS, builder
 from assistant.agent import graph as memory_graph
 
 log = logging.getLogger("assistant")
 auth = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_ANON_KEY"]).auth
 ANSWER_NODES = {"agent", "off_topic"}  # nodes whose text is the reply; rewrite and route stay internal
+FOLLOWUP_TIMEOUT = 3  # seconds; the suggestions are an extra, the user is already reading the answer
 KEEP_DAYS = 30  # conversations untouched this long are deleted at start-up (the privacy policy says so)
 graph = memory_graph
 
@@ -133,15 +134,25 @@ def tool_output(content):
     return content
 
 
+async def suggest_followups(question: str, answer: str, language: str, config: dict) -> list[str]:
+    """Next-question suggestions, or [] when the model fails or is too slow: they must never break an answer."""
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(followups.suggest, question, answer, language, config), FOLLOWUP_TIMEOUT)
+    except Exception:
+        log.warning("could not suggest follow-ups", exc_info=True)
+        return []
+
+
 async def answer_events(message: str, thread_id: str, user_id: str, token: str, question_id: str, trace_id: str,
                         page: dict | None = None):
     """Yield the run as NDJSON events, running every stats query as the user:
     step (rewrite, route) -> sources -> tool_start / tool_end (-> chart, the first successful show_chart) -> text (deltas)
-    -> done | error.
+    -> done (-> followups, after done) | error.
     done carries the Langfuse trace id (feedback scores attach to it); a failed answer gives the question back."""
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 2 * MAX_STEPS + 3,
               "callbacks": [CallbackHandler(trace_context={"trace_id": trace_id})], "run_name": "chat"}
     chart_sent = False
+    answer, question, language, off_topic = "", message, None, False
     try:
         with stats.as_user(token, user_id), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
                                                         tags=["phase-6", "api"]):
@@ -153,12 +164,18 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str, 
                     # Only reply text: no tool-call chunks, no rewrite/router output.
                     if (meta.get("langgraph_node") in ANSWER_NODES and isinstance(chunk, AIMessageChunk)
                             and chunk.content and not chunk.tool_call_chunks):
+                        answer += chunk.content
                         yield event("text", delta=chunk.content)
                     continue
                 for node, update in payload.items():
-                    if node == "rewrite" and update["question"] != message:
-                        yield event("step", kind="rewrite", question=update["question"])
+                    if node == "rewrite":
+                        question = update["question"]
+                        if question != message:
+                            yield event("step", kind="rewrite", question=question)
+                    elif node == "off_topic":
+                        off_topic = True
                     elif node == "route":
+                        language = update.get("language")
                         yield event("step", kind="route", sources=update["sources"])
                     elif node == "retrieve":
                         yield event("sources", items=[{"source": d.metadata["source"], "section": d.metadata.get("section")}
@@ -182,6 +199,11 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str, 
         log.exception("chat failed")
         await run_in_threadpool(refund_question, user_id, token, question_id)
         yield event("error", message="Sorry, something went wrong. Please try again.")
+    else:
+        if answer and language and not off_topic:  # no language: the route node never ran
+            questions = await suggest_followups(question, answer, language, config)
+            if questions:
+                yield event("followups", questions=questions)
 
 
 def use_question(user_id: str, token: str) -> str | None:

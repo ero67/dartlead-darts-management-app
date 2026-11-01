@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import time
 from contextlib import contextmanager
 
 import pytest
@@ -308,3 +309,71 @@ def test_no_page_is_none_in_graph_input(chat):
     post, graph = chat
     assert post().status_code == 200
     assert graph.inputs[0]["page"] is None
+
+
+# --- follow-up questions -------------------------------------------------------------------------------------
+
+def route_update(language="English"):
+    return "updates", {"route": {"sources": [], "language": language, "docs": []}}
+
+
+@pytest.fixture
+def suggest(monkeypatch):
+    """Replaces followups.suggest with a stub answering one question; returns the list of its calls."""
+    calls = []
+    monkeypatch.setattr(server.followups, "suggest", lambda *args: calls.append(args) or ["What about Anna?"])
+    return calls
+
+
+def types(items, use_graph, error=None):
+    use_graph(FakeGraph(items, error=error))
+    return [e["type"] for e in run()]
+
+
+def test_followups_come_after_done(use_graph, suggest):
+    use_graph(FakeGraph([route_update(), text_chunk("He leads.")]))
+    events = run()
+    assert [e["type"] for e in events] == ["step", "text", "done", "followups"]
+    assert events[-1]["questions"] == ["What about Anna?"]
+    assert suggest[0][:3] == ("hello", "He leads.", "English")
+
+
+def test_no_followups_event_when_the_list_is_empty(use_graph, monkeypatch):
+    monkeypatch.setattr(server.followups, "suggest", lambda *args: [])
+    assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
+
+
+def test_rewritten_question_reaches_suggest(use_graph, suggest):
+    types([("updates", {"rewrite": {"question": "Who leads the league?"}}), route_update(), text_chunk()], use_graph)
+    assert suggest[0][0] == "Who leads the league?"
+
+
+def test_off_topic_run_makes_no_call(use_graph, suggest):
+    assert types([route_update(), ("updates", {"off_topic": {}}), text_chunk()], use_graph) == ["step", "text", "done"]
+    assert suggest == []
+
+
+def test_failed_answer_makes_no_call(use_graph, suggest, refunds):
+    assert types([route_update(), text_chunk()], use_graph, error=RuntimeError("boom")) == ["step", "text", "error"]
+    assert suggest == []
+
+
+def test_no_text_makes_no_call(use_graph, suggest):
+    assert types([route_update()], use_graph) == ["step", "done"]
+    assert suggest == []
+
+
+def test_raising_suggest_ends_cleanly(use_graph, refunds, monkeypatch):
+    def boom(*args):
+        raise RuntimeError("gemini is down")
+
+    monkeypatch.setattr(server.followups, "suggest", boom)
+    assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
+    assert refunds == []
+
+
+def test_slow_suggest_times_out(use_graph, refunds, monkeypatch):
+    monkeypatch.setattr(server, "FOLLOWUP_TIMEOUT", 0.01)
+    monkeypatch.setattr(server.followups, "suggest", lambda *args: time.sleep(0.2))
+    assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
+    assert refunds == []
