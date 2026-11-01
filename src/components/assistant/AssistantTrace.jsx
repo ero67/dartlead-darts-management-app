@@ -41,13 +41,14 @@ function stepTitle(step, t) {
   if (status === 'error') return t('assistant.trace.failed', { tool: name });
   const known = ['find_player', 'get_player_stats', 'get_recent_matches', 'get_head_to_head', 'find_league', 'get_league_standings',
     'get_me', 'list_tournaments', 'find_tournament', 'get_tournament_summary', 'get_player_tournaments', 'get_records', 'list_leagues',
-    'get_my_practice', 'get_player_form', 'get_match_preview', 'get_round_recap'];
+    'get_my_practice', 'get_player_form', 'get_match_preview', 'get_round_recap', 'show_chart'];
   if (!known.includes(name)) return t(status === 'running' ? 'assistant.trace.running' : 'assistant.trace.ran', { tool: name });
   if (status === 'running') return t(`assistant.trace.tool.${name}.running`, { name: args.name });
   if (name === 'find_player' || name === 'find_league' || name === 'find_tournament') {
     const found = Array.isArray(output) ? output.map(c => c.name).join(', ') : '';
     return found ? t(`assistant.trace.tool.${name}.done`, { found }) : t(`assistant.trace.tool.${name}.none`, { name: args.name });
   }
+  if (name === 'show_chart' && output?.error) return t('assistant.trace.tool.show_chart.none');
   return t(`assistant.trace.tool.${name}.done`, {
     player: output?.player,
     league: output?.league,

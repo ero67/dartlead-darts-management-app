@@ -1632,6 +1632,30 @@
       "thanks": "Ďakujeme za spätnú väzbu",
       "failed": "Spätnú väzbu sa nepodarilo odoslať. Skúste to znova."
     },
+    "chart": {
+      "form": "Forma: {{subject}}",
+      "ranking": "Najlepší hráči: {{stat}}",
+      "rankingIn": "{{subject}}: {{stat}}",
+      "practice": "Tvoj tréning: {{stat}}",
+      "head_to_head": "Vzájomné zápasy",
+      "direct": "Proti sebe",
+      "career": "Celkovo",
+      "lowerIsBetter": "Nižšie je lepšie",
+      "stat": {
+        "180s": "180-ky",
+        "average": "Priemer",
+        "match_average": "Priemer zápasu",
+        "checkouts": "Najvyšší checkout",
+        "points": "Body",
+        "hitPercent": "Úspešnosť checkoutov",
+        "successPercent": "Úspešnosť 121",
+        "avgDartsPerTarget": "Šípky na cieľ",
+        "mpr": "MPR",
+        "wins": "Výhry",
+        "legs": "Legy",
+        "checkout_percent": "Checkout %"
+      }
+    },
     "trace": {
       "working": "Pracujem…",
       "summary": "Postup ({{count}})",
@@ -1684,7 +1708,8 @@
         "get_my_practice": {"running": "Načítavam tvoj tréning", "done": "Pozrel som tvoj tréning"},
         "get_player_form": {"running": "Načítavam formu", "done": "Forma: {{player}}"},
         "get_match_preview": {"running": "Pripravujem náhľad zápasu", "done": "Náhľad zápasu"},
-        "get_round_recap": {"running": "Zbieram fakty o kole", "done": "Fakty: {{tournament}}"}
+        "get_round_recap": {"running": "Zbieram fakty o kole", "done": "Fakty: {{tournament}}"},
+        "show_chart": {"running": "Pripravujem graf", "done": "Graf je pripravený", "none": "Bez grafu, málo údajov"}
       }
     }
   }

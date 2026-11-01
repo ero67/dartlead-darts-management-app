@@ -1632,6 +1632,30 @@
       "thanks": "Thanks for the feedback",
       "failed": "Could not send your feedback. Please try again."
     },
+    "chart": {
+      "form": "Form of {{subject}}",
+      "ranking": "Top players: {{stat}}",
+      "rankingIn": "{{subject}}: {{stat}}",
+      "practice": "Your practice: {{stat}}",
+      "head_to_head": "Head to head",
+      "direct": "Against each other",
+      "career": "Career",
+      "lowerIsBetter": "Lower is better",
+      "stat": {
+        "180s": "180s",
+        "average": "Average",
+        "match_average": "Match average",
+        "checkouts": "Highest checkout",
+        "points": "Points",
+        "hitPercent": "Checkout hit rate",
+        "successPercent": "121 success rate",
+        "avgDartsPerTarget": "Darts per target",
+        "mpr": "MPR",
+        "wins": "Wins",
+        "legs": "Legs",
+        "checkout_percent": "Checkout %"
+      }
+    },
     "trace": {
       "working": "Working…",
       "summary": "Worked in {{count}} steps",
@@ -1684,7 +1708,8 @@
         "get_my_practice": {"running": "Loading your practice", "done": "Looked at your practice"},
         "get_player_form": {"running": "Loading form", "done": "Form of {{player}}"},
         "get_match_preview": {"running": "Preparing the match preview", "done": "Previewed the match"},
-        "get_round_recap": {"running": "Collecting the round facts", "done": "Facts of {{tournament}}"}
+        "get_round_recap": {"running": "Collecting the round facts", "done": "Facts of {{tournament}}"},
+        "show_chart": {"running": "Preparing a chart", "done": "Prepared a chart", "none": "No chart, not enough data"}
       }
     }
   }

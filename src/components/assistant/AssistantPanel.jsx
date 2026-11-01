@@ -20,6 +20,7 @@ import {
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AssistantChart } from './AssistantChart';
 import { AssistantTrace } from './AssistantTrace';
 import { AssistantLogo } from './AssistantLogo';
 import { pageFromPath, suggestionsFor } from './assistantPage';
@@ -44,6 +45,8 @@ function applyEvent(message, event) {
       };
     case 'text':
       return { ...message, text: message.text + event.delta };
+    case 'chart':
+      return { ...message, chart: event };
     case 'done':
       return { ...message, status: 'done', isTraceOpen: false, traceId: event.trace_id };
     case 'error':
@@ -126,6 +129,7 @@ function AssistantReply({ message, onTraceOpenChange, onFeedback }) {
           {text}
         </Streamdown>
       )}
+      {text && message.chart && <AssistantChart chart={message.chart} />}
       {message.status === 'error' && (
         <p className="text-sm text-destructive">{message.error || t('assistant.error')}</p>
       )}
