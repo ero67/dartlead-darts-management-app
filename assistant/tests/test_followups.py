@@ -26,9 +26,9 @@ def stub_model(monkeypatch, questions):
     return seen
 
 
-def test_model_gives_up_in_three_seconds_and_retries_once():
-    # The server waits the same TIMEOUT; a hung call must free its worker thread, not hold it for the defaults.
-    assert (followups.model.timeout, followups.model.max_retries) == (3, 1)
+def test_model_call_is_bounded_and_not_retried():
+    # A call the stream stopped waiting for must free its worker thread, not hold it for the defaults.
+    assert (followups.model.timeout, followups.model.max_retries) == (10, 0)
 
 
 def test_clean_strips_and_drops_empty():
