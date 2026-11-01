@@ -284,8 +284,9 @@ def show_chart(kind: Literal["form", "ranking", "practice", "head_to_head"], pla
     """Show a chart under the answer. Use it only for a trend over time, a ranking of at least three items, or a
     comparison of two players, and at most once per answer. For a single number or a plain fact, do not use it.
 
-    It returns the numbers it draws (points), so you need no other tool for those numbers, and the answer should
-    use them. If the result has an error, a chart is not possible: just answer in text. Write the answer as if no
+    It returns the numbers it draws, in points (rows for head_to_head), so you need no other tool for those numbers,
+    and the answer should use them. In a ranking, "average" is a player's overall average and "match_average" ranks
+    their best single-match averages. If the result has an error, a chart is not possible: just answer in text. Write the answer as if no
     chart exists, and never mention a chart or graph.
 
     Args:

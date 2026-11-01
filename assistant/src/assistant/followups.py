@@ -23,12 +23,14 @@ class Followups(BaseModel):
 
 FOLLOWUPS_PROMPT = """You suggest what the user may ask next in DartLead, an app for running darts tournaments and leagues.
 
-Suggest up to 3 short next questions that follow from the answer below, written in {language}.
+Suggest up to 3 next questions that follow from the answer below, written in {language}. Each is under 80 characters.
 
 - Only suggest what the assistant can answer: player stats and form, head-to-head, league tables, tournaments, records
   across players, the user's own practice, darts rules and how to use the app.
 - Write each one as the user would ask it, in the first person where it fits.
-- If the answer asks the user something or says it cannot answer, return none."""
+- Use only player, league and tournament names that appear in the question or the answer. Never invent one.
+- Keep darts terms such as checkout as DartLead uses them; do not translate them literally.
+- If the answer asks the user something or says it cannot answer, return an empty list."""
 
 model = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", name="suggest-followups", timeout=MODEL_TIMEOUT, max_retries=0)
 structured = model.with_structured_output(Followups)

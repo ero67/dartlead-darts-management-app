@@ -68,4 +68,6 @@ def test_suggest_with_no_questions_is_empty(monkeypatch):
 
 def test_prompt_rules():
     assert "{language}" in FOLLOWUPS_PROMPT
-    assert "asks the user something" in FOLLOWUPS_PROMPT and "return none" in FOLLOWUPS_PROMPT
+    assert "asks the user something" in FOLLOWUPS_PROMPT and "return an empty list" in FOLLOWUPS_PROMPT
+    assert "Never invent one" in FOLLOWUPS_PROMPT and "appear in the question or the answer" in FOLLOWUPS_PROMPT
+    assert "darts terms such as checkout" in FOLLOWUPS_PROMPT and "under 80 characters" in FOLLOWUPS_PROMPT
