@@ -38,7 +38,7 @@ import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignm
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { sortStandings } from '../utils/standings';
 import { cloneTournamentPath } from '../utils/cloneTournament';
-import { nextForBoard } from '../utils/boardWaiting';
+import { nextForBoard, ownLiveMatch } from '../utils/boardWaiting';
 import { buildMatchData } from '../utils/matchStart';
 import { cn } from '@/lib/utils';
 import { isCricketGame } from '@/lib/cricket';
@@ -1971,6 +1971,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
     };
 
+    // Board changes arrive one row at a time (Auto-assign over 40 matches is
+    // 40 UPDATEs): coalesce them into one tournament reload, as the TV does.
+    let reloadTimer = null;
+    const scheduleReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => { reloadTimer = null; getTournament(tournament.id); }, 500);
+    };
+
     // Set up real-time subscription
     const channel = supabase
       .channel(`live-matches-tournament-${tournament.id}`)
@@ -1989,10 +1997,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             applyRemoteCompletion(match);
             return;
           }
-          // A waiting match moved board (manager at the PC): board tablets
-          // and cards follow. matches has REPLICA IDENTITY FULL, so old is complete.
+          // A waiting match changed (board moved by the manager at the PC):
+          // board tablets and cards follow. With RLS on, payload.old carries
+          // only the id, so any pending update counts; they are rare.
           if (match?.status === 'pending') {
-            if (payload.old?.assigned_board !== match.assigned_board) getTournament(tournament.id);
+            scheduleReload();
             return;
           }
           if (match?.status !== 'in_progress') return;
@@ -2046,7 +2055,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           const match = payload.new;
           // First-round playoff rows are created by set_match_boards with a board.
           if (match?.status === 'pending' && match.assigned_board != null) {
-            getTournament(tournament.id);
+            scheduleReload();
             return;
           }
           if (match?.status !== 'in_progress') return;
@@ -2079,16 +2088,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           }
         }
       )
-      // Board count (and other settings) set from another device: a tablet
-      // already on the page gets its waiting screen without a reload.
+      // Board count set from another device: a tablet already on the page
+      // gets its waiting screen without a reload. Only that column: the row
+      // also changes on every playoff completion and settings edit.
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournament.id}` },
-        () => getTournament(tournament.id)
+        (payload) => { if (payload.new?.board_count !== payload.old?.board_count) scheduleReload(); }
       )
       .subscribe();
 
     return () => {
       clearInterval(livePollInterval);
+      if (reloadTimer) clearTimeout(reloadTimer);
       supabase.removeChannel(channel);
     };
   }, [tournament?.id]); // Only depend on tournament ID to avoid unnecessary reloads
@@ -2140,10 +2151,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   // Plain compute: this sits below an early return, so no hook here.
   const boardQueue = hasBoardScreen ? nextForBoard(tournament, boardNumber, new Set(liveMatches.map((m) => m.id))) : { next: null, then: [] };
   // This device's own unfinished match (scorer backed out of the scorer view).
-  const ownLiveMatch = hasBoardScreen
-    ? [...tournament.groups.flatMap((g) => g.matches.map((m) => ({ ...m, groupName: g.name }))), ...(tournament.playoffMatches || [])]
-      .find((m) => m.status === 'in_progress' && isMatchInLocalStorage(m.id)) || null
-    : null;
+  const ownLive = hasBoardScreen ? ownLiveMatch(tournament, isMatchInLocalStorage) : null;
   const handleBoardStart = (next) => {
     const isPlayoff = next.roundSize != null;
     // Queue entries name their group/round in `label`; the dialog shows groupName.
@@ -2152,7 +2160,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
   const handleBoardContinue = (m) => {
     showBoardScreen();
-    onMatchStart(buildMatchData(m, tournament, m.legsToWin || tournament.legsToWin));
+    const legs = m.roundSize != null ? getPlayoffLegsToWin(m.roundSize) : m.legsToWin || tournament.legsToWin;
+    onMatchStart(buildMatchData(m.roundSize != null ? { ...m, isPlayoff: true } : m, tournament, legs));
   };
   const playerCount = tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0;
   const tournamentPhase = getTournamentPhase(tournament);
@@ -2250,7 +2259,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           boardNumber={boardNumber}
           next={boardQueue.next}
           then={boardQueue.then}
-          ownLive={ownLiveMatch}
+          ownLive={ownLive}
           onStart={handleBoardStart}
           onContinue={handleBoardContinue}
           onPickMatch={dismissBoardScreen}

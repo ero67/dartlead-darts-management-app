@@ -19,7 +19,10 @@ export function BoardsControl({ tournament, onSaved, t }) {
   const [groupBoards, setGroupBoards] = useState(() => boardsOfGroups(tournament.groups));
   const [isSaving, setIsSaving] = useState(false);
   useEffect(() => { setCount(tournament.boardCount ? String(tournament.boardCount) : ''); }, [tournament.boardCount]);
-  useEffect(() => { setGroupBoards(boardsOfGroups(tournament.groups)); }, [tournament.groups]);
+  // Reset only when the stored boards really change, not on every reload
+  // (a match finishing elsewhere must not wipe a half-made selection).
+  const storedKey = JSON.stringify(boardsOfGroups(tournament.groups));
+  useEffect(() => { setGroupBoards(JSON.parse(storedKey)); }, [storedKey]);
 
   const boards = Number.parseInt(count, 10);
   const isValid = boards >= 1 && boards <= 99;
@@ -27,6 +30,9 @@ export function BoardsControl({ tournament, onSaved, t }) {
   const assignedCount = waiting.filter((m) => m.assignedBoard).length;
   // Group boards only matter while group matches are waiting (not in playoffs).
   const showGroupBoards = isValid && waiting.some((m) => m.groupId);
+  // Boards above the current count are hidden and never sent (the RPC
+  // rejects them), so lowering the count can always be saved.
+  const usable = (groupId) => (groupBoards[groupId] || []).filter((b) => b <= boards);
 
   const save = async (assignments, message, groups = null) => {
     setIsSaving(true);
@@ -59,7 +65,7 @@ export function BoardsControl({ tournament, onSaved, t }) {
     });
   };
 
-  const handleSaveGroupBoards = () => save({}, t('boards.groupBoardsSaved'), groupBoards);
+  const handleSaveGroupBoards = () => save({}, t('boards.groupBoardsSaved'), Object.fromEntries(Object.keys(groupBoards).map((id) => [id, usable(id)])));
 
   return (
     <Card className="flex-row flex-wrap items-end gap-3 p-4">
@@ -97,7 +103,7 @@ export function BoardsControl({ tournament, onSaved, t }) {
             <div key={g.id} className="flex flex-wrap items-center gap-1.5">
               <span className="w-24 shrink-0 text-sm font-medium">{g.name}</span>
               {Array.from({ length: boards }, (_, i) => i + 1).map((b) => {
-                const isOn = (groupBoards[g.id] || []).includes(b);
+                const isOn = usable(g.id).includes(b);
                 return (
                   <Button
                     key={b}
@@ -112,7 +118,7 @@ export function BoardsControl({ tournament, onSaved, t }) {
                   </Button>
                 );
               })}
-              {(groupBoards[g.id] || []).length === 0 && <span className="text-xs text-muted-foreground">{t('boards.anyBoard')}</span>}
+              {usable(g.id).length === 0 && <span className="text-xs text-muted-foreground">{t('boards.anyBoard')}</span>}
             </div>
           ))}
           <Button variant="outline" className="self-start" onClick={handleSaveGroupBoards} disabled={isSaving}>

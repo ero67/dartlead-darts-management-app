@@ -1484,7 +1484,9 @@ export const tournamentService = {
       p_tournament_id: tournamentId,
       p_board_count: boardCount,
       p_assignments: assignments,
-      p_group_boards: groupBoards
+      // Only when used, so every other board save still works against a
+      // database that predates the 4-argument function.
+      ...(groupBoards && { p_group_boards: groupBoards })
     });
     if (error) throw error;
   },

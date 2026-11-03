@@ -3,7 +3,7 @@
 //   node scripts/check-board-schedule.mjs
 import assert from 'node:assert/strict';
 import { planBoards, autoAssignBoards, boardQueues, pendingInPlayOrder } from '../src/utils/boardSchedule.js';
-import { nextForBoard } from '../src/utils/boardWaiting.js';
+import { nextForBoard, ownLiveMatch } from '../src/utils/boardWaiting.js';
 
 // Round-robin pairings in the circle method, like the app generates them.
 const roundRobin = (ids) => {
@@ -132,5 +132,20 @@ assert.deepEqual(nextForBoard(night, '9', new Set()), { next: null, then: [] });
 // A match live elsewhere is skipped; the one after it becomes next.
 const q2 = nextForBoard(night, '2', new Set([q.next.id]));
 assert.equal(q2.next.id, q.then[0].id);
+
+// This device's own unfinished match: anything not completed that the
+// scorer left locally, including a first-round playoff match that has no
+// row yet (its local entry is the only trace) and a group match whose row
+// still reads pending because the page's copy raced the start.
+const liveHere = (id) => id === 'A3' || id === 's1';
+night.groups[0].matches[2].status = 'in_progress';
+assert.equal(ownLiveMatch(night, liveHere).id, 'A3', 'in-progress group match');
+night.groups[0].matches[2].status = 'pending';
+assert.equal(ownLiveMatch(night, liveHere).id, 'A3', 'pending row that is live here still counts');
+night.groups[0].matches[2].status = 'completed';
+assert.equal(ownLiveMatch(night, () => false), null, 'nothing live here');
+const own = ownLiveMatch(bracket, liveHere);
+assert.equal(own.id, 's1', 'bracket entry without a row');
+assert.equal(own.roundSize, 4, 'carries round size for legs-to-win');
 
 console.log('board schedule ok');
