@@ -1207,7 +1207,14 @@
     "groupBoards": "Terče pre skupiny",
     "anyBoard": "Ľubovoľný terč",
     "saveGroupBoards": "Uložiť terče skupín",
-    "groupBoardsSaved": "Terče skupín uložené"
+    "groupBoardsSaved": "Terče skupín uložené",
+    "screenTitle": "Terč {{board}}",
+    "nextUp": "Ďalší zápas na tomto terči",
+    "nothingQueued": "Na terč {{board}} nie je naplánovaný žiadny zápas",
+    "waitingForManager": "Organizátor sem pošle ďalší zápas.",
+    "pickMatch": "Vybrať zápas",
+    "continueOwn": "Pokračovať v zápase",
+    "backToBoard": "Terč {{board}}"
   },
   "export": {
     "title": "Zdieľať / export",

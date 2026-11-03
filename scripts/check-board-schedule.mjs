@@ -3,6 +3,7 @@
 //   node scripts/check-board-schedule.mjs
 import assert from 'node:assert/strict';
 import { planBoards, autoAssignBoards, boardQueues, pendingInPlayOrder } from '../src/utils/boardSchedule.js';
+import { nextForBoard } from '../src/utils/boardWaiting.js';
 
 // Round-robin pairings in the circle method, like the app generates them.
 const roundRobin = (ids) => {
@@ -121,5 +122,15 @@ const stale = planBoards([{ id: 's', p1: 'A', p2: 'B', board: null, allowed: [9]
 assert.deepEqual(stale.get('s'), { board: 1, slot: 0 });
 // Playoff entries carry roundSize for legs-to-win.
 assert.equal(pendingInPlayOrder(bracket).find((m) => m.id === 's1').roundSize, 4);
+
+// Board tablet: the device board number is a string from localStorage and
+// must still find the numeric queue; an unknown board has nothing queued.
+const q = nextForBoard(night, '2', new Set());
+assert.equal(q.next.assignedBoard, 2, 'string board number resolves the numeric queue');
+assert.ok(q.then.every((m) => m.assignedBoard === 2));
+assert.deepEqual(nextForBoard(night, '9', new Set()), { next: null, then: [] });
+// A match live elsewhere is skipped; the one after it becomes next.
+const q2 = nextForBoard(night, '2', new Set([q.next.id]));
+assert.equal(q2.next.id, q.then[0].id);
 
 console.log('board schedule ok');

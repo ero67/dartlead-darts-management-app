@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus } from 'lucide-react';
+import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus, Target } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -30,6 +30,7 @@ import { EditMatchPlayersDialog } from './tournament/EditMatchPlayersDialog';
 import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
 import { BoardsControl } from './tournament/BoardsControl';
+import { BoardWaitingScreen } from './tournament/BoardWaitingScreen';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
@@ -37,6 +38,8 @@ import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignm
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { sortStandings } from '../utils/standings';
 import { cloneTournamentPath } from '../utils/cloneTournament';
+import { nextForBoard } from '../utils/boardWaiting';
+import { buildMatchData } from '../utils/matchStart';
 import { cn } from '@/lib/utils';
 import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
@@ -240,9 +243,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     setMatchToConfirm(matchData);
   };
 
+  // Board tablets: "Pick a match" hides the waiting screen for this
+  // tournament until a match is started here, after which the tablet
+  // returns to its board.
+  const boardDismissKey = `board-screen-dismissed-${tournament.id}`;
+  const [isBoardDismissed, setIsBoardDismissed] = useState(() => sessionStorage.getItem(boardDismissKey) === '1');
+  const dismissBoardScreen = () => { sessionStorage.setItem(boardDismissKey, '1'); setIsBoardDismissed(true); };
+  const showBoardScreen = () => { sessionStorage.removeItem(boardDismissKey); setIsBoardDismissed(false); };
+
   // Confirm and start the match
   const confirmStartMatch = () => {
     if (matchToConfirm) {
+      showBoardScreen();
       onMatchStart(matchToConfirm);
       setMatchToConfirm(null);
     }
@@ -301,7 +313,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       };
     })()
   });
-  const { isMatchLive, toggleFavoriteGroup, isGroupFavorite, getFavoriteGroups } = useLiveMatch();
+  const { isMatchLive, toggleFavoriteGroup, isGroupFavorite, getFavoriteGroups, boardNumber } = useLiveMatch();
   const { isAdmin } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   // The linked league's creator and co-managers manage too; ask the DB
@@ -2104,6 +2116,27 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
 
   const isPlayoffOnly = tournament.tournamentType === 'playoff_only';
+
+  // A tablet fixed to a board, on a night that uses boards, with a scorer
+  // signed in: show what this board plays next instead of the tabs.
+  const hasBoardScreen = Boolean(boardNumber && tournament.boardCount && canScore === true && user && isTournamentRunning(tournament.status));
+  // Plain compute: this sits below an early return, so no hook here.
+  const boardQueue = hasBoardScreen ? nextForBoard(tournament, boardNumber, new Set(liveMatches.map((m) => m.id))) : { next: null, then: [] };
+  // This device's own unfinished match (scorer backed out of the scorer view).
+  const ownLiveMatch = hasBoardScreen
+    ? [...tournament.groups.flatMap((g) => g.matches.map((m) => ({ ...m, groupName: g.name }))), ...(tournament.playoffMatches || [])]
+      .find((m) => m.status === 'in_progress' && isMatchInLocalStorage(m.id)) || null
+    : null;
+  const handleBoardStart = (next) => {
+    const isPlayoff = next.roundSize != null;
+    // Queue entries name their group/round in `label`; the dialog shows groupName.
+    const match = { ...next, groupName: next.groupName || next.label, ...(isPlayoff && { isPlayoff: true }) };
+    handleStartMatchRequest(buildMatchData(match, tournament, isPlayoff ? getPlayoffLegsToWin(next.roundSize) : next.legsToWin || tournament.legsToWin));
+  };
+  const handleBoardContinue = (m) => {
+    showBoardScreen();
+    onMatchStart(buildMatchData(m, tournament, m.legsToWin || tournament.legsToWin));
+  };
   const playerCount = tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0;
   const tournamentPhase = getTournamentPhase(tournament);
   const overview = [
@@ -2194,6 +2227,19 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         </div>
       </div>
 
+      {hasBoardScreen && !isBoardDismissed ? (
+        <BoardWaitingScreen
+          tournament={tournament}
+          boardNumber={boardNumber}
+          next={boardQueue.next}
+          then={boardQueue.then}
+          ownLive={ownLiveMatch}
+          onStart={handleBoardStart}
+          onContinue={handleBoardContinue}
+          onPickMatch={dismissBoardScreen}
+          t={t}
+        />
+      ) : (<>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           {!isPlayoffOnly && (
@@ -2225,6 +2271,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <Trophy />
               {t('summary.tab')}
             </TabsTrigger>
+          )}
+          {hasBoardScreen && (
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={showBoardScreen}>
+              <Target />
+              {t('boards.backToBoard', { board: boardNumber })}
+            </Button>
           )}
         </TabsList>
       </Tabs>
@@ -2339,6 +2391,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         )}
         {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}
       </div>
+      </>)}
 
       {/* Match Start Confirmation Modal */}
       <StartMatchDialog match={matchToConfirm} onConfirm={confirmStartMatch} onCancel={cancelStartMatch} t={t} />

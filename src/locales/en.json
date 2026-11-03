@@ -1207,7 +1207,14 @@
     "groupBoards": "Boards per group",
     "anyBoard": "Any board",
     "saveGroupBoards": "Save group boards",
-    "groupBoardsSaved": "Group boards saved"
+    "groupBoardsSaved": "Group boards saved",
+    "screenTitle": "Board {{board}}",
+    "nextUp": "Next match on this board",
+    "nothingQueued": "Nothing queued for board {{board}}",
+    "waitingForManager": "The manager will send the next match here.",
+    "pickMatch": "Pick a match",
+    "continueOwn": "Continue your match",
+    "backToBoard": "Board {{board}}"
   },
   "export": {
     "title": "Share / export",
