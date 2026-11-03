@@ -672,6 +672,7 @@ export const tournamentService = {
           const groupWithData = {
             id: group.id,
             name: group.name,
+            boards: group.boards ?? null,
             players: group.group_players.map(gp => gp.player),
             matches: sortByPlayOrder(group.matches).map(match => {
               // Get player stats for this match
@@ -1475,13 +1476,15 @@ export const tournamentService = {
     }
   },
 
-  // Board count plus the board of waiting matches ({ matchId: board | null });
-  // the RPC checks can_manage_tournament and only touches pending matches.
-  async setMatchBoards(tournamentId, boardCount, assignments = {}) {
+  // Board count plus the board of waiting matches ({ matchId: board | null })
+  // and optionally the boards of groups ({ groupId: [1, 2] }, null = leave
+  // them); the RPC checks can_manage_tournament and only touches pending matches.
+  async setMatchBoards(tournamentId, boardCount, assignments = {}, groupBoards = null) {
     const { error } = await supabase.rpc('set_match_boards', {
       p_tournament_id: tournamentId,
       p_board_count: boardCount,
-      p_assignments: assignments
+      p_assignments: assignments,
+      p_group_boards: groupBoards
     });
     if (error) throw error;
   },
