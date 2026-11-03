@@ -9,6 +9,7 @@ import { ExportMenu } from '../ExportMenu';
 import { EmptyState } from '../shared/EmptyState';
 import { mergeBracketRounds } from '../../utils/bracketView';
 import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions, MatchBoard } from './MatchCardParts';
+import { buildMatchData as buildStartData } from '../../utils/matchStart';
 import { cn } from '@/lib/utils';
 
 function StartPlayoffsSection({
@@ -244,20 +245,9 @@ export function PlayoffsTab(props) {
                       const isByeSlot = match.status === 'pending' && ((match.player1 && !match.player2) || (!match.player1 && match.player2));
                       const live = liveInfoById.get(match.id);
                       const buildMatchData = (kind) => {
-                        // Calculate round size from number of matches (each match has 2 players)
-                        const roundSize = getRoundSize(round);
-                        const data = {
-                          ...match,
-                          gameType: match.gameType || tournament.gameType,
-                          legsToWin: getPlayoffLegsToWin(roundSize),
-                          startingScore: tournament.startingScore,
-                          defaultScoringMode: tournament.defaultScoringMode,
-                          isPlayoff: true,
-                          // startMatch creates the playoff row under this tournament
-                          tournamentId: tournament.id
-                        };
-                        if (kind === 'admin') data.adminOverride = true;
-                        return data;
+                        // Round size (two players per match) picks the playoff legs-to-win setting
+                        const data = buildStartData({ ...match, isPlayoff: true }, tournament, getPlayoffLegsToWin(getRoundSize(round)));
+                        return kind === 'admin' ? { ...data, adminOverride: true } : data;
                       };
 
                       return (
