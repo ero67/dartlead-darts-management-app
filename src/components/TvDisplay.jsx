@@ -16,6 +16,7 @@ import { EmptyState } from './shared/EmptyState';
 import { StatusBadge } from './shared/StatusBadge';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
 import { boardQueues } from '../utils/boardSchedule';
+import { getQualifyingPlayers } from '../utils/qualifiers';
 import { matchWinProbability } from '../lib/winProbability';
 import { liveMatchChance } from '../lib/legChance';
 import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
@@ -262,7 +263,11 @@ export function TvDisplay() {
   // Two per board fit the column up to four boards; beyond that, one each.
   const perBoard = queues.size > 4 ? 1 : 2;
 
-  const qualifiersPerGroup = tournament?.playoffSettings?.enabled ? Number(tournament.playoffSettings.qualifiersPerGroup || tournament.playoffSettings.playersPerGroup || 0) : 0;
+  // Same qualifiers as the management Standings tab, in either qualification mode.
+  const qualifierIds = useMemo(
+    () => new Set(tournament?.playoffSettings?.enabled ? getQualifyingPlayers(tournament).map((p) => p.id) : []),
+    [tournament]
+  );
 
   const liveScores = useMemo(
     () => Object.fromEntries(liveMatches.map((m) => [m.id, { player1Legs: m.player1_legs ?? 0, player2Legs: m.player2_legs ?? 0 }])),
@@ -504,7 +509,7 @@ export function TvDisplay() {
                     <TableRow><TableCell colSpan={7} className="py-6 text-center text-muted-foreground">{t('management.noMatchesPlayedYet')}</TableCell></TableRow>
                   ) : rows.map((s, i) => {
                     const diff = (s.legsWon || 0) - (s.legsLost || 0);
-                    const qualifies = qualifiersPerGroup > 0 && i < qualifiersPerGroup;
+                    const qualifies = qualifierIds.has(s.player.id);
                     return (
                       <TableRow key={s.player.id} className={cn(qualifies && 'bg-primary/15 shadow-[inset_4px_0_0_var(--primary)] hover:bg-primary/15')}>
                         <TableCell className={cn('font-display text-xl font-semibold text-muted-foreground', qualifies && 'text-primary')}>{i + 1}</TableCell>
