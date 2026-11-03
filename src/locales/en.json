@@ -1203,7 +1203,11 @@
     "startHint": "This match is scheduled for board {{board}}.",
     "startHintDevice": "This match is scheduled for board {{board}}; this device is set to board {{device}}.",
     "next": "Next",
-    "then": "Then"
+    "then": "Then",
+    "groupBoards": "Boards per group",
+    "anyBoard": "Any board",
+    "saveGroupBoards": "Save group boards",
+    "groupBoardsSaved": "Group boards saved"
   },
   "export": {
     "title": "Share / export",

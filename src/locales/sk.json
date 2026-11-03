@@ -1203,7 +1203,11 @@
     "startHint": "Tento zápas je naplánovaný na terč {{board}}.",
     "startHintDevice": "Tento zápas je naplánovaný na terč {{board}}, toto zariadenie je nastavené na terč {{device}}.",
     "next": "Na rade",
-    "then": "Potom"
+    "then": "Potom",
+    "groupBoards": "Terče pre skupiny",
+    "anyBoard": "Ľubovoľný terč",
+    "saveGroupBoards": "Uložiť terče skupín",
+    "groupBoardsSaved": "Terče skupín uložené"
   },
   "export": {
     "title": "Zdieľať / export",
