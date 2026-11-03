@@ -1989,6 +1989,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             applyRemoteCompletion(match);
             return;
           }
+          // A waiting match moved board (manager at the PC): board tablets
+          // and cards follow. matches has REPLICA IDENTITY FULL, so old is complete.
+          if (match?.status === 'pending') {
+            if (payload.old?.assigned_board !== match.assigned_board) getTournament(tournament.id);
+            return;
+          }
           if (match?.status !== 'in_progress') return;
 
           // Reload the full match data
@@ -2038,6 +2044,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         },
         async (payload) => {
           const match = payload.new;
+          // First-round playoff rows are created by set_match_boards with a board.
+          if (match?.status === 'pending' && match.assigned_board != null) {
+            getTournament(tournament.id);
+            return;
+          }
           if (match?.status !== 'in_progress') return;
 
           // Load full match data
@@ -2067,6 +2078,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             });
           }
         }
+      )
+      // Board count (and other settings) set from another device: a tablet
+      // already on the page gets its waiting screen without a reload.
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournament.id}` },
+        () => getTournament(tournament.id)
       )
       .subscribe();
 
