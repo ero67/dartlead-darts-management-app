@@ -13,6 +13,7 @@ import { BoardMotif, CheckoutRoute, FormDots, LegPips, LiveDot } from './shared/
 import { WinChanceChart } from './match/WinChanceChart';
 import { AssistantLogo } from './assistant/AssistantLogo';
 import { BOT_LEVELS } from '../lib/botPlayer';
+import { PRACTICE_GAMES } from '../lib/practiceGames';
 import { tournamentService } from '../services/tournamentService';
 import { ASSISTANT_URL, assistantService } from '../services/assistantService';
 
@@ -116,7 +117,6 @@ export function LandingPage() {
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
   const proof = [
     { icon: WifiOff, label: t('landing.proof.offline') },
-    { icon: Target, label: t('landing.proof.games') },
     { icon: Globe, label: t('landing.proof.languages') },
   ];
   const steps = ['setup', 'signup', 'score', 'follow'].map(key => ({
@@ -158,10 +158,29 @@ export function LandingPage() {
                   <ArrowRight />
                 </Button>
               )}
-              <Button size="lg" variant="ghost" onClick={() => navigate('/practice')}>
-                <Target />
-                {t('landing.ctaPractice')}
-              </Button>
+            </div>
+            {/* Practice needs no account, so it gets its own panel with every game one tap away. */}
+            <div className="flex max-w-xl flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+              <button type="button" onClick={() => navigate('/practice')} className="group -m-2 flex items-center gap-3 rounded-lg p-2 text-left transition-colors outline-none hover:bg-primary/10 focus-visible:ring-[3px] focus-visible:ring-ring">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Target className="size-5" />
+                </span>
+                <span className="flex flex-1 flex-col">
+                  <span className="font-semibold">{t('landing.ctaPractice')}</span>
+                  <span className="text-sm text-muted-foreground">{t('landing.practiceSub')}</span>
+                </span>
+                <ArrowRight className="size-4 text-primary transition-transform group-hover:translate-x-0.5" />
+              </button>
+              <ul className="flex flex-wrap gap-2">
+                {PRACTICE_GAMES.filter(game => game.available).map(game => (
+                  <li key={game.id}>
+                    <Button variant="outline" size="sm" className="h-11 sm:h-8" title={t(`practice.games.${game.id}.desc`)} onClick={() => navigate(game.path)}>
+                      <game.icon className="text-primary" />
+                      {t(`practice.games.${game.id}.title`)}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             </div>
             {/* The Android app runs this same page, so it shouldn't advertise itself. */}
             {!Capacitor.isNativePlatform() && (

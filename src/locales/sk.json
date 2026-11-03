@@ -539,13 +539,13 @@
     "heroSubtitle": "Registrácia, skupiny, play-off, skórovanie na každom terči, TV obrazovka so šancami na výhru naživo a sezónny rebríček. DartLead odvedie celý večer a hráči nikdy neplatia.",
     "ctaDemo": "Pozrieť ukážkový turnaj",
     "ctaPrimary": "Získať prístup",
-    "ctaPractice": "Trénovať zadarmo proti botom",
+    "ctaPractice": "Trénovať zadarmo",
+    "practiceSub": "X01 a kriket proti botom (priemer 35–95) alebo samostatné cvičenia. Bez registrácie.",
     "playStore": "Stiahnuť z Google Play",
     "playStoreWeb": "alebo pokračujte priamo tu v prehliadači, bez inštalácie",
     "proof": {
       "offline": "Skóruje aj bez internetu",
       "android": "Aplikácia pre Android",
-      "games": "X01 aj Cricket",
       "languages": "Slovensky a anglicky"
     },
     "stats": {
