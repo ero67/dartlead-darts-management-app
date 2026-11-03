@@ -107,4 +107,19 @@ const bracket = {
 assert.deepEqual(autoAssignBoards(bracket, 2), { s1: 1, s2: 2 });
 assert.deepEqual([...boardQueues(bracket)].map(([b, list]) => [b, list.map((m) => m.id)]), [[2, ['s2']]]);
 
+// Group boards: A on 1-2, B free, 4 boards. A keeps its boards in slot 0;
+// B takes the rest and never crowds A off 1-2 while A has matches left.
+const split = { boardCount: 4, groups: [group('A', ['a1', 'a2', 'a3', 'a4']), group('B', ['b1', 'b2', 'b3', 'b4'])] };
+split.groups[0].boards = [1, 2];
+const sa = autoAssignBoards(split, 4);
+assert.ok(Object.entries(sa).filter(([id]) => id.startsWith('A')).every(([, b]) => b === 1 || b === 2), 'A only on 1-2');
+assert.deepEqual(new Set(Object.entries(sa).filter(([id]) => id.startsWith('B')).map(([, b]) => b)), new Set([3, 4]), 'B fills 3-4 first');
+const splitInputs = pendingInPlayOrder(split).map((m) => ({ id: m.id, p1: m.player1.id, p2: m.player2.id, board: null, allowed: m.boards }));
+checkPlan(splitInputs, planBoards(splitInputs, 4), 'group boards');
+// Allowed set with no board inside the count counts as any board (no hang).
+const stale = planBoards([{ id: 's', p1: 'A', p2: 'B', board: null, allowed: [9] }], 2);
+assert.deepEqual(stale.get('s'), { board: 1, slot: 0 });
+// Playoff entries carry roundSize for legs-to-win.
+assert.equal(pendingInPlayOrder(bracket).find((m) => m.id === 's1').roundSize, 4);
+
 console.log('board schedule ok');
