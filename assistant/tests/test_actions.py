@@ -37,6 +37,7 @@ def fake(monkeypatch, **kw):
     kw.setdefault("league_members", [])
     kw.setdefault("players", [])
     monkeypatch.setattr(stats, "db", lambda: FakeDb(**kw))
+    monkeypatch.setattr(stats, "_demo", lambda: {"players": set()})
     monkeypatch.setattr(stats, "_user_id", type("V", (), {"get": lambda s: "u1"})())
 
 
@@ -114,3 +115,46 @@ def test_members_nothing_to_add_is_error(monkeypatch):
 def test_members_name_count_limits(monkeypatch):
     assert "error" in members(monkeypatch, [])
     assert "error" in members(monkeypatch, [f"N{i}" for i in range(21)])
+
+
+@pytest.mark.parametrize("bad", ["", "   ", "x" * 101])
+def test_members_blank_or_long_name_is_error(monkeypatch, bad):
+    assert "error" in members(monkeypatch, ["Marek", bad])
+
+
+def test_members_first_name_of_a_member_is_already(monkeypatch):
+    roster = [player("p2", "Eva Malá")]
+    draft = members(monkeypatch, ["Eva", "Marek"], roster=roster, members=[player("p2", "Eva Malá")])
+    assert (draft["existing"], draft["already_members"], draft["new"]) == ([], ["Eva"], ["Marek"])
+
+
+def test_members_member_outside_roster_is_already(monkeypatch):
+    draft = members(monkeypatch, ["Eva Malá", "Marek"], members=[player("p9", "Eva Malá")])
+    assert draft["already_members"] == ["Eva Malá"]
+
+
+def test_members_weak_match_is_error_not_new(monkeypatch):
+    result = members(monkeypatch, ["Jano"], roster=[player("p4", "Jan Kolár")])  # scores 0.86: close, not sure
+    assert "Jan Kolár" in result["error"]
+
+
+def test_members_duplicates_are_one_name(monkeypatch):
+    draft = members(monkeypatch, ["Marek", "marek", " MAREK "])
+    assert draft["new"] == ["Marek"]
+
+
+def test_members_exact_full_name_beats_first_name_matches(monkeypatch):
+    roster = [player("p1", "Peter Novák"), player("p3", "Peter")]
+    assert members(monkeypatch, ["Peter"], roster=roster)["existing"] == [player("p3", "Peter")]
+
+
+def test_members_demo_players_are_not_matched(monkeypatch):
+    fake(monkeypatch, players=[player("d1", "Marek Demo")])
+    monkeypatch.setattr(stats, "_demo", lambda: {"players": {"d1"}})
+    assert actions.add_members_draft(L, ["Marek Demo"])["new"] == ["Marek Demo"]
+
+
+def test_next_round_bad_date_is_error(monkeypatch):
+    fake(monkeypatch, tournaments=[round_row()])
+    assert "error" in actions.next_round_draft(L, "next friday")
+    assert actions.next_round_draft(L, "2026-12-01")["starts_at"] == "2026-12-01"
