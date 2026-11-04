@@ -8,6 +8,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Literal
+from uuid import UUID
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +18,7 @@ from langfuse import Langfuse, get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.errors import GraphRecursionError
+from langgraph.types import Command
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, Field, model_validator
@@ -91,10 +93,34 @@ class PageContext(BaseModel):
         return self
 
 
+class ResumeRequest(BaseModel):
+    """What the user did with a proposal card; it becomes the paused proposal tool's result."""
+
+    status: Literal["done", "failed", "cancelled", "changed"]
+    tournament_id: UUID | None = None  # the round the app created
+    added: int | None = Field(default=None, ge=0, le=20)  # members the app added
+    error: str | None = Field(default=None, max_length=300)
+    message: str | None = Field(default=None, min_length=1, max_length=2000)
+
+    @model_validator(mode="after")
+    def changed_needs_message(self):
+        if self.status == "changed" and self.message is None:
+            raise ValueError("a changed resume needs a message")
+        return self
+
+
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=2000)
+    message: str | None = Field(default=None, min_length=1, max_length=2000)
     thread_id: str = Field(min_length=1, max_length=100)  # made by the widget, one per conversation
     page: PageContext | None = None
+    capabilities: list[Literal["actions"]] = []  # "actions": the app can show a proposal card (v1.9.0 sends none)
+    resume: ResumeRequest | None = None
+
+    @model_validator(mode="after")
+    def message_or_resume(self):
+        if (self.message is None) == (self.resume is None):
+            raise ValueError("send exactly one of message and resume")
+        return self
 
 
 class FeedbackRequest(BaseModel):
@@ -144,21 +170,26 @@ async def suggest_followups(question: str, answer: str, language: str, config: d
         return []
 
 
-async def answer_events(message: str, thread_id: str, user_id: str, token: str, question_id: str, trace_id: str,
-                        page: dict | None = None):
+async def answer_events(message: str | None, thread_id: str, user_id: str, token: str, question_id: str | None,
+                        trace_id: str, page: dict | None = None, *, resume: dict | None = None, actions: bool = False):
     """Yield the run as NDJSON events, running every stats query as the user:
     step (rewrite, route) -> sources -> tool_start / tool_end (-> chart, the first successful show_chart) -> text (deltas)
-    -> done (-> followups, after done) | error.
-    done carries the Langfuse trace id (feedback scores attach to it); a failed answer gives the question back."""
+    -> action (a proposal: the run pauses) -> done (-> followups, after done, unless paused) | error.
+    done carries the Langfuse trace id (feedback scores attach to it); a failed answer gives the question back.
+    resume continues a paused run with what the user did; the proposal tool re-runs, so it too runs as the user."""
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 2 * MAX_STEPS + 3,
               "callbacks": [CallbackHandler(trace_context={"trace_id": trace_id})], "run_name": "chat"}
-    chart_sent = False
+    chart_sent = paused = False
     answer, question, language, off_topic = "", message, None, False
+    if resume is None:
+        graph_input = {"messages": [HumanMessage(message)], "page": page, "actions": actions}
+    else:  # a changed resume is a new message, so it sets actions like one; the others keep the paused turn's
+        graph_input = Command(resume=resume, update={"actions": actions} if resume["status"] == "changed" else None)
     try:
         with stats.as_user(token, user_id), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
                                                         tags=["phase-6", "api"]):
             # "updates": each node's output when it finishes; "messages": the reply's tokens as they are written.
-            async for mode, payload in graph.astream({"messages": [HumanMessage(message)], "page": page}, config,
+            async for mode, payload in graph.astream(graph_input, config,
                                                      stream_mode=["updates", "messages"]):
                 if mode == "messages":
                     chunk, meta = payload
@@ -169,7 +200,11 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str, 
                         yield event("text", delta=chunk.content)
                     continue
                 for node, update in payload.items():
-                    if node == "rewrite":
+                    if node == "__interrupt__":
+                        paused = True
+                        for pause in update:
+                            yield event("action", **pause.value)
+                    elif node == "rewrite":
                         question = update["question"]
                         if question != message:
                             yield event("step", kind="rewrite", question=question)
@@ -201,7 +236,7 @@ async def answer_events(message: str, thread_id: str, user_id: str, token: str, 
         await run_in_threadpool(refund_question, user_id, token, question_id)
         yield event("error", message="Sorry, something went wrong. Please try again.")
     else:
-        if answer and language and not off_topic:  # no language: the route node never ran
+        if answer and language and not off_topic and not paused:  # no language: the route node never ran (a resume)
             questions = await suggest_followups(question, answer, language, config)
             if questions:
                 yield event("followups", questions=questions)
@@ -235,12 +270,22 @@ def refund_question(user_id: str, token: str, question_id: str | None) -> None:
 @app.post("/chat")
 async def chat(request: ChatRequest, authorization: str | None = Header(default=None)):
     user_id, token = await run_in_threadpool(verify, authorization)
-    question_id = await run_in_threadpool(use_question, user_id, token)
-    trace_id = Langfuse.create_trace_id()
     # The user id is part of the thread key, so nobody can continue someone else's conversation.
     thread_id = f"{user_id}:{request.thread_id}"
-    return StreamingResponse(answer_events(request.message, thread_id, user_id, token, question_id, trace_id,
-                                         request.page.model_dump() if request.page else None),
+    paused = (await graph.aget_state({"configurable": {"thread_id": thread_id}})).interrupts
+    if request.resume and not paused:
+        raise HTTPException(409, "This action is no longer waiting for an answer. Ask again.")
+    resume = request.resume.model_dump(mode="json", exclude_none=True) if request.resume else None
+    if paused and resume is None:  # typing instead of confirming answers the card, so the thread never stays stuck
+        resume = {"status": "changed", "message": request.message}
+    # A message uses a question, also as a changed resume; done, failed and cancelled finish the one it answered.
+    question_id = None
+    if resume is None or resume["status"] == "changed":
+        question_id = await run_in_threadpool(use_question, user_id, token)
+    trace_id = Langfuse.create_trace_id()
+    return StreamingResponse(answer_events(request.message or resume.get("message"), thread_id, user_id, token,
+                                         question_id, trace_id, request.page.model_dump() if request.page else None,
+                                         resume=resume, actions="actions" in request.capabilities),
                              media_type="application/x-ndjson; charset=utf-8")
 
 

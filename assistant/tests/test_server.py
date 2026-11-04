@@ -4,13 +4,16 @@ import json
 import logging
 import time
 from contextlib import contextmanager
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from langgraph.errors import GraphRecursionError
+from langgraph.types import Command, Interrupt
 
 from assistant import server, stats
+from assistant.server import refund_question  # the real one, which fixtures replace on the module
 
 TRACE_ID = "0123456789abcdef0123456789abcdef"
 QUESTION_ID = "11111111-2222-3333-4444-555555555555"
@@ -21,10 +24,16 @@ def text_chunk(text="Hi"):
 
 
 class FakeGraph:
-    """Stands in for the compiled graph: astream yields the (mode, payload) items, then raises `error` if given."""
+    """Stands in for the compiled graph: astream yields the (mode, payload) items, then raises `error` if given;
+    aget_state reports the `paused` interrupts and records the config it was asked about."""
 
     def __init__(self, items=(), error=None):
         self.items, self.error = list(items), error
+        self.paused, self.state_configs = (), []
+
+    async def aget_state(self, config):
+        self.state_configs.append(config)
+        return SimpleNamespace(interrupts=self.paused)
 
     async def astream(self, *args, **kwargs):
         for item in self.items:
@@ -256,10 +265,11 @@ LEAGUE_ID = "0b1f6d5e-9c1a-4d2b-8e3f-123456789abc"
 class RecordingGraph(FakeGraph):
     def __init__(self):
         super().__init__([text_chunk()])
-        self.inputs = []
+        self.inputs, self.configs = [], []
 
-    async def astream(self, graph_input, *args, **kwargs):
+    async def astream(self, graph_input, config, *args, **kwargs):
         self.inputs.append(graph_input)
+        self.configs.append(config)
         async for item in super().astream(graph_input):
             yield item
 
@@ -274,8 +284,9 @@ def chat(monkeypatch, use_graph):
     monkeypatch.setattr(server, "refund_question", lambda *args: None)
     client = TestClient(server.app)
 
-    def post(**body):
-        return client.post("/chat", json={"message": "Who leads?", "thread_id": "t1", **body}, headers={"Authorization": "Bearer token"})
+    def post(**body):  # message=None leaves the message out
+        body = {k: v for k, v in {"message": "Who leads?", "thread_id": "t1", **body}.items() if v is not None}
+        return client.post("/chat", json=body, headers={"Authorization": "Bearer token"})
 
     return post, graph
 
@@ -380,3 +391,125 @@ def test_slow_suggest_times_out(use_graph, refunds, monkeypatch):
     monkeypatch.setattr(server.followups, "suggest", lambda *args: time.sleep(0.2) or ["late"])  # a missed timeout would add an event
     assert types([route_update(), text_chunk()], use_graph) == ["step", "text", "done"]
     assert refunds == []
+
+
+# --- proposals: the action event and resume --------------------------------------------------------------------
+
+PROPOSAL = {"action": "propose_next_round", "draft": {"league_id": LEAGUE_ID, "name": "Kolo 6"}}
+TOURNAMENT_ID = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
+
+
+@pytest.fixture
+def questions(monkeypatch):
+    """Records use_question calls (use it after chat, which stubs it too)."""
+    calls = []
+    monkeypatch.setattr(server, "use_question", lambda *args: calls.append(args) or QUESTION_ID)
+    return calls
+
+
+@pytest.fixture
+def paused(chat):
+    """chat on a thread waiting for the answer to PROPOSAL."""
+    post, graph = chat
+    graph.paused = (Interrupt(value=PROPOSAL),)
+    return post, graph
+
+
+def test_request_needs_exactly_one_of_message_and_resume(chat):
+    post, graph = chat
+    assert post(message=None).status_code == 422
+    assert post(resume={"status": "cancelled"}).status_code == 422
+    assert graph.inputs == []
+
+
+def test_changed_needs_a_message(paused):
+    post, graph = paused
+    assert post(message=None, resume={"status": "changed"}).status_code == 422
+    assert graph.inputs == []
+
+
+@pytest.mark.parametrize("resume", [
+    {"status": "done", "tournament_id": "abc"},
+    {"status": "done", "added": 21},
+    {"status": "failed", "error": "x" * 301},
+    {"status": "changed", "message": ""},
+    {"status": "accepted"},
+])
+def test_bad_tournament_id_refused(paused, resume):  # and the resume's other limits
+    post, graph = paused
+    assert post(message=None, resume=resume).status_code == 422
+    assert graph.inputs == []
+
+
+@pytest.mark.parametrize("capabilities, actions", [(["actions"], True), ([], False), (None, False)])
+def test_capability_reaches_the_graph(chat, capabilities, actions):
+    post, graph = chat
+    assert post(capabilities=capabilities).status_code == 200
+    assert graph.inputs[0]["actions"] is actions
+
+
+def test_unknown_capability_refused(chat):
+    post, _ = chat
+    assert post(capabilities=["payments"]).status_code == 422
+
+
+def test_pause_sends_action_then_done_and_no_followups(use_graph, suggest):
+    use_graph(FakeGraph([route_update(), text_chunk("Here is the round."),
+                         ("updates", {"__interrupt__": (Interrupt(value=PROPOSAL),)})]))
+    events = run()
+    assert [e["type"] for e in events] == ["step", "text", "action", "done"]
+    assert events[2] == {"type": "action", **PROPOSAL}
+    assert suggest == []
+
+
+def test_resume_with_nothing_pending_is_409(chat, questions):
+    post, graph = chat
+    response = post(message=None, resume={"status": "cancelled"})
+    assert response.status_code == 409
+    assert response.json()["detail"]
+    assert graph.inputs == [] and questions == []
+
+
+@pytest.mark.parametrize("resume", [
+    {"status": "done", "tournament_id": TOURNAMENT_ID},
+    {"status": "done", "added": 3},
+    {"status": "failed", "error": "permission denied"},
+    {"status": "cancelled"},
+])
+def test_resume_uses_no_question(paused, questions, resume):
+    post, graph = paused
+    assert post(message=None, resume=resume, capabilities=["actions"]).status_code == 200
+    assert questions == []
+    # The value becomes the proposal tool's result; the paused turn's actions flag stays as it was.
+    assert graph.inputs == [Command(resume=resume)]
+
+
+def test_message_on_paused_thread_resumes_as_changed(paused, questions):
+    post, graph = paused
+    assert post(message="Make it Friday", capabilities=["actions"]).status_code == 200
+    assert graph.inputs == [Command(resume={"status": "changed", "message": "Make it Friday"}, update={"actions": True})]
+    assert len(questions) == 1
+
+
+def test_changed_resume_uses_a_question(paused, questions):
+    post, graph = paused
+    assert post(message=None, resume={"status": "changed", "message": "Make it Friday"}).status_code == 200
+    assert graph.inputs == [Command(resume={"status": "changed", "message": "Make it Friday"}, update={"actions": False})]
+    assert len(questions) == 1
+
+
+def test_resume_failure_sends_error_without_refund(paused, monkeypatch, fake_db):
+    post, graph = paused
+    monkeypatch.setattr(server, "refund_question", refund_question)  # the real one: it gets no question to give back
+    db = fake_db()
+    graph.error = RuntimeError("boom")
+    response = post(message=None, resume={"status": "done", "added": 2})
+    assert [json.loads(line)["type"] for line in response.text.splitlines()] == ["text", "error"]
+    assert db.calls == []  # no refund RPC
+
+
+def test_resume_stays_on_the_callers_thread(paused):
+    post, graph = paused
+    post(message=None, resume={"status": "cancelled"})
+    assert graph.state_configs[0]["configurable"]["thread_id"] == "user-1:t1"
+    assert graph.configs[0]["configurable"]["thread_id"] == "user-1:t1"
