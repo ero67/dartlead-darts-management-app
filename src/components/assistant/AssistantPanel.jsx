@@ -209,8 +209,10 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
   };
 
   // Streams one request ({ message } or { resume }) into a new assistant reply, after the user's bubble if they typed.
-  const streamReply = async (body, userText) => {
+  // onStarted runs at the first event, once the server has accepted the request.
+  const streamReply = async (body, userText, onStarted) => {
     const replyId = crypto.randomUUID();
+    let hasStarted = false;
     setIsSending(true);
     setMessages(prev => [
       ...prev,
@@ -219,7 +221,18 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
     ]);
     try {
       // The page at send time, not at open time: the panel stays open while the user navigates.
-      await assistantService.streamChat({ ...body, threadId, page, onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
+      await assistantService.streamChat({
+        ...body,
+        threadId,
+        page,
+        onEvent: (event) => {
+          if (!hasStarted) {
+            hasStarted = true;
+            onStarted?.();
+          }
+          updateMessage(replyId, m => applyEvent(m, event));
+        },
+      });
       // A stream that ends without "done" (connection dropped) still stops the loader.
       updateMessage(replyId, m => (m.status === 'streaming' ? { ...m, status: 'done', isTraceOpen: false } : m));
     } catch (error) {
@@ -235,16 +248,18 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
     const text = raw.trim();
     if (!text || isSending) return;
     setDraft('');
-    // The server takes a message on a paused thread as the card's answer ("changed"), so the card stops here.
-    setMessages(prev => prev.map(m => (m.action?.state === 'pending' ? { ...m, action: { ...m.action, state: 'cancelled' } } : m)));
-    streamReply({ message: text }, text);
+    // An accepted message on a paused thread answers the card ("changed"), so the card stops once the stream starts;
+    // a refused one (limit, network) leaves it waiting.
+    streamReply({ message: text }, text, () => setMessages(prev => prev.map(m => (
+      m.action?.state === 'pending' ? { ...m, action: { ...m.action, state: 'cancelled' } } : m))));
   };
 
   const setAction = (id, change) => updateMessage(id, m => ({ ...m, action: { ...m.action, ...change } }));
 
   // The write runs here, with the app's own services as the signed-in user; then the paused run hears how it went.
   const handleConfirmAction = async (id) => {
-    const { action, draft } = messages.find(m => m.id === id).action;
+    const { action, draft, state } = messages.find(m => m.id === id).action;
+    if (state !== 'pending') return; // at most one write per card
     setAction(id, { state: 'running' });
     setIsSending(true);
     let resume;
@@ -269,6 +284,7 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
           tournamentType: settings.tournament_type,
           status: 'open_for_registration',
           players: draft.players,
+          groups: [], // as TournamentCreation: groups are drawn when the round starts
         });
         setAction(id, { state: 'done', tournamentId });
         resume = { status: 'done', tournament_id: tournamentId };
@@ -286,6 +302,7 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
   };
 
   const handleCancelAction = (id) => {
+    if (messages.find(m => m.id === id).action.state !== 'pending') return;
     setAction(id, { state: 'cancelled' });
     streamReply({ resume: { status: 'cancelled' } });
   };

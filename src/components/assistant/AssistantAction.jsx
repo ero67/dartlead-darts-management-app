@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, CircleAlert, Loader, X } from 'lucide-react';
 
@@ -13,12 +13,25 @@ export function AssistantAction({ action, isDisabled, onConfirm, onCancel }) {
   const { t, language } = useLanguage();
   const { draft, state } = action;
   const isNextRound = action.action === 'propose_next_round';
+  const isSettled = state !== 'pending' && state !== 'running';
+  const cardRef = useRef(null);
+  const statusRef = useRef(null);
 
-  // A date the user gave without a time ("2026-11-13") shows as a day only.
-  const when = (iso) => {
-    if (!iso) return t('assistant.action.noDate');
+  // The buttons just unmounted under the user's focus: hand it to the status line, never away from the composer.
+  useEffect(() => {
+    const active = document.activeElement;
+    if (isSettled && (active === document.body || cardRef.current?.contains(active))) statusRef.current?.focus();
+  }, [isSettled]);
+
+  // The server accepts "2026-11-13 19:00" too, which some WebViews cannot parse: use the ISO "T". A date without a
+  // time parses as UTC midnight, so it shows in UTC as that day only.
+  const when = (value) => {
+    if (!value) return t('assistant.action.noDate');
+    const iso = value.replace(' ', 'T');
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return value;
     const options = iso.includes('T') ? { dateStyle: 'full', timeStyle: 'short' } : { dateStyle: 'full', timeZone: 'UTC' };
-    return new Date(iso).toLocaleString(language === 'sk' ? 'sk-SK' : 'en-GB', options);
+    return date.toLocaleString(language === 'sk' ? 'sk-SK' : 'en-GB', options);
   };
   const field = (label, value) => (
     <div className="flex gap-3">
@@ -28,7 +41,7 @@ export function AssistantAction({ action, isDisabled, onConfirm, onCancel }) {
   );
 
   return (
-    <Card className="gap-3 py-4 text-sm animate-in fade-in duration-300">
+    <Card ref={cardRef} className="gap-3 py-4 text-sm animate-in fade-in duration-300">
       <CardHeader className="px-4">
         <CardTitle>{t(isNextRound ? 'assistant.action.nextRoundTitle' : 'assistant.action.addMembersTitle')}</CardTitle>
       </CardHeader>
@@ -61,9 +74,15 @@ export function AssistantAction({ action, isDisabled, onConfirm, onCancel }) {
         </dl>
       </CardContent>
       <CardFooter className="flex-wrap gap-2 px-4">
-        {state === 'pending' || state === 'running' ? (
+        {!isSettled && (
           <>
-            <Button size="sm" onClick={onConfirm} disabled={isDisabled || state === 'running'}>
+            <Button
+              size="sm"
+              onClick={onConfirm}
+              disabled={isDisabled || state === 'running'}
+              aria-busy={state === 'running'}
+              aria-label={state === 'running' ? t('assistant.action.working') : undefined}
+            >
               {state === 'running' && <Loader className="animate-spin" />}
               {t('assistant.action.confirm')}
             </Button>
@@ -71,13 +90,18 @@ export function AssistantAction({ action, isDisabled, onConfirm, onCancel }) {
               {t('assistant.action.cancel')}
             </Button>
           </>
-        ) : (
-          <p role="status" className={`flex items-center gap-1.5 ${state === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}>
-            {state === 'done' && <><Check className="size-4" />{t('assistant.action.confirmed')}</>}
-            {state === 'cancelled' && <><X className="size-4" />{t('assistant.action.cancelled')}</>}
-            {state === 'failed' && <><CircleAlert className="size-4 shrink-0" />{t('assistant.action.failed', { error: action.error })}</>}
-          </p>
         )}
+        {/* Mounted from the start, so screen readers announce the outcome when it appears */}
+        <p
+          ref={statusRef}
+          role="status"
+          tabIndex={-1}
+          className={`flex items-center gap-1.5 outline-none ${state === 'failed' ? 'text-destructive' : 'text-muted-foreground'}`}
+        >
+          {state === 'done' && <><Check className="size-4" />{t('assistant.action.confirmed')}</>}
+          {state === 'cancelled' && <><X className="size-4" />{t('assistant.action.cancelled')}</>}
+          {state === 'failed' && <><CircleAlert className="size-4 shrink-0" />{t('assistant.action.failed', { error: action.error })}</>}
+        </p>
         {state === 'done' && action.tournamentId && (
           <Button size="sm" variant="link" className="px-0" asChild>
             <Link to={`/tournament/${action.tournamentId}`}>{t('assistant.action.openTournament')}</Link>
