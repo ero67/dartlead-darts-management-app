@@ -9,11 +9,15 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessageChunk, ToolMessage
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
+from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Interrupt
 
 from assistant import server, stats
+from assistant.agent import State
 from assistant.server import refund_question  # the real one, which fixtures replace on the module
+from assistant.tools import _propose as propose
 
 TRACE_ID = "0123456789abcdef0123456789abcdef"
 QUESTION_ID = "11111111-2222-3333-4444-555555555555"
@@ -441,6 +445,24 @@ def test_bad_tournament_id_refused(paused, resume):  # and the resume's other li
     assert graph.inputs == []
 
 
+@pytest.mark.parametrize("resume", [
+    {"status": "cancelled", "message": "Who leads?"},  # would be a free question: no quota for cancelled
+    {"status": "done", "added": 2, "message": "Who leads?"},
+    {"status": "failed", "error": "denied", "message": "Who leads?"},
+    {"status": "done", "error": "denied"},
+    {"status": "failed", "added": 2},
+    {"status": "failed", "tournament_id": TOURNAMENT_ID},
+    {"status": "cancelled", "tournament_id": TOURNAMENT_ID},
+    {"status": "cancelled", "error": "denied"},
+    {"status": "changed", "message": "Friday", "added": 2},
+    {"status": "changed", "message": "Friday", "error": "denied"},
+])
+def test_resume_fields_must_match_status(paused, questions, resume):
+    post, graph = paused
+    assert post(message=None, resume=resume).status_code == 422
+    assert graph.inputs == [] and questions == []
+
+
 @pytest.mark.parametrize("capabilities, actions", [(["actions"], True), ([], False), (None, False)])
 def test_capability_reaches_the_graph(chat, capabilities, actions):
     post, graph = chat
@@ -448,9 +470,11 @@ def test_capability_reaches_the_graph(chat, capabilities, actions):
     assert graph.inputs[0]["actions"] is actions
 
 
-def test_unknown_capability_refused(chat):
-    post, _ = chat
-    assert post(capabilities=["payments"]).status_code == 422
+def test_unknown_capability_ignored(chat):
+    # A newer app may send capabilities this API doesn't know yet; refusing them would break it.
+    post, graph = chat
+    assert post(capabilities=["payments"]).status_code == 200
+    assert graph.inputs[0]["actions"] is False
 
 
 def test_pause_sends_action_then_done_and_no_followups(use_graph, suggest):
@@ -480,22 +504,54 @@ def test_resume_uses_no_question(paused, questions, resume):
     post, graph = paused
     assert post(message=None, resume=resume, capabilities=["actions"]).status_code == 200
     assert questions == []
-    # The value becomes the proposal tool's result; the paused turn's actions flag stays as it was.
+    # The value becomes the proposal tool's result; the paused turn's page and actions stay as they were.
     assert graph.inputs == [Command(resume=resume)]
 
 
 def test_message_on_paused_thread_resumes_as_changed(paused, questions):
     post, graph = paused
-    assert post(message="Make it Friday", capabilities=["actions"]).status_code == 200
-    assert graph.inputs == [Command(resume={"status": "changed", "message": "Make it Friday"}, update={"actions": True})]
+    page = {"kind": "league", "id": LEAGUE_ID}
+    assert post(message="Make it Friday", page=page).status_code == 200
+    # No actions update: the run paused with them on, and turning them off would make the re-run refuse the answer.
+    assert graph.inputs == [Command(resume={"status": "changed", "message": "Make it Friday"}, update={"page": page})]
     assert len(questions) == 1
 
 
 def test_changed_resume_uses_a_question(paused, questions):
     post, graph = paused
     assert post(message=None, resume={"status": "changed", "message": "Make it Friday"}).status_code == 200
-    assert graph.inputs == [Command(resume={"status": "changed", "message": "Make it Friday"}, update={"actions": False})]
+    assert graph.inputs == [Command(resume={"status": "changed", "message": "Make it Friday"}, update={"page": None})]
     assert len(questions) == 1
+
+
+def test_failed_changed_resume_refunds_its_question(paused, refunds):
+    post, graph = paused
+    graph.error = RuntimeError("boom")
+    response = post(message="Make it Friday")
+    assert [json.loads(line)["type"] for line in response.text.splitlines()] == ["text", "error"]
+    assert refunds == [("user-1", "token", QUESTION_ID)]
+
+
+def test_resume_runs_as_the_user(paused, monkeypatch):
+    # The proposal tool re-runs on resume, so its read queries must run as the user too.
+    post, graph = paused
+    active, seen = [], []
+
+    @contextmanager
+    def as_user(token, user_id=None):
+        active.append((token, user_id))
+        yield
+        active.pop()
+
+    async def astream(*args, **kwargs):
+        seen.append(list(active))
+        async for item in RecordingGraph.astream(graph, *args, **kwargs):
+            yield item
+
+    monkeypatch.setattr(stats, "as_user", as_user)
+    graph.astream = astream
+    assert post(message=None, resume={"status": "cancelled"}).status_code == 200
+    assert seen == [[("token", "user-1")]]
 
 
 def test_resume_failure_sends_error_without_refund(paused, monkeypatch, fake_db):
@@ -513,3 +569,33 @@ def test_resume_stays_on_the_callers_thread(paused):
     post(message=None, resume={"status": "cancelled"})
     assert graph.state_configs[0]["configurable"]["thread_id"] == "user-1:t1"
     assert graph.configs[0]["configurable"]["thread_id"] == "user-1:t1"
+
+
+def test_changed_message_reaches_the_paused_tool(use_graph, refunds):
+    # A real graph and checkpointer: the paused tool re-runs on resume and gets the user's new message as its result.
+    results = []
+
+    def propose_node(state):
+        results.append(propose("propose_next_round", {"name": "Kolo 6"}))
+        return {}
+
+    builder = StateGraph(State)
+    builder.add_node("propose", propose_node)
+    builder.add_edge(START, "propose")
+    builder.add_edge("propose", END)
+    graph = builder.compile(checkpointer=InMemorySaver())
+    use_graph(graph)
+    page = {"kind": "league", "id": LEAGUE_ID}
+
+    async def collect(message, **kwargs):
+        return [json.loads(line) async for line in server.answer_events(message, "t1", "user-1", "token", QUESTION_ID,
+                                                                         TRACE_ID, page, **kwargs)]
+
+    first = asyncio.run(collect("Create the next round", actions=True))
+    assert [e["type"] for e in first] == ["action", "done"]
+    assert first[0]["draft"] == {"name": "Kolo 6"}
+    resume = {"status": "changed", "message": "Make it Friday"}
+    assert [e["type"] for e in asyncio.run(collect("Make it Friday", resume=resume))] == ["done"]
+    assert results == [resume]
+    state = graph.get_state({"configurable": {"thread_id": "t1"}})
+    assert state.interrupts == () and state.values["actions"] is True and state.values["page"] == page

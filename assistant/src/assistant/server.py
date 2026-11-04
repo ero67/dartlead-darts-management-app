@@ -103,7 +103,12 @@ class ResumeRequest(BaseModel):
     message: str | None = Field(default=None, min_length=1, max_length=2000)
 
     @model_validator(mode="after")
-    def changed_needs_message(self):
+    def fields_match_status(self):
+        # The value reaches the model as the tool's result: a message on a quota-free status would be a free question.
+        allowed = {"done": {"tournament_id", "added"}, "failed": {"error"}, "cancelled": set(), "changed": {"message"}}[self.status]
+        extra = {"tournament_id", "added", "error", "message"} - allowed - {k for k, v in self if v is None}
+        if extra:
+            raise ValueError(f"a {self.status} resume takes no {', '.join(sorted(extra))}")
         if self.status == "changed" and self.message is None:
             raise ValueError("a changed resume needs a message")
         return self
@@ -113,7 +118,7 @@ class ChatRequest(BaseModel):
     message: str | None = Field(default=None, min_length=1, max_length=2000)
     thread_id: str = Field(min_length=1, max_length=100)  # made by the widget, one per conversation
     page: PageContext | None = None
-    capabilities: list[Literal["actions"]] = []  # "actions": the app can show a proposal card (v1.9.0 sends none)
+    capabilities: list[str] = []  # "actions": the app can show a proposal card; unknown ones are ignored (newer apps)
     resume: ResumeRequest | None = None
 
     @model_validator(mode="after")
@@ -183,8 +188,8 @@ async def answer_events(message: str | None, thread_id: str, user_id: str, token
     answer, question, language, off_topic = "", message, None, False
     if resume is None:
         graph_input = {"messages": [HumanMessage(message)], "page": page, "actions": actions}
-    else:  # a changed resume is a new message, so it sets actions like one; the others keep the paused turn's
-        graph_input = Command(resume=resume, update={"actions": actions} if resume["status"] == "changed" else None)
+    else:  # a changed resume is a new message, so it sets the page like one; actions stays on (it paused with them)
+        graph_input = Command(resume=resume, update={"page": page} if resume["status"] == "changed" else None)
     try:
         with stats.as_user(token, user_id), propagate_attributes(trace_name="chat", session_id=thread_id, user_id=user_id,
                                                         tags=["phase-6", "api"]):
