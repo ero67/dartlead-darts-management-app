@@ -1,7 +1,18 @@
-# Action drafts: db() is faked per table, so only the shaping and the guards are tested. No network.
-import pytest
+# Action drafts: db() is faked per table, so only the shaping and the guards are tested. The proposal tools pause
+# a tiny graph with an in-memory checkpointer. No network.
+import json
 
-from assistant import actions, stats
+import pytest
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.runnables import RunnableLambda
+from langchain_core.tools import tool
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.errors import GraphInterrupt
+from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
+
+from assistant import actions, agent, prompts, stats
+from assistant.ask_stats import run_tool
 
 L = "l" * 36
 SETTINGS = {"legs_to_win": 3, "starting_score": 501, "game_type": "501", "default_scoring_mode": "x01",
@@ -158,3 +169,115 @@ def test_next_round_bad_date_is_error(monkeypatch):
     fake(monkeypatch, tournaments=[round_row()])
     assert "error" in actions.next_round_draft(L, "next friday")
     assert actions.next_round_draft(L, "2026-12-01")["starts_at"] == "2026-12-01"
+
+
+DRAFT = {"league": "Piatková liga", "name": "Kolo 6"}
+DONE = {"status": "done", "tournament_id": "t2"}
+
+
+def call(name="propose_next_round", id="c1", **args):
+    return {"name": name, "args": {"league_id": L, **args}, "id": id, "type": "tool_call"}
+
+
+def tools_graph(monkeypatch, draft=DRAFT):
+    """The agent's tools node alone, with a checkpointer so it can pause and resume."""
+    monkeypatch.setattr(actions, "next_round_draft", lambda *args: draft)
+    builder = StateGraph(agent.State)
+    builder.add_node("tools", agent.call_tools)
+    builder.add_edge(START, "tools")
+    builder.add_edge("tools", END)
+    return builder.compile(checkpointer=InMemorySaver()), {"configurable": {"thread_id": "t"}}
+
+
+def run(graph, config, *calls, actions=True):
+    return graph.invoke({"messages": [AIMessage("", tool_calls=list(calls))], "actions": actions}, config)
+
+
+def test_action_tools_only_with_capability(monkeypatch):
+    names = lambda llm: {t["function"]["name"] for t in llm.kwargs["tools"]}  # noqa: E731
+    actions_only = {"propose_next_round", "propose_add_league_members"}
+    assert actions_only <= names(agent.model_with_actions) and not actions_only & names(agent.model_with_tools)
+    monkeypatch.setattr(prompts, "_skip_until", float("inf"))
+    used = []
+    for name in ("model_with_tools", "model_with_actions"):
+        monkeypatch.setattr(agent, name, RunnableLambda(lambda prompt, name=name: used.append(name) or AIMessage("")))
+    for actions_on in (False, True):
+        agent.call_agent({"messages": [HumanMessage("q")], "docs": [], "sources": ["stats"], "language": "English",
+                          "actions": actions_on})
+    assert used == ["model_with_tools", "model_with_actions"]
+
+
+def test_tool_pauses_with_the_draft(monkeypatch):
+    graph, config = tools_graph(monkeypatch)
+    run(graph, config, call())
+    assert [i.value for i in graph.get_state(config).interrupts] == [{"action": "propose_next_round", "draft": DRAFT}]
+
+
+def test_resume_value_is_the_tool_result(monkeypatch):
+    graph, config = tools_graph(monkeypatch)
+    run(graph, config, call())
+    state = graph.invoke(Command(resume=DONE), config)
+    assert json.loads(state["messages"][-1].content) == DONE and not graph.get_state(config).interrupts
+
+
+def test_error_draft_does_not_pause(monkeypatch):
+    graph, config = tools_graph(monkeypatch, {"error": "No previous round."})
+    state = run(graph, config, call())
+    assert "No previous round." in state["messages"][-1].content and not graph.get_state(config).interrupts
+
+
+def test_resume_wins_over_a_draft_that_no_longer_builds(monkeypatch):
+    # After "done" the members are already in the league, so the re-run tool builds an error draft.
+    graph, config = tools_graph(monkeypatch)
+    run(graph, config, call())
+    monkeypatch.setattr(actions, "next_round_draft", lambda *args: {"error": "Nothing to add."})
+    assert json.loads(graph.invoke(Command(resume=DONE), config)["messages"][-1].content) == DONE
+
+
+def test_one_proposal_per_turn(monkeypatch):
+    graph, config = tools_graph(monkeypatch)
+    run(graph, config, call(id="c1"), call(id="c2"))
+    state = graph.invoke(Command(resume=DONE), config)
+    assert json.loads(state["messages"][-2].content) == DONE and "one action" in state["messages"][-1].content
+
+
+def test_proposal_without_capability_is_refused(monkeypatch):
+    graph, config = tools_graph(monkeypatch)
+    state = run(graph, config, call(), actions=False)
+    assert "no tool called" in state["messages"][-1].content and not graph.get_state(config).interrupts
+
+
+def test_run_tool_lets_the_pause_through():
+    @tool
+    def pauses() -> str:
+        """Pauses."""
+        raise GraphInterrupt(())
+
+    @tool
+    def breaks() -> str:
+        """Breaks."""
+        raise ValueError("boom")
+
+    tools = {"pauses": pauses, "breaks": breaks}
+    with pytest.raises(GraphInterrupt):
+        run_tool({"name": "pauses", "args": {}, "id": "c1", "type": "tool_call"}, tools)
+    result = run_tool({"name": "breaks", "args": {}, "id": "c2", "type": "tool_call"}, tools)
+    assert isinstance(result, ToolMessage) and result.status == "error" and "boom" in result.content
+
+
+def test_ask_reports_a_proposal(monkeypatch):
+    def propose(state):
+        return {"question": "next round", "sources": ["stats"], "docs": [], "messages": [AIMessage("", tool_calls=[call()])]}
+
+    graph, _ = tools_graph(monkeypatch)
+    builder = StateGraph(agent.State)
+    builder.add_node("agent", propose)
+    builder.add_node("tools", agent.call_tools)
+    builder.add_edge(START, "agent")
+    builder.add_edge("agent", "tools")
+    builder.add_edge("tools", END)
+    monkeypatch.setattr(agent, "graph", builder.compile(checkpointer=InMemorySaver()))
+    result = agent.ask.invoke("Create the next round", config={}, actions=True)
+    proposal = {"action": "propose_next_round", "draft": DRAFT}
+    assert result["proposal"] == proposal and "propose_next_round" in result["tools"]
+    assert result["answer"] == "PROPOSAL " + json.dumps(proposal, ensure_ascii=False)
