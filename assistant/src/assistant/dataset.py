@@ -19,7 +19,8 @@ def load_cases() -> list[dict]:
 
 def case_input(case: dict) -> dict:
     # One place for what an item's input carries, so synced items and local runs cannot drift apart.
-    return {"question": case["question"], "history": case.get("history", []), "page": case.get("page")}
+    item = {"question": case["question"], "history": case.get("history", []), "page": case.get("page")}
+    return item | {"actions": True} if case.get("actions") else item
 
 
 def main() -> None:
