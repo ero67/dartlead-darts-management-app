@@ -49,10 +49,12 @@ def next_round_draft(league_id: str, starts_at: str | None = None, name: str | N
     }
 
 
-def add_members_draft(league_id: str, names: list[str]) -> dict:
+def add_members_draft(league_id: str, names: list[str], new_names: list[str] | None = None) -> dict:
+    # new_names are confirmed by the manager as new players: they skip roster matching.
     unique: dict[str, str] = {}
-    for n in names:
+    for n in [*(new_names or []), *names]:  # first wins, so a name in both lists stays new
         unique.setdefault(stats._norm(n.strip()), n.strip())  # "Marek" and "marek" are one name
+    confirmed_new = {stats._norm(n.strip()) for n in new_names or []}
     names = list(unique.values())
     if not 1 <= len(names) <= MAX_NAMES:
         return {"error": f"Give between 1 and {MAX_NAMES} names."}
@@ -73,6 +75,9 @@ def add_members_draft(league_id: str, names: list[str]) -> dict:
     for name in names:
         if any(m["match"] == 1.0 for m in stats._rank(name, members, 1)):  # a member outside the roster
             already.append(name)
+            continue
+        if stats._norm(name) in confirmed_new:
+            new.append(name)
             continue
         close = stats._rank(name, roster, 2)
         if not close:

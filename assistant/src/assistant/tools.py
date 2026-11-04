@@ -346,7 +346,7 @@ def propose_next_round(league_id: str, starts_at: str | None = None, name: str |
 
 
 @tool(parse_docstring=True)
-def propose_add_league_members(league_id: str, names: list[str]) -> dict:
+def propose_add_league_members(league_id: str, names: list[str], new_names: list[str] | None = None) -> dict:
     """Propose adding players to a league: names that match the user's players add those players, other names
     become new players. Use it only when the user asks to add players to a league. It shows the user a card to
     confirm and waits: the result is what the user did (status done, cancelled, failed or changed). A result with
@@ -354,10 +354,13 @@ def propose_add_league_members(league_id: str, names: list[str]) -> dict:
 
     Args:
         league_id: The id from find_league or list_leagues. Never guess it.
-        names: 1 to 20 players' names as the user wrote them, in their basic form (nominative).
+        names: Players' names as the user wrote them, in their basic form (nominative).
+        new_names: Names the user has said are new players. Use it only after the user said so, typically after
+            this tool asked which player was meant; the user still confirms on the card, where these show as new.
+            names and new_names together hold 1 to 20 names.
     """
     try:
-        draft = actions.add_members_draft(league_id, names)
+        draft = actions.add_members_draft(league_id, names, new_names)
     except Exception as e:  # an error draft, so a resumed run still gets the user's answer from _propose
         draft = {"error": str(e)}
     return _propose("propose_add_league_members", draft)

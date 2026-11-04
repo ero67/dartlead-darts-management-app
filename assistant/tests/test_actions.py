@@ -166,6 +166,36 @@ def test_members_demo_players_are_not_matched(monkeypatch):
     assert actions.add_members_draft(L, ["Marek Demo"])["new"] == ["Marek Demo"]
 
 
+def test_members_near_miss_in_new_names_becomes_new(monkeypatch):
+    fake(monkeypatch, league_members=[], players=[player("p1", "Marek Kováč")])
+    assert "error" in actions.add_members_draft(L, ["Marek Testovací"])
+    draft = actions.add_members_draft(L, [], ["Marek Testovací"])
+    assert (draft["new"], draft["existing"]) == (["Marek Testovací"], [])
+
+
+def test_members_new_name_equal_to_a_member_is_already(monkeypatch):
+    fake(monkeypatch, league_members=[{"players": player("p2", "Eva Malá")}], players=[])
+    draft = actions.add_members_draft(L, ["Marek"], ["Eva Malá"])
+    assert (draft["already_members"], draft["new"]) == (["Eva Malá"], ["Marek"])
+
+
+def test_members_dedupe_across_both_lists(monkeypatch):
+    fake(monkeypatch, league_members=[], players=[])
+    draft = actions.add_members_draft(L, ["marek"], [" Marek "])
+    assert draft["new"] == ["Marek"]
+
+
+def test_members_blank_new_name_is_error(monkeypatch):
+    fake(monkeypatch, league_members=[], players=[])
+    assert "error" in actions.add_members_draft(L, ["Marek"], ["  "])
+
+
+def test_members_limit_counts_both_lists(monkeypatch):
+    fake(monkeypatch, league_members=[], players=[])
+    assert "error" in actions.add_members_draft(L, [f"A{i}" for i in range(10)], [f"B{i}" for i in range(11)])
+    assert "new" in actions.add_members_draft(L, [f"A{i}" for i in range(10)], [f"B{i}" for i in range(10)])
+
+
 def test_next_round_bad_date_is_error(monkeypatch):
     fake(monkeypatch, tournaments=[round_row()])
     assert "error" in actions.next_round_draft(L, "next friday")
