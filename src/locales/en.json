@@ -1711,8 +1711,29 @@
         "get_player_form": {"running": "Loading form", "done": "Form of {{player}}"},
         "get_match_preview": {"running": "Preparing the match preview", "done": "Previewed the match"},
         "get_round_recap": {"running": "Collecting the round facts", "done": "Facts of {{tournament}}"},
-        "show_chart": {"running": "Preparing a chart", "done": "Prepared a chart", "none": "No chart, not enough data"}
+        "show_chart": {"running": "Preparing a chart", "done": "Prepared a chart", "none": "No chart, not enough data"},
+        "propose_next_round": {"running": "Preparing the next round", "done": "Prepared the next round", "none": "Could not prepare the next round"},
+        "propose_add_league_members": {"running": "Preparing the new members", "done": "Prepared the new members", "none": "Could not prepare the new members"}
       }
+    },
+    "action": {
+      "nextRoundTitle": "Create the next round",
+      "addMembersTitle": "Add players to the league",
+      "league": "League",
+      "name": "Name",
+      "date": "Date",
+      "venue": "Venue",
+      "players": "Players",
+      "playerCount": "Players ({{count}})",
+      "noDate": "No date",
+      "new": "New",
+      "alreadyMember": "already a member",
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "failed": "Failed: {{error}}",
+      "openTournament": "Open the tournament"
     }
   }
 }

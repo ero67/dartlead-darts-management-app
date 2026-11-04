@@ -20,11 +20,14 @@ import {
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { AssistantAction } from './AssistantAction';
 import { AssistantChart } from './AssistantChart';
 import { AssistantTrace } from './AssistantTrace';
 import { AssistantLogo } from './AssistantLogo';
 import { pageFromPath, suggestionsFor } from './assistantPage';
 import { assistantService } from '@/services/assistantService';
+import { leagueService } from '@/services/leagueService';
+import { tournamentService } from '@/services/tournamentService';
 
 // Pages whose name the "Looking at" chip shows (practice has no name to fetch).
 const CHIP_KINDS = ['league', 'tournament', 'player', 'practice'];
@@ -47,6 +50,13 @@ function applyEvent(message, event) {
       return { ...message, text: message.text + event.delta };
     case 'chart':
       return { ...message, chart: event };
+    case 'action':
+      // The paused proposal tool gets its tool_end only in the resumed run, so its step closes here.
+      return {
+        ...message,
+        action: { action: event.action, draft: event.draft, state: 'pending' },
+        steps: message.steps.map(s => (s.name === event.action && s.status === 'running' ? { ...s, status: 'done', output: event.draft } : s)),
+      };
     case 'done':
       return { ...message, status: 'done', isTraceOpen: false, traceId: event.trace_id };
     case 'error':
@@ -119,7 +129,7 @@ function AssistantFeedback({ message, onSend }) {
   );
 }
 
-function AssistantReply({ message, followups, isSending, onTraceOpenChange, onFeedback, onFollowup }) {
+function AssistantReply({ message, followups, isSending, onTraceOpenChange, onFeedback, onFollowup, onConfirmAction, onCancelAction }) {
   const { t } = useLanguage();
   const isStreaming = message.status === 'streaming';
   const text = message.text.replace(PSEUDO_CITATION, '');
@@ -132,6 +142,7 @@ function AssistantReply({ message, followups, isSending, onTraceOpenChange, onFe
         </Streamdown>
       )}
       {text && message.chart && <AssistantChart chart={message.chart} />}
+      {message.action && <AssistantAction action={message.action} isDisabled={isSending} onConfirm={onConfirmAction} onCancel={onCancelAction} />}
       {message.status === 'error' && (
         <p className="text-sm text-destructive">{message.error || t('assistant.error')}</p>
       )}
@@ -197,20 +208,18 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
     setThreadId(crypto.randomUUID());
   };
 
-  const send = async (raw) => {
-    const text = raw.trim();
-    if (!text || isSending) return;
+  // Streams one request ({ message } or { resume }) into a new assistant reply, after the user's bubble if they typed.
+  const streamReply = async (body, userText) => {
     const replyId = crypto.randomUUID();
-    setDraft('');
     setIsSending(true);
     setMessages(prev => [
       ...prev,
-      { id: crypto.randomUUID(), role: 'user', text },
+      ...(userText ? [{ id: crypto.randomUUID(), role: 'user', text: userText }] : []),
       { id: replyId, role: 'assistant', text: '', steps: [], sources: [], status: 'streaming', isTraceOpen: true, traceId: undefined, feedback: null, isSendingFeedback: false },
     ]);
     try {
       // The page at send time, not at open time: the panel stays open while the user navigates.
-      await assistantService.streamChat({ message: text, threadId, page, onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
+      await assistantService.streamChat({ ...body, threadId, page, onEvent: (event) => updateMessage(replyId, m => applyEvent(m, event)) });
       // A stream that ends without "done" (connection dropped) still stops the loader.
       updateMessage(replyId, m => (m.status === 'streaming' ? { ...m, status: 'done', isTraceOpen: false } : m));
     } catch (error) {
@@ -220,6 +229,65 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
     } finally {
       setIsSending(false);
     }
+  };
+
+  const send = (raw) => {
+    const text = raw.trim();
+    if (!text || isSending) return;
+    setDraft('');
+    // The server takes a message on a paused thread as the card's answer ("changed"), so the card stops here.
+    setMessages(prev => prev.map(m => (m.action?.state === 'pending' ? { ...m, action: { ...m.action, state: 'cancelled' } } : m)));
+    streamReply({ message: text }, text);
+  };
+
+  const setAction = (id, change) => updateMessage(id, m => ({ ...m, action: { ...m.action, ...change } }));
+
+  // The write runs here, with the app's own services as the signed-in user; then the paused run hears how it went.
+  const handleConfirmAction = async (id) => {
+    const { action, draft } = messages.find(m => m.id === id).action;
+    setAction(id, { state: 'running' });
+    setIsSending(true);
+    let resume;
+    try {
+      if (action === 'propose_next_round') {
+        const { settings } = draft;
+        const tournamentId = crypto.randomUUID();
+        await tournamentService.createTournament({
+          id: tournamentId,
+          name: draft.name,
+          leagueId: draft.league_id,
+          startsAt: draft.starts_at,
+          venue: draft.venue,
+          legsToWin: settings.legs_to_win,
+          startingScore: settings.starting_score,
+          gameType: settings.game_type,
+          defaultScoringMode: settings.default_scoring_mode,
+          groupSettings: settings.group_settings,
+          // createTournament resets the order inside groupSettings to the default unless it is passed on its own.
+          standingsCriteriaOrder: settings.group_settings?.standingsCriteriaOrder,
+          playoffSettings: settings.playoff_settings,
+          tournamentType: settings.tournament_type,
+          status: 'open_for_registration',
+          players: draft.players,
+        });
+        setAction(id, { state: 'done', tournamentId });
+        resume = { status: 'done', tournament_id: tournamentId };
+      } else {
+        const added = await leagueService.addMembers(draft.league_id, [...draft.existing.map(p => p.id), ...draft.new.map(name => ({ name }))]);
+        setAction(id, { state: 'done' });
+        resume = { status: 'done', added: added.length };
+      }
+    } catch (error) {
+      const message = String(error?.message ?? error);
+      setAction(id, { state: 'failed', error: message });
+      resume = { status: 'failed', error: message.slice(0, 300) };
+    }
+    await streamReply({ resume });
+  };
+
+  const handleCancelAction = (id) => {
+    setAction(id, { state: 'cancelled' });
+    streamReply({ resume: { status: 'cancelled' } });
   };
 
   // Lights the chosen thumb at once; a failed send puts it back so the user can try again.
@@ -302,6 +370,8 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
                           onTraceOpenChange={(open) => updateMessage(m.id, x => ({ ...x, isTraceOpen: open }))}
                           onFeedback={(value, comment) => handleFeedback(m.id, m.traceId, value, comment)}
                           onFollowup={send}
+                          onConfirmAction={() => handleConfirmAction(m.id)}
+                          onCancelAction={() => handleCancelAction(m.id)}
                         />
                       )}
                     </div>

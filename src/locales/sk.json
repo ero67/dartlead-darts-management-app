@@ -1711,8 +1711,29 @@
         "get_player_form": {"running": "Načítavam formu", "done": "Forma: {{player}}"},
         "get_match_preview": {"running": "Pripravujem náhľad zápasu", "done": "Náhľad zápasu"},
         "get_round_recap": {"running": "Zbieram fakty o kole", "done": "Fakty: {{tournament}}"},
-        "show_chart": {"running": "Pripravujem graf", "done": "Graf je pripravený", "none": "Bez grafu, málo údajov"}
+        "show_chart": {"running": "Pripravujem graf", "done": "Graf je pripravený", "none": "Bez grafu, málo údajov"},
+        "propose_next_round": {"running": "Pripravujem ďalšie kolo", "done": "Ďalšie kolo je pripravené", "none": "Ďalšie kolo sa nepodarilo pripraviť"},
+        "propose_add_league_members": {"running": "Pripravujem nových členov", "done": "Noví členovia sú pripravení", "none": "Nových členov sa nepodarilo pripraviť"}
       }
+    },
+    "action": {
+      "nextRoundTitle": "Vytvoriť ďalšie kolo",
+      "addMembersTitle": "Pridať hráčov do ligy",
+      "league": "Liga",
+      "name": "Názov",
+      "date": "Dátum",
+      "venue": "Miesto",
+      "players": "Hráči",
+      "playerCount": "Hráči ({{count}})",
+      "noDate": "Bez dátumu",
+      "new": "Nový",
+      "alreadyMember": "už je členom",
+      "confirm": "Potvrdiť",
+      "cancel": "Zrušiť",
+      "confirmed": "Potvrdené",
+      "cancelled": "Zrušené",
+      "failed": "Zlyhalo: {{error}}",
+      "openTournament": "Otvoriť turnaj"
     }
   }
 }
