@@ -75,6 +75,11 @@ def test_router_template_has_question(monkeypatch):
     assert messages[1].content == "hi"
 
 
+def test_router_sends_action_requests_to_stats():
+    # The proposal tools are bound only for stats, so a request to change something must be routed there.
+    assert '("create the next round", "add Marek to the league") need stats too' in ROUTER_PROMPT
+
+
 class CountingLangfuse(FakeLangfuse):
     """Counts get_prompt calls; raises `error` instead of answering when given (e.g. keys missing)."""
 

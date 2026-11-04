@@ -32,7 +32,8 @@ SYSTEM_PROMPT = """You route questions sent to the assistant of DartLead, an app
 Sources:
 - rules: how darts is played (scoring, busts, checkouts, game formats)
 - stats: data stored in DartLead about real players, matches, tournaments or leagues, including the user's own
-  ("my tournaments", "my average", "which leagues are there", "who won the last round")
+  ("my tournaments", "my average", "which leagues are there", "who won the last round"); requests to do something
+  in DartLead ("create the next round", "add Marek to the league") need stats too (the user's leagues and players)
 - app: how to use the DartLead app itself, and the coaching guide: advice on improving or practising ("what should
   I practise", "how do I get better at doubles") needs both stats (the user's numbers) and app (the guide)
 

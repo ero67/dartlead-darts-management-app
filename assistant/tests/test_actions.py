@@ -234,6 +234,25 @@ def test_resume_wins_over_a_draft_that_no_longer_builds(monkeypatch):
     assert json.loads(graph.invoke(Command(resume=DONE), config)["messages"][-1].content) == DONE
 
 
+def test_resume_wins_over_a_draft_that_raises(monkeypatch):
+    # A failing read while the draft is rebuilt must not turn the app's finished write into an error.
+    graph, config = tools_graph(monkeypatch)
+    run(graph, config, call())
+
+    def raises(*args):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(actions, "next_round_draft", raises)
+    assert json.loads(graph.invoke(Command(resume=DONE), config)["messages"][-1].content) == DONE
+
+
+def test_draft_that_raises_does_not_pause(monkeypatch):
+    graph, config = tools_graph(monkeypatch)
+    monkeypatch.setattr(actions, "next_round_draft", lambda *args: 1 / 0)
+    assert "division by zero" in run(graph, config, call())["messages"][-1].content
+    assert not graph.get_state(config).interrupts
+
+
 def test_one_proposal_per_turn(monkeypatch):
     graph, config = tools_graph(monkeypatch)
     run(graph, config, call(id="c1"), call(id="c2"))

@@ -338,7 +338,11 @@ def propose_next_round(league_id: str, starts_at: str | None = None, name: str |
             Leave it out for the last round's date plus 7 days.
         name: Only if the user gave the round a name. Leave it out to number it after the last round.
     """
-    return _propose("propose_next_round", actions.next_round_draft(league_id, starts_at, name))
+    try:
+        draft = actions.next_round_draft(league_id, starts_at, name)
+    except Exception as e:  # an error draft, so a resumed run still gets the user's answer from _propose
+        draft = {"error": str(e)}
+    return _propose("propose_next_round", draft)
 
 
 @tool(parse_docstring=True)
@@ -352,7 +356,11 @@ def propose_add_league_members(league_id: str, names: list[str]) -> dict:
         league_id: The id from find_league or list_leagues. Never guess it.
         names: 1 to 20 players' names as the user wrote them, in their basic form (nominative).
     """
-    return _propose("propose_add_league_members", actions.add_members_draft(league_id, names))
+    try:
+        draft = actions.add_members_draft(league_id, names)
+    except Exception as e:  # an error draft, so a resumed run still gets the user's answer from _propose
+        draft = {"error": str(e)}
+    return _propose("propose_add_league_members", draft)
 
 
 # Bound only when the app can show a confirmation card (the request's capabilities include "actions").
