@@ -18,7 +18,9 @@ def _league(league_id: str) -> dict:
 
 
 def _next_name(name: str) -> str:
-    return re.sub(r"\d+$", lambda m: str(int(m.group()) + 1), name) if re.search(r"\d+$", name) else f"{name} 2"
+    # The last number is the round's: "4. kolo" -> "5. kolo", "Round 12 Finals" -> "Round 13 Finals".
+    last = list(re.finditer(r"\d+", name))[-1:]
+    return f"{name[:last[0].start()]}{int(last[0].group()) + 1}{name[last[0].end():]}" if last else f"{name} 2"
 
 
 def next_round_draft(league_id: str, starts_at: str | None = None, name: str | None = None) -> dict:

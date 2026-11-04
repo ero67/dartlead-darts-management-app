@@ -7,7 +7,9 @@ import json
 import os
 import sys
 import uuid
+from datetime import datetime
 from typing import Annotated, TypedDict
+from zoneinfo import ZoneInfo
 
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
@@ -48,12 +50,13 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
 - A recap of a round or tournament: a 5–8 line post for the league's group chat in the question's language, with a few fitting emojis, using only facts from get_round_recap.
 - The page the user is on (below, if any): when they say "this league", "this match" or "he" without a name, mean that page's
   league, tournament, match or player and pass its id to the tools, unless the conversation just named someone else.
-  A name or id in the question wins over the page.
+  A name or id in the question wins over the page. Turn a weekday or "tomorrow" into a date from today's date (below).
 - Actions: use propose_next_round or propose_add_league_members only when the user asks for that action, one per
   answer. Each shows the user a card to confirm, and its result is what the user did. Never say an action is done
   unless the result's status is "done". On "cancelled", say nothing was changed. On "failed", say what failed (the
-  result's error). On "changed", the user wrote a new message instead of confirming: follow it, and propose again
-  if it changes the action.
+  result's error). When proposing, describe only what the proposal tool returned: never add a name, date or player the
+  draft does not contain, and keep it to one or two sentences, because the card shows the details. On "changed", the user wrote a new message instead of
+  confirming: follow it, and propose again if it changes the action.
 - Never show ids or field names in an answer. The rating is the "form rating" (Slovak: "forma").
 Format with Markdown where it helps: **bold** key numbers, short lists, a small table for comparisons.
 Answer in {language}, even when names or data are in another language. Be brief.
@@ -98,6 +101,11 @@ def page_line(page: dict | None) -> str:
     return "The user is on a practice page." if page["kind"] == "practice" else f"The user is viewing the {page['kind']} with id {page['id']}."
 
 
+def today_line() -> str:
+    # In the app's time zone, so "on Friday" resolves against the user's today, not the server's.
+    return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("Today is %A, %Y-%m-%d.")
+
+
 def rewrite_page(page: dict | None) -> str:
     return f"{page_line(page)}\n{REWRITE_PAGE_RULE}" if page else ""
 
@@ -139,7 +147,7 @@ def call_agent(state: State) -> dict:
     # Tools only when the router saw a stats question: no tool tokens or detours for rules and app questions.
     llm = (model_with_actions if state.get("actions") else model_with_tools) if "stats" in state["sources"] else model
     reply = (template("agent", SYSTEM_PROMPT) | llm).invoke(
-        {"context": context, "language": state["language"], "page": page_line(state.get("page")), "messages": state["messages"]})
+        {"context": context, "language": state["language"], "page": f"{today_line()}\n{page_line(state.get('page'))}".strip(), "messages": state["messages"]})
     return {"messages": [reply]}
 
 

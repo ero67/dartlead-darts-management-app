@@ -79,7 +79,8 @@ def test_next_round_explicit_date_and_name_win(monkeypatch):
     assert (draft["starts_at"], draft["name"]) == ("2026-12-01T18:00:00+00:00", "Finále")
 
 
-@pytest.mark.parametrize("last,expected", [("Kolo 5", "Kolo 6"), ("Round 12", "Round 13"), ("Piatok", "Piatok 2")])
+@pytest.mark.parametrize("last,expected", [("Kolo 5", "Kolo 6"), ("Round 12", "Round 13"), ("Demo Liga Šípky – 4. kolo", "Demo Liga Šípky – 5. kolo"),
+                                           ("Round 12 Finals", "Round 13 Finals"), ("Piatok", "Piatok 2")])
 def test_next_round_name(monkeypatch, last, expected):
     fake(monkeypatch, tournaments=[round_row(name=last)])
     assert actions.next_round_draft(L)["name"] == expected
