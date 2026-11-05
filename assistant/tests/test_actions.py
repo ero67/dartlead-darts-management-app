@@ -119,10 +119,26 @@ def test_next_round_without_list_has_no_new_players(monkeypatch):
     assert actions.next_round_draft(L)["new_players"] == []
 
 
-def listed(monkeypatch, names, new=None, members=(), roster=()):
+def listed(monkeypatch, names, new=None, members=(), roster=(), include_last_round=False):
     fake(monkeypatch, tournaments=[round_row()], tournament_players=[{"players": player("p0", "Last Round")}],
          league_members=[{"players": m} for m in members], players=list(roster))
-    return actions.next_round_draft(L, players=names, new_players=new)
+    return actions.next_round_draft(L, players=names, new_players=new, include_last_round=include_last_round)
+
+
+def test_next_round_last_round_plus_an_existing_player(monkeypatch):
+    draft = listed(monkeypatch, ["Eva Malá"], roster=[player("p2", "Eva Malá")], include_last_round=True)
+    assert (draft["players"], draft["new_players"]) == ([player("p0", "Last Round"), player("p2", "Eva Malá")], [])
+
+
+def test_next_round_last_round_plus_a_new_player(monkeypatch):
+    draft = listed(monkeypatch, [], ["Zoltán Neznámy"], include_last_round=True)
+    assert (draft["players"], draft["new_players"]) == ([player("p0", "Last Round")], ["Zoltán Neznámy"])
+
+
+def test_next_round_last_round_player_listed_again_is_not_duplicated(monkeypatch):
+    draft = listed(monkeypatch, ["Last Round", "Eva Malá"], members=[player("p0", "Last Round")],
+                   roster=[player("p2", "Eva Malá")], include_last_round=True)
+    assert draft["players"] == [player("p0", "Last Round"), player("p2", "Eva Malá")]
 
 
 def test_next_round_list_replaces_last_round(monkeypatch):

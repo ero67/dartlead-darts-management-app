@@ -327,7 +327,8 @@ def _propose(action: str, draft: dict) -> dict:
 
 @tool(parse_docstring=True)
 def propose_next_round(league_id: str, starts_at: str | None = None, name: str | None = None,
-                       players: list[str] | None = None, new_players: list[str] | None = None) -> dict:
+                       players: list[str] | None = None, new_players: list[str] | None = None,
+                       include_last_round: bool = False) -> dict:
     """Propose creating a league's next round with the last round's settings, venue and players. Use it only when
     the user asks to create or schedule the next round. It shows the user a card to confirm and waits: the result
     is what the user did (status done, cancelled, failed or changed). A result with an error means no card was
@@ -339,14 +340,16 @@ def propose_next_round(league_id: str, starts_at: str | None = None, name: str |
             Leave it out for the last round's date plus 7 days.
         name: Only if the user gave the round a name. Leave it out to number it after the last round.
         players: When the user lists the round's players, all of those names as the user wrote them, in their basic
-            form (nominative). The list replaces the last round's players, so for "the same as last time plus X"
-            list everyone. Leave it out to copy the last round's players unchanged.
+            form (nominative). The list replaces the last round's players unless include_last_round is true. Leave
+            it out to copy the last round's players unchanged.
         new_players: Names the user has said are new players. Use it only after the user said so, typically after
             this tool asked about a name; the user still confirms on the card, where these show as new.
             players and new_players together hold 1 to 64 names.
+        include_last_round: True when the user wants the last round's players plus others ("the same as last time
+            plus X"): pass only the added names as players.
     """
     try:
-        draft = actions.next_round_draft(league_id, starts_at, name, players, new_players)
+        draft = actions.next_round_draft(league_id, starts_at, name, players, new_players, include_last_round)
     except Exception as e:  # an error draft, so a resumed run still gets the user's answer from _propose
         draft = {"error": str(e)}
     return _propose("propose_next_round", draft)

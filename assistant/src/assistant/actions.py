@@ -136,8 +136,10 @@ def _round_players(league_id: str, names: list[str], confirmed_new: set[str]) ->
 
 
 def next_round_draft(league_id: str, starts_at: str | None = None, name: str | None = None,
-                     players: list[str] | None = None, new_players: list[str] | None = None) -> dict:
-    listed = bool(players or new_players)  # without a list, the last round's players
+                     players: list[str] | None = None, new_players: list[str] | None = None,
+                     include_last_round: bool = False) -> dict:
+    listed = bool(players or new_players)  # without a list, the last round's players; with one, it replaces them
+    # unless include_last_round adds it to them
     if listed:
         names, confirmed_new, error = _names(players or [], new_players, MAX_ROUND_PLAYERS)
         if error:
@@ -155,13 +157,16 @@ def next_round_draft(league_id: str, starts_at: str | None = None, name: str | N
         starts_at = _starts_at(starts_at, last["starts_at"])
     except ValueError:
         return {"error": "The date must be an ISO date or date-time, like 2026-11-06T19:00:00+01:00."}
+    chosen = {"players": [], "new_players": []}
     if listed:
         chosen = _round_players(league_id, names, confirmed_new)
         if "error" in chosen:
             return chosen
-    else:
+    if include_last_round or not listed:
         rows = stats.db().table("tournament_players").select("players(id, name)").eq("tournament_id", last["id"]).execute().data
-        chosen = {"players": [{"id": r["players"]["id"], "name": r["players"]["name"]} for r in rows], "new_players": []}
+        previous = [{"id": r["players"]["id"], "name": r["players"]["name"]} for r in rows]
+        ids = {p["id"] for p in previous}
+        chosen["players"] = previous + [p for p in chosen["players"] if p["id"] not in ids]
     return {
         "league_id": league_id, "league": league["name"], "name": name or _next_name(last["name"]),
         "starts_at": starts_at, "venue": last["venue"], "settings": {k: last[k] for k in SETTINGS}, **chosen,
