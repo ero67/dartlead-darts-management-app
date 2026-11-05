@@ -19,7 +19,7 @@ SETTINGS = {"legs_to_win": 3, "starting_score": 501, "game_type": "501", "defaul
             "group_settings": {"a": 1}, "playoff_settings": {"b": 2}, "tournament_type": "league"}
 
 
-def round_row(id="t1", name="Kolo 5", starts_at="2026-10-30T19:00:00+00:00", venue="Pub"):
+def round_row(id="t1", name="Kolo 5", starts_at="2026-10-30T19:00:00+01:00", venue="Pub"):
     return {"id": id, "name": name, "starts_at": starts_at, "venue": venue, **SETTINGS}
 
 
@@ -65,7 +65,29 @@ def test_next_round_copies_settings_and_players(monkeypatch):
 
 def test_next_round_date_is_last_plus_7_days(monkeypatch):
     fake(monkeypatch, tournaments=[round_row()])
-    assert actions.next_round_draft(L)["starts_at"] == "2026-11-06T19:00:00+00:00"
+    assert actions.next_round_draft(L)["starts_at"] == "2026-11-06T19:00:00+01:00"
+
+
+@pytest.mark.parametrize("last, expected", [
+    ("2026-10-23T19:00:00+02:00", "2026-10-30T19:00:00+01:00"),  # summer time ends on 25 October
+    ("2026-03-27T19:00:00+01:00", "2026-04-03T19:00:00+02:00"),  # and starts on 29 March
+    ("2026-10-23T17:00:00+00:00", "2026-10-30T19:00:00+01:00"),  # a UTC value is read in Bratislava time
+])
+def test_next_round_date_keeps_the_local_time_across_dst(monkeypatch, last, expected):
+    fake(monkeypatch, tournaments=[round_row(starts_at=last)])
+    assert actions.next_round_draft(L)["starts_at"] == expected
+
+
+@pytest.mark.parametrize("last, given, expected", [
+    ("2026-10-30T18:30:00+00:00", "2026-11-13", "2026-11-13T19:30:00+01:00"),  # the last round's local time of day
+    (None, "2026-11-13", "2026-11-13T19:00:00+01:00"),  # no last date: 19:00
+    (None, "2026-11-13T18:00:00", "2026-11-13T18:00:00+01:00"),  # no offset: Bratislava, not UTC
+    (None, "2026-07-03 18:00", "2026-07-03T18:00:00+02:00"),
+    (None, "2026-12-01T18:00:00+00:00", "2026-12-01T19:00:00+01:00"),  # an offset is kept as the same moment
+])
+def test_next_round_given_date_gets_a_time_and_an_offset(monkeypatch, last, given, expected):
+    fake(monkeypatch, tournaments=[round_row(starts_at=last)])
+    assert actions.next_round_draft(L, given)["starts_at"] == expected
 
 
 def test_next_round_without_last_date_has_no_date(monkeypatch):
@@ -75,8 +97,8 @@ def test_next_round_without_last_date_has_no_date(monkeypatch):
 
 def test_next_round_explicit_date_and_name_win(monkeypatch):
     fake(monkeypatch, tournaments=[round_row()])
-    draft = actions.next_round_draft(L, "2026-12-01T18:00:00+00:00", "Finále")
-    assert (draft["starts_at"], draft["name"]) == ("2026-12-01T18:00:00+00:00", "Finále")
+    draft = actions.next_round_draft(L, "2026-12-01T18:00:00+01:00", "Finále")
+    assert (draft["starts_at"], draft["name"]) == ("2026-12-01T18:00:00+01:00", "Finále")
 
 
 @pytest.mark.parametrize("last,expected", [("Kolo 5", "Kolo 6"), ("Round 12", "Round 13"), ("Demo Liga Šípky – 4. kolo", "Demo Liga Šípky – 5. kolo"),
@@ -199,7 +221,7 @@ def test_members_limit_counts_both_lists(monkeypatch):
 def test_next_round_bad_date_is_error(monkeypatch):
     fake(monkeypatch, tournaments=[round_row()])
     assert "error" in actions.next_round_draft(L, "next friday")
-    assert actions.next_round_draft(L, "2026-12-01")["starts_at"] == "2026-12-01"
+    assert actions.next_round_draft(L, "2026-12-01")["starts_at"] == "2026-12-01T19:00:00+01:00"
 
 
 DRAFT = {"league": "Piatková liga", "name": "Kolo 6"}

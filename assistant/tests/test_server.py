@@ -401,6 +401,7 @@ def test_slow_suggest_times_out(use_graph, refunds, monkeypatch):
 
 PROPOSAL = {"action": "propose_next_round", "draft": {"league_id": LEAGUE_ID, "name": "Kolo 6"}}
 TOURNAMENT_ID = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
+PAUSE_ID = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
 
 
 @pytest.fixture
@@ -415,7 +416,7 @@ def questions(monkeypatch):
 def paused(chat):
     """chat on a thread waiting for the answer to PROPOSAL."""
     post, graph = chat
-    graph.paused = (Interrupt(value=PROPOSAL),)
+    graph.paused = (Interrupt(value=PROPOSAL, id=PAUSE_ID),)
     return post, graph
 
 
@@ -470,6 +471,13 @@ def test_capability_reaches_the_graph(chat, capabilities, actions):
     assert graph.inputs[0]["actions"] is actions
 
 
+def test_too_many_capabilities_refused(chat):
+    post, graph = chat
+    assert post(capabilities=[f"c{i}" for i in range(8)]).status_code == 200
+    assert post(capabilities=[f"c{i}" for i in range(9)]).status_code == 422
+    assert len(graph.inputs) == 1
+
+
 def test_unknown_capability_ignored(chat):
     # A newer app may send capabilities this API doesn't know yet; refusing them would break it.
     post, graph = chat
@@ -479,10 +487,10 @@ def test_unknown_capability_ignored(chat):
 
 def test_pause_sends_action_then_done_and_no_followups(use_graph, suggest):
     use_graph(FakeGraph([route_update(), text_chunk("Here is the round."),
-                         ("updates", {"__interrupt__": (Interrupt(value=PROPOSAL),)})]))
+                         ("updates", {"__interrupt__": (Interrupt(value=PROPOSAL, id=PAUSE_ID),)})]))
     events = run()
     assert [e["type"] for e in events] == ["step", "text", "action", "done"]
-    assert events[2] == {"type": "action", **PROPOSAL}
+    assert events[2] == {"type": "action", "id": PAUSE_ID, **PROPOSAL}
     assert suggest == []
 
 
@@ -506,6 +514,21 @@ def test_resume_uses_no_question(paused, questions, resume):
     assert questions == []
     # The value becomes the proposal tool's result; the paused turn's page and actions stay as they were.
     assert graph.inputs == [Command(resume=resume)]
+
+
+def test_resume_for_its_own_pause_goes_through(paused, questions):
+    post, graph = paused
+    assert post(message=None, resume={"status": "done", "added": 3, "pause_id": PAUSE_ID}).status_code == 200
+    assert graph.inputs == [Command(resume={"status": "done", "added": 3})]  # the id is not part of the tool's result
+
+
+@pytest.mark.parametrize("resume", [{"status": "cancelled", "pause_id": "an-older-card"},
+                                    {"status": "changed", "message": "Friday", "pause_id": "an-older-card"}])
+def test_resume_for_another_pause_is_409(paused, questions, resume):
+    post, graph = paused
+    response = post(message=None, resume=resume)
+    assert response.status_code == 409
+    assert graph.inputs == [] and questions == []
 
 
 def test_message_on_paused_thread_resumes_as_changed(paused, questions):
@@ -594,6 +617,8 @@ def test_changed_message_reaches_the_paused_tool(use_graph, refunds):
     first = asyncio.run(collect("Create the next round", actions=True))
     assert [e["type"] for e in first] == ["action", "done"]
     assert first[0]["draft"] == {"name": "Kolo 6"}
+    # The id the app echoes as pause_id is the one /chat checks against.
+    assert [i.id for i in graph.get_state({"configurable": {"thread_id": "t1"}}).interrupts] == [first[0]["id"]]
     resume = {"status": "changed", "message": "Make it Friday"}
     assert [e["type"] for e in asyncio.run(collect("Make it Friday", resume=resume))] == ["done"]
     assert results == [resume]

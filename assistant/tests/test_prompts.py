@@ -1,10 +1,11 @@
 # Prompt loading with no network: get_client() is stubbed with a fake that builds real Langfuse prompt clients.
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableLambda
 from langfuse.api import Prompt_Text
 from langfuse.model import TextPromptClient
 
-from assistant import prompts
+from assistant import agent, prompts
 from assistant.agent import SYSTEM_PROMPT
 from assistant.router import SYSTEM_PROMPT as ROUTER_PROMPT
 
@@ -75,9 +76,35 @@ def test_router_template_has_question(monkeypatch):
     assert messages[1].content == "hi"
 
 
-def test_router_sends_action_requests_to_stats():
-    # The proposal tools are bound only for stats, so a request to change something must be routed there.
-    assert '("create the next round", "add Marek to the league") need stats too' in ROUTER_PROMPT
+def test_router_sends_action_requests_to_stats_and_app():
+    # The proposal tools are bound only for stats; app brings the documented steps for an app without cards.
+    assert '("create the next round", "add Marek to the league") need stats and app' in ROUTER_PROMPT
+
+
+def agent_system_text(monkeypatch, actions, sources):
+    """The system text call_agent sends, with the code prompt and a stub model."""
+    use_langfuse(monkeypatch, fallback_only=True)
+    sent = []
+    for name in ("model", "model_with_tools", "model_with_actions"):
+        monkeypatch.setattr(agent, name, RunnableLambda(lambda prompt: sent.append(prompt.messages[0].content) or AIMessage("")))
+    agent.call_agent({"messages": [HumanMessage("q")], "docs": [], "sources": sources, "language": "English",
+                      "actions": actions})
+    return sent[0]
+
+
+def test_stored_prompt_has_no_actions_rule():
+    assert "propose_" not in SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize("actions, sources, has_rule", [
+    (True, ["stats", "app"], True),
+    (False, ["stats", "app"], False),  # an app without cards
+    (True, ["app"], False),  # no tools bound
+])
+def test_actions_rule_only_with_the_proposal_tools(monkeypatch, actions, sources, has_rule):
+    text = agent_system_text(monkeypatch, actions, sources)
+    assert (agent.ACTIONS_RULE in text) is has_rule
+    assert agent.today_line() in text
 
 
 class CountingLangfuse(FakeLangfuse):

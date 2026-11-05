@@ -1,6 +1,7 @@
 # Drafts for the actions the assistant proposes. Read-only: the app writes after the user confirms.
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from assistant import stats
 
@@ -8,6 +9,8 @@ SETTINGS = ["legs_to_win", "starting_score", "game_type", "default_scoring_mode"
 MAX_NAMES = 20
 MATCH, TIE, EPSILON = 0.9, 0.05, 1e-9
 MAX_NAME_LENGTH = 100
+ZONE = ZoneInfo("Europe/Bratislava")  # the app's time zone, as in agent.today_line
+DEFAULT_TIME = time(19, 0)
 
 
 def _league(league_id: str) -> dict:
@@ -23,6 +26,25 @@ def _next_name(name: str) -> str:
     return f"{name[:last[0].start()]}{int(last[0].group()) + 1}{name[last[0].end():]}" if last else f"{name} 2"
 
 
+def _local(value: str) -> datetime:
+    # No offset means Bratislava time: the database would read it as UTC, while the card shows it as local.
+    moment = datetime.fromisoformat(value)
+    return moment.replace(tzinfo=ZONE) if moment.tzinfo is None else moment.astimezone(ZONE)
+
+
+def _starts_at(value: str | None, last: str | None) -> str | None:
+    """The round's start as an ISO date-time with an offset, in Bratislava time; None when nothing gives a date."""
+    previous = _local(last) if last else None
+    if value is None:
+        # Same tzinfo, so the 7 days are wall-clock days: 19:00 stays 19:00 across a DST change.
+        return (previous + timedelta(days=7)).isoformat() if previous else None
+    try:
+        day = date.fromisoformat(value)  # a date alone starts at the last round's time of day
+    except ValueError:
+        return _local(value).isoformat()
+    return datetime.combine(day, previous.time() if previous else DEFAULT_TIME, tzinfo=ZONE).isoformat()
+
+
 def next_round_draft(league_id: str, starts_at: str | None = None, name: str | None = None) -> dict:
     league = _league(league_id)
     if "error" in league:
@@ -33,13 +55,10 @@ def next_round_draft(league_id: str, starts_at: str | None = None, name: str | N
     if not last:
         return {"error": "This league has no previous round to copy."}
     last = last[0]
-    if starts_at is not None:
-        try:
-            datetime.fromisoformat(starts_at)
-        except ValueError:
-            return {"error": "The date must be an ISO date or date-time, like 2026-11-06T19:00:00+00:00."}
-    elif last["starts_at"]:
-        starts_at = (datetime.fromisoformat(last["starts_at"]) + timedelta(days=7)).isoformat()
+    try:
+        starts_at = _starts_at(starts_at, last["starts_at"])
+    except ValueError:
+        return {"error": "The date must be an ISO date or date-time, like 2026-11-06T19:00:00+01:00."}
     rows = stats.db().table("tournament_players").select("players(id, name)").eq("tournament_id", last["id"]).execute().data
     return {
         "league_id": league_id, "league": league["name"], "name": name or _next_name(last["name"]),

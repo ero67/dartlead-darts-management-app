@@ -101,6 +101,8 @@ class ResumeRequest(BaseModel):
     added: int | None = Field(default=None, ge=0, le=20)  # members the app added
     error: str | None = Field(default=None, max_length=300)
     message: str | None = Field(default=None, min_length=1, max_length=2000)
+    # The action event's id, so a card answers only its own pause; a changed resume from a typed message has none.
+    pause_id: str | None = Field(default=None, max_length=100)
 
     @model_validator(mode="after")
     def fields_match_status(self):
@@ -118,7 +120,7 @@ class ChatRequest(BaseModel):
     message: str | None = Field(default=None, min_length=1, max_length=2000)
     thread_id: str = Field(min_length=1, max_length=100)  # made by the widget, one per conversation
     page: PageContext | None = None
-    capabilities: list[str] = []  # "actions": the app can show a proposal card; unknown ones are ignored (newer apps)
+    capabilities: list[str] = Field(default=[], max_length=8)  # "actions": the app can show a proposal card; unknown ones are ignored (newer apps)
     resume: ResumeRequest | None = None
 
     @model_validator(mode="after")
@@ -208,7 +210,7 @@ async def answer_events(message: str | None, thread_id: str, user_id: str, token
                     if node == "__interrupt__":
                         paused = True
                         for pause in update:
-                            yield event("action", **pause.value)
+                            yield event("action", id=pause.id, **pause.value)
                     elif node == "rewrite":
                         question = update["question"]
                         if question != message:
@@ -278,9 +280,10 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
     # The user id is part of the thread key, so nobody can continue someone else's conversation.
     thread_id = f"{user_id}:{request.thread_id}"
     paused = (await graph.aget_state({"configurable": {"thread_id": thread_id}})).interrupts
-    if request.resume and not paused:
+    # A pause_id from another card (an old one, or a second tab) must not answer this pause.
+    if request.resume and (not paused or request.resume.pause_id not in {None, *(p.id for p in paused)}):
         raise HTTPException(409, "This action is no longer waiting for an answer. Ask again.")
-    resume = request.resume.model_dump(mode="json", exclude_none=True) if request.resume else None
+    resume = request.resume.model_dump(mode="json", exclude_none=True, exclude={"pause_id"}) if request.resume else None
     if paused and resume is None:  # typing instead of confirming answers the card, so the thread never stays stuck
         resume = {"status": "changed", "message": request.message}
     # A message uses a question, also as a changed resume; done, failed and cancelled finish the one it answered.

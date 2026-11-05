@@ -51,12 +51,6 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
 - The page the user is on (below, if any): when they say "this league", "this match" or "he" without a name, mean that page's
   league, tournament, match or player and pass its id to the tools, unless the conversation just named someone else.
   A name or id in the question wins over the page. Turn a weekday or "tomorrow" into a date from today's date (below).
-- Actions: use propose_next_round or propose_add_league_members only when the user asks for that action, one per
-  answer. Each shows the user a card to confirm, and its result is what the user did. Never say an action is done
-  unless the result's status is "done". On "cancelled", say nothing was changed. On "failed", say what failed (the
-  result's error). When proposing, describe only what the proposal tool returned: never add a name, date or player the
-  draft does not contain, and keep it to one or two sentences, because the card shows the details. On "changed", the user wrote a new message instead of
-  confirming: follow it, and propose again if it changes the action.
 - Never show ids or field names in an answer. The rating is the "form rating" (Slovak: "forma").
 Format with Markdown where it helps: **bold** key numbers, short lists, a small table for comparisons.
 Answer in {language}, even when names or data are in another language. Be brief.
@@ -65,6 +59,14 @@ Answer in {language}, even when names or data are in another language. Be brief.
 
 Sources:
 {context}"""
+# Joins the page text only when the proposal tools are bound, so the stored prompt keeps its variables: an app
+# without cards, or a question with no tools, never hears of them and offers no button it cannot show.
+ACTIONS_RULE = """Actions: use propose_next_round or propose_add_league_members only when the user asks for that action, one per
+answer. Each shows the user a card to confirm, and its result is what the user did. Never say an action is done
+unless the result's status is "done". On "cancelled", say nothing was changed. On "failed", say what failed (the
+result's error). When proposing, describe only what the proposal tool returned: never add a name, date or player the
+draft does not contain, and keep it to one or two sentences, because the card shows the details. On "changed", the
+user wrote a new message instead of confirming: follow it, and propose again if it changes the action."""
 OFF_TOPIC_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
 The question is not about darts or DartLead. In one or two sentences, in {language},
 say that you can help with darts rules, using the DartLead app, and players' statistics. Do not answer the question itself."""
@@ -145,9 +147,11 @@ def off_topic(state: State) -> dict:
 def call_agent(state: State) -> dict:
     context = format_sources(state["docs"]) if state["docs"] else "(none)"
     # Tools only when the router saw a stats question: no tool tokens or detours for rules and app questions.
-    llm = (model_with_actions if state.get("actions") else model_with_tools) if "stats" in state["sources"] else model
+    with_actions = state.get("actions") and "stats" in state["sources"]
+    llm = model_with_actions if with_actions else model_with_tools if "stats" in state["sources"] else model
+    page = "\n".join(filter(None, [today_line(), page_line(state.get("page")), with_actions and ACTIONS_RULE]))
     reply = (template("agent", SYSTEM_PROMPT) | llm).invoke(
-        {"context": context, "language": state["language"], "page": f"{today_line()}\n{page_line(state.get('page'))}".strip(), "messages": state["messages"]})
+        {"context": context, "language": state["language"], "page": page, "messages": state["messages"]})
     return {"messages": [reply]}
 
 
