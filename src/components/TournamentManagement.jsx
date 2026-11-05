@@ -1512,7 +1512,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const confirmMessage = t('management.confirmResetPlayoffs') || 
       'Are you sure you want to reset the playoffs? This will clear all playoff matches and results. Group stage data will be preserved.';
     
-    if ((await confirmDialog(confirmMessage))) {
+    if ((await confirmDialog(confirmMessage, { destructive: true }))) {
       try {
         await contextResetPlayoffs();
         toast.success(t('management.playoffsResetSuccess'));
@@ -1595,7 +1595,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
     const confirmMessage = t('management.confirmDeleteTournament', { name: tournament.name });
     
-    if ((await confirmDialog(confirmMessage))) {
+    if ((await confirmDialog(confirmMessage, { destructive: true }))) {
       try {
         await onDeleteTournament(tournament.id);
         // Redirect to tournaments list after successful deletion
@@ -2105,6 +2105,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
 
   const isPlayoffOnly = tournament.tournamentType === 'playoff_only';
+  const showPlayoffsNudge = canManage && !isPlayoffOnly && activeTab !== 'playoffs'
+    && isTournamentRunning(tournament.status) && tournament.playoffSettings?.enabled
+    && tournament.groups?.some(g => g.matches?.length) && isGroupStageComplete()
+    && !tournament.playoffs?.rounds?.length;
   const playerCount = tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0;
   const tournamentPhase = getTournamentPhase(tournament);
   const overview = [
@@ -2228,6 +2232,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       </Tabs>
 
       <div className="flex flex-col gap-4">
+        {showPlayoffsNudge && (
+          <Alert role="status">
+            <Trophy />
+            <AlertTitle>{t('management.groupStageDoneTitle')}</AlertTitle>
+            <AlertDescription>
+              <p>{t('management.groupStageDoneText')}</p>
+              <Button type="button" size="sm" className="mt-1" onClick={() => handleTabChange('playoffs')}>
+                {t('management.goToPlayoffs')}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {showScorerNudge && (
           <Alert role="status" className="pr-12">
             <ClipboardList />
@@ -2333,6 +2349,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             type="tournament"
             entityId={tournament.id}
             onScorersChange={(list) => setTournamentScorerCount(list.length)}
+          />
+        )}
+        {/* League scorers cover every round, so managers stop re-adding them weekly */}
+        {activeTab === 'scorers' && canManage && tournament.leagueId && (
+          <ScorersPanel
+            type="league"
+            entityId={tournament.leagueId}
+            onScorersChange={(list) => setLeagueScorerCount(list.length)}
           />
         )}
         {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}

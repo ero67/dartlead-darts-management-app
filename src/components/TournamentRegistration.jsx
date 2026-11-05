@@ -585,7 +585,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
     if (!tournament || !canManage) return;
 
     const confirmMessage = t('management.confirmDeleteTournament', { name: tournament.name });
-    if (!(await confirmDialog(confirmMessage))) return;
+    if (!(await confirmDialog(confirmMessage, { destructive: true }))) return;
 
     try {
       await onDeleteTournament(tournament.id);
@@ -720,6 +720,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               once the tournament is running (previously this panel lived on the
               completed-tournament summary tab, which was far too late). */}
           {canManage && <ScorersPanel type="tournament" entityId={tournament.id} />}
+          {canManage && tournament.leagueId && <ScorersPanel type="league" entityId={tournament.leagueId} />}
         </div>
       </div>
 
