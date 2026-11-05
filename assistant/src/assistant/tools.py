@@ -339,7 +339,8 @@ def propose_next_round(league_id: str, starts_at: str | None = None, name: str |
             Leave it out for the last round's date plus 7 days.
         name: Only if the user gave the round a name. Leave it out to number it after the last round.
         players: When the user lists the round's players, all of those names as the user wrote them, in their basic
-            form (nominative). Leave it out to copy the last round's players.
+            form (nominative). The list replaces the last round's players, so for "the same as last time plus X"
+            list everyone. Leave it out to copy the last round's players unchanged.
         new_players: Names the user has said are new players. Use it only after the user said so, typically after
             this tool asked about a name; the user still confirms on the card, where these show as new.
             players and new_players together hold 1 to 64 names.
