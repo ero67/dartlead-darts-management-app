@@ -36,6 +36,7 @@ import { leagueService } from '../services/leagueService';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { sortStandings } from '../utils/standings';
+import { getQualifyingPlayers } from '../utils/qualifiers';
 import { cloneTournamentPath } from '../utils/cloneTournament';
 import { cn } from '@/lib/utils';
 import { isCricketGame } from '@/lib/cricket';
@@ -1253,111 +1254,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     criteriaOrder
   );
 
-  // Get qualifying players based on group standings, sorted by performance for seeding
-  const getQualifyingPlayers = () => {
-    if (!tournament) return [];
-    
-    // For playoff-only tournaments, all registered players qualify,
-    // sorted by name (or keep current order if you prefer)
-    if (tournament.tournamentType === 'playoff_only') {
-      const players = tournament.players || [];
-      return [...players].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    
-    if (!tournament.groups) return [];
-    
-    // Use the same criteria order as the UI standings display
-    const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-    const qualificationMode = tournament.playoffSettings?.qualificationMode || 'perGroup';
-    const allQualifyingPlayers = [];
-    const allPlayersValue = 9999; // Special value to represent "all players"
-    
-    if (qualificationMode === 'totalPlayers') {
-      // Mode: Total players to advance
-      const totalPlayersToAdvance = tournament.playoffSettings?.totalPlayersToAdvance || 8;
-      const numberOfGroups = tournament.groups.length;
-      const playersPerGroup = Math.floor(totalPlayersToAdvance / numberOfGroups);
-      const remainder = totalPlayersToAdvance % numberOfGroups;
-      
-      // First, collect players from each group (equal distribution)
-      const playersByPosition = {}; // position -> array of players from all groups
-      
-      tournament.groups.forEach(group => {
-        if (group.standings && group.standings.length > 0) {
-          // Sort using the same criteria as the UI standings
-          const sortedStandings = sortStandingsByCriteria(group.standings, criteriaOrder);
-          
-          // Take playersPerGroup players from this group
-          for (let i = 0; i < playersPerGroup && i < sortedStandings.length; i++) {
-            const standing = sortedStandings[i];
-            allQualifyingPlayers.push({
-              ...standing,
-              groupPosition: i + 1,
-              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
-              groupId: group.id
-            });
-          }
-          
-          // Store remaining players by position for remainder selection
-          for (let i = playersPerGroup; i < sortedStandings.length; i++) {
-            const standing = sortedStandings[i];
-            const position = i + 1;
-            if (!playersByPosition[position]) {
-              playersByPosition[position] = [];
-            }
-            playersByPosition[position].push({
-              ...standing,
-              groupPosition: position,
-              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
-              groupId: group.id
-            });
-          }
-        }
-      });
-      
-      // If there's a remainder, take the best players from the next position
-      if (remainder > 0) {
-        const nextPosition = playersPerGroup + 1;
-        if (playersByPosition[nextPosition]) {
-          // Sort remainder candidates using the same criteria
-          const candidates = sortStandingsByCriteria(playersByPosition[nextPosition], criteriaOrder);
-          
-          // Take top 'remainder' players
-          for (let i = 0; i < remainder && i < candidates.length; i++) {
-            allQualifyingPlayers.push(candidates[i]);
-          }
-        }
-      }
-    } else {
-      // Mode: Players per group (original logic)
-      const playersPerGroup = tournament.playoffSettings?.playersPerGroup || 2;
-      
-      tournament.groups.forEach(group => {
-        if (group.standings && group.standings.length > 0) {
-          // Sort using the same criteria as the UI standings
-          const sortedStandings = sortStandingsByCriteria(group.standings, criteriaOrder);
-          
-          // Take top N players from each group with their position info
-          // If playersPerGroup is 9999 (all players), take all players
-          const topPlayers = playersPerGroup === allPlayersValue 
-            ? sortedStandings 
-            : sortedStandings.slice(0, playersPerGroup);
-          topPlayers.forEach((standing, index) => {
-            allQualifyingPlayers.push({
-              ...standing,
-              groupPosition: index + 1, // 1st, 2nd, etc. in group
-              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0)
-            });
-          });
-        }
-      });
-    }
-    
-    // Sort all qualifying players globally for seeding using the same criteria as UI standings,
-    // with group position as final tiebreaker (1st in group > 2nd in group)
-    return sortByGroupPositionThenCriteria(allQualifyingPlayers, criteriaOrder).map(qp => qp.player);
-  };
-
   const getRankedPlayersForSeeding = () => {
     if (!tournament) return [];
 
@@ -1415,7 +1311,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     return true;
   };
 
-  const defaultQualifyingPlayers = getQualifyingPlayers();
+  const defaultQualifyingPlayers = getQualifyingPlayers(tournament);
   const defaultQualifierIds = defaultQualifyingPlayers.map(player => player.id);
   const defaultQualifierIdSet = new Set(defaultQualifierIds);
   const rankedPlayersForSeeding = getRankedPlayersForSeeding();
