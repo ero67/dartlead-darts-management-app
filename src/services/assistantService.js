@@ -110,11 +110,12 @@ export const assistantService = {
     }
   },
 
-  // Sends one message and calls onEvent for every event of the run as it streams in (NDJSON, one JSON
-  // object per line): step, sources, tool_start, tool_end, text, done, error.
+  // Sends one message, or with `resume` what the user did with a proposal card, and calls onEvent for every
+  // event of the run as it streams in (NDJSON, one JSON object per line): step, sources, tool_start, tool_end,
+  // text, action, done, error.
   // The user's access token goes along, so the assistant only sees what this user may see.
   // `page` ({ kind, id }, optional) is the page the user is on, so "who leads?" means that league.
-  async streamChat({ message, threadId, page, onEvent }) {
+  async streamChat({ message, resume, threadId, page, onEvent }) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sign in to use the assistant.');
@@ -122,7 +123,8 @@ export const assistantService = {
       const response = await fetch(`${ASSISTANT_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ message, thread_id: threadId, ...(page && { page }) }),
+        // "actions": this app shows proposal cards, so the assistant may propose writes.
+        body: JSON.stringify({ ...(resume ? { resume } : { message }), thread_id: threadId, capabilities: ['actions'], ...(page && { page }) }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));

@@ -10,8 +10,10 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_openai import ChatOpenAI
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
+from langgraph.errors import GraphInterrupt
+from langgraph.types import interrupt
 
-from assistant import stats  # importing loads .env
+from assistant import actions, stats  # importing loads .env
 
 
 @tool(parse_docstring=True)
@@ -309,6 +311,63 @@ def show_chart(kind: Literal["form", "ranking", "practice", "head_to_head"], pla
 TOOLS = [find_player, get_player_stats, get_recent_matches, get_head_to_head, find_league, get_league_standings,
          get_me, list_tournaments, find_tournament, get_tournament_summary, get_player_tournaments, get_records, list_leagues,
          get_my_practice, get_player_form, get_match_preview, get_round_recap, show_chart]
+
+
+def _propose(action: str, draft: dict) -> dict:
+    # Pauses the run until the app sends back what the user did, which becomes the tool's result. interrupt() runs
+    # even for an error draft: a resumed run re-runs this tool, and the user's answer must win over a draft that no
+    # longer builds (the members were just added). Not resuming, an error draft is returned without a pause.
+    try:
+        return interrupt({"action": action, "draft": draft})
+    except GraphInterrupt:
+        if "error" in draft:
+            return draft
+        raise
+
+
+@tool(parse_docstring=True)
+def propose_next_round(league_id: str, starts_at: str | None = None, name: str | None = None) -> dict:
+    """Propose creating a league's next round with the last round's settings, venue and players. Use it only when
+    the user asks to create or schedule the next round. It shows the user a card to confirm and waits: the result
+    is what the user did (status done, cancelled, failed or changed). A result with an error means no card was
+    shown: tell the user why.
+
+    Args:
+        league_id: The id from find_league or list_leagues. Never guess it.
+        starts_at: Only if the user gave a date: an ISO date or date-time ("2026-11-13" or "2026-11-13T19:00:00+01:00").
+            Leave it out for the last round's date plus 7 days.
+        name: Only if the user gave the round a name. Leave it out to number it after the last round.
+    """
+    try:
+        draft = actions.next_round_draft(league_id, starts_at, name)
+    except Exception as e:  # an error draft, so a resumed run still gets the user's answer from _propose
+        draft = {"error": str(e)}
+    return _propose("propose_next_round", draft)
+
+
+@tool(parse_docstring=True)
+def propose_add_league_members(league_id: str, names: list[str], new_names: list[str] | None = None) -> dict:
+    """Propose adding players to a league: names that match the user's players add those players, other names
+    become new players. Use it only when the user asks to add players to a league. It shows the user a card to
+    confirm and waits: the result is what the user did (status done, cancelled, failed or changed). A result with
+    an error means no card was shown: tell the user why, and if it lists close matches, ask which player is meant.
+
+    Args:
+        league_id: The id from find_league or list_leagues. Never guess it.
+        names: Players' names as the user wrote them, in their basic form (nominative).
+        new_names: Names the user has said are new players. Use it only after the user said so, typically after
+            this tool asked which player was meant; the user still confirms on the card, where these show as new.
+            names and new_names together hold 1 to 20 names.
+    """
+    try:
+        draft = actions.add_members_draft(league_id, names, new_names)
+    except Exception as e:  # an error draft, so a resumed run still gets the user's answer from _propose
+        draft = {"error": str(e)}
+    return _propose("propose_add_league_members", draft)
+
+
+# Bound only when the app can show a confirmation card (the request's capabilities include "actions").
+ACTION_TOOLS = [propose_next_round, propose_add_league_members]
 
 
 def main() -> None:

@@ -3,13 +3,16 @@
 # A checkpointer keeps each conversation, and rewrite turns follow-ups ("Novák") into standalone questions.
 #   START -> rewrite -> route -> off_topic -> END
 #                            -> retrieve -> agent <-> tools -> END   (retrieve only for rules/app, tools only for stats)
+import json
 import os
 import sys
 import uuid
+from datetime import datetime
 from typing import Annotated, TypedDict
+from zoneinfo import ZoneInfo
 
 from langchain_core.documents import Document
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig, chain
 from langchain_openai import ChatOpenAI
 from langfuse import get_client, propagate_attributes
@@ -20,11 +23,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 from assistant.answer import format_sources  # importing loads .env
-from assistant.ask_stats import MAX_STEPS, run_tool
+from assistant.ask_stats import MAX_STEPS, run_tool, tools_by_name
 from assistant.prompts import template
 from assistant.retrieve import retriever
 from assistant.router import chain as router
-from assistant.tools import TOOLS
+from assistant.tools import ACTION_TOOLS, TOOLS
 
 SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
 
@@ -47,7 +50,7 @@ SYSTEM_PROMPT = """You are the assistant of DartLead, an app for running darts t
 - A recap of a round or tournament: a 5–8 line post for the league's group chat in the question's language, with a few fitting emojis, using only facts from get_round_recap.
 - The page the user is on (below, if any): when they say "this league", "this match" or "he" without a name, mean that page's
   league, tournament, match or player and pass its id to the tools, unless the conversation just named someone else.
-  A name or id in the question wins over the page.
+  A name or id in the question wins over the page. Turn a weekday or "tomorrow" into a date from today's date (below).
 - Never show ids or field names in an answer. The rating is the "form rating" (Slovak: "forma").
 Format with Markdown where it helps: **bold** key numbers, short lists, a small table for comparisons.
 Answer in {language}, even when names or data are in another language. Be brief.
@@ -56,6 +59,14 @@ Answer in {language}, even when names or data are in another language. Be brief.
 
 Sources:
 {context}"""
+# Joins the page text only when the proposal tools are bound, so the stored prompt keeps its variables: an app
+# without cards, or a question with no tools, never hears of them and offers no button it cannot show.
+ACTIONS_RULE = """Actions: use propose_next_round or propose_add_league_members only when the user asks for that action, one per
+answer. Each shows the user a card to confirm, and its result is what the user did. Never say an action is done
+unless the result's status is "done". On "cancelled", say nothing was changed. On "failed", say what failed (the
+result's error). When proposing, describe only what the proposal tool returned: never add a name, date or player the
+draft does not contain, and keep it to one or two sentences, because the card shows the details. On "changed", the
+user wrote a new message instead of confirming: follow it, and propose again if it changes the action."""
 OFF_TOPIC_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
 The question is not about darts or DartLead. In one or two sentences, in {language},
 say that you can help with darts rules, using the DartLead app, and players' statistics. Do not answer the question itself."""
@@ -70,6 +81,9 @@ REWRITE_PAGE_RULE = ('If the message refers to that page, say so in the question
 model = ChatOpenAI(model=os.environ["ANSWER_MODEL"], base_url="https://openrouter.ai/api/v1",
                    api_key=os.environ["OPENROUTER_API_KEY"], name="write-answer")
 model_with_tools = model.bind_tools(TOOLS)
+model_with_actions = model.bind_tools(TOOLS + ACTION_TOOLS)
+tools_with_actions = tools_by_name | {t.name: t for t in ACTION_TOOLS}
+action_names = {t.name for t in ACTION_TOOLS}
 rewriter = model.with_config(run_name="rewrite-question")
 
 
@@ -80,12 +94,18 @@ class State(TypedDict):
     language: str  # the question's language, named by the router ("English", "Slovak")
     docs: list[Document]  # retrieved chunks for this question
     page: dict | None  # the page the user is on, sent with every message: no reducer, so each turn overwrites it
+    actions: bool  # the app can show a confirmation card, so the proposal tools are on; overwritten each turn like page
 
 
 def page_line(page: dict | None) -> str:
     if not page:
         return ""
     return "The user is on a practice page." if page["kind"] == "practice" else f"The user is viewing the {page['kind']} with id {page['id']}."
+
+
+def today_line() -> str:
+    # In the app's time zone, so "on Friday" resolves against the user's today, not the server's.
+    return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("Today is %A, %Y-%m-%d.")
 
 
 def rewrite_page(page: dict | None) -> str:
@@ -127,14 +147,22 @@ def off_topic(state: State) -> dict:
 def call_agent(state: State) -> dict:
     context = format_sources(state["docs"]) if state["docs"] else "(none)"
     # Tools only when the router saw a stats question: no tool tokens or detours for rules and app questions.
-    llm = model_with_tools if "stats" in state["sources"] else model
+    with_actions = state.get("actions") and "stats" in state["sources"]
+    llm = model_with_actions if with_actions else model_with_tools if "stats" in state["sources"] else model
+    page = "\n".join(filter(None, [today_line(), page_line(state.get("page")), with_actions and ACTIONS_RULE]))
     reply = (template("agent", SYSTEM_PROMPT) | llm).invoke(
-        {"context": context, "language": state["language"], "page": page_line(state.get("page")), "messages": state["messages"]})
+        {"context": context, "language": state["language"], "page": page, "messages": state["messages"]})
     return {"messages": [reply]}
 
 
 def call_tools(state: State) -> dict:
-    return {"messages": [run_tool(call) for call in state["messages"][-1].tool_calls]}
+    calls = state["messages"][-1].tool_calls
+    tools = tools_with_actions if state.get("actions") else tools_by_name
+    # One proposal per turn: a resumed run re-runs this node, and its single pause must meet the user's single answer.
+    first = next((c for c in calls if c["name"] in action_names), None)
+    return {"messages": [run_tool(c, tools) if c is first or c["name"] not in action_names else
+                         ToolMessage("Error: propose one action at a time.", tool_call_id=c["id"], status="error")
+                         for c in calls]}
 
 
 def after_route(state: State) -> str:
@@ -168,24 +196,28 @@ graph = builder.compile(checkpointer=InMemorySaver())
 
 
 @chain  # one Langfuse trace per question
-def ask(question: str, config: RunnableConfig, page: dict | None = None) -> dict:
+def ask(question: str, config: RunnableConfig, page: dict | None = None, actions: bool = False) -> dict:
     # Same thread_id = same conversation. Without one, every question starts a new conversation (as the evals want).
     thread_id = config.get("configurable", {}).get("thread_id") or str(uuid.uuid4())
+    run_config = {"recursion_limit": 2 * MAX_STEPS + 3, "configurable": {"thread_id": thread_id}}
     try:
         # rewrite + route + retrieve, then MAX_STEPS agent turns with the tool runs between them
-        state = graph.invoke({"messages": [HumanMessage(question)], "page": page},
-                             {"recursion_limit": 2 * MAX_STEPS + 3, "configurable": {"thread_id": thread_id}})
+        state = graph.invoke({"messages": [HumanMessage(question)], "page": page, "actions": actions}, run_config)
     except GraphRecursionError:
         return {"answer": "Sorry, this needed more steps than I may take. Try a narrower question: one player, tournament or league.", "question": question,
-                "sources": [], "docs": [], "tools": []}
+                "sources": [], "docs": [], "tools": [], "proposal": None}
     # This turn = everything from the last user message on; earlier turns' tool calls don't count.
     start = max(i for i, m in enumerate(state["messages"]) if isinstance(m, HumanMessage))
+    # A paused run ends on the proposal, not on text: the evals see the card's content as the answer.
+    interrupts = graph.get_state(run_config).interrupts
+    proposal = interrupts[0].value if interrupts else None
     return {
-        "answer": state["messages"][-1].content,
+        "answer": "PROPOSAL " + json.dumps(proposal, ensure_ascii=False) if proposal else state["messages"][-1].content,
         "question": state["question"],
         "sources": state["sources"],
         "docs": state["docs"],
         "tools": [c["name"] for m in state["messages"][start:] for c in getattr(m, "tool_calls", [])],
+        "proposal": proposal,
     }
 
 

@@ -1,4 +1,6 @@
 # The page the user is on: its prompt line, and the prompts still format with the new {page} variable.
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableLambda
@@ -75,7 +77,12 @@ def test_call_agent_passes_page_line(monkeypatch, no_langfuse, page, line):
     calls = fake_model(monkeypatch, "model_with_tools")
     state = {"messages": [HumanMessage("who leads?")], "docs": [], "sources": ["stats"], "language": "English", "page": page}
     agent.call_agent(state)
-    assert calls[0][0].content == SYSTEM_PROMPT.format(context="(none)", language="English", page=line)
+    assert calls[0][0].content == SYSTEM_PROMPT.format(context="(none)", language="English", page=f"{agent.today_line()}\n{line}".strip())
+
+
+def test_today_line_has_date_and_weekday():
+    now = datetime.now(ZoneInfo("Europe/Bratislava"))
+    assert agent.today_line() == f"Today is {now:%A}, {now:%Y-%m-%d}."
 
 
 def test_case_input_carries_page():

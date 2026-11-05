@@ -2,6 +2,7 @@
 # case by case in Langfuse (scores, cost, latency).
 #   uv run experiment baseline                 -> every case, as a run of the dataset
 #   uv run experiment judge-check rag-01,off-01 -> only these cases, a local run (not linked to the dataset)
+import json
 import os
 import re
 import sys
@@ -30,7 +31,7 @@ def task(*, item, **_):
     config = {"configurable": {"thread_id": str(uuid.uuid4())}, "callbacks": [CallbackHandler()]}
     for turn in data.get("history", []):
         ask.invoke(turn, config=config)
-    result = ask.invoke(data["question"], config=config, page=data.get("page"))
+    result = ask.invoke(data["question"], config=config, page=data.get("page"), actions=data.get("actions", False))
     messages = graph.get_state(config).values["messages"]
     return {
         "answer": result["answer"],
@@ -39,7 +40,8 @@ def task(*, item, **_):
         # The evidence the answer may rely on: retrieved chunks and every tool result in the conversation
         # (a follow-up can answer from an earlier turn's results without calling a tool again).
         "evidence": [d.page_content for d in result["docs"]]
-                    + [f"{m.name} -> {m.content}" for m in messages if isinstance(m, ToolMessage)],
+                    + [f"{m.name} -> {m.content}" for m in messages if isinstance(m, ToolMessage)]
+                    + ([json.dumps(result["proposal"], ensure_ascii=False)] if result["proposal"] else []),
     }
 
 
