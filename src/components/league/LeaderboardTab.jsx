@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, RefreshCw } from 'lucide-react';
+import { Trophy, RefreshCw, Plus } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { EndSeasonDialog, PastSeasons } from './Seasons';
 import { currentSeasonName } from '../../utils/leagueSeason';
 import { cn } from '@/lib/utils';
 
-export function LeaderboardTab({ league, isManager, isRecalculating, onRecalculate, onSeasonChanged }) {
+export function LeaderboardTab({ league, isManager, isRecalculating, onRecalculate, onSeasonChanged, onCreateTournament }) {
   const { t } = useLanguage();
   const leaderboard = league.leaderboard || [];
 
@@ -95,7 +95,17 @@ export function LeaderboardTab({ league, isManager, isRecalculating, onRecalcula
           </Table>
         </Card>
       ) : (
-        <EmptyState icon={Trophy} title={t(league.seasons?.length ? 'leagues.newSeasonEmpty' : 'leagues.noResultsYet')} />
+        <EmptyState
+          icon={Trophy}
+          title={t(league.seasons?.length ? 'leagues.newSeasonEmpty' : 'leagues.noResultsYet')}
+        >
+          {isManager && onCreateTournament && (
+            <Button onClick={() => onCreateTournament(league)}>
+              <Plus />
+              {t('leagues.createTournament')}
+            </Button>
+          )}
+        </EmptyState>
       )}
 
       <PastSeasons league={league} isManager={isManager} onChanged={onSeasonChanged} />
