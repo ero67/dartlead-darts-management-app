@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, ArrowLeft, Settings, Trash2, CopyPlus } from 'lucide-react';
+import { Play, Settings, Trash2, CopyPlus } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import { leagueService } from '../services/leagueService';
 import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { StatusBadge } from './shared/StatusBadge';
+import { TournamentCrumbs } from './tournament/TournamentCrumbs';
 import { RoundSchedule } from './shared/RoundSchedule';
 import { PlayersSection } from './registration/PlayersSection';
 import { RegistrationRequests } from './registration/RegistrationRequests';
@@ -600,10 +601,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
       <div className="flex flex-col gap-3">
-        <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
-          <ArrowLeft />
-          {t('registration.backToTournaments')}
-        </Button>
+        <TournamentCrumbs tournament={tournament} onBack={onBack} backLabel={t('registration.backToTournaments')} />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">

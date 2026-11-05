@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus } from 'lucide-react';
+import { Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -30,6 +30,7 @@ import { EditMatchPlayersDialog } from './tournament/EditMatchPlayersDialog';
 import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
 import { BoardsControl } from './tournament/BoardsControl';
+import { TournamentCrumbs } from './tournament/TournamentCrumbs';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
@@ -2121,10 +2122,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-hidden p-4 text-foreground md:p-8">
       <BoardMotif />
       <div className="relative flex flex-col gap-4">
-        <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
-          <ArrowLeft />
-          {t('common.backToDashboard')}
-        </Button>
+        <TournamentCrumbs tournament={tournament} onBack={onBack} backLabel={t('common.backToDashboard')} />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">

@@ -504,6 +504,7 @@ export const tournamentService = {
         .from('tournaments')
         .select(`
           *,
+          league:leagues!tournaments_league_id_fkey(name),
           tournament_players(
             player:players(*)
           ),
@@ -664,6 +665,7 @@ export const tournamentService = {
           tournamentType: tournament.tournament_type || 'groups_with_playoffs',
           standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
           leagueId: tournament.league_id || null,
+          leagueName: tournament.league?.name || null,
           createdAt: tournament.created_at,
           updatedAt: tournament.updated_at,
           userId: tournament.user_id,
