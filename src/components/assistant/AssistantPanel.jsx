@@ -295,7 +295,8 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
           playoffSettings: settings.playoff_settings,
           tournamentType: settings.tournament_type,
           status: 'open_for_registration',
-          players: draft.players,
+          // As TournamentCreation's typed players: an id not in the table yet, so createTournament inserts them.
+          players: [...draft.players, ...(draft.new_players ?? []).map(name => ({ id: crypto.randomUUID(), name }))],
           groups: [], // as TournamentCreation: groups are drawn when the round starts
         });
         setAction(id, { state: 'done', tournamentId });

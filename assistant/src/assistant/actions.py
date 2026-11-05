@@ -7,10 +7,15 @@ from assistant import stats
 
 SETTINGS = ["legs_to_win", "starting_score", "game_type", "default_scoring_mode", "group_settings", "playoff_settings", "tournament_type"]
 MAX_NAMES = 20
+MAX_ROUND_PLAYERS = 64
 MATCH, TIE, EPSILON = 0.9, 0.05, 1e-9
 MAX_NAME_LENGTH = 100
 ZONE = ZoneInfo("Europe/Bratislava")  # the app's time zone, as in agent.today_line
 DEFAULT_TIME = time(19, 0)
+# The dotted ordinal "5. kolo" first (a year may follow it), then "kolo 5" (a year or league number may precede it),
+# then "5 kolo".
+ROUND_NUMBER = (re.compile(r"(\d+)\.\s*(?:kolo|kola|round|runda)\b"), re.compile(r"\b(?:kolo|kola|round|runda)\s*(\d+)"),
+                re.compile(r"(\d+)\s*(?:kolo|kola|round|runda)\b"))
 
 
 def _league(league_id: str) -> dict:
@@ -21,9 +26,17 @@ def _league(league_id: str) -> dict:
 
 
 def _next_name(name: str) -> str:
-    # The last number is the round's: "4. kolo" -> "5. kolo", "Round 12 Finals" -> "Round 13 Finals".
-    last = list(re.finditer(r"\d+", name))[-1:]
-    return f"{name[:last[0].start()]}{int(last[0].group()) + 1}{name[last[0].end():]}" if last else f"{name} 2"
+    # The number next to a round word is the round's: "7.kolo Liga 3" -> "8.kolo Liga 3"; else the last number.
+    folded = "".join(stats._norm(c)[:1] or c for c in name)  # one character per character, so positions match name
+    found = next(filter(None, (pattern.search(folded) for pattern in ROUND_NUMBER)), None)
+    if found:
+        start, end = found.span(1)
+    else:
+        last = list(re.finditer(r"\d+", name))[-1:]
+        if not last:
+            return f"{name} 2"
+        start, end = last[0].span()
+    return f"{name[:start]}{int(name[start:end]) + 1}{name[end:]}"
 
 
 def _local(value: str) -> datetime:
@@ -45,7 +58,97 @@ def _starts_at(value: str | None, last: str | None) -> str | None:
     return datetime.combine(day, previous.time() if previous else DEFAULT_TIME, tzinfo=ZONE).isoformat()
 
 
-def next_round_draft(league_id: str, starts_at: str | None = None, name: str | None = None) -> dict:
+def _names(names: list[str], new_names: list[str] | None, limit: int) -> tuple[list[str], set[str], dict | None]:
+    """Deduped names, the normalised ones confirmed as new, and an error when the names are not usable."""
+    unique: dict[str, str] = {}
+    for n in [*(new_names or []), *names]:  # first wins, so a name in both lists stays new
+        unique.setdefault(stats._norm(n.strip()), n.strip())  # "Marek" and "marek" are one name
+    names = list(unique.values())
+    if not 1 <= len(names) <= limit:
+        return names, set(), {"error": f"Give between 1 and {limit} names."}
+    if any(not n or len(n) > MAX_NAME_LENGTH for n in names):
+        return names, set(), {"error": f"Every name must be between 1 and {MAX_NAME_LENGTH} characters."}
+    return names, {stats._norm(n.strip()) for n in new_names or []}, None
+
+
+def _members(league_id: str) -> list[dict]:
+    return [r["players"] for r in stats.db().table("league_members").select("players(id, name)")
+            .eq("league_id", league_id).eq("is_active", True).is_("left_at", "null").execute().data]
+
+
+def _roster() -> list[dict]:
+    hidden = stats._demo()["players"]
+    # shortcut: ranks the whole roster in Python (PostgREST returns at most 1000 rows); move to a
+    # pg_trgm RPC when a manager has more players than that.
+    return [p for p in stats.db().table("players").select("id, name").eq("owner_id", stats._user_id.get()).execute().data
+            if p["id"] not in hidden]
+
+
+def _is_member(name: str, members: list[dict]) -> bool:
+    return any(m["match"] == 1.0 for m in stats._rank(name, members, 1))
+
+
+def _pick(name: str, rows: list[dict], member_ids: set[str] = frozenset()) -> tuple[dict | None, list[dict]]:
+    """The row `name` clearly means, or None, and the close rows: None with close rows means ask which one."""
+    close = stats._rank(name, rows, len(rows))  # sorted is stable: among equal scores, rows keep their order
+    if not close:
+        return None, []
+    top = close[0]
+    is_member = top["id"] in member_ids
+    if top["match"] == 1.0:  # an exact full name; another exact one is the same name stored twice: take the first
+        # An exact non-member ("Katka") wins only when no member is a match too ("Katka Nová"): then ask.
+        member = None if is_member else next((c for c in close if c["id"] in member_ids and c["match"] >= MATCH), None)
+        return (None, [top, member]) if member else (top, close)
+    rivals = [c for c in close[1:] if top["match"] - c["match"] <= TIE + EPSILON
+              and stats._norm(c["name"]) != stats._norm(top["name"])  # stored twice: the first, as createTournament takes
+              and not (is_member and c["id"] not in member_ids and c["match"] == top["match"])]  # a member wins a tie
+    if top["match"] < MATCH or rivals:
+        return None, [top, *rivals] if rivals else close[:2]
+    return top, close
+
+
+def _ask(close: list[dict]) -> str:
+    return f'{" or ".join(c["name"] for c in close)}?' if close else "no such player, is it a new player?"
+
+
+def _unclear(unclear: dict[str, str]) -> dict:
+    # Every unclear name in one error, so the agent asks about all of them at once.
+    asks = " ".join(f'"{name}": {question}' for name, question in unclear.items())
+    return {"error": f"Some names are unclear. Ask the user about all of them at once: {asks}"}
+
+
+def _round_players(league_id: str, names: list[str], confirmed_new: set[str], previous: list[dict]) -> dict:
+    # The last round's players (when kept), members and roster ranked together; the first two come first and are
+    # preferred, so they win equal scores.
+    first = previous + [m for m in _members(league_id) if m["id"] not in {p["id"] for p in previous}]
+    member_ids = {p["id"] for p in first}
+    rows = first + [p for p in _roster() if p["id"] not in member_ids]
+    players, new, unclear, given = [], [], {}, {}
+    for name in names:
+        top, close = _pick(name, rows, member_ids)
+        # A confirmed new name skips matching, unless it is exactly a stored name: createTournament would not see that
+        # "Jozef Kral" is "Jozef Kráľ" and would insert a duplicate.
+        if stats._norm(name) in confirmed_new and not (top and top["match"] == 1.0):
+            new.append(name)
+        elif top is None:
+            unclear[name] = _ask(close)
+        elif top["id"] in given:
+            unclear[name] = f'the same player as "{given[top["id"]]}"?'
+        else:
+            given[top["id"]] = name
+            players.append({"id": top["id"], "name": top["name"]})
+    return _unclear(unclear) if unclear else {"players": players, "new_players": new}
+
+
+def next_round_draft(league_id: str, starts_at: str | None = None, name: str | None = None,
+                     players: list[str] | None = None, new_players: list[str] | None = None,
+                     include_last_round: bool = False) -> dict:
+    listed = bool(players or new_players)  # without a list, the last round's players; with one, it replaces them
+    # unless include_last_round adds it to them
+    if listed:
+        names, confirmed_new, error = _names(players or [], new_players, MAX_ROUND_PLAYERS)
+        if error:
+            return error
     league = _league(league_id)
     if "error" in league:
         return league
@@ -59,58 +162,59 @@ def next_round_draft(league_id: str, starts_at: str | None = None, name: str | N
         starts_at = _starts_at(starts_at, last["starts_at"])
     except ValueError:
         return {"error": "The date must be an ISO date or date-time, like 2026-11-06T19:00:00+01:00."}
-    rows = stats.db().table("tournament_players").select("players(id, name)").eq("tournament_id", last["id"]).execute().data
+    previous = []
+    if include_last_round or not listed:
+        rows = stats.db().table("tournament_players").select("players(id, name)").eq("tournament_id", last["id"]).execute().data
+        previous = [{"id": r["players"]["id"], "name": r["players"]["name"]} for r in rows]
+    chosen = {"players": previous, "new_players": []}
+    if listed:
+        chosen = _round_players(league_id, names, confirmed_new, previous)
+        if "error" in chosen:
+            return chosen
+        kept = {p["id"] for p in previous}
+        chosen["players"] = previous + [p for p in chosen["players"] if p["id"] not in kept]
+        if len(chosen["players"]) + len(chosen["new_players"]) > MAX_ROUND_PLAYERS:
+            return {"error": f"A round holds at most {MAX_ROUND_PLAYERS} players."}
     return {
         "league_id": league_id, "league": league["name"], "name": name or _next_name(last["name"]),
-        "starts_at": starts_at, "venue": last["venue"], "settings": {k: last[k] for k in SETTINGS},
-        "players": [{"id": r["players"]["id"], "name": r["players"]["name"]} for r in rows],
+        "starts_at": starts_at, "venue": last["venue"], "settings": {k: last[k] for k in SETTINGS}, **chosen,
         "copied_from": {"id": last["id"], "name": last["name"], "starts_at": last["starts_at"]},
     }
 
 
 def add_members_draft(league_id: str, names: list[str], new_names: list[str] | None = None) -> dict:
     # new_names are confirmed by the manager as new players: they skip roster matching.
-    unique: dict[str, str] = {}
-    for n in [*(new_names or []), *names]:  # first wins, so a name in both lists stays new
-        unique.setdefault(stats._norm(n.strip()), n.strip())  # "Marek" and "marek" are one name
-    confirmed_new = {stats._norm(n.strip()) for n in new_names or []}
-    names = list(unique.values())
-    if not 1 <= len(names) <= MAX_NAMES:
-        return {"error": f"Give between 1 and {MAX_NAMES} names."}
-    if any(not n or len(n) > MAX_NAME_LENGTH for n in names):
-        return {"error": f"Every name must be between 1 and {MAX_NAME_LENGTH} characters."}
+    names, confirmed_new, error = _names(names, new_names, MAX_NAMES)
+    if error:
+        return error
     league = _league(league_id)
     if "error" in league:
         return league
-    members = [r["players"] for r in stats.db().table("league_members").select("players(id, name)")
-               .eq("league_id", league_id).is_("left_at", "null").execute().data]
+    members = _members(league_id)
     member_ids = {m["id"] for m in members}
-    hidden = stats._demo()["players"]
-    # shortcut: ranks the whole roster in Python (PostgREST returns at most 1000 rows); move to a
-    # pg_trgm RPC when a manager has more players than that.
-    roster = [p for p in stats.db().table("players").select("id, name").eq("owner_id", stats._user_id.get()).execute().data
-              if p["id"] not in hidden]
-    existing, new, already = [], [], []
+    roster = _roster()
+    existing, new, already, unclear, given = [], [], [], {}, {}
     for name in names:
-        if any(m["match"] == 1.0 for m in stats._rank(name, members, 1)):  # a member outside the roster
+        if _is_member(name, members):  # a member outside the roster
             already.append(name)
             continue
         if stats._norm(name) in confirmed_new:
             new.append(name)
             continue
-        close = stats._rank(name, roster, 2)
-        if not close:
+        top, close = _pick(name, roster)
+        if top is None and close:
+            unclear[name] = _ask(close)
+        elif top is None:
             new.append(name)
-            continue
-        # An exact full name (1.0) wins over first-name-only matches; otherwise the best match must reach MATCH and lead by more than TIE.
-        top, rest = close[0], close[1:]
-        exact = top["match"] == 1.0 and (not rest or rest[0]["match"] < 1.0)
-        if not exact and (top["match"] < MATCH or (rest and top["match"] - rest[0]["match"] <= TIE + EPSILON)):
-            return {"error": f'Which player is "{name}": {" or ".join(c["name"] for c in close)}? Ask which one.'}
-        if top["id"] in member_ids:
+        elif top["id"] in member_ids:
             already.append(name)
-        elif top["id"] not in {p["id"] for p in existing}:
+        elif top["id"] in given:
+            unclear[name] = f'the same player as "{given[top["id"]]}"?'
+        else:
+            given[top["id"]] = name
             existing.append({"id": top["id"], "name": top["name"]})
+    if unclear:
+        return _unclear(unclear)
     if not existing and not new:
         return {"error": "Everyone is already a member of this league."}
     return {"league_id": league_id, "league": league["name"], "existing": existing, "new": new, "already_members": already}
