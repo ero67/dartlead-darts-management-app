@@ -101,11 +101,85 @@ def test_next_round_explicit_date_and_name_win(monkeypatch):
     assert (draft["starts_at"], draft["name"]) == ("2026-12-01T18:00:00+01:00", "Finále")
 
 
-@pytest.mark.parametrize("last,expected", [("Kolo 5", "Kolo 6"), ("Round 12", "Round 13"), ("Demo Liga Šípky – 4. kolo", "Demo Liga Šípky – 5. kolo"),
-                                           ("Round 12 Finals", "Round 13 Finals"), ("Piatok", "Piatok 2")])
+@pytest.mark.parametrize("last,expected", [
+    ("Kolo 5", "Kolo 6"), ("Round 12", "Round 13"), ("Demo Liga Šípky – 4. kolo", "Demo Liga Šípky – 5. kolo"),
+    ("Round 12 Finals", "Round 13 Finals"), ("Piatok", "Piatok 2"),
+    ("7.kolo Paňovská liga 3", "8.kolo Paňovská liga 3"),  # the number next to "kolo", not the part number
+    ("Demo Liga – 4. kolo", "Demo Liga – 5. kolo"), ("Kolo 5 (2026)", "Kolo 6 (2026)"), ("Piatok 3", "Piatok 4"),
+    ("2. KOLA liga 9", "3. KOLA liga 9"), ("Runda 4, sezóna 2", "Runda 5, sezóna 2"),
+])
 def test_next_round_name(monkeypatch, last, expected):
     fake(monkeypatch, tournaments=[round_row(name=last)])
     assert actions.next_round_draft(L)["name"] == expected
+
+
+def test_next_round_without_list_has_no_new_players(monkeypatch):
+    fake(monkeypatch, tournaments=[round_row()], tournament_players=[{"players": player("p1", "Erik")}])
+    assert actions.next_round_draft(L)["new_players"] == []
+
+
+def listed(monkeypatch, names, new=None, members=(), roster=()):
+    fake(monkeypatch, tournaments=[round_row()], tournament_players=[{"players": player("p0", "Last Round")}],
+         league_members=[{"players": m} for m in members], players=list(roster))
+    return actions.next_round_draft(L, players=names, new_players=new)
+
+
+def test_next_round_list_replaces_last_round(monkeypatch):
+    draft = listed(monkeypatch, ["Peter Novak", "eva"], members=[player("p1", "Peter Novák")], roster=[player("p2", "Eva Malá")])
+    assert (draft["players"], draft["new_players"]) == ([player("p1", "Peter Novák"), player("p2", "Eva Malá")], [])
+
+
+def test_next_round_member_wins_over_roster(monkeypatch):
+    # "Peter" is clear among the league's members, though the roster has two Peters.
+    draft = listed(monkeypatch, ["Peter"], members=[player("p1", "Peter Novák")],
+                   roster=[player("p1", "Peter Novák"), player("p3", "Peter Horváth")])
+    assert draft["players"] == [player("p1", "Peter Novák")]
+
+
+def test_next_round_member_with_nickname_matches(monkeypatch):
+    draft = listed(monkeypatch, ["Peter Novák"], members=[player("p1", 'Peter " Rýchly " Novák')])
+    assert draft["players"] == [player("p1", 'Peter " Rýchly " Novák')]
+
+
+def test_next_round_lists_every_unclear_name_at_once(monkeypatch):
+    result = listed(monkeypatch, ["Peter", "Jano", "Zoltán Neznámy", "Eva Malá"],
+                    roster=[player("p1", "Peter Novák"), player("p3", "Peter Horváth"), player("p4", "Jan Kolár"),
+                            player("p2", "Eva Malá")])
+    for text in ('"Peter"', "Peter Novák", "Peter Horváth", '"Jano"', "Jan Kolár", '"Zoltán Neznámy"'):
+        assert text in result["error"]
+    assert "Eva" not in result["error"]
+
+
+def test_next_round_confirmed_new_players(monkeypatch):
+    draft = listed(monkeypatch, ["Eva Malá", "eva malá"], ["Zoltán Neznámy", "Peter Novák"], members=[player("p1", "Peter Novák")],
+                   roster=[player("p2", "Eva Malá"), player("p5", "Zoltán Neznámy st.")])
+    # A confirmed new name skips matching, unless it is exactly a member's.
+    assert draft["players"] == [player("p1", "Peter Novák"), player("p2", "Eva Malá")]
+    assert draft["new_players"] == ["Zoltán Neznámy"]
+
+
+def test_next_round_list_limits(monkeypatch):
+    assert "error" in listed(monkeypatch, [f"A{i}" for i in range(40)], [f"B{i}" for i in range(25)])
+    assert "error" in listed(monkeypatch, ["Marek", "  "])
+    assert "error" in listed(monkeypatch, ["x" * 101])
+    assert len(listed(monkeypatch, [], [f"B{i}" for i in range(64)])["new_players"]) == 64
+
+
+def test_rank_ignores_a_nickname_between_names():
+    rows = [player("p1", 'Peter " Rýchly " Novák'), player("p2", "Petra Nováková")]
+    assert stats._rank("Peter Novak", rows, 2)[0] == {"id": "p1", "name": 'Peter " Rýchly " Novák', "match": 0.9}
+    assert all(r["id"] != "p1" for r in stats._rank("Peter Kováč", rows, 2))  # every query word must be in the name
+
+
+def test_members_nickname_is_existing_not_new(monkeypatch):
+    draft = members(monkeypatch, ["Peter Novák"], roster=[player("p1", 'Peter " Rýchly " Novák')])
+    assert (draft["existing"], draft["new"]) == ([player("p1", 'Peter " Rýchly " Novák')], [])
+
+
+def test_members_lists_every_unclear_name_at_once(monkeypatch):
+    result = members(monkeypatch, ["Peter", "Jano"], roster=[player("p1", "Peter Novák"), player("p3", "Peter Horváth"),
+                                                             player("p4", "Jan Kolár")])
+    assert all(n in result["error"] for n in ("Peter Horváth", "Jan Kolár"))
 
 
 def test_next_round_uses_latest_round(monkeypatch):

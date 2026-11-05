@@ -78,6 +78,7 @@ def _norm(text: str) -> str:
 def _rank(query: str, rows: list[dict], limit: int) -> list[dict]:
     # Best name matches first, with a 0-1 score; the caller decides what a tie means.
     query = _norm(query).strip()
+    query_words = re.findall(r"\w+", query)
 
     def score(row: dict) -> float:
         full = _norm(row["name"])
@@ -89,6 +90,8 @@ def _rank(query: str, rows: list[dict], limit: int) -> list[dict]:
         if any(w.startswith(query) for w in words):  # "Pet" -> "Peter"
             return 0.9
         if " " in query and query in full:  # part of a longer name, "demo liga" -> "Demo Liga Šípky"
+            return 0.9
+        if len(query_words) > 1 and set(query_words) <= set(re.findall(r"\w+", full)):  # a nickname in between, 'Ján "Drak" Novák'
             return 0.9
         return max(SequenceMatcher(None, query, w).ratio() for w in [full, *words])  # typos, "Jano" -> "Jan"
 

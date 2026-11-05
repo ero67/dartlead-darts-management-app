@@ -66,7 +66,8 @@ answer. Each shows the user a card to confirm, and its result is what the user d
 unless the result's status is "done". On "cancelled", say nothing was changed. On "failed", say what failed (the
 result's error). When proposing, describe only what the proposal tool returned: never add a name, date or player the
 draft does not contain, and keep it to one or two sentences, because the card shows the details. On "changed", the
-user wrote a new message instead of confirming: follow it, and propose again if it changes the action."""
+user wrote a new message instead of confirming: follow it, and propose again if it changes the action.
+If the user lists players for the round, pass them all as players to propose_next_round."""
 OFF_TOPIC_PROMPT = """You are the assistant of DartLead, an app for running darts tournaments and leagues.
 The question is not about darts or DartLead. In one or two sentences, in {language},
 say that you can help with darts rules, using the DartLead app, and players' statistics. Do not answer the question itself."""

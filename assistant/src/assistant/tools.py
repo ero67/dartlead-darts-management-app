@@ -326,20 +326,26 @@ def _propose(action: str, draft: dict) -> dict:
 
 
 @tool(parse_docstring=True)
-def propose_next_round(league_id: str, starts_at: str | None = None, name: str | None = None) -> dict:
+def propose_next_round(league_id: str, starts_at: str | None = None, name: str | None = None,
+                       players: list[str] | None = None, new_players: list[str] | None = None) -> dict:
     """Propose creating a league's next round with the last round's settings, venue and players. Use it only when
     the user asks to create or schedule the next round. It shows the user a card to confirm and waits: the result
     is what the user did (status done, cancelled, failed or changed). A result with an error means no card was
-    shown: tell the user why.
+    shown: tell the user why, and if it lists unclear names, ask about all of them in one message.
 
     Args:
         league_id: The id from find_league or list_leagues. Never guess it.
         starts_at: Only if the user gave a date: an ISO date or date-time ("2026-11-13" or "2026-11-13T19:00:00+01:00").
             Leave it out for the last round's date plus 7 days.
         name: Only if the user gave the round a name. Leave it out to number it after the last round.
+        players: When the user lists the round's players, all of those names as the user wrote them, in their basic
+            form (nominative). Leave it out to copy the last round's players.
+        new_players: Names the user has said are new players. Use it only after the user said so, typically after
+            this tool asked about a name; the user still confirms on the card, where these show as new.
+            players and new_players together hold 1 to 64 names.
     """
     try:
-        draft = actions.next_round_draft(league_id, starts_at, name)
+        draft = actions.next_round_draft(league_id, starts_at, name, players, new_players)
     except Exception as e:  # an error draft, so a resumed run still gets the user's answer from _propose
         draft = {"error": str(e)}
     return _propose("propose_next_round", draft)
