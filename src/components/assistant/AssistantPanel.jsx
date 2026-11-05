@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { Streamdown } from 'streamdown';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLeague } from '@/contexts/LeagueContext';
+import { useTournament } from '@/contexts/TournamentContext';
 import { Badge } from '@/components/ui/badge';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { Button } from '@/components/ui/button';
@@ -26,8 +28,6 @@ import { AssistantTrace } from './AssistantTrace';
 import { AssistantLogo } from './AssistantLogo';
 import { pageFromPath, suggestionsFor } from './assistantPage';
 import { assistantService } from '@/services/assistantService';
-import { leagueService } from '@/services/leagueService';
-import { tournamentService } from '@/services/tournamentService';
 
 // Pages whose name the "Looking at" chip shows (practice has no name to fetch).
 const CHIP_KINDS = ['league', 'tournament', 'player', 'practice'];
@@ -54,7 +54,7 @@ function applyEvent(message, event) {
       // The paused proposal tool gets its tool_end only in the resumed run, so its step closes here.
       return {
         ...message,
-        action: { action: event.action, draft: event.draft, state: 'pending' },
+        action: { action: event.action, draft: event.draft, pauseId: event.id, state: 'pending' },
         steps: message.steps.map(s => (s.name === event.action && s.status === 'running' ? { ...s, status: 'done', output: event.draft } : s)),
       };
     case 'done':
@@ -178,6 +178,9 @@ function AssistantReply({ message, followups, isSending, onTraceOpenChange, onFe
 
 export function AssistantPanel({ isOpen, onOpenChange }) {
   const { t } = useLanguage();
+  // Writes go through the contexts, so the new round and members are in the app's state (and its links) at once.
+  const { createTournament } = useTournament();
+  const { currentLeague, addMembers, selectLeague } = useLeague();
   const { pathname } = useLocation();
   const page = useMemo(() => pageFromPath(pathname), [pathname]);
   // The names for one page; a result is only used while `page` is still that page.
@@ -209,8 +212,9 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
   };
 
   // Streams one request ({ message } or { resume }) into a new assistant reply, after the user's bubble if they typed.
-  // onStarted runs at the first event, once the server has accepted the request.
-  const streamReply = async (body, userText, onStarted) => {
+  // onStarted runs at the first event, once the server has accepted the request. isAfterWrite: a resume after the
+  // app's write succeeded, which must reach the paused run and never read as "ask again" under a confirmed card.
+  const streamReply = async (body, userText, onStarted, isAfterWrite = false) => {
     const replyId = crypto.randomUUID();
     let hasStarted = false;
     setIsSending(true);
@@ -221,7 +225,7 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
     ]);
     try {
       // The page at send time, not at open time: the panel stays open while the user navigates.
-      await assistantService.streamChat({
+      const request = () => assistantService.streamChat({
         ...body,
         threadId,
         page,
@@ -233,10 +237,18 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
           updateMessage(replyId, m => applyEvent(m, event));
         },
       });
+      try {
+        await request();
+      } catch (error) {
+        // A network error (no HTTP status) before any event: the run is still paused, so tell it once more.
+        if (!isAfterWrite || hasStarted || error.status) throw error;
+        await request();
+      }
       // A stream that ends without "done" (connection dropped) still stops the loader.
       updateMessage(replyId, m => (m.status === 'streaming' ? { ...m, status: 'done', isTraceOpen: false } : m));
     } catch (error) {
-      const text = error.status === 429 ? t('assistant.limitReached') : error.status === 403 ? t('assistant.notAvailable') : error.message;
+      const text = isAfterWrite && error.status === 409 ? t('assistant.action.doneUntold')
+        : error.status === 429 ? t('assistant.limitReached') : error.status === 403 ? t('assistant.notAvailable') : error.message;
       // The stream stays open after "done" for the follow-ups; a drop then must not turn a finished answer into an error.
       updateMessage(replyId, m => (m.status === 'done' ? m : { ...m, status: 'error', isTraceOpen: false, error: text }));
     } finally {
@@ -256,9 +268,9 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
 
   const setAction = (id, change) => updateMessage(id, m => ({ ...m, action: { ...m.action, ...change } }));
 
-  // The write runs here, with the app's own services as the signed-in user; then the paused run hears how it went.
+  // The write runs here, through the app's contexts as the signed-in user; then the paused run hears how it went.
   const handleConfirmAction = async (id) => {
-    const { action, draft, state } = messages.find(m => m.id === id).action;
+    const { action, draft, pauseId, state } = messages.find(m => m.id === id).action;
     if (state !== 'pending') return; // at most one write per card
     setAction(id, { state: 'running' });
     setIsSending(true);
@@ -267,7 +279,7 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
       if (action === 'propose_next_round') {
         const { settings } = draft;
         const tournamentId = crypto.randomUUID();
-        await tournamentService.createTournament({
+        await createTournament({
           id: tournamentId,
           name: draft.name,
           leagueId: draft.league_id,
@@ -288,8 +300,10 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
         });
         setAction(id, { state: 'done', tournamentId });
         resume = { status: 'done', tournament_id: tournamentId };
+        // The league page lists its rounds from the loaded league: reload it to show the new one.
+        if (currentLeague?.id === draft.league_id) selectLeague(draft.league_id).catch(() => {});
       } else {
-        const added = await leagueService.addMembers(draft.league_id, [...draft.existing.map(p => p.id), ...draft.new.map(name => ({ name }))]);
+        const added = await addMembers(draft.league_id, [...draft.existing.map(p => p.id), ...draft.new.map(name => ({ name }))]);
         setAction(id, { state: 'done' });
         resume = { status: 'done', added: added.length };
       }
@@ -298,13 +312,14 @@ export function AssistantPanel({ isOpen, onOpenChange }) {
       setAction(id, { state: 'failed', error: message });
       resume = { status: 'failed', error: message.slice(0, 300) };
     }
-    await streamReply({ resume });
+    await streamReply({ resume: { ...resume, pause_id: pauseId } }, null, null, resume.status === 'done');
   };
 
   const handleCancelAction = (id) => {
-    if (messages.find(m => m.id === id).action.state !== 'pending') return;
+    const { pauseId, state } = messages.find(m => m.id === id).action;
+    if (state !== 'pending') return;
     setAction(id, { state: 'cancelled' });
-    streamReply({ resume: { status: 'cancelled' } });
+    streamReply({ resume: { status: 'cancelled', pause_id: pauseId } });
   };
 
   // Lights the chosen thumb at once; a failed send puts it back so the user can try again.

@@ -1734,7 +1734,8 @@
       "confirmed": "Confirmed",
       "cancelled": "Cancelled",
       "failed": "Failed: {{error}}",
-      "openTournament": "Open the tournament"
+      "openTournament": "Open the tournament",
+      "doneUntold": "Done. The assistant could not be told; refresh to see it."
     }
   }
 }

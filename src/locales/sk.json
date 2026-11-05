@@ -1734,7 +1734,8 @@
       "confirmed": "Potvrdené",
       "cancelled": "Zrušené",
       "failed": "Zlyhalo: {{error}}",
-      "openTournament": "Otvoriť turnaj"
+      "openTournament": "Otvoriť turnaj",
+      "doneUntold": "Hotovo. Asistent o tom nedostal správu; obnovte stránku, aby ste to videli."
     }
   }
 }
