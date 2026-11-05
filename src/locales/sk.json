@@ -88,6 +88,7 @@
     "nextRound": "Vytvoriť ďalšie kolo",
     "copySuffix": "(kópia)",
     "copiedFrom": "Nastavenia sú prevzaté z turnaja {{name}} — pred vytvorením môžete čokoľvek zmeniť.",
+    "forLeague": "Liga: {{name}}",
     "samePlayers": "Rovnakí hráči ({{count}})",
     "copySourceFailed": "Turnaj na skopírovanie sa nepodarilo načítať — začínate s prázdnym formulárom.",
     "filterPlayers": "Hľadať hráčov...",

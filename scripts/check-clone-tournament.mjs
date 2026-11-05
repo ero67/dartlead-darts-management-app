@@ -61,6 +61,8 @@ assert.equal(source.standingsCriteriaOrder[0], 'legDifference');
 // Registration rounds: settings copied, player list only offered.
 assert.equal(buildClonePrefill({ ...source, status: 'open_for_registration' }, '(copy)').copyPlayers, false);
 assert.equal(buildClonePrefill({ ...source, venue: 'Pub U Kohúta', startsAt: '2026-11-07T18:00:00Z' }, '(copy)').venue, 'Pub U Kohúta');
+assert.equal(buildClonePrefill({ ...source, boardCount: 4 }, '(copy)').boardCount, 4);
+assert.equal(prefill.boardCount, undefined);
 assert.equal('startsAt' in buildClonePrefill({ ...source, startsAt: '2026-11-07T18:00:00Z' }, '(copy)'), false);
 
 // Sparse legacy rows leave the form defaults alone.
