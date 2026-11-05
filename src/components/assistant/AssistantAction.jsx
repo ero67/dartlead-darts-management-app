@@ -13,6 +13,7 @@ export function AssistantAction({ action, isDisabled, onConfirm, onCancel }) {
   const { t, language } = useLanguage();
   const { draft, state } = action;
   const isNextRound = action.action === 'propose_next_round';
+  const newPlayers = draft.new_players ?? []; // an assistant deployed before new_players sends none
   const isSettled = state !== 'pending' && state !== 'running';
   const cardRef = useRef(null);
   const statusRef = useRef(null);
@@ -53,7 +54,17 @@ export function AssistantAction({ action, isDisabled, onConfirm, onCancel }) {
               {field(t('assistant.action.name'), draft.name)}
               {field(t('assistant.action.date'), when(draft.starts_at))}
               {draft.venue && field(t('assistant.action.venue'), draft.venue)}
-              {field(t('assistant.action.playerCount', { count: draft.players.length }), draft.players.map(p => p.name).join(', '))}
+              {field(t('assistant.action.playerCount', { count: draft.players.length + newPlayers.length }), (
+                <>
+                  {draft.players.map(p => p.name).join(', ')}
+                  {newPlayers.map((name, i) => (
+                    <span key={`new-${name}`} className="inline-flex items-center gap-1.5">
+                      {(draft.players.length > 0 || i > 0) && ', '}{name}
+                      <Badge variant="secondary">{t('assistant.action.new')}</Badge>
+                    </span>
+                  ))}
+                </>
+              ))}
             </>
           ) : (
             field(t('assistant.action.players'), (
