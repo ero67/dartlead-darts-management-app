@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Badge as BadgeIcon, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save, Activity, UserCheck, ClipboardList, CreditCard, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { Badge as BadgeIcon, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save, Activity, UserCheck, ClipboardList, CreditCard, CheckCircle, XCircle, ExternalLink, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,6 +64,7 @@ export function ManagerPanel() {
       ? leagues
       : leagues.filter(l => user && (l.createdBy === user.id || (l.managerIds || []).includes(user.id)))
   ), [leagues, isAdmin, user]);
+  const leagueNameById = useMemo(() => new Map(leagues.map(l => [l.id, l.name])), [leagues]);
 
   // Own tournaments plus every tournament of a league this user (co-)manages
   const myTournaments = useMemo(() => {
@@ -578,7 +579,13 @@ export function ManagerPanel() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatTile label={t('manager.overviewLiveNow')} value={liveMatchesNow} icon={Activity} />
             <StatTile label={t('manager.overviewPendingMatches')} value={pendingMatchesCount} icon={RotateCcw} />
-            <StatTile label={t('manager.overviewPendingRequests')} value={requests.length} icon={UserCheck} />
+            <button
+              type="button"
+              className="rounded-xl text-left transition-colors hover:[&>*]:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => setActiveTab('requests')}
+            >
+              <StatTile label={t('manager.overviewPendingRequests')} value={requests.length} icon={UserCheck} />
+            </button>
             <StatTile label={t('manager.overviewOpenTournaments')} value={openTournaments.length} icon={BadgeIcon} />
           </div>
 
@@ -592,7 +599,13 @@ export function ManagerPanel() {
               </CardHeader>
               <CardContent>
                 {attentionTournaments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t('manager.overviewNothingActive')}</p>
+                  <div className="flex flex-col items-start gap-3">
+                    <p className="text-sm text-muted-foreground">{t('manager.overviewNothingActive')}</p>
+                    <Button size="sm" onClick={() => navigate('/create-tournament')}>
+                      <Plus />
+                      {t('tournaments.create')}
+                    </Button>
+                  </div>
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {attentionTournaments.map((tr) => (
@@ -600,7 +613,7 @@ export function ManagerPanel() {
                         <div className="flex min-w-0 flex-col">
                           <span className="truncate text-sm font-medium">{tr.name}</span>
                           <span className="text-xs text-muted-foreground">
-                            {tournamentStatusLabel(tr.status, t)}
+                            {[leagueNameById.get(tr.leagueId), tournamentStatusLabel(tr.status, t)].filter(Boolean).join(' · ')}
                             {(tr.inProgressMatches ?? 0) > 0 && ` · ${tr.inProgressMatches} ${t('manager.overviewLiveNow').toLowerCase()}`}
                             {tr.status !== 'open_for_registration' && (tr.pendingMatches ?? 0) > 0 && ` · ${tr.pendingMatches} ${t('manager.overviewPendingMatches').toLowerCase()}`}
                           </span>
@@ -687,7 +700,10 @@ export function ManagerPanel() {
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-sm font-medium">{reg.player_name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {reg.tournament?.name} · {new Date(reg.created_at).toLocaleDateString()}
+                          <Link to={`/tournament/${reg.tournament_id}`} className="hover:text-foreground hover:underline">
+                            {reg.tournament?.name}
+                          </Link>
+                          {' · '}{new Date(reg.created_at).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="flex gap-2">

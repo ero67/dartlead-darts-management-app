@@ -374,8 +374,7 @@ function AppContent() {
   } = useTournament();
   const {
     reloadLeagues,
-    createLeague,
-    selectLeague
+    createLeague
   } = useLeague();
   
   const navigate = useNavigate();
@@ -482,10 +481,7 @@ function AppContent() {
     }
   };
 
-  const handleSelectLeague = (league) => {
-    selectLeague(league.id);
-    navigate(`/league/${league.id}`);
-  };
+  const handleSelectLeague = (league) => navigate(`/league/${league.id}`);
 
   // With sourceTournamentId: "Create next round", prefilled from that round.
   const handleCreateTournamentFromLeague = (league, sourceTournamentId) => {

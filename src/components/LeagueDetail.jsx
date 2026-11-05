@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Trophy, Users, Settings, TrendingUp, Pencil, Trash2, X, Check, BarChart3, LogIn } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -17,6 +17,7 @@ import { PlayersTab } from './league/PlayersTab';
 import { SettingsTab } from './league/SettingsTab';
 import { SeasonSelect } from './league/Seasons';
 import { getUserDisplayName } from '../utils/userDisplayName';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,7 +53,10 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const navigate = useNavigate();
   const { isAdmin } = useAdmin();
   const { currentLeague, selectLeague, updateLeague, deleteLeague, addMembers, updateMemberStatus, removeMember, refreshLeaderboard, getUnlinkedTournaments, linkTournamentToLeague, unlinkTournamentFromLeague, registerForLeague, approveLeagueRegistration, rejectLeagueRegistration, withdrawLeagueRegistration } = useLeague();
-  const [activeTab, setActiveTab] = useState('leaderboard'); // 'leaderboard', 'tournaments', 'players', 'settings'
+  // Tab lives in the URL so coming back from a round lands on the same tab
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'leaderboard';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '' });
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -108,9 +112,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     currentLeague.createdBy === user.id ||
     (currentLeague.managerIds && currentLeague.managerIds.includes(user.id))
   ));
+  const pendingRegCount = leagueRegistrations.filter(r => r.status === 'pending').length;
 
   useEffect(() => {
-    if (!leagueId || (currentLeague && currentLeague.id === leagueId)) return;
+    // Fetch once per mount even when the cached league matches, so reopening
+    // a league shows the cached copy at once and then refreshes it.
+    if (!leagueId) return;
     // selectLeague is a fresh function on every provider render, so without
     // this guard the (heavy) getLeague fetch fired once per render until the
     // league arrived.
@@ -226,7 +233,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     return () => { cancelled = true; };
   }, [currentLeagueId, userId, isManager]);
 
-  if (!currentLeague) {
+  // A previously opened league may still be cached while this one loads
+  if (!currentLeague || currentLeague.id !== leagueId) {
     if (loadError) {
       return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
@@ -743,13 +751,17 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
+      <Tabs value={activeTab === 'settings' && !isManager ? 'leaderboard' : activeTab} onValueChange={setActiveTab} className="gap-6">
         <TabsList>
           <TabsTrigger value="leaderboard"><TrendingUp />{t('leagues.leaderboard')}</TabsTrigger>
           <TabsTrigger value="tournaments"><Trophy />{t('tournaments.title')}</TabsTrigger>
           <TabsTrigger value="statistics"><BarChart3 />{t('leagues.statistics')}</TabsTrigger>
           <TabsTrigger value="h2h"><Users />{t('leagues.headToHead')}</TabsTrigger>
-          <TabsTrigger value="players"><Users />{t('leagues.players')}</TabsTrigger>
+          <TabsTrigger value="players">
+            <Users />
+            {t('leagues.players')}
+            {isManager && pendingRegCount > 0 && <Badge variant="secondary" className="tabular-nums">{pendingRegCount}</Badge>}
+          </TabsTrigger>
           {isManager && <TabsTrigger value="settings"><Settings />{t('leagues.settings')}</TabsTrigger>}
         </TabsList>
 
@@ -760,6 +772,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
             isRecalculating={isRecalculating}
             onRecalculate={handleRecalculate}
             onSeasonChanged={handleSeasonChanged}
+            onCreateTournament={onCreateTournament}
           />
         </TabsContent>
 

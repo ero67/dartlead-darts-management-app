@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Plus, Trophy, Users, Calendar, Trash2, Play, Crown, LayoutGrid } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,21 +25,26 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
   const { user } = useAuth();
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed', 'mine'
   const [sortBy, setSortBy] = useState('updated'); // 'updated', 'created', 'name'
+  const [leagueFilter, setLeagueFilter] = useState('all'); // 'all' or a league id
   const { isAdmin, canCreateTournaments } = useAdmin();
   const { leagues } = useLeague();
 
   const canCreate = Boolean(user && canCreateTournaments);
   const isMine = (tournament) => Boolean(user && tournament.userId && user.id === tournament.userId);
 
+  // Only leagues that actually have rounds in this list
+  const leaguesInList = leagues.filter(l => tournaments.some(x => x.leagueId === l.id));
+  const inLeague = leagueFilter === 'all' ? tournaments : tournaments.filter(x => x.leagueId === leagueFilter);
+
   const filters = [
-    { key: 'all', label: t('tournaments.all'), count: tournaments.length },
-    { key: 'active', label: t('common.active'), count: tournaments.filter(x => isTournamentRunning(x.status)).length },
-    { key: 'completed', label: t('common.completed'), count: tournaments.filter(x => x.status === 'completed').length },
-    ...(canCreate ? [{ key: 'mine', label: t('tournaments.myTournaments'), count: tournaments.filter(isMine).length }] : []),
+    { key: 'all', label: t('tournaments.all'), count: inLeague.length },
+    { key: 'active', label: t('common.active'), count: inLeague.filter(x => isTournamentRunning(x.status)).length },
+    { key: 'completed', label: t('common.completed'), count: inLeague.filter(x => x.status === 'completed').length },
+    ...(canCreate ? [{ key: 'mine', label: t('tournaments.myTournaments'), count: inLeague.filter(isMine).length }] : []),
   ];
   const filterLabels = Object.fromEntries(filters.map(f => [f.key, f.label]));
 
-  const filteredTournaments = tournaments.filter(tournament => {
+  const filteredTournaments = inLeague.filter(tournament => {
     if (filter === 'all') return true;
     if (filter === 'mine') return isMine(tournament);
     if (filter === 'active') return isTournamentRunning(tournament.status);
@@ -96,7 +102,20 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
           </TabsList>
         </Tabs>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {leaguesInList.length > 0 && (
+            <Select value={leagueFilter} onValueChange={setLeagueFilter}>
+              <SelectTrigger className="w-44" aria-label={t('tournaments.filterByLeague')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('tournaments.allLeagues')}</SelectItem>
+                {leaguesInList.map(l => (
+                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <span className="text-sm text-muted-foreground">{t('tournaments.sortBy')}</span>
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-44" aria-label={t('tournaments.sortBy')}>
@@ -160,10 +179,13 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                     </div>
                   </div>
                   {linkedLeague && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Link
+                      to={`/league/${linkedLeague.id}`}
+                      className="flex w-fit max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    >
                       <Crown className="size-3" />
                       <span className="truncate">{linkedLeague.name}</span>
-                    </div>
+                    </Link>
                   )}
                 </CardHeader>
 
