@@ -12,8 +12,10 @@ MATCH, TIE, EPSILON = 0.9, 0.05, 1e-9
 MAX_NAME_LENGTH = 100
 ZONE = ZoneInfo("Europe/Bratislava")  # the app's time zone, as in agent.today_line
 DEFAULT_TIME = time(19, 0)
-# "kolo 5" first, so a year or a league number before it ("Liga 2 kolo 7") is not taken for the round's; then "5. kolo".
-ROUND_NUMBER = (re.compile(r"\b(?:kolo|kola|round|runda)\s*(\d+)"), re.compile(r"(\d+)\.?\s*(?:kolo|kola|round|runda)\b"))
+# The dotted ordinal "5. kolo" first (a year may follow it), then "kolo 5" (a year or league number may precede it),
+# then "5 kolo".
+ROUND_NUMBER = (re.compile(r"(\d+)\.\s*(?:kolo|kola|round|runda)\b"), re.compile(r"\b(?:kolo|kola|round|runda)\s*(\d+)"),
+                re.compile(r"(\d+)\s*(?:kolo|kola|round|runda)\b"))
 
 
 def _league(league_id: str) -> dict:
@@ -92,9 +94,11 @@ def _pick(name: str, rows: list[dict], member_ids: set[str] = frozenset()) -> tu
     if not close:
         return None, []
     top = close[0]
-    if top["match"] == 1.0:  # an exact full name; another exact one is the same name stored twice: take the first
-        return top, close
     is_member = top["id"] in member_ids
+    if top["match"] == 1.0:  # an exact full name; another exact one is the same name stored twice: take the first
+        # An exact non-member ("Katka") wins only when no member is a match too ("Katka Nová"): then ask.
+        member = None if is_member else next((c for c in close if c["id"] in member_ids and c["match"] >= MATCH), None)
+        return (None, [top, member]) if member else (top, close)
     rivals = [c for c in close[1:] if top["match"] - c["match"] <= TIE + EPSILON
               and stats._norm(c["name"]) != stats._norm(top["name"])  # stored twice: the first, as createTournament takes
               and not (is_member and c["id"] not in member_ids and c["match"] == top["match"])]  # a member wins a tie
@@ -113,11 +117,12 @@ def _unclear(unclear: dict[str, str]) -> dict:
     return {"error": f"Some names are unclear. Ask the user about all of them at once: {asks}"}
 
 
-def _round_players(league_id: str, names: list[str], confirmed_new: set[str]) -> dict:
-    # Members and roster ranked together, members first so they win equal scores.
-    members = _members(league_id)
-    member_ids = {m["id"] for m in members}
-    rows = members + [p for p in _roster() if p["id"] not in member_ids]
+def _round_players(league_id: str, names: list[str], confirmed_new: set[str], previous: list[dict]) -> dict:
+    # The last round's players (when kept), members and roster ranked together; the first two come first and are
+    # preferred, so they win equal scores.
+    first = previous + [m for m in _members(league_id) if m["id"] not in {p["id"] for p in previous}]
+    member_ids = {p["id"] for p in first}
+    rows = first + [p for p in _roster() if p["id"] not in member_ids]
     players, new, unclear, given = [], [], {}, {}
     for name in names:
         top, close = _pick(name, rows, member_ids)
@@ -157,16 +162,19 @@ def next_round_draft(league_id: str, starts_at: str | None = None, name: str | N
         starts_at = _starts_at(starts_at, last["starts_at"])
     except ValueError:
         return {"error": "The date must be an ISO date or date-time, like 2026-11-06T19:00:00+01:00."}
-    chosen = {"players": [], "new_players": []}
-    if listed:
-        chosen = _round_players(league_id, names, confirmed_new)
-        if "error" in chosen:
-            return chosen
+    previous = []
     if include_last_round or not listed:
         rows = stats.db().table("tournament_players").select("players(id, name)").eq("tournament_id", last["id"]).execute().data
         previous = [{"id": r["players"]["id"], "name": r["players"]["name"]} for r in rows]
-        ids = {p["id"] for p in previous}
-        chosen["players"] = previous + [p for p in chosen["players"] if p["id"] not in ids]
+    chosen = {"players": previous, "new_players": []}
+    if listed:
+        chosen = _round_players(league_id, names, confirmed_new, previous)
+        if "error" in chosen:
+            return chosen
+        kept = {p["id"] for p in previous}
+        chosen["players"] = previous + [p for p in chosen["players"] if p["id"] not in kept]
+        if len(chosen["players"]) + len(chosen["new_players"]) > MAX_ROUND_PLAYERS:
+            return {"error": f"A round holds at most {MAX_ROUND_PLAYERS} players."}
     return {
         "league_id": league_id, "league": league["name"], "name": name or _next_name(last["name"]),
         "starts_at": starts_at, "venue": last["venue"], "settings": {k: last[k] for k in SETTINGS}, **chosen,

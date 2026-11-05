@@ -108,6 +108,7 @@ def test_next_round_explicit_date_and_name_win(monkeypatch):
     ("Demo Liga – 4. kolo", "Demo Liga – 5. kolo"), ("Kolo 5 (2026)", "Kolo 6 (2026)"), ("Piatok 3", "Piatok 4"),
     ("2. KOLA liga 9", "3. KOLA liga 9"), ("Runda 4, sezóna 2", "Runda 5, sezóna 2"),
     ("Sezóna 2026 Kolo 5", "Sezóna 2026 Kolo 6"), ("Liga 2 kolo 7", "Liga 2 kolo 8"), ("2026 Round 3", "2026 Round 4"),
+    ("3.kolo 2026", "4.kolo 2026"), ("X 10. kolo 2026", "X 11. kolo 2026"), ("4. kolo 2. časť", "5. kolo 2. časť"),
 ])
 def test_next_round_name(monkeypatch, last, expected):
     fake(monkeypatch, tournaments=[round_row(name=last)])
@@ -175,9 +176,32 @@ def test_next_round_confirmed_new_players(monkeypatch):
     assert draft["new_players"] == ["Zoltán Neznámy"]
 
 
-def test_next_round_exact_roster_name_beats_close_member(monkeypatch):
-    draft = listed(monkeypatch, ["Petr Novák"], members=[player("p1", "Peter Novák")], roster=[player("p2", "Petr Novák")])
+def test_next_round_exact_roster_name_with_close_member_asks(monkeypatch):
+    # Never the close member silently; the exact non-member only when no member matches too.
+    result = listed(monkeypatch, ["Petr Novák"], members=[player("p1", "Peter Novák")], roster=[player("p2", "Petr Novák")])
+    assert "Petr Novák or Peter Novák" in result["error"]
+    draft = listed(monkeypatch, ["Petr Novák"], members=[player("p1", "Pavol Malý")], roster=[player("p2", "Petr Novák")])
     assert draft["players"] == [player("p2", "Petr Novák")]
+
+
+def test_next_round_exact_non_member_with_member_match_asks(monkeypatch):
+    result = listed(monkeypatch, ["Katka"], members=[player("p1", "Katka Nová")], roster=[player("p2", "Katka")])
+    assert "Katka or Katka Nová" in result["error"]
+
+
+def test_next_round_kept_players_are_matched_first(monkeypatch):
+    # "Peter" is clear among the last round's players, though the roster has another Peter.
+    fake(monkeypatch, tournaments=[round_row()], tournament_players=[{"players": player("p0", "Peter Novák")}],
+         players=[player("p3", "Peter Horváth"), player("p0", "Peter Novák")])
+    assert "error" in actions.next_round_draft(L, players=["Peter"])  # without the last round: two Peters
+    draft = actions.next_round_draft(L, players=["Peter"], include_last_round=True)
+    assert draft["players"] == [player("p0", "Peter Novák")]
+
+
+def test_next_round_kept_players_count_towards_the_cap(monkeypatch):
+    fake(monkeypatch, tournaments=[round_row()], tournament_players=[{"players": player(f"k{i}", f"K{i}")} for i in range(60)])
+    assert "error" in actions.next_round_draft(L, new_players=[f"N{i}" for i in range(5)], include_last_round=True)
+    assert len(actions.next_round_draft(L, new_players=[f"N{i}" for i in range(4)], include_last_round=True)["new_players"]) == 4
 
 
 def test_next_round_member_wins_only_equal_scores(monkeypatch):
