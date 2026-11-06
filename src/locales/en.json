@@ -88,6 +88,7 @@
     "nextRound": "Create next round",
     "copySuffix": "(copy)",
     "copiedFrom": "Settings copied from {{name}} — change anything before creating.",
+    "forLeague": "League: {{name}}",
     "samePlayers": "Same players ({{count}})",
     "copySourceFailed": "Couldn't load the tournament to copy — starting with an empty form.",
     "filterPlayers": "Search players...",
@@ -112,6 +113,8 @@
     "myTournaments": "My Tournaments",
     "yours": "Yours",
     "sortBy": "Sort by",
+    "filterByLeague": "Filter by league",
+    "allLeagues": "All leagues",
     "lastUpdated": "Last Updated",
     "dateCreated": "Date Created",
     "progress": "Progress",
@@ -428,6 +431,9 @@
     "playoffsNote": "Selected players will be seeded based on standings order.",
     "playoffsNotAvailable": "Playoffs Not Available",
     "playoffsAvailableAfterGroups": "Playoffs will be available once group stage is completed.",
+    "groupStageDoneTitle": "Group stage finished",
+    "groupStageDoneText": "Every group match is played. Check the standings, then start the playoffs.",
+    "goToPlayoffs": "Go to playoffs",
     "editMatchPlayers": "Edit Match Players",
     "playoffMatchUpdated": "Playoff match updated successfully",
     "failedToUpdatePlayoffMatch": "Failed to update playoff match",
@@ -539,11 +545,13 @@
     "heroSubtitle": "Registration, groups, playoffs, scoring on every board, a TV wall with live win chances and season standings. DartLead runs the whole evening, and players never pay.",
     "ctaDemo": "See a demo tournament",
     "ctaPrimary": "Get access",
-    "ctaPractice": "Practice free against bots",
+    "ctaPractice": "Practice free",
+    "practiceSub": "X01 and Cricket against bots (35–95 average), or solo drills. No sign-up needed.",
+    "playStore": "Get it on Google Play",
+    "playStoreWeb": "or keep using it right here in your browser, no install needed",
     "proof": {
       "offline": "Keeps scoring offline",
       "android": "Android app",
-      "games": "X01 and Cricket",
       "languages": "Slovak and English"
     },
     "stats": {
@@ -1181,6 +1189,11 @@
     "completed": "Completed",
     "inProgress": "In progress",
     "views": "Views",
+    "stats": "Stats",
+    "statCheckout": "Highest checkout",
+    "statAverage": "Best average",
+    "stat180s": "180s",
+    "statFewestDarts": "Fewest darts in a leg",
     "pause": "Pause rotation",
     "resume": "Resume rotation",
     "paused": "Rotation paused — press space to resume",
@@ -1720,8 +1733,31 @@
         "get_player_form": {"running": "Loading form", "done": "Form of {{player}}"},
         "get_match_preview": {"running": "Preparing the match preview", "done": "Previewed the match"},
         "get_round_recap": {"running": "Collecting the round facts", "done": "Facts of {{tournament}}"},
-        "show_chart": {"running": "Preparing a chart", "done": "Prepared a chart", "none": "No chart, not enough data"}
+        "show_chart": {"running": "Preparing a chart", "done": "Prepared a chart", "none": "No chart, not enough data"},
+        "propose_next_round": {"running": "Preparing the next round", "done": "Prepared the next round", "none": "Could not prepare the next round"},
+        "propose_add_league_members": {"running": "Preparing the new members", "done": "Prepared the new members", "none": "Could not prepare the new members"}
       }
+    },
+    "action": {
+      "nextRoundTitle": "Create the next round",
+      "addMembersTitle": "Add players to the league",
+      "league": "League",
+      "name": "Name",
+      "date": "Date",
+      "venue": "Venue",
+      "players": "Players",
+      "playerCount": "Players ({{count}})",
+      "noDate": "No date",
+      "new": "New",
+      "alreadyMember": "already a member",
+      "confirm": "Confirm",
+      "working": "Working…",
+      "cancel": "Cancel",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "failed": "Failed: {{error}}",
+      "openTournament": "Open the tournament",
+      "doneUntold": "Done. The assistant could not be told; refresh to see it."
     }
   }
 }

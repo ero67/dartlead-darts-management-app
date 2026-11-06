@@ -88,6 +88,7 @@
     "nextRound": "Vytvoriť ďalšie kolo",
     "copySuffix": "(kópia)",
     "copiedFrom": "Nastavenia sú prevzaté z turnaja {{name}} — pred vytvorením môžete čokoľvek zmeniť.",
+    "forLeague": "Liga: {{name}}",
     "samePlayers": "Rovnakí hráči ({{count}})",
     "copySourceFailed": "Turnaj na skopírovanie sa nepodarilo načítať — začínate s prázdnym formulárom.",
     "filterPlayers": "Hľadať hráčov...",
@@ -112,6 +113,8 @@
     "myTournaments": "Moje Turnaje",
     "yours": "Váš",
     "sortBy": "Zoradiť podľa",
+    "filterByLeague": "Filtrovať podľa ligy",
+    "allLeagues": "Všetky ligy",
     "lastUpdated": "Naposledy Aktualizované",
     "dateCreated": "Dátum Vytvorenia",
     "progress": "Priebeh",
@@ -428,6 +431,9 @@
     "playoffsNote": "Vybraní hráči budú nasadení podľa poradia v tabuľkách.",
     "playoffsNotAvailable": "Play-off Nie Je Dostupné",
     "playoffsAvailableAfterGroups": "Play-off bude dostupné po dokončení skupinovej fázy.",
+    "groupStageDoneTitle": "Skupinová fáza je dohraná",
+    "groupStageDoneText": "Všetky zápasy v skupinách sú odohrané. Skontrolujte tabuľky a spustite play-off.",
+    "goToPlayoffs": "Prejsť na play-off",
     "editMatchPlayers": "Upraviť Hráčov Zápasu",
     "playoffMatchUpdated": "Playoff zápas bol úspešne aktualizovaný",
     "failedToUpdatePlayoffMatch": "Nepodarilo sa aktualizovať playoff zápas",
@@ -539,11 +545,13 @@
     "heroSubtitle": "Registrácia, skupiny, play-off, skórovanie na každom terči, TV obrazovka so šancami na výhru naživo a sezónny rebríček. DartLead odvedie celý večer a hráči nikdy neplatia.",
     "ctaDemo": "Pozrieť ukážkový turnaj",
     "ctaPrimary": "Získať prístup",
-    "ctaPractice": "Trénovať zadarmo proti botom",
+    "ctaPractice": "Trénovať zadarmo",
+    "practiceSub": "X01 a kriket proti botom (priemer 35–95) alebo samostatné cvičenia. Bez registrácie.",
+    "playStore": "Stiahnuť z Google Play",
+    "playStoreWeb": "alebo pokračujte priamo tu v prehliadači, bez inštalácie",
     "proof": {
       "offline": "Skóruje aj bez internetu",
       "android": "Aplikácia pre Android",
-      "games": "X01 aj Cricket",
       "languages": "Slovensky a anglicky"
     },
     "stats": {
@@ -1181,6 +1189,11 @@
     "completed": "Ukončený",
     "inProgress": "Prebieha",
     "views": "Zobrazenia",
+    "stats": "Štatistiky",
+    "statCheckout": "Najvyšší checkout",
+    "statAverage": "Najlepší priemer",
+    "stat180s": "180-ky",
+    "statFewestDarts": "Najmenej šípok na leg",
     "pause": "Pozastaviť striedanie",
     "resume": "Obnoviť striedanie",
     "paused": "Striedanie pozastavené — medzerník pokračuje",
@@ -1720,8 +1733,31 @@
         "get_player_form": {"running": "Načítavam formu", "done": "Forma: {{player}}"},
         "get_match_preview": {"running": "Pripravujem náhľad zápasu", "done": "Náhľad zápasu"},
         "get_round_recap": {"running": "Zbieram fakty o kole", "done": "Fakty: {{tournament}}"},
-        "show_chart": {"running": "Pripravujem graf", "done": "Graf je pripravený", "none": "Bez grafu, málo údajov"}
+        "show_chart": {"running": "Pripravujem graf", "done": "Graf je pripravený", "none": "Bez grafu, málo údajov"},
+        "propose_next_round": {"running": "Pripravujem ďalšie kolo", "done": "Ďalšie kolo je pripravené", "none": "Ďalšie kolo sa nepodarilo pripraviť"},
+        "propose_add_league_members": {"running": "Pripravujem nových členov", "done": "Noví členovia sú pripravení", "none": "Nových členov sa nepodarilo pripraviť"}
       }
+    },
+    "action": {
+      "nextRoundTitle": "Vytvoriť ďalšie kolo",
+      "addMembersTitle": "Pridať hráčov do ligy",
+      "league": "Liga",
+      "name": "Názov",
+      "date": "Dátum",
+      "venue": "Miesto",
+      "players": "Hráči",
+      "playerCount": "Hráči ({{count}})",
+      "noDate": "Bez dátumu",
+      "new": "Nový",
+      "alreadyMember": "už je členom",
+      "confirm": "Potvrdiť",
+      "working": "Pracujem…",
+      "cancel": "Zrušiť",
+      "confirmed": "Potvrdené",
+      "cancelled": "Zrušené",
+      "failed": "Zlyhalo: {{error}}",
+      "openTournament": "Otvoriť turnaj",
+      "doneUntold": "Hotovo. Asistent o tom nedostal správu; obnovte stránku, aby ste to videli."
     }
   }
 }

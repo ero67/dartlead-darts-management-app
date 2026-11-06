@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus, Target } from 'lucide-react';
+import { Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus, Target } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -31,12 +31,14 @@ import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
 import { BoardsControl } from './tournament/BoardsControl';
 import { BoardWaitingScreen } from './tournament/BoardWaitingScreen';
+import { TournamentCrumbs } from './tournament/TournamentCrumbs';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { assignGroupScorers, assignPlayoffScorers } from '../utils/scorerAssignment';
 import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { sortStandings } from '../utils/standings';
+import { getQualifyingPlayers } from '../utils/qualifiers';
 import { cloneTournamentPath } from '../utils/cloneTournament';
 import { nextForBoard, ownLiveMatch } from '../utils/boardWaiting';
 import { buildMatchData } from '../utils/matchStart';
@@ -1265,111 +1267,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     criteriaOrder
   );
 
-  // Get qualifying players based on group standings, sorted by performance for seeding
-  const getQualifyingPlayers = () => {
-    if (!tournament) return [];
-    
-    // For playoff-only tournaments, all registered players qualify,
-    // sorted by name (or keep current order if you prefer)
-    if (tournament.tournamentType === 'playoff_only') {
-      const players = tournament.players || [];
-      return [...players].sort((a, b) => a.name.localeCompare(b.name));
-    }
-    
-    if (!tournament.groups) return [];
-    
-    // Use the same criteria order as the UI standings display
-    const criteriaOrder = tournament.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'];
-    const qualificationMode = tournament.playoffSettings?.qualificationMode || 'perGroup';
-    const allQualifyingPlayers = [];
-    const allPlayersValue = 9999; // Special value to represent "all players"
-    
-    if (qualificationMode === 'totalPlayers') {
-      // Mode: Total players to advance
-      const totalPlayersToAdvance = tournament.playoffSettings?.totalPlayersToAdvance || 8;
-      const numberOfGroups = tournament.groups.length;
-      const playersPerGroup = Math.floor(totalPlayersToAdvance / numberOfGroups);
-      const remainder = totalPlayersToAdvance % numberOfGroups;
-      
-      // First, collect players from each group (equal distribution)
-      const playersByPosition = {}; // position -> array of players from all groups
-      
-      tournament.groups.forEach(group => {
-        if (group.standings && group.standings.length > 0) {
-          // Sort using the same criteria as the UI standings
-          const sortedStandings = sortStandingsByCriteria(group.standings, criteriaOrder);
-          
-          // Take playersPerGroup players from this group
-          for (let i = 0; i < playersPerGroup && i < sortedStandings.length; i++) {
-            const standing = sortedStandings[i];
-            allQualifyingPlayers.push({
-              ...standing,
-              groupPosition: i + 1,
-              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
-              groupId: group.id
-            });
-          }
-          
-          // Store remaining players by position for remainder selection
-          for (let i = playersPerGroup; i < sortedStandings.length; i++) {
-            const standing = sortedStandings[i];
-            const position = i + 1;
-            if (!playersByPosition[position]) {
-              playersByPosition[position] = [];
-            }
-            playersByPosition[position].push({
-              ...standing,
-              groupPosition: position,
-              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0),
-              groupId: group.id
-            });
-          }
-        }
-      });
-      
-      // If there's a remainder, take the best players from the next position
-      if (remainder > 0) {
-        const nextPosition = playersPerGroup + 1;
-        if (playersByPosition[nextPosition]) {
-          // Sort remainder candidates using the same criteria
-          const candidates = sortStandingsByCriteria(playersByPosition[nextPosition], criteriaOrder);
-          
-          // Take top 'remainder' players
-          for (let i = 0; i < remainder && i < candidates.length; i++) {
-            allQualifyingPlayers.push(candidates[i]);
-          }
-        }
-      }
-    } else {
-      // Mode: Players per group (original logic)
-      const playersPerGroup = tournament.playoffSettings?.playersPerGroup || 2;
-      
-      tournament.groups.forEach(group => {
-        if (group.standings && group.standings.length > 0) {
-          // Sort using the same criteria as the UI standings
-          const sortedStandings = sortStandingsByCriteria(group.standings, criteriaOrder);
-          
-          // Take top N players from each group with their position info
-          // If playersPerGroup is 9999 (all players), take all players
-          const topPlayers = playersPerGroup === allPlayersValue 
-            ? sortedStandings 
-            : sortedStandings.slice(0, playersPerGroup);
-          topPlayers.forEach((standing, index) => {
-            allQualifyingPlayers.push({
-              ...standing,
-              groupPosition: index + 1, // 1st, 2nd, etc. in group
-              legDifference: (standing.legsWon || 0) - (standing.legsLost || 0)
-            });
-          });
-        }
-      });
-    }
-    
-    // Sort all qualifying players globally for seeding using the same criteria as UI standings,
-    // with group position as final tiebreaker (1st in group > 2nd in group)
-    return sortByGroupPositionThenCriteria(allQualifyingPlayers, criteriaOrder).map(qp => qp.player);
-  };
-
   const getRankedPlayersForSeeding = () => {
     if (!tournament) return [];
 
@@ -1427,7 +1324,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     return true;
   };
 
-  const defaultQualifyingPlayers = getQualifyingPlayers();
+  const defaultQualifyingPlayers = getQualifyingPlayers(tournament);
   const defaultQualifierIds = defaultQualifyingPlayers.map(player => player.id);
   const defaultQualifierIdSet = new Set(defaultQualifierIds);
   const rankedPlayersForSeeding = getRankedPlayersForSeeding();
@@ -1523,7 +1420,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     const confirmMessage = t('management.confirmResetPlayoffs') || 
       'Are you sure you want to reset the playoffs? This will clear all playoff matches and results. Group stage data will be preserved.';
     
-    if ((await confirmDialog(confirmMessage))) {
+    if ((await confirmDialog(confirmMessage, { destructive: true }))) {
       try {
         await contextResetPlayoffs();
         toast.success(t('management.playoffsResetSuccess'));
@@ -1606,7 +1503,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
     const confirmMessage = t('management.confirmDeleteTournament', { name: tournament.name });
     
-    if ((await confirmDialog(confirmMessage))) {
+    if ((await confirmDialog(confirmMessage, { destructive: true }))) {
       try {
         await onDeleteTournament(tournament.id);
         // Redirect to tournaments list after successful deletion
@@ -2144,6 +2041,10 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   };
 
   const isPlayoffOnly = tournament.tournamentType === 'playoff_only';
+  const showPlayoffsNudge = canManage && !isPlayoffOnly && activeTab !== 'playoffs'
+    && isTournamentRunning(tournament.status) && tournament.playoffSettings?.enabled
+    && tournament.groups?.some(g => g.matches?.length) && isGroupStageComplete()
+    && !tournament.playoffs?.rounds?.length;
 
   // A tablet fixed to a board, on a night that uses boards, with a scorer
   // signed in: show what this board plays next instead of the tabs.
@@ -2180,10 +2081,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-hidden p-4 text-foreground md:p-8">
       <BoardMotif />
       <div className="relative flex flex-col gap-4">
-        <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
-          <ArrowLeft />
-          {t('common.backToDashboard')}
-        </Button>
+        <TournamentCrumbs tournament={tournament} onBack={onBack} backLabel={t('common.backToDashboard')} />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -2308,6 +2206,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       </Tabs>
 
       <div className="flex flex-col gap-4">
+        {showPlayoffsNudge && (
+          <Alert role="status">
+            <Trophy />
+            <AlertTitle>{t('management.groupStageDoneTitle')}</AlertTitle>
+            <AlertDescription>
+              <p>{t('management.groupStageDoneText')}</p>
+              <Button type="button" size="sm" className="mt-1" onClick={() => handleTabChange('playoffs')}>
+                {t('management.goToPlayoffs')}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {showScorerNudge && (
           <Alert role="status" className="pr-12">
             <ClipboardList />
@@ -2413,6 +2323,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             type="tournament"
             entityId={tournament.id}
             onScorersChange={(list) => setTournamentScorerCount(list.length)}
+          />
+        )}
+        {/* League scorers cover every round, so managers stop re-adding them weekly */}
+        {activeTab === 'scorers' && canManage && tournament.leagueId && (
+          <ScorersPanel
+            type="league"
+            entityId={tournament.leagueId}
+            onScorersChange={(list) => setLeagueScorerCount(list.length)}
           />
         )}
         {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}

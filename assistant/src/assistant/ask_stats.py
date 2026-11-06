@@ -9,7 +9,7 @@ from langchain_core.runnables import chain
 from langchain_openai import ChatOpenAI
 from langfuse import get_client, propagate_attributes
 from langfuse.langchain import CallbackHandler
-from langgraph.errors import GraphRecursionError
+from langgraph.errors import GraphBubbleUp, GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
@@ -27,13 +27,15 @@ model_with_tools = model.bind_tools(TOOLS)
 tools_by_name = {t.name: t for t in TOOLS}
 
 
-def run_tool(call: dict) -> ToolMessage:
+def run_tool(call: dict, tools: dict = tools_by_name) -> ToolMessage:
     # The model only asks; this is where our code decides. Errors go back as text so the model can recover.
-    tool = tools_by_name.get(call["name"])
+    tool = tools.get(call["name"])
     if tool is None:
         return ToolMessage(f"Error: there is no tool called {call['name']}.", tool_call_id=call["id"])
     try:
         return tool.invoke(call)  # given a whole tool call, a tool returns a ToolMessage with the same id
+    except GraphBubbleUp:  # a proposal's pause (interrupt) is LangGraph's to handle, not a tool error
+        raise
     except Exception as e:
         return ToolMessage(f"Error: {e}", tool_call_id=call["id"], status="error")
 

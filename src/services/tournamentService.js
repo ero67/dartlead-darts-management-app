@@ -144,6 +144,7 @@ export const tournamentService = {
           default_scoring_mode: tournamentData.defaultScoringMode || 'dart',
           starts_at: tournamentData.startsAt || null,
           venue: tournamentData.venue || null,
+          board_count: tournamentData.boardCount ?? null,
           group_settings: tournamentData.groupSettings ? {
             ...tournamentData.groupSettings,
             standingsCriteriaOrder: tournamentData.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead']
@@ -157,7 +158,8 @@ export const tournamentService = {
           user_id: user.id,
           status: tournamentData.status || 'open_for_registration'
         })
-        .select()
+        // League name for the breadcrumb on the page we land on next
+        .select('*, league:leagues!tournaments_league_id_fkey(name)')
         .single()
 
       if (tournamentError) {
@@ -384,6 +386,8 @@ export const tournamentService = {
         playoffs: tournament.playoffs,
         standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || tournamentData.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
         leagueId: tournament.league_id || tournamentData.leagueId || null,
+        leagueName: tournament.league?.name || null,
+        boardCount: tournament.board_count ?? null,
         createdAt: tournament.created_at,
         updatedAt: tournament.updated_at,
         players: tournamentData.players.map(player => ({
@@ -504,6 +508,7 @@ export const tournamentService = {
         .from('tournaments')
         .select(`
           *,
+          league:leagues!tournaments_league_id_fkey(name),
           tournament_players(
             player:players(*)
           ),
@@ -664,6 +669,7 @@ export const tournamentService = {
           tournamentType: tournament.tournament_type || 'groups_with_playoffs',
           standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
           leagueId: tournament.league_id || null,
+          leagueName: tournament.league?.name || null,
           createdAt: tournament.created_at,
           updatedAt: tournament.updated_at,
           userId: tournament.user_id,

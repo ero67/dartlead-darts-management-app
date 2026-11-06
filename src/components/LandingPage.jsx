@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Bot, Check, CheckCircle2, Clock, Download, Globe, LineChart, Mail, MonitorPlay, Smartphone, Target, Trophy, Tv, WifiOff, Wifi } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { ArrowRight, Bot, Check, CheckCircle2, Clock, Download, Globe, LineChart, Mail, MonitorPlay, Target, Trophy, Tv, WifiOff, Wifi } from 'lucide-react';
 import logo from '../assets/logo-256.webp';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Badge } from '@/components/ui/badge';
@@ -12,11 +13,12 @@ import { BoardMotif, CheckoutRoute, FormDots, LegPips, LiveDot } from './shared/
 import { WinChanceChart } from './match/WinChanceChart';
 import { AssistantLogo } from './assistant/AssistantLogo';
 import { BOT_LEVELS } from '../lib/botPlayer';
+import { PRACTICE_GAMES } from '../lib/practiceGames';
 import { tournamentService } from '../services/tournamentService';
 import { ASSISTANT_URL, assistantService } from '../services/assistantService';
 
 const CONTACT_EMAIL = 'info@dartlead.app';
-const ANDROID_APK_URL = 'https://github.com/ero67/dartlead-darts-management-app/releases/download/android-latest/DartLead.apk';
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.dartlead.app';
 // Set per environment once the demo league is seeded (docs/DEMO_LEAGUE.md);
 // without it the demo button and section are hidden.
 const DEMO_TOURNAMENT_ID = import.meta.env.VITE_DEMO_TOURNAMENT_ID;
@@ -79,6 +81,18 @@ function Wordmark({ className = '' }) {
   );
 }
 
+// Google Play's four-colour triangle, like the "G" in Auth.jsx.
+function PlayMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 shrink-0" aria-hidden="true">
+      <path fill="#4285F4" d="M3 2v20l10-10z" />
+      <path fill="#34A853" d="M3 2l10 10 3.2-3.2z" />
+      <path fill="#FBBC05" d="M16.2 8.8L13 12l3.2 3.2L21 12z" />
+      <path fill="#EA4335" d="M3 22l10-10 3.2 3.2z" />
+    </svg>
+  );
+}
+
 function Eyebrow({ children }) {
   return <span className="text-xs font-semibold uppercase tracking-widest text-primary">{children}</span>;
 }
@@ -103,8 +117,6 @@ export function LandingPage() {
   const scrollToContact = () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
   const proof = [
     { icon: WifiOff, label: t('landing.proof.offline') },
-    { icon: Smartphone, label: t('landing.proof.android') },
-    { icon: Target, label: t('landing.proof.games') },
     { icon: Globe, label: t('landing.proof.languages') },
   ];
   const steps = ['setup', 'signup', 'score', 'follow'].map(key => ({
@@ -146,11 +158,42 @@ export function LandingPage() {
                   <ArrowRight />
                 </Button>
               )}
-              <Button size="lg" variant="ghost" onClick={() => navigate('/practice')}>
-                <Target />
-                {t('landing.ctaPractice')}
-              </Button>
             </div>
+            {/* Practice needs no account, so it gets its own panel with every game one tap away. */}
+            <div className="flex max-w-xl flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+              <button type="button" onClick={() => navigate('/practice')} className="group -m-2 flex items-center gap-3 rounded-lg p-2 text-left transition-colors outline-none hover:bg-primary/10 focus-visible:ring-[3px] focus-visible:ring-ring">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Target className="size-5" />
+                </span>
+                <span className="flex flex-1 flex-col">
+                  <span className="font-semibold">{t('landing.ctaPractice')}</span>
+                  <span className="text-sm text-muted-foreground">{t('landing.practiceSub')}</span>
+                </span>
+                <ArrowRight className="size-4 text-primary transition-transform group-hover:translate-x-0.5" />
+              </button>
+              <ul className="flex flex-wrap gap-2">
+                {PRACTICE_GAMES.filter(game => game.available).map(game => (
+                  <li key={game.id}>
+                    <Button variant="outline" size="sm" className="h-11 sm:h-8" title={t(`practice.games.${game.id}.desc`)} onClick={() => navigate(game.path)}>
+                      <game.icon className="text-primary" />
+                      {t(`practice.games.${game.id}.title`)}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* The Android app runs this same page, so it shouldn't advertise itself. */}
+            {!Capacitor.isNativePlatform() && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+                <Button variant="outline" asChild>
+                  <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
+                    <PlayMark />
+                    {t('landing.playStore')}
+                  </a>
+                </Button>
+                <span>{t('landing.playStoreWeb')}</span>
+              </div>
+            )}
             <ul className="flex flex-wrap gap-2 text-sm">
               {proof.map(item => (
                 <li key={item.label} className="flex items-center gap-1.5 rounded-full border bg-background/70 px-3 py-1 text-muted-foreground">
@@ -424,7 +467,7 @@ export function LandingPage() {
                 <AccordionContent className="flex flex-col gap-2 text-muted-foreground">
                   <p>{t(`landing.faq.${key}A`)}</p>
                   {key === 'devices' && (
-                    <a href={ANDROID_APK_URL} className="inline-flex w-fit items-center gap-1.5 font-medium text-primary underline underline-offset-4">
+                    <a href={PLAY_STORE_URL} className="inline-flex w-fit items-center gap-1.5 font-medium text-primary underline underline-offset-4">
                       <Download className="size-4" />
                       {t('landing.faq.devicesLink')}
                     </a>
@@ -464,7 +507,7 @@ export function LandingPage() {
             © {new Date().getFullYear()} DartLead
           </span>
           <span className="flex flex-wrap items-center gap-4">
-            <a href={ANDROID_APK_URL} className="underline-offset-4 hover:underline">{t('landing.proof.android')}</a>
+            <a href={PLAY_STORE_URL} className="underline-offset-4 hover:underline">{t('landing.proof.android')}</a>
             <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={() => navigate('/privacy')}>
               {t('navigation.privacy')}
             </Button>

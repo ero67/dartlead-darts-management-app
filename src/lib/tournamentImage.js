@@ -1,4 +1,5 @@
 import { mergeBracketRounds } from '../utils/bracketView';
+import { getQualifyingPlayers } from '../utils/qualifiers';
 
 // Draws a tournament "poster" PNG on a canvas: podium, group standings, the
 // playoff bracket results and (optionally) stat awards, as dense as a sheet
@@ -123,8 +124,8 @@ function drawStandings(ctx, tournament, labels, y) {
   const gap = 16;
   const gw = (W - PAD * 2 - gap * (cols - 1)) / cols;
   const row = 26;
-  const perGroup = tournament.playoffSettings?.enabled !== false && tournament.playoffSettings?.qualificationMode !== 'total'
-    ? Number(tournament.playoffSettings?.playersPerGroup || 0) : 0;
+  const qualifierIds = new Set(tournament.playoffSettings?.enabled !== false
+    ? getQualifyingPlayers(tournament).map((p) => p.id) : []);
   // Right-aligned numeric columns, from the right edge inward.
   const isCricket = tournament.gameType === 'cricket';
   const numCols = [['avg', 58], ['legs', 58], ['lost', 34], ['won', 34], ['played', 34]];
@@ -146,7 +147,7 @@ function drawStandings(ctx, tournament, labels, y) {
     const nameMax = cx - (x + 44);
     g.standings.forEach((s, r) => {
       const ry = rowY + 44 + r * row;
-      const qualifies = perGroup > 0 && r < perGroup;
+      const qualifies = qualifierIds.has(s.player?.id);
       if (qualifies) {
         ctx.fillStyle = C.greenDim;
         ctx.fillRect(x + 6, ry - 2, gw - 12, row);

@@ -15,7 +15,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { canCreateTournaments } = useAdmin();
-  const { leagues, loading, selectLeague } = useLeague();
+  const { leagues, loading } = useLeague();
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed', 'archived', 'mine'
 
   const canCreate = Boolean(user && canCreateTournaments);
@@ -37,14 +37,8 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
     return league.status === filter;
   });
 
-  const handleSelectLeague = async (league) => {
-    try {
-      await selectLeague(league.id);
-      onSelectLeague(league);
-    } catch (error) {
-      console.error('Error selecting league:', error);
-    }
-  };
+  // LeagueDetail loads the league itself; fetching here only delayed navigation.
+  const handleSelectLeague = (league) => onSelectLeague(league);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">

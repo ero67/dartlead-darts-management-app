@@ -232,6 +232,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
       standingsCriteriaOrder: standingsCriteriaOrder,
       playoffs: null, // Playoffs will be created only when user clicks "Start Playoffs"
       leagueId: leagueId || null, // Link to league if created from league
+      boardCount: clonePrefill?.boardCount ?? null,
       scorers: scorers.map(s => ({ id: s.id, email: s.email })),
       createdAt: new Date().toISOString(),
       status: 'open_for_registration' // Tournament is open for player registration
@@ -305,6 +306,9 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
           {clonePrefill ? <CopyPlus className="size-6 text-primary" /> : <Trophy className="size-6 text-primary" />}
           {t('tournaments.createNew')}
         </h1>
+        {leagueId && currentLeague?.id === leagueId && (
+          <p className="text-sm text-muted-foreground">{t('tournaments.forLeague', { name: currentLeague.name })}</p>
+        )}
         {clonePrefill && (
           <p className="text-sm text-muted-foreground">{t('tournaments.copiedFrom', { name: clonePrefill.sourceName })}</p>
         )}

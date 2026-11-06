@@ -16,6 +16,7 @@ import { EmptyState } from './shared/EmptyState';
 import { StatusBadge } from './shared/StatusBadge';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
 import { boardQueues } from '../utils/boardSchedule';
+import { getQualifyingPlayers } from '../utils/qualifiers';
 import { matchWinProbability } from '../lib/winProbability';
 import { liveMatchChance } from '../lib/legChance';
 import { biggestUpset, firstResultAt, formatChance } from '../utils/upsets';
@@ -27,14 +28,15 @@ import { PreMatchCard } from './match/PreMatchCard';
 import { CricketBoard } from './cricket/CricketBoard';
 import { CricketMarksTable } from './cricket/CricketMarksTable';
 import { isCricketGame } from '../lib/cricket';
+import { x01Leaderboards } from '../utils/tournamentStats';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
 // dark high-contrast palette independent of the app theme. Cycles through
-// live boards, group standings and the bracket; refreshes on realtime
+// live boards, group standings, the bracket and X01 stats; refreshes on realtime
 // changes with a polling fallback.
 //
 //   /tv/:id                 rotate through every available view
-//   /tv/:id?view=standings  pin one view (live | standings | bracket)
+//   /tv/:id?view=standings  pin one view (live | standings | bracket | stats)
 //   /tv/:id?rotate=20       seconds per view (default 12)
 //   keys: ← → switch view (holds it for a minute), space pause/resume, F fullscreen
 
@@ -172,6 +174,21 @@ export function TvDisplay() {
     [tournament, playoffRows]
   );
 
+  // Top-5 boards for the stats view, one row per player (same numbers as the
+  // Statistics tab). X01 only: none of the four stats applies to Cricket.
+  const statBoards = useMemo(() => {
+    if (!tournament || isCricketGame(tournament.gameType)) return [];
+    const matches = [...(tournament.groups || []).flatMap((g) => g.matches || []), ...playoffRows];
+    const lb = x01Leaderboards(matches, { unknownName: t('common.unknown'), limit: 5 });
+    return [
+      { key: 'checkout', title: t('tv.statCheckout'), rows: lb.bestCheckouts.map((e) => ({ player: e.player, value: e.checkouts[0] })) },
+      { key: 'average', title: t('tv.statAverage'), rows: lb.bestAverages.map((e) => ({ player: e.player, value: e.average.toFixed(1) })) },
+      { key: '180s', title: t('tv.stat180s'), rows: lb.highScores.filter((e) => e.bands[180] > 0).map((e) => ({ player: e.player, value: e.bands[180] })) },
+      { key: 'darts', title: t('tv.statFewestDarts'), rows: lb.fewestDarts.map((e) => ({ player: e.player, value: e.darts })) },
+    ];
+  }, [tournament, playoffRows, t]);
+  const hasStats = statBoards.some((b) => b.rows.length > 0);
+
   // Which views make sense for this tournament right now. The bracket counts
   // once any slot has a player, in the JSONB or in the playoff match rows.
   const views = useMemo(() => {
@@ -181,8 +198,9 @@ export function TvDisplay() {
     const hasBracket = bracketRounds.some((r) => r.matches.some((m) => m.player1 || m.player2));
     if (hasGroups) list.push('standings');
     if (hasBracket) list.push('bracket');
+    if (hasStats) list.push('stats');
     return list;
-  }, [tournament, bracketRounds]);
+  }, [tournament, bracketRounds, hasStats]);
 
   const activeView = pinnedView && views.includes(pinnedView) ? pinnedView : views[viewIndex % views.length];
 
@@ -262,7 +280,11 @@ export function TvDisplay() {
   // Two per board fit the column up to four boards; beyond that, one each.
   const perBoard = queues.size > 4 ? 1 : 2;
 
-  const qualifiersPerGroup = tournament?.playoffSettings?.enabled ? Number(tournament.playoffSettings.qualifiersPerGroup || tournament.playoffSettings.playersPerGroup || 0) : 0;
+  // Same qualifiers as the management Standings tab, in either qualification mode.
+  const qualifierIds = useMemo(
+    () => new Set(tournament?.playoffSettings?.enabled ? getQualifyingPlayers(tournament).map((p) => p.id) : []),
+    [tournament]
+  );
 
   const liveScores = useMemo(
     () => Object.fromEntries(liveMatches.map((m) => [m.id, { player1Legs: m.player1_legs ?? 0, player2Legs: m.player2_legs ?? 0 }])),
@@ -504,7 +526,7 @@ export function TvDisplay() {
                     <TableRow><TableCell colSpan={7} className="py-6 text-center text-muted-foreground">{t('management.noMatchesPlayedYet')}</TableCell></TableRow>
                   ) : rows.map((s, i) => {
                     const diff = (s.legsWon || 0) - (s.legsLost || 0);
-                    const qualifies = qualifiersPerGroup > 0 && i < qualifiersPerGroup;
+                    const qualifies = qualifierIds.has(s.player.id);
                     return (
                       <TableRow key={s.player.id} className={cn(qualifies && 'bg-primary/15 shadow-[inset_4px_0_0_var(--primary)] hover:bg-primary/15')}>
                         <TableCell className={cn('font-display text-xl font-semibold text-muted-foreground', qualifies && 'text-primary')}>{i + 1}</TableCell>
@@ -535,7 +557,30 @@ export function TvDisplay() {
     </div>
   );
 
-  const viewLabel = { live: t('tv.liveBoards'), standings: t('management.standings'), bracket: t('management.playoffs') };
+  const renderStats = () => (
+    <div className="grid content-start gap-4 lg:h-full lg:grid-cols-2 lg:grid-rows-2">
+      {statBoards.map((b) => (
+        <Card key={b.key} className="min-h-0 gap-3 py-4">
+          <CardHeader className="px-6">
+            <CardTitle className="text-lg font-medium uppercase tracking-wider text-primary">{b.title}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 px-6">
+            {b.rows.length === 0 ? (
+              <p className="py-6 text-center text-xl text-muted-foreground">—</p>
+            ) : b.rows.map((r, i) => (
+              <div key={r.player?.id || i} className={cn('flex items-baseline gap-4 text-3xl', i === 0 && 'text-4xl font-semibold')}>
+                <span className={cn('w-10 font-display text-muted-foreground', i === 0 && 'text-primary')}>{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate">{r.player?.name || t('common.unknown')}</span>
+                <span className="font-display tabular-nums">{r.value}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const viewLabel = { live: t('tv.liveBoards'), standings: t('management.standings'), bracket: t('management.playoffs'), stats: t('tv.stats') };
 
   return (
     <div className="dark-mode flex min-h-screen flex-col bg-background text-foreground lg:fixed lg:inset-0 lg:overflow-hidden [&:fullscreen]:cursor-none" ref={rootRef}>
@@ -579,6 +624,7 @@ export function TvDisplay() {
             {v === 'live' && renderLive()}
             {v === 'standings' && renderStandings()}
             {v === 'bracket' && renderBracket()}
+            {v === 'stats' && renderStats()}
           </div>
         ))}
       </main>
