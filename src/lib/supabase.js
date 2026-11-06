@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -20,7 +21,21 @@ const fetchWithTimeout = (url, options = {}) => {
   return fetch(url, { ...options, signal })
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, { global: { fetch: fetchWithTimeout } })
+// Native: PKCE, so a code caught by another app claiming our deep-link scheme
+// is useless without the verifier kept in this WebView. Web keeps implicit.
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  global: { fetch: fetchWithTimeout },
+  auth: { flowType: Capacitor.isNativePlatform() ? 'pkce' : 'implicit' }
+})
+
+// Password-reset links open in the phone's browser, which never has the PKCE
+// verifier the app stored, so the app requests them through an implicit-flow
+// client. The link lands on the https site, not the deep link.
+export const createImplicitAuthClient = () =>
+  createClient(supabaseUrl, supabaseKey, {
+    global: { fetch: fetchWithTimeout },
+    auth: { flowType: 'implicit', persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'dartlead-implicit-auth' }
+  })
 
 // Helper function to generate UUIDs (for when we don't have uuid extension)
 export const generateId = () => {
