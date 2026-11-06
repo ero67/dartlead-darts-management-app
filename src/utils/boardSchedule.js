@@ -9,19 +9,30 @@
 import { mergeBracketRounds, upcomingPlayoffMatches } from './bracketView.js';
 
 // Plan matches into slots. `matches` are in play order, each
-// { id, p1, p2, board }: board null = free to go on any board, a number =
-// fixed to that board. Slot by slot, every board takes the first remaining
-// match it may play whose players are not already on a board in that slot,
-// so nobody is booked on two boards at once. Returns Map id -> { board, slot }.
+// { id, p1, p2, board, allowed? }: board null = free, a number = fixed to
+// that board; `allowed` (group boards) narrows a free match to those boards.
+// Slot by slot, every board takes the first remaining match it may play
+// whose players are not already on a board in that slot, so nobody is booked
+// on two boards at once. A board prefers matches confined to it over free
+// ones, so a free group never crowds a confined group off its own boards.
+// Returns Map id -> { board, slot }.
 export function planBoards(matches, boardCount) {
   const boards = Math.max(Number(boardCount) || 0, ...matches.map((m) => m.board || 0));
   const plan = new Map();
   if (boards < 1) return plan;
+  // Group boards outside the count are stale (count was lowered): any board.
+  const allowedOf = (m) => {
+    const usable = (m.allowed || []).filter((b) => b >= 1 && b <= boards);
+    return usable.length ? usable : null;
+  };
+  const mayPlay = (m, board) => (m.board != null ? m.board === board : !allowedOf(m) || allowedOf(m).includes(board));
   const remaining = [...matches];
   for (let slot = 0; remaining.length > 0; slot++) {
     const busy = new Set();
     for (let board = 1; board <= boards; board++) {
-      const i = remaining.findIndex((m) => (m.board == null || m.board === board) && !busy.has(m.p1) && !busy.has(m.p2));
+      const free = (m) => !busy.has(m.p1) && !busy.has(m.p2);
+      let i = remaining.findIndex((m) => m.board == null && allowedOf(m)?.includes(board) && free(m));
+      if (i === -1) i = remaining.findIndex((m) => mayPlay(m, board) && free(m));
       if (i === -1) continue;
       const [m] = remaining.splice(i, 1);
       busy.add(m.p1);
@@ -38,7 +49,7 @@ export function planBoards(matches, boardCount) {
 // round name) and `assignedBoard`.
 export function pendingInPlayOrder(tournament) {
   const ready = (m) => m.status === 'pending' && m.player1 && m.player2;
-  const queues = (tournament?.groups || []).map((g) => (g.matches || []).filter(ready).map((m) => ({ ...m, label: g.name })));
+  const queues = (tournament?.groups || []).map((g) => (g.matches || []).filter(ready).map((m) => ({ ...m, label: g.name, boards: g.boards ?? null })));
   const groupMatches = [];
   for (let i = 0; i < Math.max(0, ...queues.map((q) => q.length)); i++) {
     for (const q of queues) if (q[i]) groupMatches.push(q[i]);
@@ -50,7 +61,7 @@ export function pendingInPlayOrder(tournament) {
   return [...groupMatches, ...playoffMatches];
 }
 
-const toSlotInput = (m, board) => ({ id: m.id, p1: m.player1.id, p2: m.player2.id, board });
+const toSlotInput = (m, board) => ({ id: m.id, p1: m.player1.id, p2: m.player2.id, board, allowed: m.boards ?? null });
 
 // Auto-assign: every waiting match is spread over `boardCount` boards.
 // Returns { [matchId]: board } for the set_match_boards RPC.

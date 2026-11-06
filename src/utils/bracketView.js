@@ -80,8 +80,11 @@ export function mergeBracketRounds(rounds, playoffMatches = [], players = []) {
 export function upcomingPlayoffMatches(mergedRounds) {
   const items = [];
   for (const round of mergedRounds || []) {
+    // Players in the round (the 3rd-place match is not a bracket round);
+    // the playoff legs-to-win setting is keyed by it.
+    const roundSize = Math.max(2, (round.matches || []).filter((m) => !m.isThirdPlaceMatch).length * 2);
     for (const m of round.matches || []) {
-      if (m.status === 'pending' && m.player1 && m.player2) items.push({ ...m, roundName: round.name });
+      if (m.status === 'pending' && m.player1 && m.player2) items.push({ ...m, roundName: round.name, roundSize });
     }
   }
   return items;

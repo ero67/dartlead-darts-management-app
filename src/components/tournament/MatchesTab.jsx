@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EmptyState } from '../shared/EmptyState';
 import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions, MatchBoard } from './MatchCardParts';
+import { buildMatchData as buildStartData } from '../../utils/matchStart';
 import { cn } from '@/lib/utils';
 
 // `card` bundles the match-card callbacks/flags owned by TournamentManagement:
@@ -162,24 +163,10 @@ export function MatchesTab({
                 const isLive = isMatchActuallyLive(match.id);
                 const isLiveHere = isMatchInLocalStorage(match.id);
                 const live = liveInfoById.get(match.id);
-                const buildMatchData = (kind) => (kind === 'admin'
-                  ? {
-                    ...match,
-                    adminOverride: true,
-                    gameType: match.gameType || tournament.gameType,
-                    legsToWin: match.legsToWin || tournament.legsToWin,
-                    startingScore: match.startingScore || tournament.startingScore,
-                    defaultScoringMode: tournament.defaultScoringMode
-                  }
-                  : {
-                    ...match,
-                    tournamentId: tournament.id,
-                    groupId: match.groupId,
-                    gameType: match.gameType || tournament.gameType,
-                    legsToWin: match.legsToWin || tournament.legsToWin,
-                    startingScore: match.startingScore || tournament.startingScore,
-                    defaultScoringMode: tournament.defaultScoringMode
-                  });
+                const buildMatchData = (kind) => {
+                  const data = buildStartData(match, tournament, match.legsToWin || tournament.legsToWin);
+                  return kind === 'admin' ? { ...data, adminOverride: true } : data;
+                };
 
                 return (
                   <Card key={match.id} className={cn('gap-3 p-4', isLive && 'border-destructive/50')}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus } from 'lucide-react';
+import { Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus, Target } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -30,6 +30,7 @@ import { EditMatchPlayersDialog } from './tournament/EditMatchPlayersDialog';
 import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
 import { BoardsControl } from './tournament/BoardsControl';
+import { BoardWaitingScreen } from './tournament/BoardWaitingScreen';
 import { TournamentCrumbs } from './tournament/TournamentCrumbs';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
@@ -39,6 +40,8 @@ import { resolveActiveTemplate, nextPow2 } from '../utils/seedSlots';
 import { sortStandings } from '../utils/standings';
 import { getQualifyingPlayers } from '../utils/qualifiers';
 import { cloneTournamentPath } from '../utils/cloneTournament';
+import { nextForBoard, ownLiveMatch } from '../utils/boardWaiting';
+import { buildMatchData } from '../utils/matchStart';
 import { cn } from '@/lib/utils';
 import { isCricketGame } from '@/lib/cricket';
 import { toast } from 'sonner';
@@ -242,9 +245,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     setMatchToConfirm(matchData);
   };
 
+  // Board tablets: "Pick a match" hides the waiting screen for this
+  // tournament until a match is started here, after which the tablet
+  // returns to its board.
+  const boardDismissKey = `board-screen-dismissed-${tournament.id}`;
+  const [isBoardDismissed, setIsBoardDismissed] = useState(() => sessionStorage.getItem(boardDismissKey) === '1');
+  const dismissBoardScreen = () => { sessionStorage.setItem(boardDismissKey, '1'); setIsBoardDismissed(true); };
+  const showBoardScreen = () => { sessionStorage.removeItem(boardDismissKey); setIsBoardDismissed(false); };
+
   // Confirm and start the match
   const confirmStartMatch = () => {
     if (matchToConfirm) {
+      showBoardScreen();
       onMatchStart(matchToConfirm);
       setMatchToConfirm(null);
     }
@@ -303,7 +315,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       };
     })()
   });
-  const { isMatchLive, toggleFavoriteGroup, isGroupFavorite, getFavoriteGroups } = useLiveMatch();
+  const { isMatchLive, toggleFavoriteGroup, isGroupFavorite, getFavoriteGroups, boardNumber } = useLiveMatch();
   const { isAdmin } = useAdmin();
   const isOwner = user && tournament?.userId && user.id === tournament.userId;
   // The linked league's creator and co-managers manage too; ask the DB
@@ -1856,6 +1868,14 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       }
     };
 
+    // Board changes arrive one row at a time (Auto-assign over 40 matches is
+    // 40 UPDATEs): coalesce them into one tournament reload, as the TV does.
+    let reloadTimer = null;
+    const scheduleReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => { reloadTimer = null; getTournament(tournament.id); }, 500);
+    };
+
     // Set up real-time subscription
     const channel = supabase
       .channel(`live-matches-tournament-${tournament.id}`)
@@ -1872,6 +1892,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           const match = payload.new;
           if (match?.status === 'completed') {
             applyRemoteCompletion(match);
+            return;
+          }
+          // A waiting match changed (board moved by the manager at the PC):
+          // board tablets and cards follow. With RLS on, payload.old carries
+          // only the id, so any pending update counts; they are rare.
+          if (match?.status === 'pending') {
+            scheduleReload();
             return;
           }
           if (match?.status !== 'in_progress') return;
@@ -1923,6 +1950,11 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         },
         async (payload) => {
           const match = payload.new;
+          // First-round playoff rows are created by set_match_boards with a board.
+          if (match?.status === 'pending' && match.assigned_board != null) {
+            scheduleReload();
+            return;
+          }
           if (match?.status !== 'in_progress') return;
 
           // Load full match data
@@ -1953,10 +1985,18 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           }
         }
       )
+      // Board count set from another device: a tablet already on the page
+      // gets its waiting screen without a reload. Only that column: the row
+      // also changes on every playoff completion and settings edit.
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournament.id}` },
+        (payload) => { if (payload.new?.board_count !== payload.old?.board_count) scheduleReload(); }
+      )
       .subscribe();
 
     return () => {
       clearInterval(livePollInterval);
+      if (reloadTimer) clearTimeout(reloadTimer);
       supabase.removeChannel(channel);
     };
   }, [tournament?.id]); // Only depend on tournament ID to avoid unnecessary reloads
@@ -2005,6 +2045,25 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     && isTournamentRunning(tournament.status) && tournament.playoffSettings?.enabled
     && tournament.groups?.some(g => g.matches?.length) && isGroupStageComplete()
     && !tournament.playoffs?.rounds?.length;
+
+  // A tablet fixed to a board, on a night that uses boards, with a scorer
+  // signed in: show what this board plays next instead of the tabs.
+  const hasBoardScreen = Boolean(boardNumber && tournament.boardCount && canScore === true && user && isTournamentRunning(tournament.status));
+  // Plain compute: this sits below an early return, so no hook here.
+  const boardQueue = hasBoardScreen ? nextForBoard(tournament, boardNumber, new Set(liveMatches.map((m) => m.id))) : { next: null, then: [] };
+  // This device's own unfinished match (scorer backed out of the scorer view).
+  const ownLive = hasBoardScreen ? ownLiveMatch(tournament, isMatchInLocalStorage) : null;
+  const handleBoardStart = (next) => {
+    const isPlayoff = next.roundSize != null;
+    // Queue entries name their group/round in `label`; the dialog shows groupName.
+    const match = { ...next, groupName: next.groupName || next.label, ...(isPlayoff && { isPlayoff: true }) };
+    handleStartMatchRequest(buildMatchData(match, tournament, isPlayoff ? getPlayoffLegsToWin(next.roundSize) : next.legsToWin || tournament.legsToWin));
+  };
+  const handleBoardContinue = (m) => {
+    showBoardScreen();
+    const legs = m.roundSize != null ? getPlayoffLegsToWin(m.roundSize) : m.legsToWin || tournament.legsToWin;
+    onMatchStart(buildMatchData(m.roundSize != null ? { ...m, isPlayoff: true } : m, tournament, legs));
+  };
   const playerCount = tournament.players?.length || uniqueGroups?.reduce((total, group) => total + (group.players?.length || 0), 0) || 0;
   const tournamentPhase = getTournamentPhase(tournament);
   const overview = [
@@ -2092,6 +2151,19 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         </div>
       </div>
 
+      {hasBoardScreen && !isBoardDismissed ? (
+        <BoardWaitingScreen
+          tournament={tournament}
+          boardNumber={boardNumber}
+          next={boardQueue.next}
+          then={boardQueue.then}
+          ownLive={ownLive}
+          onStart={handleBoardStart}
+          onContinue={handleBoardContinue}
+          onPickMatch={dismissBoardScreen}
+          t={t}
+        />
+      ) : (<>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           {!isPlayoffOnly && (
@@ -2123,6 +2195,12 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
               <Trophy />
               {t('summary.tab')}
             </TabsTrigger>
+          )}
+          {hasBoardScreen && (
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={showBoardScreen}>
+              <Target />
+              {t('boards.backToBoard', { board: boardNumber })}
+            </Button>
           )}
         </TabsList>
       </Tabs>
@@ -2257,6 +2335,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         )}
         {activeTab === 'summary' && <TournamentSummary tournament={tournament} />}
       </div>
+      </>)}
 
       {/* Match Start Confirmation Modal */}
       <StartMatchDialog match={matchToConfirm} onConfirm={confirmStartMatch} onCancel={cancelStartMatch} t={t} />
