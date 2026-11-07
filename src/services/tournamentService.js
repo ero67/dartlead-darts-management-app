@@ -2,6 +2,7 @@ import { supabase, generateId } from '../lib/supabase.js'
 import { isCricketGame } from '../lib/cricket.js'
 import { sortStandings } from '../utils/standings.js'
 import { fetchAllRows } from '../lib/fetchAllRows.js'
+import { roundRobinRounds } from '../utils/groupRounds.js'
 
 // Group matches in their intended play order. The DB rows carry match_order
 // (migration 20260910190000); rows from before it fall back to insert order.
@@ -844,7 +845,7 @@ export const tournamentService = {
             id: groupId,
             name: groupName,
             players: groupPlayers,
-            matches: this.generateGroupMatches(groupPlayers, i + 1),
+            matches: this.generateGroupMatches(groupPlayers),
             standings: []
           };
         })
@@ -981,7 +982,7 @@ export const tournamentService = {
         id: generateId(),
         name: `Group ${String.fromCharCode(65 + i)}`,
         players: groupBuckets[i],
-        matches: this.generateGroupMatches(groupBuckets[i], i + 1),
+        matches: this.generateGroupMatches(groupBuckets[i]),
         standings: []
       });
     }
@@ -989,98 +990,15 @@ export const tournamentService = {
     return groups;
   },
 
-  // Helper function to reorder matches to minimize player overlap
-  // Strategy: Try to avoid using players from the last 1-2 matches in the next match
-  reorderMatchesToMinimizeOverlap(matches) {
-    if (matches.length <= 1) return matches;
-    
-    const ordered = [];
-    const remaining = [...matches];
-    
-    // Start with the first match
-    let currentMatch = remaining.shift();
-    ordered.push(currentMatch);
-    
-    // Track players from the last match (2 players) and the match before that (4 players total)
-    let lastMatchPlayers = new Set([currentMatch.player1.id, currentMatch.player2.id]);
-    let previousMatchPlayers = new Set();
-    
-    while (remaining.length > 0) {
-      let foundMatch = null;
-      let foundIndex = -1;
-      
-      // First, try to find a match that doesn't overlap with players from the last match
-      for (let i = 0; i < remaining.length; i++) {
-        const match = remaining[i];
-        const matchPlayer1 = match.player1.id;
-        const matchPlayer2 = match.player2.id;
-        
-        // Check if this match overlaps with the last match
-        const overlapsLastMatch = lastMatchPlayers.has(matchPlayer1) || lastMatchPlayers.has(matchPlayer2);
-        
-        if (!overlapsLastMatch) {
-          // Also check if we can avoid overlapping with previous match (if we have one)
-          if (previousMatchPlayers.size === 0) {
-            // No previous match, so this is perfect
-            foundMatch = match;
-            foundIndex = i;
-            break;
-          } else {
-            // Check if it also avoids previous match players
-            const overlapsPrevious = previousMatchPlayers.has(matchPlayer1) || previousMatchPlayers.has(matchPlayer2);
-            if (!overlapsPrevious) {
-              // Perfect: avoids both last and previous match
-              foundMatch = match;
-              foundIndex = i;
-              break;
-            } else if (!foundMatch) {
-              // Still good: avoids last match (but overlaps previous)
-              foundMatch = match;
-              foundIndex = i;
-            }
-          }
-        }
-      }
-      
-      // If we found a match that avoids the last match, use it
-      if (foundMatch) {
-        ordered.push(foundMatch);
-        remaining.splice(foundIndex, 1);
-        
-        // Update tracking: previous becomes last, current becomes new last
-        previousMatchPlayers = new Set(lastMatchPlayers);
-        lastMatchPlayers = new Set([foundMatch.player1.id, foundMatch.player2.id]);
-      } else {
-        // No match found that avoids the last match - start a new "round"
-        // Take any remaining match and reset tracking
-        foundMatch = remaining.shift();
-        ordered.push(foundMatch);
-        
-        // Reset: this match becomes the new starting point
-        lastMatchPlayers = new Set([foundMatch.player1.id, foundMatch.player2.id]);
-        previousMatchPlayers = new Set();
-      }
-    }
-    
-    return ordered;
-  },
-
-  // Helper function to generate group matches
-  generateGroupMatches(groupPlayers, groupId) {
-    const matches = [];
-    for (let i = 0; i < groupPlayers.length; i++) {
-      for (let j = i + 1; j < groupPlayers.length; j++) {
-        matches.push({
-          id: generateId(),
-          player1: groupPlayers[i],
-          player2: groupPlayers[j],
-          status: 'pending',
-          result: null
-        });
-      }
-    }
-    // Reorder matches to minimize player overlap between consecutive matches
-    return this.reorderMatchesToMinimizeOverlap(matches);
+  // Group matches in rounds (see roundRobinRounds); the list order is the play order.
+  generateGroupMatches(groupPlayers) {
+    return roundRobinRounds(groupPlayers).flat().map(([player1, player2]) => ({
+      id: generateId(),
+      player1,
+      player2,
+      status: 'pending',
+      result: null
+    }));
   },
 
   // Add player to tournament

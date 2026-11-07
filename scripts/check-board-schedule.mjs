@@ -3,21 +3,10 @@
 //   node scripts/check-board-schedule.mjs
 import assert from 'node:assert/strict';
 import { planBoards, autoAssignBoards, boardQueues, pendingInPlayOrder } from '../src/utils/boardSchedule.js';
+import { roundRobinRounds } from '../src/utils/groupRounds.js';
 
-// Round-robin pairings in the circle method, like the app generates them.
-const roundRobin = (ids) => {
-  const list = ids.length % 2 ? [...ids, null] : [...ids];
-  const out = [];
-  for (let r = 0; r < list.length - 1; r++) {
-    for (let i = 0; i < list.length / 2; i++) {
-      const a = list[i];
-      const b = list[list.length - 1 - i];
-      if (a && b) out.push([a, b]);
-    }
-    list.splice(1, 0, list.pop());
-  }
-  return out;
-};
+// Round-robin pairings exactly as the app generates them.
+const roundRobin = (ids) => roundRobinRounds(ids).flat();
 const player = (id) => ({ id, name: id });
 const group = (name, ids) => ({
   id: name, name,
