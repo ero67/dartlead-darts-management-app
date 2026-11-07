@@ -362,6 +362,7 @@
     "youAreViewing": "You are viewing this tournament",
     "tournamentGroups": "Tournament Groups",
     "allMatches": "All Matches",
+    "groupRound": "Round {{number}}",
     "groupStandings": "Group Standings",
     "qualifies": "Qualifies",
     "eliminated": "Eliminated",

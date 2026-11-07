@@ -9,6 +9,7 @@ import { EmptyState } from '../shared/EmptyState';
 import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions, MatchBoard } from './MatchCardParts';
 import { buildMatchData as buildStartData } from '../../utils/matchStart';
 import { cn } from '@/lib/utils';
+import { roundByMatch } from '../../utils/groupRounds';
 
 // `card` bundles the match-card callbacks/flags owned by TournamentManagement:
 // user, canScore, canManage, isAdmin, isMatchActuallyLive, isMatchInLocalStorage,
@@ -73,6 +74,9 @@ export function MatchesTab({
     if (!a.isFavorite && b.isFavorite) return 1;
     return 0;
   });
+
+  // Round of each match, from the whole group (filters must not shift rounds).
+  const roundsByGroup = new Map((uniqueGroups || []).map(g => [g.id, roundByMatch(g.matches)]));
 
   const { user, canManage, isMatchActuallyLive, isMatchInLocalStorage, getMatchStatusText, liveInfoById } = card;
 
@@ -156,7 +160,11 @@ export function MatchesTab({
               </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {groupData.matches.map(match => {
+              {groupData.matches.map((match, index) => {
+                // No round headings for groups from before rounds (roundByMatch is null).
+                const rounds = roundsByGroup.get(groupData.groupId);
+                const round = rounds?.get(match.id);
+                const isFirstOfRound = !!round && (index === 0 || rounds.get(groupData.matches[index - 1].id) !== round);
                 const isPlayer1Winner = match.status === 'completed' && match.result && match.result.winner === match.player1?.id;
                 const isPlayer2Winner = match.status === 'completed' && match.result && match.result.winner === match.player2?.id;
                 const isCompleted = match.status === 'completed' && match.result;
@@ -169,7 +177,11 @@ export function MatchesTab({
                 };
 
                 return (
-                  <Card key={match.id} className={cn('gap-3 p-4', isLive && 'border-destructive/50')}>
+                  <React.Fragment key={match.id}>
+                  {isFirstOfRound && (
+                    <h4 className="col-span-full -mb-1 text-sm font-medium text-muted-foreground">{t('management.groupRound', { number: round })}</h4>
+                  )}
+                  <Card className={cn('gap-3 p-4', isLive && 'border-destructive/50')}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <MatchStatusBadge status={match.status} isLive={isLive}>
@@ -264,6 +276,7 @@ export function MatchesTab({
                       </div>
                     </div>
                   </Card>
+                  </React.Fragment>
                 );
               })}
             </div>

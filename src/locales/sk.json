@@ -362,6 +362,7 @@
     "youAreViewing": "Prezeráte tento turnaj",
     "tournamentGroups": "Skupiny Turnaja",
     "allMatches": "Všetky Zápasy",
+    "groupRound": "Kolo {{number}}",
     "groupStandings": "Tabuľka Skupín",
     "qualifies": "Postupuje",
     "eliminated": "Vypadáva",
