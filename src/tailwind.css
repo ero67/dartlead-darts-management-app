@@ -76,6 +76,16 @@
    chrome so the whole keypad fits without scrolling. */
 @custom-variant short (@media (max-height: 700px));
 
+/* TV display (/tv): any landscape screen that isn't a phone gets the wall layout.
+   TVs and scaled laptops report 960-1280 CSS px on a 1080p panel, so width
+   breakpoints (xl = 1280) fell back to the stacked phone layout. The root font
+   then scales the 1920x1080 design to the screen (16px at 1080p), since all
+   sizes are rem. Keep in sync with TV_QUERY in TvDisplay.jsx. */
+@custom-variant tv (@media (orientation: landscape) and (min-width: 900px) and (min-height: 500px));
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 500px) {
+  html.tv-scale { font-size: min(calc(100vw / 120), calc(100vh / 67.5)); }
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
