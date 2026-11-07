@@ -46,6 +46,8 @@ const DEFAULT_ROTATE_SECONDS = 12;
 const MANUAL_HOLD_MS = 60000;
 const MAX_BRACKET_SCALE = 1.6;
 const POLL_MS = 30000;
+// The `tv` variant in tailwind.css: where the fixed wall layout (and root-font scaling) applies.
+const TV_QUERY = '(orientation: landscape) and (min-width: 900px) and (min-height: 500px)';
 
 const fmtClock = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -65,20 +67,26 @@ const roundRobin = (queues) => {
 };
 
 // Standings: up to four group cards side by side on a wide screen.
-const GROUP_COLS = { 1: '', 2: 'xl:grid-cols-2', 3: 'xl:grid-cols-3', 4: 'xl:grid-cols-4' };
+const GROUP_COLS = { 1: '', 2: 'tv:grid-cols-2', 3: 'tv:grid-cols-3', 4: 'tv:grid-cols-4' };
 
 // Each view stays mounted (rotation only toggles `hidden`) so scroll positions
 // survive. On a large screen inactive views are stacked in the same grid cell
 // and hidden with `visibility` — display:none would reset their scroll offsets
 // (the bracket "jumping back"). On phones the page scrolls normally and hidden
 // views simply collapse.
-const VIEW_CLASS = 'min-h-0 lg:col-start-1 lg:row-start-1 lg:h-full lg:[&[hidden]]:pointer-events-none lg:[&[hidden]]:invisible lg:[&[hidden]]:block';
+const VIEW_CLASS = 'min-h-0 tv:col-start-1 tv:row-start-1 tv:h-full tv:[&[hidden]]:pointer-events-none tv:[&[hidden]]:invisible tv:[&[hidden]]:block';
 
 export function TvDisplay() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const { t } = useLanguage();
   useKeepScreenAwake(true);
+
+  // Scale the rem-based layout to the screen; only while this page is shown.
+  useEffect(() => {
+    document.documentElement.classList.add('tv-scale');
+    return () => document.documentElement.classList.remove('tv-scale');
+  }, []);
 
   const pinnedView = params.get('view');
   const rotateMs = Math.max(5, Number(params.get('rotate')) || DEFAULT_ROTATE_SECONDS) * 1000;
@@ -293,7 +301,7 @@ export function TvDisplay() {
 
   // A wall screen cannot scroll: shrink the bracket until every round fits the
   // view. Sizes scale linearly with `scale`, so one measurement gives the
-  // factor. Only where the view has a fixed height (lg+); phones scroll.
+  // factor. Only where the view has a fixed height (tv); phones scroll.
   useEffect(() => {
     const box = bracketBoxRef.current;
     if (!box) return undefined;
@@ -303,7 +311,7 @@ export function TvDisplay() {
       frame = requestAnimationFrame(() => {
         const bracket = box.firstElementChild;
         const columns = bracket?.firstElementChild;
-        if (!bracket || !columns || !box.clientHeight || !window.matchMedia('(min-width: 1024px)').matches) return;
+        if (!bracket || !columns || !box.clientHeight || !window.matchMedia(TV_QUERY).matches) return;
         setBracketScale((s) => {
           const k = Math.min(box.clientWidth / columns.scrollWidth, box.clientHeight / bracket.scrollHeight);
           // Shrink on any overflow, grow only with real room; the 3% margin
@@ -394,7 +402,7 @@ export function TvDisplay() {
             className="min-w-0 flex-1"
           />
           {boards.length === 1 && (
-            <CricketBoard marks={marks} thrower={m.current_player ?? 0} visitDarts={m.live_state?.visit} className="hidden w-[34rem] shrink-0 xl:block" />
+            <CricketBoard marks={marks} thrower={m.current_player ?? 0} visitDarts={m.live_state?.visit} className="hidden w-[34rem] shrink-0 tv:block" />
           )}
         </CardContent>
         {renderNextOnBoard(m)}
@@ -403,7 +411,7 @@ export function TvDisplay() {
   };
 
   const renderLive = () => (
-    <div className="flex h-full min-h-0 flex-col gap-6 lg:flex-row">
+    <div className="flex h-full min-h-0 flex-col gap-6 tv:flex-row">
       <section className="flex min-w-0 flex-1 flex-col gap-4">
         <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
           <Target className="size-5" />{t('tv.liveBoards')}
@@ -411,7 +419,7 @@ export function TvDisplay() {
         {boards.length === 0 ? (
           <EmptyState icon={Target} title={t('tv.noLiveMatches')} />
         ) : (
-          <div className={cn('grid gap-4', boards.length > 1 && 'xl:grid-cols-2', isCompact && 'xl:grid-cols-3')}>
+          <div className={cn('grid gap-4', boards.length > 1 && 'tv:grid-cols-2', isCompact && 'tv:grid-cols-3')}>
             {boards.map((m) => {
               const p1 = m.player1?.name || '—';
               const p2 = m.player2?.name || '—';
@@ -440,7 +448,7 @@ export function TvDisplay() {
           </div>
         )}
       </section>
-      <Card className="shrink-0 gap-3 py-4 lg:w-96">
+      <Card className="shrink-0 gap-3 py-4 tv:w-96">
         <CardHeader className="px-4">
           <CardTitle className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
             <Clock className="size-4" />{t('tv.upNext')}
@@ -558,7 +566,7 @@ export function TvDisplay() {
   );
 
   const renderStats = () => (
-    <div className="grid content-start gap-4 lg:h-full lg:grid-cols-2 lg:grid-rows-2">
+    <div className="grid content-start gap-4 tv:h-full tv:grid-cols-2 tv:grid-rows-2">
       {statBoards.map((b) => (
         <Card key={b.key} className="min-h-0 gap-3 py-4">
           <CardHeader className="px-6">
@@ -583,8 +591,8 @@ export function TvDisplay() {
   const viewLabel = { live: t('tv.liveBoards'), standings: t('management.standings'), bracket: t('management.playoffs'), stats: t('tv.stats') };
 
   return (
-    <div className="dark-mode flex min-h-screen flex-col bg-background text-foreground lg:fixed lg:inset-0 lg:overflow-hidden [&:fullscreen]:cursor-none" ref={rootRef}>
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-3 lg:h-20 lg:flex-nowrap lg:py-0">
+    <div className="dark-mode flex min-h-screen flex-col bg-background text-foreground tv:fixed tv:inset-0 tv:overflow-hidden [&:fullscreen]:cursor-none" ref={rootRef}>
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-3 tv:h-20 tv:flex-nowrap tv:py-0">
         <div className="flex min-w-0 items-center gap-3">
           <Trophy className="size-7 shrink-0 text-primary" />
           <h1 className="truncate text-3xl font-semibold">{tournament?.name || '…'}</h1>
@@ -594,7 +602,7 @@ export function TvDisplay() {
           value={activeView}
           onValueChange={(v) => showView(views.indexOf(v))}
           activationMode="manual"
-          className="order-3 w-full items-center lg:order-none lg:w-auto"
+          className="order-3 w-full items-center tv:order-none tv:w-auto"
           aria-label={t('tv.views')}
         >
           <TabsList>
@@ -616,11 +624,11 @@ export function TvDisplay() {
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 p-6 lg:grid lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-        {error && <p className="py-8 text-center text-xl text-destructive lg:col-start-1 lg:row-start-1 lg:self-start">{error}</p>}
-        {!tournament && !error && <p className="py-8 text-center text-xl text-muted-foreground lg:col-start-1 lg:row-start-1 lg:self-start">{t('common.loading')}</p>}
+      <main className="min-h-0 flex-1 p-6 tv:grid tv:grid-rows-[minmax(0,1fr)] tv:overflow-hidden">
+        {error && <p className="py-8 text-center text-xl text-destructive tv:col-start-1 tv:row-start-1 tv:self-start">{error}</p>}
+        {!tournament && !error && <p className="py-8 text-center text-xl text-muted-foreground tv:col-start-1 tv:row-start-1 tv:self-start">{t('common.loading')}</p>}
         {tournament && views.map((v) => (
-          <div key={v} className={cn(VIEW_CLASS, v === 'standings' && 'lg:overflow-auto')} hidden={v !== activeView}>
+          <div key={v} className={cn(VIEW_CLASS, v === 'standings' && 'tv:overflow-auto')} hidden={v !== activeView}>
             {v === 'live' && renderLive()}
             {v === 'standings' && renderStandings()}
             {v === 'bracket' && renderBracket()}
