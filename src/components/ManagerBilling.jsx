@@ -1,23 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader, RefreshCw, Ban, Undo2, Crown, X, StickyNote, Users } from 'lucide-react';
+import { Loader, RefreshCw, Ban, Undo2, Crown, X, StickyNote, Users, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EmptyState } from './shared/EmptyState';
 import { cn } from '@/lib/utils';
 import { confirmDialog } from '../lib/confirmDialog';
+import { PAYMENT_PERIODS, paidPeriod, todayIso } from '../utils/billing';
 
-// Admin panel section: managers with billing state (monthly, invoiced
-// manually), resource counts, ban controls and role changes. Enforcement is
-// deliberately manual — paid_until is the admin's ledger, nothing auto-blocks.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const periodLabel = (months) => (months % 12 === 0 ? plural(months / 12, 'year') : plural(months, 'month'));
+
+// Admin panel section: managers with billing state (per month or per year,
+// invoiced manually), their co-managers, resource counts, ban controls and role
+// changes. Enforcement is deliberately manual — paid_until is the admin's
+// ledger, nothing auto-blocks.
 export function ManagerBilling() {
   const { user } = useAuth();
   const [rows, setRows] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [busyUserId, setBusyUserId] = useState(null);
   const [error, setError] = useState('');
+  // Open "Record payment" dialog: { row, paidOn, months }
+  const [payment, setPayment] = useState(null);
 
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
@@ -55,21 +67,26 @@ export function ManagerBilling() {
     }
   };
 
-  const addMonth = (row) => runAction(row.user_id, async () => {
-    // Extend from paid_until if still in the future, otherwise from today
-    const base = row.paid_until && new Date(row.paid_until) > new Date()
-      ? new Date(row.paid_until)
-      : new Date();
-    base.setMonth(base.getMonth() + 1);
-    const newDate = base.toISOString().slice(0, 10);
-    const { data, error: rpcError } = await supabase.rpc('admin_update_subscription', {
-      target_user_id: row.user_id,
-      new_paid_until: newDate,
-      new_notes: null
+  // "Paid until" is computed from the payment date and the period, never typed.
+  const paymentPeriod = payment && ISO_DATE.test(payment.paidOn)
+    ? paidPeriod(payment.paidOn, payment.months, payment.row.paid_until)
+    : null;
+
+  const handleSavePayment = () => {
+    const { row, paidOn, months } = payment;
+    const { until } = paymentPeriod;
+    setPayment(null);
+    runAction(row.user_id, async () => {
+      const { data, error: rpcError } = await supabase.rpc('admin_record_payment', {
+        target_user_id: row.user_id,
+        paid_on: paidOn,
+        months,
+        new_paid_until: until
+      });
+      if (rpcError) throw rpcError;
+      return data;
     });
-    if (rpcError) throw rpcError;
-    return data;
-  });
+  };
 
   const setDate = (row) => {
     const input = window.prompt('Paid until (YYYY-MM-DD):', row.paid_until || new Date().toISOString().slice(0, 10));
@@ -140,7 +157,14 @@ export function ManagerBilling() {
       ? 'text-red-600 dark:text-red-400'
       : until < soon ? 'text-amber-600 dark:text-amber-400' : 'text-green-700 dark:text-green-400';
     const label = until < now ? `expired ${row.paid_until}` : `paid until ${row.paid_until}`;
-    return <span className={cn('font-semibold tabular-nums', color)}>{label}</span>;
+    return (
+      <>
+        <span className={cn('font-semibold tabular-nums', color)}>{label}</span>
+        {row.paid_at && (
+          <span className="text-muted-foreground tabular-nums"> · paid {row.paid_at} for {periodLabel(row.period_months)}</span>
+        )}
+      </>
+    );
   };
 
   return (
@@ -149,7 +173,8 @@ export function ManagerBilling() {
         <div className="flex flex-col gap-1.5">
           <CardTitle>Managers & Billing</CardTitle>
           <CardDescription>
-            Monthly billing per manager, invoiced manually. New managers start on a 30-day trial.
+            Billing per manager ({PAYMENT_PERIODS.map((p) => `${p.price} € per ${periodLabel(p.months).replace(/^1 /, '')}`).join(' or ')}), invoiced manually.
+            Co-managers of a manager's leagues share that manager's subscription. New managers start on a 30-day trial.
             Nothing blocks automatically — expired means it is time to chase the invoice.
             Every change here is recorded in the audit log.
           </CardDescription>
@@ -169,17 +194,20 @@ export function ManagerBilling() {
         ) : rows.length === 0 ? (
           <EmptyState icon={Users} title="No managers yet." />
         ) : (
-          <div className="divide-y rounded-lg border">
+          <div className="flex flex-col gap-3">
             {rows.map((row) => {
               const isSelf = row.user_id === user?.id;
               const busy = busyUserId === row.user_id;
               return (
-                <div key={row.user_id} className="flex flex-wrap items-start justify-between gap-3 p-4">
+                // One block per paying manager; their co-managers sit inside it.
+                <div key={row.user_id} className="overflow-hidden rounded-lg border">
+                <div className="flex flex-wrap items-start justify-between gap-3 p-4">
                   <div className="flex min-w-56 flex-1 flex-col gap-1 text-sm">
                     <div className="flex flex-wrap items-center gap-2 font-medium">
                       {row.email}
                       {row.role === 'admin' && <Crown className="size-3.5 text-amber-600 dark:text-amber-400" />}
                       {row.is_banned && <Badge variant="destructive">BANNED</Badge>}
+                      {row.hidden_from_overview && <Badge variant="outline">hidden from overview</Badge>}
                     </div>
                     {row.full_name && <div>{row.full_name}</div>}
                     <div className="text-xs text-muted-foreground tabular-nums">
@@ -194,10 +222,17 @@ export function ManagerBilling() {
                   <div className="flex flex-wrap items-center gap-2">
                     {row.role === 'manager' && (
                       <>
-                        <Button variant="outline" size="sm" onClick={() => addMonth(row)} disabled={busy} title="Extend paid period by one month">
-                          +1 month
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPayment({ row, paidOn: todayIso(), months: PAYMENT_PERIODS[0].months })}
+                          disabled={busy}
+                          title="Enter a payment: date and period, paid-until is computed"
+                        >
+                          <CreditCard />
+                          Record payment
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => setDate(row)} disabled={busy} title="Set paid-until date">
+                        <Button variant="outline" size="sm" onClick={() => setDate(row)} disabled={busy} title="Set paid-until date by hand (override)">
                           Set date
                         </Button>
                       </>
@@ -230,11 +265,80 @@ export function ManagerBilling() {
                     )}
                   </div>
                 </div>
+                {row.co_managers?.length > 0 && (
+                  <div className="border-t bg-muted/40 px-4 py-3">
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                      Co-managers · share this subscription
+                    </div>
+                    <ul className="flex flex-col gap-1.5 border-l-2 pl-3 text-sm">
+                      {row.co_managers.map((co) => (
+                        <li key={co.user_id} className="flex flex-wrap items-baseline gap-x-2">
+                          <span className="font-medium">{co.full_name || co.email}</span>
+                          {co.full_name && <span className="text-muted-foreground">{co.email}</span>}
+                          {co.role && <Badge variant="outline">also {co.role}</Badge>}
+                          <span className="ml-auto text-xs text-muted-foreground">{co.leagues.join(', ')}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                </div>
               );
             })}
           </div>
         )}
       </CardContent>
+
+      <Dialog open={!!payment} onOpenChange={(open) => { if (!open) setPayment(null); }}>
+        {payment && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Record payment</DialogTitle>
+              <DialogDescription>{payment.row.full_name ? `${payment.row.full_name} · ` : ''}{payment.row.email}</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="paymentDate">Payment date</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={payment.paidOn}
+                  onChange={(e) => setPayment({ ...payment, paidOn: e.target.value })}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="paymentPeriod">Period paid for</Label>
+                <Select value={String(payment.months)} onValueChange={(v) => setPayment({ ...payment, months: Number(v) })}>
+                  <SelectTrigger id="paymentPeriod" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_PERIODS.map((p) => (
+                      <SelectItem key={p.months} value={String(p.months)}>{periodLabel(p.months)} · {p.price} €</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {paymentPeriod && (
+                <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
+                  <div>
+                    Paid until <strong className="tabular-nums">{paymentPeriod.until}</strong>
+                  </div>
+                  <div className="text-xs text-muted-foreground tabular-nums">
+                    {paymentPeriod.start === payment.paidOn
+                      ? `The period starts on the payment date, ${paymentPeriod.start}.`
+                      : `The period starts on ${paymentPeriod.start}, when the current one ends, so no days are lost.`}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPayment(null)}>Cancel</Button>
+              <Button onClick={handleSavePayment} disabled={!paymentPeriod}>Save payment</Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
     </Card>
   );
 }

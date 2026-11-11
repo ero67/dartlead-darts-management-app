@@ -10,6 +10,8 @@ import { HeadToHead } from './HeadToHead';
 import { StatusBadge } from './shared/StatusBadge';
 import { BoardMotif } from './shared/DartsAccents';
 import { EmptyState } from './shared/EmptyState';
+import { SubscriptionNotice } from './shared/SubscriptionNotice';
+import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
 import { LeaderboardTab } from './league/LeaderboardTab';
 import { TournamentsTab } from './league/TournamentsTab';
 import { StatisticsTab } from './league/StatisticsTab';
@@ -113,6 +115,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     (currentLeague.managerIds && currentLeague.managerIds.includes(user.id))
   ));
   const pendingRegCount = leagueRegistrations.filter(r => r.status === 'pending').length;
+  // The league runs on its creator's subscription; warn the people who manage it.
+  const subscriptionStatuses = useSubscriptionStatus(isManager);
 
   useEffect(() => {
     // Fetch once per mount even when the cached league matches, so reopening
@@ -689,6 +693,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
           <ArrowLeft />
           {t('leagues.backToLeagues')}
         </Button>
+
+        <SubscriptionNotice statuses={(subscriptionStatuses || []).filter(s => s.owner_id === currentLeague.createdBy)} />
 
         {isEditing ? (
           <div className="flex w-full max-w-3xl flex-col gap-3">

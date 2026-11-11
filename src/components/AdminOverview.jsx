@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { AlertTriangle, Clock, Ban, Moon, RefreshCw, Loader, CreditCard, Users, Trophy, Target, ChevronUp, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Clock, Ban, Moon, RefreshCw, Loader, CreditCard, Users, Trophy, Target, ChevronUp, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +18,8 @@ const INACTIVE_DAYS = 60;
 const DAY = 24 * 60 * 60 * 1000;
 const daysUntil = (date) => Math.ceil((new Date(date) - new Date()) / DAY);
 const daysSince = (date) => Math.floor((new Date() - new Date(date)) / DAY);
-const isTrial = (row) => /trial/i.test(row.notes || '');
+// A recorded payment ends the trial, whatever the notes still say.
+const isTrial = (row) => !row.paid_at && /trial/i.test(row.notes || '');
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
 
 const TONE_CLASS = {
@@ -61,6 +62,7 @@ export function AdminOverview({ onOpenBilling }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [sortKey, setSortKey] = useState('matches_30d');
+  const [showHidden, setShowHidden] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -79,18 +81,38 @@ export function AdminOverview({ onOpenBilling }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const buckets = useMemo(() => classifyManagers(rows), [rows]);
+  // Hidden managers (the admin's own test accounts) stay out of every figure
+  // on this tab; the table can show them again so they can be un-hidden.
+  const visibleRows = useMemo(() => rows.filter((r) => !r.hidden_from_overview), [rows]);
+  const hiddenCount = rows.filter((r) => r.role === 'manager' && r.hidden_from_overview).length;
+
+  const handleToggleHidden = async (row) => {
+    const hidden = !row.hidden_from_overview;
+    setError('');
+    // Admins may write the ledger directly (RLS); upsert covers a manager without a row.
+    const { error: saveError } = await supabase
+      .from('manager_subscriptions')
+      .upsert({ user_id: row.user_id, hidden_from_overview: hidden }, { onConflict: 'user_id' });
+    if (saveError) {
+      console.error('Error hiding manager:', saveError);
+      setError(saveError.message);
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.user_id === row.user_id ? { ...r, hidden_from_overview: hidden } : r)));
+  };
+
+  const buckets = useMemo(() => classifyManagers(visibleRows), [visibleRows]);
   const managers = useMemo(() => {
-    const list = rows.filter((r) => r.role === 'manager');
+    const list = (showHidden ? rows : visibleRows).filter((r) => r.role === 'manager');
     const num = (v) => Number(v || 0);
     return [...list].sort((a, b) => {
       if (sortKey === 'last_activity_at') return new Date(b.last_activity_at || 0) - new Date(a.last_activity_at || 0);
       if (sortKey === 'paid_until') return new Date(a.paid_until || '2100-01-01') - new Date(b.paid_until || '2100-01-01');
       return num(b[sortKey]) - num(a[sortKey]);
     });
-  }, [rows, sortKey]);
+  }, [rows, visibleRows, showHidden, sortKey]);
 
-  const totals = useMemo(() => managers.reduce((acc, r) => ({
+  const totals = useMemo(() => managers.filter((r) => !r.hidden_from_overview).reduce((acc, r) => ({
     managers: acc.managers + 1,
     paying: acc.paying + (r.paid_until && !isTrial(r) && daysUntil(r.paid_until) >= 0 ? 1 : 0),
     trials: acc.trials + (r.paid_until && isTrial(r) && daysUntil(r.paid_until) >= 0 ? 1 : 0),
@@ -160,11 +182,19 @@ export function AdminOverview({ onOpenBilling }) {
       </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Usage per manager · last 30 days</CardTitle>
-          <CardDescription>
-            What each subscription is being used for. Sort by a column to find the heaviest users and the quiet ones.
-          </CardDescription>
+        <CardHeader className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>Usage per manager · last 30 days</CardTitle>
+            <CardDescription>
+              What each subscription is being used for, including league tournaments their co-managers created. Sort by a column to find the heaviest users and the quiet ones.
+            </CardDescription>
+          </div>
+          {hiddenCount > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setShowHidden((v) => !v)} aria-pressed={showHidden}>
+              {showHidden ? <EyeOff /> : <Eye />}
+              {showHidden ? 'Hide hidden' : `Show hidden (${hiddenCount})`}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {managers.length === 0 ? (
@@ -186,16 +216,22 @@ export function AdminOverview({ onOpenBilling }) {
                       </button>
                     </TableHead>
                   ))}
+                  <TableHead className="w-0" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {managers.map((r) => {
                   const overdue = r.paid_until && daysUntil(r.paid_until) < 0;
                   return (
-                    <TableRow key={r.user_id} className={r.is_banned ? 'opacity-60' : ''}>
+                    <TableRow key={r.user_id} className={r.is_banned || r.hidden_from_overview ? 'opacity-60' : ''}>
                       <TableCell>
                         <div className="font-medium">{r.full_name || r.email}</div>
                         {r.full_name && <div className="text-xs text-muted-foreground">{r.email}</div>}
+                        {r.co_managers?.length > 0 && (
+                          <div className="text-xs text-muted-foreground" title={r.co_managers.map((c) => c.full_name || c.email).join(', ')}>
+                            +{r.co_managers.length} co-manager{r.co_managers.length === 1 ? '' : 's'}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{r.tournaments_30d}</TableCell>
                       <TableCell className="text-right tabular-nums">{r.matches_30d}</TableCell>
@@ -203,6 +239,17 @@ export function AdminOverview({ onOpenBilling }) {
                       <TableCell className="text-right tabular-nums">{r.tournament_count}</TableCell>
                       <TableCell className="tabular-nums">{fmtDate(r.last_activity_at)}</TableCell>
                       <TableCell className={cn('tabular-nums', overdue && 'font-medium text-red-600 dark:text-red-400')}>{fmtDate(r.paid_until)}{isTrial(r) ? ' · trial' : ''}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => handleToggleHidden(r)}
+                          title={r.hidden_from_overview ? 'Show in overview again' : 'Hide from overview'}
+                          aria-label={r.hidden_from_overview ? `Show ${r.email} in overview again` : `Hide ${r.email} from overview`}
+                        >
+                          {r.hidden_from_overview ? <Eye /> : <EyeOff />}
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
