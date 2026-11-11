@@ -20,7 +20,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
+import { SubscriptionNotice } from './shared/SubscriptionNotice';
 import { confirmDialog } from '../lib/confirmDialog';
+import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
+import { subscriptionLevel } from '../utils/billing';
 
 const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
 
@@ -85,37 +88,9 @@ export function ManagerPanel() {
     (tr.status !== 'completed' && (tr.pendingMatches ?? 0) > 0)
   ));
 
-  // --- My subscription (managers can read their own row via RLS) ---
-  const [subscription, setSubscription] = useState({ loaded: false, paidUntil: null });
-
-  useEffect(() => {
-    if (!user || isAdmin) {
-      setSubscription({ loaded: true, paidUntil: null });
-      return;
-    }
-    let cancelled = false;
-    supabase
-      .from('manager_subscriptions')
-      .select('paid_until')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) console.error('Error loading subscription:', error);
-        setSubscription({ loaded: true, paidUntil: data?.paid_until || null });
-      });
-    return () => { cancelled = true; };
-  }, [user, isAdmin]);
-
-  const subscriptionState = useMemo(() => {
-    if (!subscription.paidUntil) return null;
-    const daysLeft = Math.ceil((new Date(subscription.paidUntil) - new Date()) / 86400000);
-    return {
-      date: new Date(subscription.paidUntil).toLocaleDateString(),
-      daysLeft,
-      level: daysLeft < 0 ? 'expired' : daysLeft <= 14 ? 'warn' : 'ok'
-    };
-  }, [subscription.paidUntil]);
+  // --- Subscriptions that cover me: my own, or (as a co-manager) the league owner's ---
+  const subscriptionStatuses = useSubscriptionStatus();
+  const datedSubscriptions = (subscriptionStatuses || []).filter(s => s.paid_until);
 
   // --- Pending registration requests across all my open tournaments ---
   const [requests, setRequests] = useState([]);
@@ -554,6 +529,8 @@ export function ManagerPanel() {
         </div>
       </div>
 
+      <SubscriptionNotice statuses={subscriptionStatuses} />
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
         <TabsList>
           <TabsTrigger value="overview">
@@ -637,33 +614,42 @@ export function ManagerPanel() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2 text-sm">
-                {!subscription.loaded ? (
-                  <p className="text-muted-foreground">{t('common.loading')}</p>
-                ) : isAdmin ? (
+                {isAdmin ? (
                   <p className="text-muted-foreground">{t('manager.subscriptionAdmin')}</p>
-                ) : !subscriptionState ? (
+                ) : !subscriptionStatuses ? (
+                  <p className="text-muted-foreground">{t('common.loading')}</p>
+                ) : datedSubscriptions.length === 0 ? (
                   <p className="text-muted-foreground">{t('manager.subscriptionNone')}</p>
-                ) : (
-                  <>
-                    <Badge
-                      variant="outline"
-                      className={
-                        subscriptionState.level === 'expired'
-                          ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
-                          : subscriptionState.level === 'warn'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
-                            : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
-                      }
-                    >
-                      {subscriptionState.level === 'expired'
-                        ? t('manager.subscriptionExpired', { date: subscriptionState.date })
-                        : t('manager.subscriptionActiveUntil', { date: subscriptionState.date })}
-                    </Badge>
-                    {subscriptionState.level === 'warn' && (
-                      <p className="text-muted-foreground">{t('manager.subscriptionExpiresSoon')}</p>
-                    )}
-                  </>
-                )}
+                ) : datedSubscriptions.map((s) => {
+                  const level = subscriptionLevel(s.paid_until);
+                  const date = new Date(s.paid_until).toLocaleDateString();
+                  return (
+                    <div key={s.owner_id} className="flex flex-col gap-1">
+                      {!s.is_own && (
+                        <p className="text-muted-foreground">
+                          {t('manager.subscriptionCoveredBy', { name: s.owner_name || t('manager.subscriptionLeagueOwner') })}
+                        </p>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={
+                          level === 'expired'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
+                            : level === 'warn'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+                              : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
+                        }
+                      >
+                        {level === 'expired'
+                          ? t('manager.subscriptionExpired', { date })
+                          : t('manager.subscriptionActiveUntil', { date })}
+                      </Badge>
+                      {level === 'warn' && (
+                        <p className="text-muted-foreground">{t('manager.subscriptionExpiresSoon')}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           </div>
