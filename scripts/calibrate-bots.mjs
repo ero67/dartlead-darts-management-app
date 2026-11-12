@@ -7,16 +7,17 @@
 // optimiser tiers make it slow, several minutes.
 //
 //   node scripts/calibrate-bots.mjs           # recalibrate
-//   node scripts/calibrate-bots.mjs --check   # verify the current table (±3), exit 1 if off
+//   node scripts/calibrate-bots.mjs --check   # verify the current table (±3, few dragging legs), exit 1 if off
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { BOT_LEVELS, simulateMatch, throwAt } from '../src/lib/botPlayer.js';
+import { BOT_LEVELS, simulateLeg, simulateMatch, throwAt } from '../src/lib/botPlayer.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const checkouts = JSON.parse(readFileSync(join(root, '../src/data/checkouts.json'), 'utf8'));
 
 const MATCHES = 400;
+const SOLO_LEGS = 1000;
 
 const matchAverage = (level) => {
   let darts = 0, scored = 0, attempts = 0, legs = 0, seed = 1234567;
@@ -31,9 +32,19 @@ if (process.argv.includes('--check')) {
   let ok = true;
   for (const level of BOT_LEVELS) {
     const { average } = matchAverage(level);
-    const off = Math.abs(average - level.average) > 3;
+    // Legs the bot has to finish itself (the opponent never checks out): how
+    // far below the label they average, and how many drag on (steadying).
+    let seed = 99, darts = 0, dragging = 0;
+    for (let i = 0; i < SOLO_LEGS; i++) {
+      const leg = simulateLeg({ level, checkouts, seed });
+      seed = leg.seed; darts += leg.darts;
+      if ((leg.scored / leg.darts) * 3 < level.average * 0.7) dragging++;
+    }
+    const solo = ((501 * SOLO_LEGS) / darts) * 3;
+    const draggingPct = (dragging / SOLO_LEGS) * 100;
+    const off = Math.abs(average - level.average) > 3 || draggingPct > 3;
     ok &&= !off;
-    console.log(`level ${level.level}  target ${level.average}  measured ${average.toFixed(1)}${off ? '  OFF' : ''}`);
+    console.log(`level ${level.level}  target ${level.average}  measured ${average.toFixed(1)}  full legs ${solo.toFixed(1)}  legs under 70% of target ${draggingPct.toFixed(1)}%${off ? '  OFF' : ''}`);
   }
   process.exit(ok ? 0 : 1);
 }
