@@ -26,7 +26,7 @@ import {
   createX01Match, matchApplyDart, matchApplyVisitTotal, matchUndoHuman, matchCanUndo,
   matchApplySequence, matchAwardLegByBullup, matchSetStarter, matchSetScoringMode, isBotTurn, currentPlayerState, computeMatchStats, isMatch, MATCH_LEG_OPTIONS
 } from '../../lib/x01Match';
-import { BOT_LEVELS, getBotLevel, botThrow, newSeed } from '../../lib/botPlayer';
+import { BOT_LEVELS, getBotLevel, botThrow, legAverageSoFar, newSeed } from '../../lib/botPlayer';
 import {
   loadActiveSession, saveActiveSession, clearActiveSession, appendHistory,
   newSessionId, loadGameSettings, saveGameSettings
@@ -277,12 +277,15 @@ export function PracticeX01() {
     let outcome = null;
     for (let i = 0; i < 3; i++) {
       const ps = currentPlayerState(probe);
+      const remaining = liveRemaining(ps);
+      const legDarts = ps.current.visits.reduce((sum, v) => sum + v.darts, 0) + ps.current.visit.darts.length;
       const thrown = botThrow({
-        remaining: liveRemaining(ps),
+        remaining,
         dartsLeft: 3 - ps.current.visit.darts.length,
         level,
         checkouts: checkoutData,
-        seed
+        seed,
+        legAverage: legAverageSoFar(ps.current.startRemaining, remaining, legDarts)
       });
       seed = thrown.seed;
       const result = matchApplyDart(probe, thrown.dart);

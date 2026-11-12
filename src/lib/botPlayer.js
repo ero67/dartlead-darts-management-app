@@ -4,7 +4,8 @@
 // real dartboard and lands with two-dimensional Gaussian scatter, then the
 // landing point is scored by geometry. Difficulty is the scatter radius in
 // millimetres (`sigma`); everything a player would recognise — averages,
-// 180s, missed doubles, the odd bust — falls out of that one number.
+// 180s, missed doubles, the odd bust — falls out of that one number. The one
+// exception is "Steadying" below, which stops a leg dragging on for ever.
 //
 // Strategy comes in three tiers so weak bots are weak for the right reasons:
 //   naive      scores at whatever its accuracy makes best (T19 / bull rather
@@ -216,23 +217,45 @@ export const chooseTarget = ({ remaining, dartsLeft, level, checkouts, seed }) =
   return optimiserTarget(remaining, dartsLeft, level, checkouts, seed);
 };
 
+// ---- Steadying -------------------------------------------------------------
+// A weak bot hits a double with about one dart in seven, so left alone one leg
+// in eight drags on to under 70% of the level's average (45+ darts at level
+// 3). When the leg in progress is running below the level's average, the bot
+// bears down on its finishing double: scatter shrinks with how far behind it
+// is. Scoring darts and legs that are on pace are untouched.
+const STEADY_POWER = 4;
+const steadySigma = (level, legAverage) =>
+  (legAverage > 0 && legAverage < level.average
+    ? level.sigma * (legAverage / level.average) ** STEADY_POWER
+    : level.sigma);
+
+// 3-dart average of the leg in progress, for `botThrow`'s `legAverage`.
+export const legAverageSoFar = (startingScore, remaining, darts) =>
+  (darts > 0 ? ((startingScore - remaining) / darts) * 3 : undefined);
+
 // One dart: pick a target, throw at it. Returns { dart, target, seed }.
-export const botThrow = ({ remaining, dartsLeft, level, checkouts, seed }) => {
+// `legAverage` (optional) is the bot's average in this leg so far; without it
+// the bot never steadies, which is what callers modelling a human want.
+export const botThrow = ({ remaining, dartsLeft, level, checkouts, seed, legAverage }) => {
   const choice = chooseTarget({ remaining, dartsLeft, level, checkouts, seed });
-  const thrown = throwAt(choice.label, level.sigma, choice.seed);
+  const isFinishingDouble = isDoubleOut(remaining) && choice.label === (remaining === 50 ? 'Bull' : `D${remaining / 2}`);
+  const thrown = throwAt(choice.label, isFinishingDouble ? steadySigma(level, legAverage) : level.sigma, choice.seed);
   return { dart: thrown.dart, target: choice.label, seed: thrown.seed };
 };
 
 // A whole visit from `remaining`: up to three darts, stopping on a checkout or
 // a bust the same way the engine would. Returns the darts in engine format
 // (the caller feeds them to the engine one by one), the outcome and the seed.
-export const botVisit = ({ remaining, level, checkouts, seed }) => {
+// Pass `startingScore` and `legDarts` (darts already thrown this leg) to let
+// the bot steady itself.
+export const botVisit = ({ remaining, level, checkouts, seed, startingScore, legDarts = 0 }) => {
   const darts = [];
   let left = remaining;
   let s = seed;
   let outcome = 'visit';
   for (let i = 0; i < 3; i++) {
-    const t = botThrow({ remaining: left, dartsLeft: 3 - i, level, checkouts, seed: s });
+    const legAverage = startingScore ? legAverageSoFar(startingScore, left, legDarts + i) : undefined;
+    const t = botThrow({ remaining: left, dartsLeft: 3 - i, level, checkouts, seed: s, legAverage });
     s = t.seed;
     darts.push({ ...t.dart, target: t.target });
     const after = left - t.dart.value;
@@ -253,7 +276,7 @@ export const simulateLeg = ({ startingScore = 501, level, checkouts, seed }) => 
   let checkoutAttempts = 0;
   while (remaining > 0 && visits < 200) {
     if (isFinishable(remaining)) checkoutAttempts++;
-    const v = botVisit({ remaining, level, checkouts, seed: s });
+    const v = botVisit({ remaining, level, checkouts, seed: s, startingScore, legDarts: darts });
     s = v.seed;
     visits++;
     darts += v.darts.length;
@@ -278,13 +301,15 @@ export const simulateMatch = ({ startingScore = 501, legsToWin = 3, level, check
   let checkoutAttempts = 0;
   while (legsWon < legsToWin && legsLost < legsToWin) {
     const remaining = [startingScore, startingScore];
+    const legDarts = [0, 0];
     let turn = (legsWon + legsLost) % 2;
     let winner = -1;
     let guard = 0;
     while (winner < 0 && guard++ < 400) {
       if (turn === 0 && isFinishable(remaining[0])) checkoutAttempts++;
-      const v = botVisit({ remaining: remaining[turn], level, checkouts, seed: s });
+      const v = botVisit({ remaining: remaining[turn], level, checkouts, seed: s, startingScore, legDarts: legDarts[turn] });
       s = v.seed;
+      legDarts[turn] += v.darts.length;
       if (turn === 0) darts += v.darts.length;
       if (v.outcome !== 'bust') {
         const visitScore = v.darts.reduce((sum, d) => sum + d.value, 0);
