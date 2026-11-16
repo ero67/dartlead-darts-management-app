@@ -17,6 +17,7 @@ import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
 import { FormRating } from './FormRating';
 import { DisplayNameEditor } from './DisplayNameEditor';
+import { AvatarCropDialog } from './AvatarCropDialog';
 import { AccountDeletion } from './AccountDeletion';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { PracticeBests } from './practice/PracticeBests';
@@ -75,6 +76,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const [statsMatch, setStatsMatch] = useState(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
   const photoInputRef = useRef(null);
 
   useEffect(() => {
@@ -131,14 +133,14 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const x01 = (label) => (cricketStats ? `${label} · ${t('common.gameTypeX01')}` : label);
   const isOwnProfile = !!(user && player.user_id && player.user_id === user.id);
 
-  // file = upload or replace your photo; null = remove it.
-  const handlePhotoChange = async (file) => {
+  // file = upload or replace your photo (crop = the square picked in the crop dialog); null = remove it.
+  const handlePhotoChange = async (file, crop) => {
     const path = `avatars/${user.id}.webp`;
     setIsSavingPhoto(true);
     try {
       let url = null;
       if (file) {
-        url = await mediaService.uploadImage(path, file, { maxSide: 256, square: true });
+        url = await mediaService.uploadImage(path, file, { maxSide: 256, square: true, crop });
       } else {
         await mediaService.removeImage(path);
       }
@@ -239,9 +241,22 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     e.target.value = ''; // picking the same file again still fires onChange
-                    if (file) handlePhotoChange(file);
+                    if (file) setCropFile(file);
                   }}
                 />
+                {/* Mounted per file, so each new photo starts centred at zoom 1. */}
+                {cropFile && <AvatarCropDialog
+                  file={cropFile}
+                  onCancel={() => setCropFile(null)}
+                  onSave={(crop) => {
+                    setCropFile(null);
+                    handlePhotoChange(cropFile, crop);
+                  }}
+                  onUnsupported={() => {
+                    setCropFile(null);
+                    toast.error(t('media.unsupportedImage'));
+                  }}
+                />}
                 <Button
                   type="button"
                   variant="secondary"
