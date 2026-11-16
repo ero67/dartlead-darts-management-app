@@ -1039,6 +1039,13 @@
     "publicLeagueHint": "Public by default, like tournament pages: the league page, leaderboard, members, results and past seasons. Switch it off to show the league only to signed-in users. Registration, settings and management always need a login.",
     "publicLeagueOn": "The league is now public",
     "publicLeagueOff": "The league is now visible only to signed-in users",
+    "logo": "League logo",
+    "logoHint": "Shown on the league page, its tournaments and the TV display.",
+    "uploadLogo": "Upload logo",
+    "changeLogo": "Change logo",
+    "removeLogo": "Remove",
+    "logoSaved": "Logo saved",
+    "logoRemoved": "Logo removed",
     "membersOnlyTitle": "Sign in to see this league",
     "membersOnlyText": "This league is visible to signed-in users only, or it no longer exists."
   },
@@ -1069,6 +1076,12 @@
     "viewProfile": "View player profile",
     "yourProfile": "Your profile",
     "editName": "Edit name",
+    "changePhoto": "Change photo",
+    "removePhoto": "Remove photo",
+    "adjustPhoto": "Adjust your photo",
+    "zoom": "Zoom",
+    "photoSaved": "Photo saved",
+    "photoRemoved": "Photo removed",
     "yourName": "Your name",
     "nameHint": "This name is shown in tournaments, leagues and statistics.",
     "nameInvalid": "The name must be 2 to 60 characters long.",
@@ -1766,5 +1779,10 @@
       "openTournament": "Open the tournament",
       "doneUntold": "Done. The assistant could not be told; refresh to see it."
     }
+  },
+  "media": {
+    "tooLarge": "The image is too large (max 10 MB)",
+    "unsupportedImage": "This image format is not supported. Try a JPG or PNG.",
+    "uploadFailed": "Could not upload the image"
   }
 }

@@ -1039,6 +1039,13 @@
     "publicLeagueHint": "Predvolene verejná, ako stránky turnajov: stránka ligy, rebríček, členovia, výsledky a minulé sezóny. Vypnite, ak má ligu vidieť len prihlásený používateľ. Registrácia, nastavenia a správa vždy vyžadujú prihlásenie.",
     "publicLeagueOn": "Liga je teraz verejná",
     "publicLeagueOff": "Ligu teraz vidia len prihlásení používatelia",
+    "logo": "Logo ligy",
+    "logoHint": "Zobrazí sa na stránke ligy, pri jej turnajoch a v TV režime.",
+    "uploadLogo": "Nahrať logo",
+    "changeLogo": "Zmeniť logo",
+    "removeLogo": "Odstrániť",
+    "logoSaved": "Logo uložené",
+    "logoRemoved": "Logo odstránené",
     "membersOnlyTitle": "Prihláste sa, aby ste videli túto ligu",
     "membersOnlyText": "Túto ligu vidia len prihlásení používatelia, alebo už neexistuje."
   },
@@ -1069,6 +1076,12 @@
     "viewProfile": "Zobraziť profil hráča",
     "yourProfile": "Váš profil",
     "editName": "Upraviť meno",
+    "changePhoto": "Zmeniť fotku",
+    "removePhoto": "Odstrániť fotku",
+    "adjustPhoto": "Upravte svoju fotku",
+    "zoom": "Priblíženie",
+    "photoSaved": "Fotka uložená",
+    "photoRemoved": "Fotka odstránená",
     "yourName": "Vaše meno",
     "nameHint": "Toto meno sa zobrazuje v turnajoch, ligách a štatistikách.",
     "nameInvalid": "Meno musí mať 2 až 60 znakov.",
@@ -1766,5 +1779,10 @@
       "openTournament": "Otvoriť turnaj",
       "doneUntold": "Hotovo. Asistent o tom nedostal správu; obnovte stránku, aby ste to videli."
     }
+  },
+  "media": {
+    "tooLarge": "Obrázok je príliš veľký (max. 10 MB)",
+    "unsupportedImage": "Tento formát obrázka nie je podporovaný. Skúste JPG alebo PNG.",
+    "uploadFailed": "Obrázok sa nepodarilo nahrať"
   }
 }

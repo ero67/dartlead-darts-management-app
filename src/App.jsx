@@ -279,8 +279,10 @@ function MatchRoute({ onMatchComplete }) {
         }
 
         if (match) {
+          // Bracket entries hold only {id, name}; take the full player rows (photo) from the tournament.
+          const full = (p) => p && { ...currentTournament.players?.find(x => x.id === p.id), ...p };
           // Bracket matches carry no tournamentId; startMatch needs it to create the row.
-          startMatch({ ...match, tournamentId: match.tournamentId || currentTournament.id });
+          startMatch({ ...match, player1: full(match.player1), player2: full(match.player2), tournamentId: match.tournamentId || currentTournament.id });
         } else {
           // Match not found, redirect to tournament. replace: a redirect must
           // not leave the dead /match URL in history, or "back" bounces

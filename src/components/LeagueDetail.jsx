@@ -6,8 +6,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { leagueService } from '../services/leagueService';
+import { mediaService } from '../services/mediaService';
 import { HeadToHead } from './HeadToHead';
 import { StatusBadge } from './shared/StatusBadge';
+import { LeagueLogo } from './shared/LeagueLogo';
 import { BoardMotif } from './shared/DartsAccents';
 import { EmptyState } from './shared/EmptyState';
 import { SubscriptionNotice } from './shared/SubscriptionNotice';
@@ -66,6 +68,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   const [addMode, setAddMode] = useState('name'); // 'name' or 'users'
   // In-flight guards — every one of these actions used to be double-clickable
   const [isSavingLeague, setIsSavingLeague] = useState(false);
+  const [isSavingLogo, setIsSavingLogo] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [pendingMemberIds, setPendingMemberIds] = useState(() => new Set());
   const [isLinking, setIsLinking] = useState(false);
@@ -316,6 +319,30 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     } catch (error) {
       console.error('Error updating league visibility:', error);
       toast.error(t('leagues.failedToUpdateLeague'));
+    }
+  };
+
+  // file = upload or replace the logo; null = remove it.
+  const handleLogoChange = async (file) => {
+    const path = `logos/${currentLeague.id}.webp`;
+    setIsSavingLogo(true);
+    try {
+      if (file) {
+        const url = await mediaService.uploadImage(path, file, { maxSide: 512, square: false });
+        await updateLeague(currentLeague.id, { logo_url: url });
+        toast.success(t('leagues.logoSaved'));
+      } else {
+        await mediaService.removeImage(path);
+        await updateLeague(currentLeague.id, { logo_url: null });
+        toast.success(t('leagues.logoRemoved'));
+      }
+    } catch (error) {
+      console.error('Error saving league logo:', error);
+      if (error.code === 'too_large') toast.error(t('media.tooLarge'));
+      else if (error.code === 'unsupported') toast.error(t('media.unsupportedImage'));
+      else toast.error(t('media.uploadFailed'));
+    } finally {
+      setIsSavingLogo(false);
     }
   };
 
@@ -726,6 +753,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 flex-col gap-2">
               <div className="flex flex-wrap items-center gap-3">
+                <LeagueLogo src={currentLeague.logoUrl} className="size-10" />
                 <h1 className="text-2xl font-semibold tracking-tight">{currentLeague.name}</h1>
                 <StatusBadge status={currentLeague.status} t={t} />
               </div>
@@ -886,6 +914,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               onSaveDefaults={handleSaveTournamentDefaults}
               onResetDefaults={handleResetTournamentDefaults}
               onTogglePublic={handleTogglePublic}
+              onLogoChange={handleLogoChange}
+              isSavingLogo={isSavingLogo}
             />
           </TabsContent>
         )}

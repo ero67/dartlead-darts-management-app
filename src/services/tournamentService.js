@@ -160,7 +160,7 @@ export const tournamentService = {
           status: tournamentData.status || 'open_for_registration'
         })
         // League name for the breadcrumb on the page we land on next
-        .select('*, league:leagues!tournaments_league_id_fkey(name)')
+        .select('*, league:leagues!tournaments_league_id_fkey(name, logo_url)')
         .single()
 
       if (tournamentError) {
@@ -388,6 +388,7 @@ export const tournamentService = {
         standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || tournamentData.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
         leagueId: tournament.league_id || tournamentData.leagueId || null,
         leagueName: tournament.league?.name || null,
+        leagueLogoUrl: tournament.league?.logo_url || null,
         boardCount: tournament.board_count ?? null,
         createdAt: tournament.created_at,
         updatedAt: tournament.updated_at,
@@ -509,7 +510,7 @@ export const tournamentService = {
         .from('tournaments')
         .select(`
           *,
-          league:leagues!tournaments_league_id_fkey(name),
+          league:leagues!tournaments_league_id_fkey(name, logo_url),
           tournament_players(
             player:players(*)
           ),
@@ -671,6 +672,7 @@ export const tournamentService = {
           standingsCriteriaOrder: groupSettings?.standingsCriteriaOrder || ['matchesWon', 'legDifference', 'average', 'headToHead'],
           leagueId: tournament.league_id || null,
           leagueName: tournament.league?.name || null,
+          leagueLogoUrl: tournament.league?.logo_url || null,
           createdAt: tournament.created_at,
           updatedAt: tournament.updated_at,
           userId: tournament.user_id,
@@ -1608,11 +1610,23 @@ export const tournamentService = {
     }
   },
 
+  // Sets (or with null clears) the signed-in user's photo on their player rows.
+  async setMyAvatar(url) {
+    try {
+      const { error } = await supabase.rpc('set_my_avatar', { url });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving player photo:', error);
+      throw error;
+    }
+  },
+
   async unlinkPlayerFromUser(playerId) {
     try {
       const { data, error } = await supabase
         .from('players')
-        .update({ user_id: null })
+        // The photo belongs to the account, so it leaves with it.
+        .update({ user_id: null, avatar_url: null })
         .eq('id', playerId)
         .select('id, name, user_id')
         .single();

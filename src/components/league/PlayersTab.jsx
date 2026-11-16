@@ -4,7 +4,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { UserSearchPicker } from '../UserSearchPicker';
 import { DisplayNameEditor } from '../DisplayNameEditor';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -217,6 +217,7 @@ export function PlayersTab({
             return (
               <Card key={member.player?.id || member.id} className="flex-row items-center gap-3 px-4 py-3">
                 <Avatar>
+                  <AvatarImage src={member.player?.avatar_url || undefined} alt="" />
                   <AvatarFallback>{initials(member.player?.name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">

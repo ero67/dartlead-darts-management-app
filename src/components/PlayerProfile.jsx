@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Trophy, Target, Crown, Calendar, TrendingUp, Award, Medal,
-  Flame, Zap, Percent, Swords, ShieldCheck, ChevronRight, Activity, Pencil, BarChart3
+  Flame, Zap, Percent, Swords, ShieldCheck, ChevronRight, Activity, Pencil, BarChart3, Camera, Loader, X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,10 +17,13 @@ import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
 import { FormRating } from './FormRating';
 import { DisplayNameEditor } from './DisplayNameEditor';
+import { AvatarCropDialog } from './AvatarCropDialog';
 import { AccountDeletion } from './AccountDeletion';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { PracticeBests } from './practice/PracticeBests';
 import { tournamentService } from '../services/tournamentService';
+import { mediaService } from '../services/mediaService';
+import { toast } from 'sonner';
 import { loadHistory } from '../lib/practiceStorage';
 
 const getInitials = (name) => {
@@ -72,6 +75,9 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const [loading, setLoading] = useState(true);
   const [statsMatch, setStatsMatch] = useState(null);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
+  const photoInputRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +132,30 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const hasX01 = !cricketStats || careerStats.matchesPlayed > cricketStats.matches;
   const x01 = (label) => (cricketStats ? `${label} · ${t('common.gameTypeX01')}` : label);
   const isOwnProfile = !!(user && player.user_id && player.user_id === user.id);
+
+  // file = upload or replace your photo (crop = the square picked in the crop dialog); null = remove it.
+  const handlePhotoChange = async (file, crop) => {
+    const path = `avatars/${user.id}.webp`;
+    setIsSavingPhoto(true);
+    try {
+      let url = null;
+      if (file) {
+        url = await mediaService.uploadImage(path, file, { maxSide: 256, square: true, crop });
+      } else {
+        await mediaService.removeImage(path);
+      }
+      await tournamentService.setMyAvatar(url);
+      setProfileData(prev => prev ? { ...prev, player: { ...prev.player, avatar_url: url } } : prev);
+      toast.success(t(url ? 'playerProfile.photoSaved' : 'playerProfile.photoRemoved'));
+    } catch (error) {
+      console.error('Error saving player photo:', error);
+      if (error.code === 'too_large') toast.error(t('media.tooLarge'));
+      else if (error.code === 'unsupported') toast.error(t('media.unsupportedImage'));
+      else toast.error(t('media.uploadFailed'));
+    } finally {
+      setIsSavingPhoto(false);
+    }
+  };
   const winRate = careerStats.matchesPlayed > 0
     ? (careerStats.wins / careerStats.matchesPlayed) * 100
     : 0;
@@ -196,9 +226,66 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
       {/* Hero */}
       <Card className="flex-col gap-6 p-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-          <Avatar className="size-20 shrink-0">
-            <AvatarFallback className="text-2xl font-semibold text-foreground">{getInitials(player.name)}</AvatarFallback>
-          </Avatar>
+          <div className="relative size-20 shrink-0">
+            <Avatar className="size-20">
+              <AvatarImage src={player.avatar_url || undefined} alt="" />
+              <AvatarFallback className="text-2xl font-semibold text-foreground">{getInitials(player.name)}</AvatarFallback>
+            </Avatar>
+            {isOwnProfile && (
+              <>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = ''; // picking the same file again still fires onChange
+                    if (file) setCropFile(file);
+                  }}
+                />
+                {/* Mounted per file, so each new photo starts centred at zoom 1. */}
+                {cropFile && <AvatarCropDialog
+                  file={cropFile}
+                  onCancel={() => setCropFile(null)}
+                  onSave={(crop) => {
+                    setCropFile(null);
+                    handlePhotoChange(cropFile, crop);
+                  }}
+                  onUnsupported={() => {
+                    setCropFile(null);
+                    toast.error(t('media.unsupportedImage'));
+                  }}
+                />}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon-sm"
+                  className="absolute -right-1 -bottom-1 rounded-full shadow-sm"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={isSavingPhoto}
+                  title={t('playerProfile.changePhoto')}
+                  aria-label={t('playerProfile.changePhoto')}
+                >
+                  {isSavingPhoto ? <Loader className="animate-spin" /> : <Camera />}
+                </Button>
+                {player.avatar_url && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon-sm"
+                    className="absolute -top-1 -right-1 size-6 rounded-full shadow-sm"
+                    onClick={() => handlePhotoChange(null)}
+                    disabled={isSavingPhoto}
+                    title={t('playerProfile.removePhoto')}
+                    aria-label={t('playerProfile.removePhoto')}
+                  >
+                    <X />
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             {isOwnProfile && isEditingName ? (
               <DisplayNameEditor

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { PlayerHome } from './PlayerHome';
 import { StatusBadge } from './shared/StatusBadge';
+import { LeagueLogo } from './shared/LeagueLogo';
 import { BoardMotif, LiveDot, PhaseBar } from './shared/DartsAccents';
 import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
@@ -137,7 +138,10 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
               <Card key={league.id} className="gap-4">
                 <CardHeader className="gap-2">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="truncate text-base font-semibold leading-6">{league.name}</h3>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <LeagueLogo src={league.logoUrl} className="size-6" />
+                      <h3 className="truncate text-base font-semibold leading-6">{league.name}</h3>
+                    </div>
                     <StatusBadge status={league.status} t={t} />
                   </div>
                   {league.description && (
@@ -194,7 +198,10 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
                 <Card key={tournament.id} className="gap-4">
                   <CardHeader className="gap-2">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <LeagueLogo src={linkedLeague?.logoUrl} className="size-6" />
+                        <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
+                      </div>
                       <StatusBadge status={tournament.status} t={t} />
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

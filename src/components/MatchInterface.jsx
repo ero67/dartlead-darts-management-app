@@ -2029,8 +2029,8 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
         ) : (
           <StarterDialog
             players={[
-              { name: playerNames[0], legs: legScores.player1.legs },
-              { name: playerNames[1], legs: legScores.player2.legs }
+              { name: playerNames[0], legs: legScores.player1.legs, avatarUrl: match?.player1?.avatar_url },
+              { name: playerNames[1], legs: legScores.player2.legs, avatarUrl: match?.player2?.avatar_url }
             ]}
             scoringMode={scoringMode}
             onScoringModeChange={setScoringMode}

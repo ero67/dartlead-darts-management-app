@@ -1494,6 +1494,7 @@ export const leagueService = {
       description: league.description,
       status: league.status,
       isDemo: Boolean(league.is_demo),
+      logoUrl: league.logo_url || null,
       // Co-managers (league_managers join); the creator is implicit via createdBy
       managerIds: (league.league_managers || []).map(m => m.user_id),
       createdBy: league.created_by,

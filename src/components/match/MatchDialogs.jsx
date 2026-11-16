@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Eye } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -13,6 +14,8 @@ const stay = (e) => e.preventDefault();
 // `children` (optional) sits above the starter buttons: the match screen puts
 // the pre-match card there; practice passes nothing. Without
 // `onScoringModeChange` there is no scoring-mode toggle (Cricket is per dart).
+const initials = (name) => (name || '?').split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+
 export function StarterDialog({ players, scoringMode, onScoringModeChange, onSelect, children }) {
   const { t } = useLanguage();
   return (
@@ -41,9 +44,15 @@ export function StarterDialog({ players, scoringMode, onScoringModeChange, onSel
         {children}
         <div className="flex flex-col gap-2">
           {players.map((player, idx) => (
-            <Button key={idx} type="button" variant="outline" className="h-16 w-full flex-col gap-0" onClick={() => onSelect(idx)}>
-              <span className="max-w-full truncate text-base font-semibold">{player.name}</span>
-              <span className="text-xs font-normal text-muted-foreground tabular-nums">{player.legs} {t('match.legs')}</span>
+            <Button key={idx} type="button" variant="outline" className="h-16 w-full justify-start gap-3" onClick={() => onSelect(idx)}>
+              <Avatar className="size-10">
+                <AvatarImage src={player.avatarUrl || undefined} alt="" />
+                <AvatarFallback className="font-semibold">{initials(player.name)}</AvatarFallback>
+              </Avatar>
+              <span className="flex min-w-0 flex-col items-start">
+                <span className="max-w-full truncate text-base font-semibold">{player.name}</span>
+                <span className="text-xs font-normal text-muted-foreground tabular-nums">{player.legs} {t('match.legs')}</span>
+              </span>
             </Button>
           ))}
         </div>

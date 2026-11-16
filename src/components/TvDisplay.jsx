@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { BracketVisualization } from './BracketVisualization';
 import { EmptyState } from './shared/EmptyState';
 import { StatusBadge } from './shared/StatusBadge';
+import { LeagueLogo } from './shared/LeagueLogo';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
 import { boardQueues } from '../utils/boardSchedule';
 import { getQualifyingPlayers } from '../utils/qualifiers';
@@ -594,7 +595,9 @@ export function TvDisplay() {
     <div className="dark-mode flex min-h-screen flex-col bg-background text-foreground tv:fixed tv:inset-0 tv:overflow-hidden [&:fullscreen]:cursor-none" ref={rootRef}>
       <header className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-3 tv:h-20 tv:flex-nowrap tv:py-0">
         <div className="flex min-w-0 items-center gap-3">
-          <Trophy className="size-7 shrink-0 text-primary" />
+          {tournament?.leagueLogoUrl
+            ? <LeagueLogo src={tournament.leagueLogoUrl} className="h-12 max-w-32" />
+            : <Trophy className="size-7 shrink-0 text-primary" />}
           <h1 className="truncate text-3xl font-semibold">{tournament?.name || '…'}</h1>
           {tournament && <StatusBadge status={tournament.status} t={t} className="shrink-0" />}
         </div>
