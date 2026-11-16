@@ -1,6 +1,7 @@
 import React from 'react';
-import { Plus, X, Save, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, X, Save, RotateCcw, ChevronUp, ChevronDown, ImageUp, Loader } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { LeagueLogo } from '../shared/LeagueLogo';
 import { LeagueManagersPanel } from '../LeagueManagersPanel';
 import { ScorersPanel } from '../ScorersPanel';
 import { SeedingPresetLibrary } from '../SeedingPresetLibrary';
@@ -44,8 +45,10 @@ export function SettingsTab({
   isSavingScoring, onSaveScoringRules,
   tournamentDefaults, setTournamentDefaults, isSavingDefaults, onSaveDefaults, onResetDefaults,
   onTogglePublic,
+  onLogoChange, isSavingLogo,
 }) {
   const { t } = useLanguage();
+  const logoInputRef = React.useRef(null);
 
   const getPlacementLabel = (position) => {
     if (position === 'playoffDefault') return t('leagues.playoffParticipant') || '🏟️ Other Playoff Participants';
@@ -86,6 +89,37 @@ export function SettingsTab({
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-lg font-semibold tracking-tight">{t('leagues.leagueSettings')}</h2>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('leagues.logo')}</CardTitle>
+          <CardDescription>{t('leagues.logoHint')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-4">
+          {league.logoUrl && <LeagueLogo src={league.logoUrl} className="size-16 rounded-md border bg-muted/30 p-1" />}
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = ''; // picking the same file again still fires onChange
+              if (file) onLogoChange(file);
+            }}
+          />
+          <Button variant="outline" onClick={() => logoInputRef.current?.click()} disabled={isSavingLogo}>
+            {isSavingLogo ? <Loader className="animate-spin" /> : <ImageUp />}
+            {league.logoUrl ? t('leagues.changeLogo') : t('leagues.uploadLogo')}
+          </Button>
+          {league.logoUrl && (
+            <Button variant="ghost" onClick={() => onLogoChange(null)} disabled={isSavingLogo}>
+              <X />
+              {t('leagues.removeLogo')}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

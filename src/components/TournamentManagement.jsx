@@ -15,6 +15,7 @@ import { ScorersPanel } from './ScorersPanel';
 import { RefreshButton } from './RefreshButton';
 import { MatchStatisticsModal } from './MatchStatisticsModal';
 import { StatusBadge } from './shared/StatusBadge';
+import { LeagueLogo } from './shared/LeagueLogo';
 import { RoundSchedule } from './shared/RoundSchedule';
 import { BoardMotif, LiveDot, PhaseBar } from './shared/DartsAccents';
 import { isTournamentRunning, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
@@ -2085,6 +2086,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
+              <LeagueLogo src={tournament.leagueLogoUrl} className="size-8" />
               <h1 className="text-2xl font-semibold tracking-tight">{tournament.name}</h1>
               <StatusBadge status={tournament.status} t={t} />
               {user && (

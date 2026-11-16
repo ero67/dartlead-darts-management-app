@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Trophy, Target, Zap, Award, Hash, Download, Loader, Crown, Flame } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Avatar, AvatarFallback, AvatarGroup } from '@/components/ui/avatar';
+import { LeagueLogo } from './shared/LeagueLogo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -473,9 +474,13 @@ export function TournamentSummary({ tournament }) {
       <div className="flex flex-col gap-6 rounded-xl bg-background">
         <Card>
           <CardHeader className="flex items-center gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Trophy className="size-6" />
-            </div>
+            {tournament.leagueLogoUrl ? (
+              <LeagueLogo src={tournament.leagueLogoUrl} className="size-12" />
+            ) : (
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Trophy className="size-6" />
+              </div>
+            )}
             <div className="flex min-w-0 flex-col gap-1">
               <span className="truncate text-xs font-medium uppercase tracking-wider text-muted-foreground">{tournament.name}</span>
               <h2 className="text-2xl font-semibold tracking-tight">
