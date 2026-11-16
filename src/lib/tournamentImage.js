@@ -1,5 +1,6 @@
 import { mergeBracketRounds } from '../utils/bracketView';
 import { getQualifyingPlayers } from '../utils/qualifiers';
+import { fitImage } from './imageFit';
 
 // Draws a tournament "poster" PNG on a canvas: podium, group standings, the
 // playoff bracket results and (optionally) stat awards, as dense as a sheet
@@ -56,15 +57,36 @@ function sectionTitle(ctx, label, y) {
 
 // ---- sections ----------------------------------------------------------------
 
-function drawHeader(ctx, tournament, labels, y) {
-  text(ctx, tournament.name, PAD, y + 44, { size: 44, weight: 700, family: DISPLAY, max: W - PAD * 2 });
+const LOGO_BOX = 72;
+
+// The league logo as a bitmap, or null. fetch (CORS) instead of <img> so the
+// canvas stays exportable; any failure just leaves the logo out.
+async function loadLogo(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await createImageBitmap(await res.blob());
+  } catch {
+    return null;
+  }
+}
+
+function drawHeader(ctx, tournament, labels, y, logo) {
+  let x = PAD;
+  if (logo) {
+    const { dw, dh } = fitImage(logo.width, logo.height, { maxSide: LOGO_BOX, square: false });
+    ctx.drawImage(logo, PAD, y + 8 + (LOGO_BOX - dh) / 2, dw, dh);
+    x = PAD + dw + 20;
+  }
+  text(ctx, tournament.name, x, y + 44, { size: 44, weight: 700, family: DISPLAY, max: W - PAD - x });
   const date = tournament.createdAt ? new Date(tournament.createdAt) : null;
   const meta = [
     date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString() : null,
     `${tournament.gameType === 'cricket' ? labels.cricket : tournament.startingScore || 501} · ${labels.firstTo} ${tournament.legsToWin || 3}`,
     tournament.status === 'completed' ? labels.completed : null
   ].filter(Boolean).join('   ·   ');
-  text(ctx, meta, PAD, y + 72, { size: 14, color: C.muted });
+  text(ctx, meta, x, y + 72, { size: 14, color: C.muted });
   text(ctx, 'dartlead.app', W - PAD, y + 72, { size: 14, weight: 600, color: C.green, align: 'right' });
   return y + 100;
 }
@@ -238,6 +260,7 @@ export async function tournamentToPngBlob(tournament, labels, { awards = [] } = 
     await Promise.allSettled([document.fonts.load(font(20, 700, DISPLAY)), document.fonts.load(font(14, 400, SANS)), document.fonts.load(font(14, 700, SANS))]);
   }
   const rounds = mergeBracketRounds(tournament.playoffs?.rounds, tournament.playoffMatches, tournament.players);
+  const logo = await loadLogo(tournament.leagueLogoUrl);
 
   // Draw on a tall scratch canvas, then crop to the used height.
   const scratch = document.createElement('canvas');
@@ -249,7 +272,7 @@ export async function tournamentToPngBlob(tournament, labels, { awards = [] } = 
   ctx.fillRect(0, 0, W, 8000);
 
   let y = PAD;
-  y = drawHeader(ctx, tournament, labels, y);
+  y = drawHeader(ctx, tournament, labels, y, logo);
   y = drawPodium(ctx, podiumFromRounds(rounds), y);
   y = drawAwards(ctx, awards, labels, y);
   y = drawStandings(ctx, tournament, labels, y);

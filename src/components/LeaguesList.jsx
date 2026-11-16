@@ -9,6 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
+import { LeagueLogo } from './shared/LeagueLogo';
 import { EmptyState } from './shared/EmptyState';
 
 export function LeaguesList({ onCreateLeague, onSelectLeague }) {
@@ -96,7 +97,10 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
             <Card key={league.id} className="gap-4">
               <CardHeader className="gap-2">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="truncate text-base font-semibold leading-6">{league.name}</h3>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <LeagueLogo src={league.logoUrl} className="size-6" />
+                    <h3 className="truncate text-base font-semibold leading-6">{league.name}</h3>
+                  </div>
                   <StatusBadge status={league.status} t={t} />
                 </div>
                 {league.description && (

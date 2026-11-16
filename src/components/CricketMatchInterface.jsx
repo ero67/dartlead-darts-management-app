@@ -360,7 +360,7 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
         {isViewOnly ? (
           <ViewOnlyDialog description={isNotScorer ? t('match.notScorerDescription') : t('match.viewOnlyStartDescription')} onBack={onBack} />
         ) : (
-          <StarterDialog players={playerNames.map((name, i) => ({ name, legs: engine.legsWon[i] }))} onSelect={selectStarter}>
+          <StarterDialog players={playerNames.map((name, i) => ({ name, legs: engine.legsWon[i], avatarUrl: match[`player${i + 1}`]?.avatar_url }))} onSelect={selectStarter}>
             <PreMatchCard player1={match.player1} player2={match.player2} legsToWin={legsToWin} gameType="cricket" className="rounded-lg border p-3" />
           </StarterDialog>
         )}

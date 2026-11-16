@@ -11,6 +11,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
+import { LeagueLogo } from './shared/LeagueLogo';
 import { EmptyState } from './shared/EmptyState';
 import { PhaseBar } from './shared/DartsAccents';
 import { RoundSchedule } from './shared/RoundSchedule';
@@ -144,7 +145,10 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                 <CardHeader className="gap-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-col gap-2">
-                      <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <LeagueLogo src={linkedLeague?.logoUrl} className="size-6" />
+                        <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
+                      </div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge status={tournament.status} t={t} />
                         {upcomingIds.has(tournament.id) && <Badge variant="outline">{t('schedule.upcoming')}</Badge>}
