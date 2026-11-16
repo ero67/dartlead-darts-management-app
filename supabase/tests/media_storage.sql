@@ -67,6 +67,25 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
+-- The URL check is anchored: the right path on a foreign host does not pass.
+SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000a0a1');
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  ASSERT pg_temp.raises($q$SELECT public.set_my_avatar('https://evil.example/storage/v1/object/public/media/avatars/00000000-0000-0000-0000-00000000a0a1.webp?v=1')$q$), 'foreign host with the right path accepted';
+  ASSERT pg_temp.raises($q$SELECT public.set_my_avatar('https://evil.example/p.gif#/storage/v1/object/public/media/avatars/00000000-0000-0000-0000-00000000a0a1.webp?v=1')$q$), 'fragment trick accepted';
+END $$;
+RESET ROLE;
+
+-- The row owner (M) cannot set a photo directly, only clear it (unlinking).
+SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000c0c1');
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  ASSERT pg_temp.raises($q$UPDATE public.players SET avatar_url = 'https://x.supabase.co/storage/v1/object/public/media/avatars/00000000-0000-0000-0000-00000000a0a1.webp?v=9' WHERE id = 'a0000000-0000-0000-0000-00000000aaa1'$q$), 'owner set a photo directly';
+  ASSERT pg_temp.raises($q$INSERT INTO public.players (name, owner_id, avatar_url) VALUES ('Media X', '00000000-0000-0000-0000-00000000c0c1', 'https://evil.example/p.png')$q$), 'insert with a photo allowed';
+  ASSERT NOT pg_temp.raises($q$UPDATE public.players SET avatar_url = NULL WHERE id = 'a0000000-0000-0000-0000-00000000aaa1'$q$), 'owner cannot clear a photo';
+END $$;
+RESET ROLE;
+
 -- Deleting A's account clears the photo link on A's player row.
 SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000a0a1');
 SET LOCAL ROLE authenticated;

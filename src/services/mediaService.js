@@ -6,8 +6,12 @@ const MAX_INPUT_BYTES = 10 * 1024 * 1024;
 
 const mediaError = (code) => Object.assign(new Error(code), { code });
 
-// Decode, crop and shrink in the browser so only a small WebP is stored.
-async function toWebp(file, { maxSide, square }) {
+const encode = (canvas, type) => new Promise((resolve) => canvas.toBlob(resolve, type, 0.85));
+
+// Decode, crop and shrink in the browser so only a small image is stored.
+// WebP where the browser can encode it; Safari cannot, so it gets JPEG for
+// photos and PNG for logos (keeps transparency).
+async function toSmallImage(file, { maxSide, square }) {
   let bitmap;
   try {
     bitmap = await createImageBitmap(file);
@@ -21,8 +25,12 @@ async function toWebp(file, { maxSide, square }) {
   // No background fill: transparent logos stay transparent.
   canvas.getContext('2d').drawImage(bitmap, sx, sy, sw, sh, 0, 0, dw, dh);
   bitmap.close();
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', 0.85));
-  if (!blob || blob.type !== 'image/webp') throw mediaError('unsupported');
+  let blob = await encode(canvas, 'image/webp');
+  if (blob?.type !== 'image/webp') {
+    const fallback = square ? 'image/jpeg' : 'image/png';
+    blob = await encode(canvas, fallback);
+    if (blob?.type !== fallback) throw mediaError('unsupported');
+  }
   return blob;
 }
 
@@ -31,11 +39,12 @@ export const mediaService = {
   async uploadImage(path, file, { maxSide, square }) {
     if (!file?.type?.startsWith('image/')) throw mediaError('unsupported');
     if (file.size > MAX_INPUT_BYTES) throw mediaError('too_large');
-    const blob = await toWebp(file, { maxSide, square });
+    const blob = await toSmallImage(file, { maxSide, square });
     try {
+      // The served type comes from contentType, so the .webp path stays the same either way.
       const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
         upsert: true,
-        contentType: 'image/webp',
+        contentType: blob.type,
         cacheControl: '31536000',
       });
       if (error) throw error;
