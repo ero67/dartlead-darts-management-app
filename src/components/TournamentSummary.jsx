@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Trophy, Target, Zap, Award, Hash, Download, Loader, Crown, Flame } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Avatar, AvatarFallback, AvatarGroup } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarGroup, AvatarImage } from '@/components/ui/avatar';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -206,6 +206,8 @@ export function TournamentSummary({ tournament }) {
   }, [tournament]);
 
   const isCricket = isCricketGame(tournament?.gameType);
+  // Podium players come from the playoffs JSON ({id, name}); photos live on the player rows.
+  const avatarById = useMemo(() => new Map((tournament?.players || []).map(p => [p.id, p.avatar_url])), [tournament?.players]);
 
   // Tournament W–L and average (X01) or MPR (Cricket) for the podium.
   const podiumStats = useMemo(() => {
@@ -511,6 +513,7 @@ export function TournamentSummary({ tournament }) {
                           <AvatarGroup>
                             {entries.map(({ player }) => (
                               <Avatar key={player?.id} className="size-10">
+                                <AvatarImage src={avatarById.get(player?.id) || undefined} alt="" />
                                 <AvatarFallback className="font-semibold">{initials(player?.name)}</AvatarFallback>
                               </Avatar>
                             ))}
@@ -523,6 +526,7 @@ export function TournamentSummary({ tournament }) {
                             <div key={player?.id} className="flex w-full flex-col items-center gap-1.5 text-center">
                               {!isShared && (
                                 <Avatar className={cn(isWinner ? 'size-16 ring-4 ring-amber-400/50 sm:size-20' : 'size-12 sm:size-14')}>
+                                  <AvatarImage src={avatarById.get(player?.id) || undefined} alt="" />
                                   <AvatarFallback className={cn('font-semibold', isWinner && 'bg-amber-400/20 text-xl text-amber-800 dark:text-amber-200')}>
                                     {initials(player?.name)}
                                   </AvatarFallback>
