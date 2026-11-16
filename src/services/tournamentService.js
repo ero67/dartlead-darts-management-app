@@ -1610,11 +1610,23 @@ export const tournamentService = {
     }
   },
 
+  // Sets (or with null clears) the signed-in user's photo on their player rows.
+  async setMyAvatar(url) {
+    try {
+      const { error } = await supabase.rpc('set_my_avatar', { url });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving player photo:', error);
+      throw error;
+    }
+  },
+
   async unlinkPlayerFromUser(playerId) {
     try {
       const { data, error } = await supabase
         .from('players')
-        .update({ user_id: null })
+        // The photo belongs to the account, so it leaves with it.
+        .update({ user_id: null, avatar_url: null })
         .eq('id', playerId)
         .select('id, name, user_id')
         .single();

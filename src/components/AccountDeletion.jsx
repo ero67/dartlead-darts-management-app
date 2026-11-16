@@ -4,6 +4,7 @@ import { Trash2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { mediaService } from '../services/mediaService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,7 +19,7 @@ import {
 // player records (the organisers' event history) stay, without the account link.
 export function AccountDeletion() {
   const { t } = useLanguage();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -37,6 +38,8 @@ export function AccountDeletion() {
     setIsDeleting(true);
     setError('');
     try {
+      // Remove the photo file first; the RPC clears the link. A failure here must not block deletion.
+      await mediaService.removeImage(`avatars/${user.id}.webp`).catch(() => {});
       const { data, error: rpcError } = await supabase.rpc('delete_my_account');
       if (rpcError) throw rpcError;
       if (!data?.success) throw new Error(data?.error || 'delete_failed');
