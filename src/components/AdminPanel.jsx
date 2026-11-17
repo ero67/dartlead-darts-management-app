@@ -6,6 +6,7 @@ import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ManagerBilling } from './ManagerBilling';
 import { AdminOverview } from './AdminOverview';
+import { MatchStatsCleanup } from './MatchStatsCleanup';
 import { AssistantSettings } from './assistant/AssistantSettings';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -1113,6 +1114,8 @@ export function AdminPanel() {
         </TabsContent>
 
         <TabsContent value="data" className="flex flex-col gap-6">
+          <MatchStatsCleanup />
+
           <Card>
             <CardHeader>
               <CardTitle>Force Tournament Status</CardTitle>
