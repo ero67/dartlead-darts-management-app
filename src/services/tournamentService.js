@@ -1929,6 +1929,27 @@ export const tournamentService = {
     return data;
   },
 
+  // Admin-only: a league's completed X01 matches with per-side stats and fake-data hints.
+  async getMatchStatsReview(leagueId) {
+    const { data, error } = await supabase.rpc('admin_match_stats_review', { p_league_id: leagueId });
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  // Admin-only: backs up and removes the throwing stats of up to 20 matches of one tournament.
+  async clearMatchStats(matchIds) {
+    const { data, error } = await supabase.rpc('admin_clear_match_stats', { p_match_ids: matchIds });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  // Admin-only: puts cleared stats back from the backup.
+  async restoreMatchStats(matchIds) {
+    const { data, error } = await supabase.rpc('admin_restore_match_stats', { p_match_ids: matchIds });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
   // Delete tournament (soft delete - sets deleted flag to true)
   async deleteTournament(tournamentId) {
     try {

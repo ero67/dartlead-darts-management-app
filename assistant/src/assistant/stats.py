@@ -230,7 +230,8 @@ def get_recent_matches(player_id: str, n: int = 5) -> dict:
             "game": "cricket" if cricket else "x01",
             # X01: 3-dart average; Cricket: marks per round (MPR), both as on the profile page.
             **({"mpr": round((m[f"m{me}"] or 0) / darts * 3, 2) if darts else None} if cricket
-               else {"average": float(averages[m["id"]]) if averages.get(m["id"]) is not None else None}),
+               # 0 means no stats (an admin clear zeroes them), as the profile shows "—".
+               else {"average": float(averages[m["id"]]) if averages.get(m["id"]) else None}),
         })
     return {"player": player["name"], "matches": rows}
 
