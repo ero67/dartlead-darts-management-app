@@ -1376,10 +1376,14 @@ export const leagueService = {
         return arr.slice(0, 10);
       };
 
-      // Chart: the three players with the best overall league average, with
-      // their 3-dart average in each completed tournament (null = didn't play).
+      // Chart: the three regulars (played at least half the rounds, min 2) with
+      // the best overall league average, with their 3-dart average in each
+      // completed tournament (null = didn't play). Without the attendance floor
+      // one-night guests took the slots and the chart had almost nothing to draw.
       const avg = ({ score, darts }) => (score / darts) * 3;
+      const minRounds = Math.max(2, Math.ceil(tournaments.length / 2));
       const series = Array.from(playerRoundTotals.values())
+        .filter(({ byTournament }) => byTournament.size >= minRounds)
         .map(({ player, byTournament }) => {
           const sum = Array.from(byTournament.values()).reduce((acc, r) => ({ score: acc.score + r.score, darts: acc.darts + r.darts }), { score: 0, darts: 0 });
           return { player, overall: avg(sum), values: tournaments.map(t => (byTournament.has(t.id) ? avg(byTournament.get(t.id)) : null)) };
@@ -1392,7 +1396,7 @@ export const leagueService = {
         bestCheckouts: toSortedArray(playerCheckouts, e => e.highest),
         bestMatchAverages: toSortedArray(playerMatchAvg, e => e.average),
         fewestDartsLegs: toSortedArray(playerBestLeg, e => e.darts, true),
-        averageByRound: { rounds: tournaments.map(t => ({ id: t.id, name: t.name })), series },
+        averageByRound: { rounds: tournaments.map(t => ({ id: t.id, name: t.name })), series, minRounds },
       };
     } catch (error) {
       console.error('Error fetching league statistics:', error);

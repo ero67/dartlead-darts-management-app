@@ -1010,6 +1010,7 @@
     "roundNumber": "Round {{number}}",
     "averageByRound": "Tournament average by round",
     "topThree": "top three",
+    "averageByRoundHint": "Best season averages among players with at least {{count}} rounds played. Each dot is a round they played.",
     "swapPlayers": "Swap players",
     "leagueRank": "League #{{rank}}",
     "matchesWon": "Matches won",
