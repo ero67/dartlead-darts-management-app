@@ -25,6 +25,7 @@ const SKIP_REASONS = {
   no_stats: 'has no stats',
   no_backup: 'no backup to restore',
   rescored: 'scored again since the clear, left as is',
+  changed: 'reset or given a new result since the clear, left as is',
 };
 
 const COLUMNS = [
@@ -47,7 +48,7 @@ const sortValue = (row, { key, asc }) => {
 
 const matchLine = (row) => {
   const pair = (key, digits) => `${fmt(row.p1?.[key], digits)} / ${fmt(row.p2?.[key], digits)}`;
-  return `${row.p1?.name || '?'} vs ${row.p2?.name || '?'} (${row.p1?.legs ?? 0}:${row.p2?.legs ?? 0}) · avg ${pair('average', 1)} · best checkout ${pair('bestCheckout')} · fewest darts ${pair('fewestDarts')}`;
+  return `${row.p1?.name || '?'} vs ${row.p2?.name || '?'} (${row.p1?.legs ?? 0}:${row.p2?.legs ?? 0}) · avg ${pair('average', 1)} · best checkout ${pair('bestCheckout')} · fewest darts ${pair('fewestDarts')} · 180s ${pair('oneEighties')}`;
 };
 
 function SideFlags({ side }) {
@@ -154,7 +155,7 @@ export function MatchStatsCleanup() {
       const row = rows.find(r => r.match_id === id);
       return row ? `${row.p1?.name} vs ${row.p2?.name}` : id;
     };
-    toast.warning(skipped.map(s => `Skipped ${nameOf(s.match_id)}: ${SKIP_REASONS[s.reason] || s.reason}`).join('\n'));
+    skipped.forEach(s => toast.warning(`Skipped ${nameOf(s.match_id)}: ${SKIP_REASONS[s.reason] || s.reason}`));
   };
 
   const handleClear = async () => {
@@ -167,7 +168,7 @@ export function MatchStatsCleanup() {
     setIsBusy(true);
     try {
       const result = await tournamentService.clearMatchStats(chosen.map(r => r.match_id));
-      toast.success(`Cleared stats of ${result.cleared.length} match(es).`);
+      if (result.cleared.length) toast.success(`Cleared stats of ${result.cleared.length} match(es).`);
       reportSkipped(result.skipped);
       await loadRows(leagueId, true);
     } catch (err) {

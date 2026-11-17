@@ -9,10 +9,13 @@
 --    average 15+ over the player's average in their other league matches).
 -- 2. admin_clear_match_stats(ids) backs the stats up into match_stats_backups
 --    and removes them in the same transaction: the result JSONB loses
---    player1Stats/player2Stats, match_player_stats keeps its legs but zeroes
---    darts, score, average and checkout. Winner, legs and status stay.
--- 3. admin_restore_match_stats(ids) puts the backup back, unless the match
---    has stats again (re-scored since), which it leaves alone.
+--    player1Stats/player2Stats and the visit log, match_player_stats keeps its
+--    legs but zeroes darts, score, average and checkout. Winner, legs and
+--    status stay. Copies the clear does not touch, which no screen reads: the
+--    legs table and the stats inside tournaments.playoffs.
+-- 3. admin_restore_match_stats(ids) puts the backup back exactly. A match
+--    that was re-scored ("rescored") or reset since ("changed") keeps its
+--    current data, and its stale backup is closed so it can be cleared again.
 -- Every reader already skips matches without stats. Each clear/restore is
 -- logged in admin_audit_log. Installed Android apps don't call any of these.
 -- Idempotent.
@@ -29,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.match_stats_backups (
 );
 -- Read and written only through the functions below.
 ALTER TABLE public.match_stats_backups ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.match_stats_backups FROM anon, authenticated;
 -- One open backup per match: a second clear can't replace it with nothing.
 CREATE UNIQUE INDEX IF NOT EXISTS match_stats_backups_open_idx
   ON public.match_stats_backups (match_id) WHERE restored_at IS NULL;
@@ -137,7 +141,8 @@ BEGIN
   )
   SELECT lm.mid, lm.tid, lm.tname, lm.tcreated, lm.done_at, lm.playoff,
          a.has OR b.has,
-         EXISTS (SELECT 1 FROM public.match_stats_backups bk WHERE bk.match_id = lm.mid AND bk.restored_at IS NULL),
+         NOT (a.has OR b.has)
+           AND EXISTS (SELECT 1 FROM public.match_stats_backups bk WHERE bk.match_id = lm.mid AND bk.restored_at IS NULL),
          a.j, b.j
   FROM lm
   JOIN js a ON a.mid = lm.mid AND a.n = 1
@@ -147,6 +152,27 @@ END;
 $$;
 REVOKE EXECUTE ON FUNCTION public.admin_match_stats_review(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_match_stats_review(uuid) TO authenticated;
+
+-- Closes a match's open backup without restoring it (the match changed since).
+-- Internal: called by the admin functions below, not granted to clients.
+CREATE OR REPLACE FUNCTION public.close_match_stats_backup(p_match_id uuid, p_tournament_id uuid, p_owner uuid)
+  RETURNS void
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.match_stats_backups
+     SET restored_by = (SELECT auth.uid()), restored_at = now()
+   WHERE match_id = p_match_id AND restored_at IS NULL;
+  IF FOUND THEN
+    INSERT INTO public.admin_audit_log (actor_id, action, target_user_id, details)
+    VALUES ((SELECT auth.uid()), 'supersede_match_stats_backup', p_owner,
+            jsonb_build_object('match_id', p_match_id, 'tournament_id', p_tournament_id));
+  END IF;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public.close_match_stats_backup(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.admin_clear_match_stats(p_match_ids uuid[])
   RETURNS jsonb
@@ -184,19 +210,22 @@ BEGIN
       skipped := skipped || jsonb_build_object('match_id', mid, 'reason', 'not_completed');
     ELSIF gtype = 'cricket' OR m.game_type = 'cricket' OR m.result ->> 'gameType' = 'cricket' THEN
       skipped := skipped || jsonb_build_object('match_id', mid, 'reason', 'cricket');
-    ELSIF EXISTS (SELECT 1 FROM public.match_stats_backups b WHERE b.match_id = mid AND b.restored_at IS NULL) THEN
-      skipped := skipped || jsonb_build_object('match_id', mid, 'reason', 'already_cleared');
     ELSIF NOT COALESCE(m.result ? 'player1Stats' OR m.result ? 'player2Stats', false) THEN
-      skipped := skipped || jsonb_build_object('match_id', mid, 'reason', 'no_stats');
+      skipped := skipped || jsonb_build_object('match_id', mid,
+        'reason', CASE WHEN EXISTS (SELECT 1 FROM public.match_stats_backups b WHERE b.match_id = mid AND b.restored_at IS NULL)
+                       THEN 'already_cleared' ELSE 'no_stats' END);
     ELSE
+      -- Re-scored since an earlier clear: that backup is stale, close it.
+      PERFORM public.close_match_stats_backup(mid, m.tournament_id, owner);
       INSERT INTO public.match_stats_backups (match_id, result_stats, player_stats, cleared_by)
       VALUES (
         mid,
-        jsonb_build_object('player1Stats', m.result -> 'player1Stats', 'player2Stats', m.result -> 'player2Stats'),
+        jsonb_build_object('player1Stats', m.result -> 'player1Stats', 'player2Stats', m.result -> 'player2Stats',
+                           'visits', m.result -> 'visits'),
         COALESCE((SELECT jsonb_agg(to_jsonb(s)) FROM public.match_player_stats s WHERE s.match_id = mid), '[]'::jsonb),
         (SELECT auth.uid())
       );
-      UPDATE public.matches SET result = result - 'player1Stats' - 'player2Stats' WHERE id = mid;
+      UPDATE public.matches SET result = result - 'player1Stats' - 'player2Stats' - 'visits' WHERE id = mid;
       UPDATE public.match_player_stats
          SET total_darts = 0, total_score = 0, average = 0, highest_checkout = 0
        WHERE match_id = mid;
@@ -224,6 +253,7 @@ DECLARE
   m        public.matches;
   bk       public.match_stats_backups;
   owner    uuid;
+  reason   text;
   restored jsonb := '[]'::jsonb;
   skipped  jsonb := '[]'::jsonb;
 BEGIN
@@ -242,13 +272,27 @@ BEGIN
       CONTINUE;
     END IF;
     SELECT * INTO m FROM public.matches WHERE id = mid FOR UPDATE;
-    IF COALESCE(m.result ? 'player1Stats' OR m.result ? 'player2Stats', false) THEN
-      skipped := skipped || jsonb_build_object('match_id', mid, 'reason', 'rescored');
+    SELECT t.user_id INTO owner FROM public.tournaments t WHERE t.id = m.tournament_id;
+    -- A reset deletes the stats rows and a re-score re-inserts them, so a
+    -- missing backed-up row means the match was replayed or re-entered.
+    reason := CASE
+      WHEN COALESCE(m.result ? 'player1Stats' OR m.result ? 'player2Stats', false) THEN 'rescored'
+      WHEN m.status IS DISTINCT FROM 'completed'
+        OR EXISTS (SELECT 1 FROM jsonb_array_elements(bk.player_stats) e
+                   WHERE NOT EXISTS (SELECT 1 FROM public.match_player_stats s WHERE s.id = (e ->> 'id')::uuid))
+        THEN 'changed'
+    END;
+    IF reason IS NOT NULL THEN
+      PERFORM public.close_match_stats_backup(mid, m.tournament_id, owner);
+      skipped := skipped || jsonb_build_object('match_id', mid, 'reason', reason);
       CONTINUE;
     END IF;
 
+    -- Only absent keys are dropped; nulls inside the stats come back as saved.
     UPDATE public.matches
-       SET result = COALESCE(result, '{}'::jsonb) || jsonb_strip_nulls(bk.result_stats)
+       SET result = COALESCE(result, '{}'::jsonb)
+                    || (SELECT COALESCE(jsonb_object_agg(key, value), '{}'::jsonb)
+                          FROM jsonb_each(bk.result_stats) WHERE jsonb_typeof(value) <> 'null')
      WHERE id = mid;
     UPDATE public.match_player_stats s
        SET total_darts      = (e ->> 'total_darts')::int,
@@ -260,7 +304,6 @@ BEGIN
     UPDATE public.match_stats_backups
        SET restored_by = (SELECT auth.uid()), restored_at = now()
      WHERE id = bk.id;
-    SELECT t.user_id INTO owner FROM public.tournaments t WHERE t.id = m.tournament_id;
     INSERT INTO public.admin_audit_log (actor_id, action, target_user_id, details)
     VALUES ((SELECT auth.uid()), 'restore_match_stats', owner,
             jsonb_build_object('match_id', mid, 'tournament_id', m.tournament_id));

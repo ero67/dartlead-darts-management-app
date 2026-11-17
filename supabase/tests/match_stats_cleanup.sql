@@ -31,10 +31,11 @@ INSERT INTO public.matches (id, tournament_id, player1_id, player2_id, status, w
    'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'completed',
    'a0000000-0000-0000-0000-000000000001', 2, 0,
    '{"winner":"a0000000-0000-0000-0000-000000000001","player1Legs":2,"player2Legs":0,
-     "player1Stats":{"average":70,"totalScore":1002,"totalDarts":43,"oneEighties":0,
+     "visits":[[1,1,60],[1,2,60]],
+     "player1Stats":{"average":70,"totalScore":1002,"totalDarts":43,"oneEighties":0,"checkoutBasis":null,
        "visitScores":[60,60,60,60,60,60,60,60,60,60,100,45],
        "checkouts":[{"leg":1,"checkout":"141"},{"leg":2,"checkout":81}],
-       "legs":[{"leg":1,"darts":21,"isWin":true},{"leg":2,"darts":22,"isWin":true}]},
+       "legs":[{"leg":1,"darts":21,"isWin":true},{"leg":2,"darts":22,"isWin":true,"remainingScore":null}]},
      "player2Stats":{"average":60,"totalScore":800,"totalDarts":40,"oneEighties":1,
        "visitScores":[60,60,60,60,60,60,60,60,60,60,60,60],
        "checkouts":[],"legs":[{"leg":1,"darts":21,"isWin":false},{"leg":2,"darts":19,"isWin":false}]}}'),
@@ -67,6 +68,15 @@ INSERT INTO public.match_player_stats (match_id, player_id, legs_won, legs_lost,
   ('30000000-0000-0000-0000-0000000000f1', 'a0000000-0000-0000-0000-000000000001', 2, 0, 43, 1002, 70, 141),
   ('30000000-0000-0000-0000-0000000000f1', 'a0000000-0000-0000-0000-000000000002', 0, 2, 40, 800, 60, 0),
   ('30000000-0000-0000-0000-0000000000a2', 'a0000000-0000-0000-0000-000000000001', 1, 2, 75, 1002, 40.08, 40);
+
+-- MX: cleared, then reset and given a new result by hand (resetMatchToPending + updateMatchResult).
+INSERT INTO public.matches (id, tournament_id, player1_id, player2_id, status, winner_id, player1_legs, player2_legs, result) VALUES
+  ('30000000-0000-0000-0000-0000000000d1', '20000000-0000-0000-0000-000000000001',
+   'a0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003', 'completed',
+   'a0000000-0000-0000-0000-000000000002', 2, 1,
+   '{"player1Stats":{"average":30,"totalScore":1503,"totalDarts":150},"player2Stats":{"average":28,"totalScore":1300,"totalDarts":140}}');
+INSERT INTO public.match_player_stats (match_id, player_id, legs_won, legs_lost, total_darts, total_score, average, highest_checkout) VALUES
+  ('30000000-0000-0000-0000-0000000000d1', 'a0000000-0000-0000-0000-000000000002', 2, 1, 150, 1503, 30, 40);
 
 CREATE FUNCTION pg_temp.act_as(u text) RETURNS void LANGUAGE sql AS $$
   SELECT set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
@@ -142,6 +152,7 @@ BEGIN
 
   SELECT * INTO m FROM public.matches WHERE id = '30000000-0000-0000-0000-0000000000f1';
   ASSERT NOT (m.result ? 'player1Stats') AND NOT (m.result ? 'player2Stats'), 'stats still in result';
+  ASSERT NOT (m.result ? 'visits'), 'visit log still in result';
   ASSERT m.result->>'winner' = 'a0000000-0000-0000-0000-000000000001', 'result winner lost';
   ASSERT m.winner_id = 'a0000000-0000-0000-0000-000000000001' AND m.player1_legs = 2 AND m.player2_legs = 0 AND m.status = 'completed', 'result columns changed';
   ASSERT NOT EXISTS (SELECT 1 FROM public.match_player_stats WHERE match_id = m.id
@@ -171,6 +182,9 @@ BEGIN
   ASSERT (m.result->'player1Stats'->>'average')::numeric = 70, 'p1 stats not restored';
   ASSERT m.result->'player1Stats'->'checkouts'->0->>'checkout' = '141', 'checkouts not restored';
   ASSERT (m.result->'player2Stats'->>'oneEighties')::int = 1, 'p2 stats not restored';
+  ASSERT m.result->'visits' = '[[1,1,60],[1,2,60]]'::jsonb, 'visit log not restored';
+  ASSERT m.result->'player1Stats' ? 'checkoutBasis', 'top-level null field lost on restore';
+  ASSERT m.result->'player1Stats'->'legs'->1 ? 'remainingScore', 'nested null field lost on restore';
   ASSERT (SELECT total_darts = 43 AND total_score = 1002 AND average = 70 AND highest_checkout = 141
           FROM public.match_player_stats WHERE match_id = m.id AND player_id = 'a0000000-0000-0000-0000-000000000001'), 'stats row not restored';
   ASSERT NOT EXISTS (SELECT 1 FROM public.match_stats_backups WHERE match_id = m.id AND restored_at IS NULL), 'backup still open';
@@ -178,6 +192,45 @@ BEGIN
 
   ASSERT current_setting('t.restore2')::jsonb->'skipped' @> '[{"reason":"rescored"}]'::jsonb, 'restore2: ' || current_setting('t.restore2');
   ASSERT (SELECT result->'player1Stats'->>'average' FROM public.matches WHERE id = '30000000-0000-0000-0000-0000000000a2') = '1', 'rescored stats overwritten';
+END $$;
+
+-- A skipped restore closes the stale backup, so the re-scored match can be cleared again.
+-- MT2: re-scored after a clear (no restore attempt) can be cleared again directly.
+-- MX: cleared, reset to pending, then given a new result by hand: restore must not bring the old stats back.
+SELECT pg_temp.act_as('00000000-0000-0000-0000-0000000000d1');
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  ASSERT NOT (SELECT stats_cleared FROM public.admin_match_stats_review('10000000-0000-0000-0000-000000000001') WHERE match_id = '30000000-0000-0000-0000-0000000000a2'), 'rescored MN still shown cleared';
+END $$;
+SELECT set_config('t.reclear', public.admin_clear_match_stats(ARRAY['30000000-0000-0000-0000-0000000000a2']::uuid[])::text, true);
+SELECT public.admin_clear_match_stats(ARRAY['30000000-0000-0000-0000-0000000000b2']::uuid[]);
+SELECT public.admin_clear_match_stats(ARRAY['30000000-0000-0000-0000-0000000000d1']::uuid[]);
+RESET ROLE;
+UPDATE public.matches SET result = result || '{"player1Stats":{"average":2}}' WHERE id = '30000000-0000-0000-0000-0000000000b2';
+UPDATE public.matches SET status = 'pending', result = NULL, winner_id = NULL WHERE id = '30000000-0000-0000-0000-0000000000d1';
+DELETE FROM public.match_player_stats WHERE match_id = '30000000-0000-0000-0000-0000000000d1';
+UPDATE public.matches SET status = 'completed', winner_id = 'a0000000-0000-0000-0000-000000000003', player1_legs = 1, player2_legs = 2,
+  result = '{"winner":"a0000000-0000-0000-0000-000000000003","player1Legs":1,"player2Legs":2,"manuallyCorrected":true}'
+  WHERE id = '30000000-0000-0000-0000-0000000000d1';
+SELECT pg_temp.act_as('00000000-0000-0000-0000-0000000000d1');
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  ASSERT (SELECT has_stats AND NOT stats_cleared FROM public.admin_match_stats_review('10000000-0000-0000-0000-000000000001') WHERE match_id = '30000000-0000-0000-0000-0000000000b2'), 're-scored MT2 still shown cleared';
+END $$;
+SELECT set_config('t.reclear2', public.admin_clear_match_stats(ARRAY['30000000-0000-0000-0000-0000000000b2']::uuid[])::text, true);
+SELECT set_config('t.restorex', public.admin_restore_match_stats(ARRAY['30000000-0000-0000-0000-0000000000d1']::uuid[])::text, true);
+RESET ROLE;
+
+DO $$ BEGIN
+  ASSERT current_setting('t.reclear')::jsonb->'cleared' = '["30000000-0000-0000-0000-0000000000a2"]'::jsonb, 're-clear MN: ' || current_setting('t.reclear');
+  ASSERT current_setting('t.reclear2')::jsonb->'cleared' = '["30000000-0000-0000-0000-0000000000b2"]'::jsonb, 're-clear MT2: ' || current_setting('t.reclear2');
+  ASSERT (SELECT count(*) FROM public.match_stats_backups WHERE match_id = '30000000-0000-0000-0000-0000000000b2') = 2, 'MT2 should have old + new backup';
+  ASSERT (SELECT count(*) FROM public.match_stats_backups WHERE match_id = '30000000-0000-0000-0000-0000000000b2' AND restored_at IS NULL) = 1, 'MT2 one open backup';
+  ASSERT current_setting('t.restorex')::jsonb->'skipped' @> '[{"reason":"changed"}]'::jsonb, 'restore after reset: ' || current_setting('t.restorex');
+  ASSERT NOT (SELECT result ? 'player1Stats' FROM public.matches WHERE id = '30000000-0000-0000-0000-0000000000d1'), 'old stats put onto new result';
+  ASSERT NOT EXISTS (SELECT 1 FROM public.match_stats_backups WHERE match_id = '30000000-0000-0000-0000-0000000000d1' AND restored_at IS NULL), 'MX backup left open';
+  ASSERT NOT has_table_privilege('authenticated', 'public.match_stats_backups', 'SELECT'), 'authenticated can read backups';
+  ASSERT NOT has_table_privilege('anon', 'public.match_stats_backups', 'SELECT'), 'anon can read backups';
 END $$;
 
 SELECT 'ALL ASSERTS PASSED';
