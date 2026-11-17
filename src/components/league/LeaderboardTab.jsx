@@ -11,6 +11,11 @@ import { EndSeasonDialog, PastSeasons } from './Seasons';
 import { currentSeasonName } from '../../utils/leagueSeason';
 import { cn } from '@/lib/utils';
 
+// Rank and name stay put while the other columns scroll under them on phones.
+// Solid background so nothing shows through; on hover the same tint the row
+// gets (muted/50), mixed into the card colour so it stays opaque.
+const PINNED = 'sticky z-10 bg-card group-hover:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]';
+
 export function LeaderboardTab({ league, isManager, isRecalculating, onRecalculate, onSeasonChanged, onCreateTournament }) {
   const { t } = useLanguage();
   const leaderboard = league.leaderboard || [];
@@ -61,33 +66,31 @@ export function LeaderboardTab({ league, isManager, isRecalculating, onRecalcula
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>{t('leagues.player')}</TableHead>
-                <TableHead className="hidden sm:table-cell">{t('leagues.form')}</TableHead>
+                <TableHead className={cn(PINNED, 'left-0 w-12 min-w-12')}>#</TableHead>
+                <TableHead className={cn(PINNED, 'left-12')}>{t('leagues.player')}</TableHead>
                 <TableHead className="text-right">{t('leagues.points')}</TableHead>
-                <TableHead className="hidden text-right md:table-cell">{t('leagues.legs')}</TableHead>
-                <TableHead className="hidden text-right md:table-cell">{t('tournaments.title')}</TableHead>
-                <TableHead className="hidden text-right lg:table-cell">{t('leagues.best')}</TableHead>
-                <TableHead className="hidden text-right lg:table-cell">{t('leagues.avgPlacement')}</TableHead>
+                <TableHead className="text-right">{t('leagues.legs')}</TableHead>
+                <TableHead className="text-right">{t('tournaments.title')}</TableHead>
+                <TableHead className="text-right">{t('leagues.best')}</TableHead>
+                <TableHead className="text-right">{t('leagues.avgPlacement')}</TableHead>
+                <TableHead>{t('leagues.form')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {leaderboard.map((entry, index) => {
                 const rank = index + 1;
                 return (
-                  <TableRow key={entry.player?.id || index}>
-                    <TableCell className={cn('font-display text-lg font-semibold', rank <= 3 ? 'text-primary' : 'text-muted-foreground')}>
+                  <TableRow key={entry.player?.id || index} className="group">
+                    <TableCell className={cn(PINNED, 'left-0 min-w-12 font-display text-lg font-semibold', rank <= 3 ? 'text-primary' : 'text-muted-foreground')}>
                       {rank}
                     </TableCell>
-                    <TableCell><PlayerLink player={entry.player} /></TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <FormDots results={entry.last5 || []} />
-                    </TableCell>
+                    <TableCell className={cn(PINNED, 'left-12')}><PlayerLink player={entry.player} /></TableCell>
                     <TableCell className="text-right font-display text-lg font-semibold">{entry.totalPoints || 0}</TableCell>
-                    <TableCell className="hidden text-right tabular-nums md:table-cell">{entry.legsWon}:{entry.legsLost}</TableCell>
-                    <TableCell className="hidden text-right tabular-nums md:table-cell">{entry.tournamentsPlayed || 0}</TableCell>
-                    <TableCell className="hidden text-right tabular-nums lg:table-cell">{entry.bestPlacement || '-'}</TableCell>
-                    <TableCell className="hidden text-right tabular-nums lg:table-cell">{entry.avgPlacement ? entry.avgPlacement.toFixed(1) : '-'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{entry.legsWon}:{entry.legsLost}</TableCell>
+                    <TableCell className="text-right tabular-nums">{entry.tournamentsPlayed || 0}</TableCell>
+                    <TableCell className="text-right tabular-nums">{entry.bestPlacement || '-'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{entry.avgPlacement ? entry.avgPlacement.toFixed(1) : '-'}</TableCell>
+                    <TableCell><FormDots results={entry.last5 || []} /></TableCell>
                   </TableRow>
                 );
               })}
