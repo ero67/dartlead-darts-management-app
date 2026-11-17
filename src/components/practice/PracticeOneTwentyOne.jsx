@@ -3,7 +3,6 @@ import { Keyboard, Repeat, Target, TrendingDown } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { DartKeypad } from '../scoring/DartKeypad';
 import { TurnTotalKeypad } from '../scoring/TurnTotalKeypad';
-import { CheckoutDialog } from '../scoring/CheckoutDialog';
 import {
   PracticeScreenHeader, PracticeChips, PracticeSummary, PracticeSetup, PracticeField, PracticeOptionCards,
   PracticePlay, PracticeBoard, PracticeBoardLabel, PracticeBoardValue, PracticeCheckoutHint, PracticeKeypad,
@@ -74,7 +73,6 @@ export function PracticeOneTwentyOne() {
     usePracticeSession(GAME, { defaultSettings: DEFAULT_SETTINGS, sanitize, computeStats });
   const [inputMode, setInputMode] = useState('single');
   const [turnTotalInput, setTurnTotalInput] = useState('');
-  const [pendingCheckout, setPendingCheckout] = useState(null);
   const [flash, setFlash] = useState(null); // { type: 'success' | 'fail' | 'bust', target }
   const flashTimer = useRef(null);
 
@@ -110,18 +108,9 @@ export function PracticeOneTwentyOne() {
   const handleTurnTotal = (total) => {
     if (!session || flash) return;
     hapticTap();
-    if (session.round.current.remaining - total === 0) {
-      setPendingCheckout({ total, dartsUsed: 3, finishedOnDouble: true });
-      return;
-    }
     setTurnTotalInput('');
-    handleOutcome(applyVisitTotal(session, total, { finishedOnDouble: false }));
-  };
-
-  const handleConfirmCheckout = (p) => {
-    setPendingCheckout(null);
-    setTurnTotalInput('');
-    handleOutcome(applyVisitTotal(session, p.total, { dartsUsed: p.dartsUsed, finishedOnDouble: p.finishedOnDouble }));
+    // Reaching zero is the checkout: 121 only counts success, so no darts/double dialog as in X01.
+    handleOutcome(applyVisitTotal(session, total, { finishedOnDouble: session.round.current.remaining === total }));
   };
 
   const handleUndo = () => {
@@ -261,7 +250,6 @@ export function PracticeOneTwentyOne() {
       title={`${t('practice.games.oneTwentyOne.title')} · ${roundText}`}
       subtitle={<>{t('practice.oneTwentyOne.stats.successes')} <b>{stats.successes}/{stats.rounds}</b></>}
     >
-      <CheckoutDialog pending={pendingCheckout} onChange={setPendingCheckout} onCancel={() => setPendingCheckout(null)} onConfirm={handleConfirmCheckout} />
 
       <PracticeBoard flash={boardFlash}>
         <div className="flex items-end justify-between gap-3">
