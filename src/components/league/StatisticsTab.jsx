@@ -59,6 +59,17 @@ function AverageByRoundChart({ rounds, series }) {
             vectorEffect="non-scaling-stroke"
           />
         )))}
+        {/* Dots as zero-length round-capped lines: a <circle> would stretch into an oval in this viewBox, and lone rounds between gaps need them to show at all. */}
+        {series.map((s, i) => s.values.map((v, j) => v != null && (
+          <line
+            key={`dot-${i}-${j}`}
+            x1={x(j)} x2={x(j)} y1={y(v)} y2={y(v)}
+            className={SERIES_CLASS[i].line}
+            strokeWidth={i === 0 ? 7 : 6}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        )))}
       </svg>
       <span />
       <div className="relative h-4 text-xs text-muted-foreground">
