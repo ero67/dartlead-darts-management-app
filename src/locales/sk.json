@@ -1010,6 +1010,7 @@
     "roundNumber": "{{number}}. kolo",
     "averageByRound": "Turnajový priemer podľa kôl",
     "topThree": "najlepší traja",
+    "averageByRoundHint": "Najlepší sezónny priemer spomedzi hráčov s aspoň {{count}} odohranými kolami. Každá bodka je odohrané kolo.",
     "swapPlayers": "Vymeniť hráčov",
     "leagueRank": "{{rank}}. v lige",
     "matchesWon": "Vyhrané zápasy",

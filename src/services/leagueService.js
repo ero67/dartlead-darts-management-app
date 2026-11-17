@@ -1396,7 +1396,7 @@ export const leagueService = {
         bestCheckouts: toSortedArray(playerCheckouts, e => e.highest),
         bestMatchAverages: toSortedArray(playerMatchAvg, e => e.average),
         fewestDartsLegs: toSortedArray(playerBestLeg, e => e.darts, true),
-        averageByRound: { rounds: tournaments.map(t => ({ id: t.id, name: t.name })), series },
+        averageByRound: { rounds: tournaments.map(t => ({ id: t.id, name: t.name })), series, minRounds },
       };
     } catch (error) {
       console.error('Error fetching league statistics:', error);

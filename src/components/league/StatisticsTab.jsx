@@ -157,6 +157,7 @@ export function StatisticsTab({ leagueStats, loadingStats, seasonSelect }) {
                     ))}
                   </span>
                 </div>
+                <p className="-mt-1 text-xs text-muted-foreground">{t('leagues.averageByRoundHint', { count: chart.minRounds })}</p>
                 <AverageByRoundChart rounds={chart.rounds} series={chart.series} />
               </Card>
             )}
