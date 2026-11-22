@@ -254,8 +254,14 @@ function MatchRoute({ onMatchComplete }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { tournaments, currentTournament, currentMatch, startMatch } = useTournament();
+  // Saving the result clears currentMatch. Keep handing the scorer the match it just
+  // finished, so its "match complete" card stays until the user taps back, and the
+  // effect below does not find the match again and reopen it for scoring.
+  const [finishedMatch, setFinishedMatch] = useState(null);
+  const isFinished = finishedMatch?.id === id;
 
   useEffect(() => {
+    if (isFinished) return;
     if (id && (!currentMatch || currentMatch.id !== id)) {
       // Wait for the full tournament to hydrate -- a lightweight list stub
       // has empty groups, so searching it would falsely "not find" the match
@@ -298,7 +304,12 @@ function MatchRoute({ onMatchComplete }) {
       // If tournaments.length === 0, we're still loading – don't redirect yet,
       // the LOAD_TOURNAMENTS action will restore currentTournament from sessionStorage.
     }
-  }, [id, currentTournament, currentMatch, startMatch, navigate, tournaments.length]);
+  }, [id, isFinished, currentTournament, currentMatch, startMatch, navigate, tournaments.length]);
+
+  const handleFinished = (matchResult) => {
+    setFinishedMatch(currentMatch);
+    return onMatchComplete(matchResult);
+  };
 
   // Bracket matches restored from the playoffs JSONB carry no gameType: the
   // tournament's decides (one game type per tournament).
@@ -307,8 +318,8 @@ function MatchRoute({ onMatchComplete }) {
     : MatchInterface;
   return (
     <Scorer
-      match={currentMatch}
-      onMatchComplete={onMatchComplete}
+      match={isFinished ? finishedMatch : currentMatch}
+      onMatchComplete={handleFinished}
       onBack={() => navigate(`/tournament/${currentTournament?.id}`)}
     />
   );
@@ -438,22 +449,14 @@ function AppContent() {
     navigate(`/tournament/${tournament.id}`);
   };
 
+  // No navigation here: the scorer's "match complete" card stays on screen and its
+  // back button returns to the tournament (MatchRoute keeps the finished match).
   const handleMatchComplete = async (matchResult) => {
     try {
       await completeMatch(matchResult);
-      if (currentTournament) {
-        navigate(`/tournament/${currentTournament.id}`);
-      } else {
-        navigate('/tournaments');
-      }
     } catch (error) {
       console.error('Error completing match:', error);
-      // Still navigate back even if there's an error
-      if (currentTournament) {
-        navigate(`/tournament/${currentTournament.id}`);
-      } else {
-        navigate('/tournaments');
-      }
+      toast.error(t('manager.failedToSaveResult'));
     }
   };
 
