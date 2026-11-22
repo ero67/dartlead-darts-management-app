@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AssistantLogo } from './assistant/AssistantLogo';
 import { DeviceSettings } from './DeviceSettings';
+import { PartnerStrip } from './shared/PartnerStrip';
 import logoIcon from '../assets/logo-icon-128.webp';
 import { getUserDisplayName, getUserInitials } from '../utils/userDisplayName';
 
@@ -196,6 +197,8 @@ export function Navigation({ currentView, onViewChange, tournament }) {
               <span>{t('navigation.privacy')}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
+
+          <PartnerStrip variant="sidebar" />
 
           <SidebarMenuItem>
             {user ? (

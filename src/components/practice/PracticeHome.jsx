@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { BoardMotif, CheckoutRoute, LiveDot } from '../shared/DartsAccents';
 import { PracticeBests } from './PracticeBests';
 import { PracticeGameAbbr } from './PracticeShared';
+import { PartnerStrip } from '../shared/PartnerStrip';
 import { MarkGlyph } from '../cricket/MarkGlyph';
 import { sessionHeadline } from './practiceView';
 import { PRACTICE_GAMES, describeSession, formatSessionDate, sessionHighlights } from '../../lib/practiceGames';
@@ -178,6 +179,7 @@ export function PracticeHome() {
           {user && <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{getUserDisplayName(user)}</span>}
           <h1 className="font-display text-4xl font-bold leading-none tracking-tight md:text-5xl">{t('practice.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('practice.subtitle')}</p>
+          <PartnerStrip className="-mx-2 w-fit max-w-full" />
         </div>
         {syncPill}
       </header>

@@ -1785,5 +1785,10 @@
     "tooLarge": "Obrázok je príliš veľký (max. 10 MB)",
     "unsupportedImage": "Tento formát obrázka nie je podporovaný. Skúste JPG alebo PNG.",
     "uploadFailed": "Obrázok sa nepodarilo nahrať"
+  },
+  "partner": {
+    "label": "Partner",
+    "offer": "{{discount}} s kódom {{code}}",
+    "visitShop": "Navštíviť {{name}}"
   }
 }
