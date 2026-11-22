@@ -1,0 +1,82 @@
+import { supabase } from '../lib/supabase.js';
+import { mediaService } from './mediaService.js';
+
+const PARTNER_COLUMNS = 'id, name, code, discount_label, url, image_url';
+const SETTINGS_COLUMNS = 'audience, active_partner_id';
+const imagePath = (id) => `partners/${id}.webp`;
+
+export const partnerService = {
+  // The partner players see right now, or null (none active, hidden by the visibility switch, or an error).
+  async getActivePartner() {
+    try {
+      const { data, error } = await supabase.rpc('get_active_partner').maybeSingle();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error loading the active partner:', error);
+      return null;
+    }
+  },
+
+  // Everything below is admins only (RLS) and throws on failure.
+  async listPartners() {
+    const { data, error } = await supabase.from('partners').select(PARTNER_COLUMNS).order('created_at');
+    if (error) throw error;
+    return data;
+  },
+
+  async getSettings() {
+    const { data, error } = await supabase.from('partner_settings').select(SETTINGS_COLUMNS).single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateSettings(changes) {
+    const { data, error } = await supabase
+      .from('partner_settings')
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .eq('id', true)
+      .select(SETTINGS_COLUMNS)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  // Insert (no id) or update the partner, then upload the image when one is given:
+  // the storage path needs the partner's id, so the row comes first.
+  async savePartner({ id, name, code, discount_label, url }, imageFile = null) {
+    const fields = { name, code, discount_label, url, updated_at: new Date().toISOString() };
+    const query = id
+      ? supabase.from('partners').update(fields).eq('id', id)
+      : supabase.from('partners').insert(fields);
+    const { data, error } = await query.select(PARTNER_COLUMNS).single();
+    if (error) throw error;
+    if (!imageFile) return data;
+    const imageUrl = await mediaService.uploadImage(imagePath(data.id), imageFile, { maxSide: 512, square: false });
+    return this.setImageUrl(data.id, imageUrl);
+  },
+
+  async setImageUrl(id, imageUrl) {
+    const { data, error } = await supabase
+      .from('partners')
+      .update({ image_url: imageUrl, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select(PARTNER_COLUMNS)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async removePartnerImage(id) {
+    await mediaService.removeImage(imagePath(id));
+    return this.setImageUrl(id, null);
+  },
+
+  // File first (storage remove of a missing file is not an error), then the row;
+  // partner_settings.active_partner_id falls back to NULL in the database.
+  async deletePartner(id) {
+    await mediaService.removeImage(imagePath(id));
+    const { error } = await supabase.from('partners').delete().eq('id', id);
+    if (error) throw error;
+  },
+};
