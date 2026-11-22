@@ -175,7 +175,7 @@ export function PracticeHome() {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex max-w-xl flex-col gap-2">
+        <div className="flex min-w-0 max-w-xl flex-col gap-2">
           {user && <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{getUserDisplayName(user)}</span>}
           <h1 className="font-display text-4xl font-bold leading-none tracking-tight md:text-5xl">{t('practice.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('practice.subtitle')}</p>

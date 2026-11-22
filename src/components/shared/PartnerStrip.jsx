@@ -24,7 +24,7 @@ export function PartnerStrip({ variant = 'card', className }) {
         <span>{t('partner.label')}</span>
         {partner.image_url
           ? <img src={partner.image_url} alt={partner.name} className="h-7 max-w-28 shrink-0 object-contain" />
-          : <span className="shrink-0 font-semibold text-foreground">{partner.name}</span>}
+          : <span className="min-w-0 max-w-40 truncate font-semibold text-foreground">{partner.name}</span>}
         <span className="truncate text-foreground">{offer}</span>
       </span>
     );
@@ -60,7 +60,7 @@ export function PartnerStrip({ variant = 'card', className }) {
     >
       {partner.image_url
         ? <img src={partner.image_url} alt="" className="h-6 max-w-24 shrink-0 object-contain" />
-        : <span className="shrink-0 font-semibold">{partner.name}</span>}
+        : <span className="min-w-0 max-w-40 truncate font-semibold">{partner.name}</span>}
       <span className="min-w-0 flex-1 truncate">
         <span className="text-muted-foreground">{t('partner.label')} · </span>
         {offer}
