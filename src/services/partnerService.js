@@ -44,7 +44,9 @@ export const partnerService = {
   },
 
   // Insert (no id) or update the partner, then upload the image when one is given:
-  // the storage path needs the partner's id, so the row comes first.
+  // the storage path needs the partner's id, so the row comes first. A failed upload
+  // does not throw (the row is already saved, and Save again would insert a duplicate):
+  // the saved partner comes back with `imageError` set instead.
   async savePartner({ id, name, code, discount_label, url }, imageFile = null) {
     const fields = { name, code, discount_label, url, updated_at: new Date().toISOString() };
     const query = id
@@ -53,8 +55,12 @@ export const partnerService = {
     const { data, error } = await query.select(PARTNER_COLUMNS).single();
     if (error) throw error;
     if (!imageFile) return data;
-    const imageUrl = await mediaService.uploadImage(imagePath(data.id), imageFile, { maxSide: 512, square: false });
-    return this.setImageUrl(data.id, imageUrl);
+    try {
+      const imageUrl = await mediaService.uploadImage(imagePath(data.id), imageFile, { maxSide: 512, square: false });
+      return await this.setImageUrl(data.id, imageUrl);
+    } catch (imageError) {
+      return { ...data, imageError };
+    }
   },
 
   async setImageUrl(id, imageUrl) {

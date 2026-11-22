@@ -189,8 +189,10 @@ function PartnerDialog({ partner, onClose, onSaved }) {
     setIsSaving(true);
     try {
       const fields = { id: partner.id, name: form.name.trim(), code: form.code.trim(), discount_label: form.discount_label.trim(), url: form.url.trim() };
-      onSaved(await partnerService.savePartner(fields, imageFile));
-      toast.success(isNew ? 'Partner added' : 'Partner saved');
+      const { imageError, ...saved } = await partnerService.savePartner(fields, imageFile);
+      onSaved(saved);
+      if (imageError) toast.error(`${saved.name} saved without the image: ${imageErrorText(imageError)}`);
+      else toast.success(isNew ? 'Partner added' : 'Partner saved');
     } catch (error) {
       toast.error(imageErrorText(error));
     } finally {
