@@ -9,9 +9,10 @@ export const partnerService = {
   // The partner players see right now, or null (none active, hidden by the visibility switch, or an error).
   async getActivePartner() {
     try {
-      const { data, error } = await supabase.rpc('get_active_partner').maybeSingle();
+      // Plain array, not .maybeSingle(): that asks PostgREST for one object and gets a 406 when none is active.
+      const { data, error } = await supabase.rpc('get_active_partner');
       if (error) throw error;
-      return data;
+      return data?.[0] ?? null;
     } catch (error) {
       console.error('Error loading the active partner:', error);
       return null;
