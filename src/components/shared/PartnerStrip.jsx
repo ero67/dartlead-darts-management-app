@@ -34,15 +34,19 @@ export function PartnerStrip({ variant = 'card', className }) {
   if (variant === 'sidebar') {
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton asChild size="lg" tooltip={`${partner.name} · ${offer}`}>
+        <SidebarMenuButton asChild size="lg" tooltip={`${partner.name} · ${offer}`} className="h-auto py-2">
           <a {...linkProps} className="group-data-[collapsible=icon]:justify-center">
-            {partner.image_url
-              ? <img src={partner.image_url} alt="" className="size-8 shrink-0 rounded-md bg-white object-contain p-0.5" />
-              : <Tag className="size-5" />}
-            {/* Collapsed sidebar: icon only, the tooltip carries the text. */}
-            <span className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-              <span className="truncate text-xs text-muted-foreground">{t('partner.label')} · {partner.name}</span>
-              <span className="truncate text-sm font-medium">{offer}</span>
+            {/* Collapsed sidebar: icon only (a wordmark is unreadable at 32px), the tooltip carries the text. */}
+            <Tag className="hidden group-data-[collapsible=icon]:block" />
+            {/* Two rows so a wide wordmark logo gets the full sidebar width. */}
+            <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
+              <span className="flex min-w-0 items-center justify-between gap-2">
+                {partner.image_url
+                  ? <img src={partner.image_url} alt={partner.name} className="h-6 min-w-0 max-w-full object-contain object-left" />
+                  : <span className="truncate text-sm font-semibold">{partner.name}</span>}
+                <span className="shrink-0 text-[0.65rem] uppercase tracking-wider text-muted-foreground">{t('partner.label')}</span>
+              </span>
+              <span className="text-sm font-medium leading-tight">{offer}</span>
             </span>
           </a>
         </SidebarMenuButton>
@@ -61,10 +65,8 @@ export function PartnerStrip({ variant = 'card', className }) {
       {partner.image_url
         ? <img src={partner.image_url} alt="" className="h-6 max-w-24 shrink-0 object-contain" />
         : <span className="min-w-0 max-w-40 truncate font-semibold">{partner.name}</span>}
-      <span className="min-w-0 flex-1 truncate">
-        <span className="text-muted-foreground">{t('partner.label')} · </span>
-        {offer}
-      </span>
+      {/* Wraps rather than truncates: the code is the part players need. */}
+      <span className="min-w-0 flex-1">{offer}</span>
       <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
     </a>
   );
