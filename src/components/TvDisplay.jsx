@@ -30,6 +30,7 @@ import { CricketBoard } from './cricket/CricketBoard';
 import { CricketMarksTable } from './cricket/CricketMarksTable';
 import { isCricketGame } from '../lib/cricket';
 import { x01Leaderboards } from '../utils/tournamentStats';
+import { PartnerStrip } from './shared/PartnerStrip';
 
 // TV / wall display for a tournament: no login, no navigation, big type,
 // dark high-contrast palette independent of the app theme. Cycles through
@@ -641,7 +642,10 @@ export function TvDisplay() {
       </main>
 
       <footer className="flex h-12 items-center justify-between border-t px-6 text-sm text-muted-foreground">
-        <span>dartlead.app</span>
+        <span className="flex min-w-0 items-center gap-6">
+          <span className="shrink-0">dartlead.app</span>
+          <PartnerStrip variant="tv" />
+        </span>
         <span>
           {pinnedView
             ? t('tv.pinned')

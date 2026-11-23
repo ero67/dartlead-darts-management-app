@@ -1785,5 +1785,10 @@
     "tooLarge": "The image is too large (max 10 MB)",
     "unsupportedImage": "This image format is not supported. Try a JPG or PNG.",
     "uploadFailed": "Could not upload the image"
+  },
+  "partner": {
+    "label": "Partner",
+    "offer": "{{discount}} with code {{code}}",
+    "visitShop": "Visit {{name}}"
   }
 }

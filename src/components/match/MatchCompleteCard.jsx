@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { PartnerStrip } from '../shared/PartnerStrip';
 
 // Final screen after the last leg: winner, final score, back to the tournament.
 export function MatchCompleteCard({ winnerName, player1Legs, player2Legs, onBack }) {
@@ -20,6 +21,7 @@ export function MatchCompleteCard({ winnerName, player1Legs, player2Legs, onBack
           <ArrowLeft />
           {t('match.backToTournament')}
         </Button>
+        <PartnerStrip className="w-full" />
       </Card>
     </div>
   );
