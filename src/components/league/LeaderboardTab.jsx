@@ -1,13 +1,17 @@
-import React from 'react';
-import { Trophy, RefreshCw, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, RefreshCw, Plus, Star } from 'lucide-react';
+import { toast } from 'sonner';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyState } from '../shared/EmptyState';
 import { FormDots } from '../shared/DartsAccents';
 import { PlayerLink } from './PlayerLink';
 import { EndSeasonDialog, PastSeasons } from './Seasons';
+import { leagueService } from '../../services/leagueService';
 import { currentSeasonName } from '../../utils/leagueSeason';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +37,7 @@ export function LeaderboardTab({ league, isManager, isRecalculating, onRecalcula
               <RefreshCw className={cn(isRecalculating && 'animate-spin')} />
               {isRecalculating ? t('common.loading') : t('leagues.recalculate')}
             </Button>
+            {leaderboard.length > 0 && <BonusPointsDialog league={league} onSaved={onSeasonChanged} />}
             {leaderboard.length > 0 && <EndSeasonDialog league={league} onEnded={onSeasonChanged} />}
           </div>
         )}
@@ -113,5 +118,97 @@ export function LeaderboardTab({ league, isManager, isRecalculating, onRecalcula
 
       <PastSeasons league={league} isManager={isManager} onChanged={onSeasonChanged} />
     </div>
+  );
+}
+
+// Manager-only: extra (or negative, as a penalty) points on top of tournament
+// points. The server trigger recomputes total_points from manual_points.
+function BonusPointsDialog({ league, onSaved }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const [edited, setEdited] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const leaderboard = league.leaderboard || [];
+
+  const handleOpenChange = (isOpen) => {
+    if (isOpen) setEdited(Object.fromEntries(leaderboard.map(e => [e.player.id, String(e.manualPoints || 0)])));
+    setOpen(isOpen);
+  };
+
+  const changed = leaderboard.filter(e => (parseInt(edited[e.player.id], 10) || 0) !== (e.manualPoints || 0));
+
+  const handleSave = async () => {
+    if (isSaving || changed.length === 0) return;
+    setIsSaving(true);
+    try {
+      for (const entry of changed) {
+        await leagueService.setManualPoints(league.id, entry.player.id, parseInt(edited[entry.player.id], 10) || 0);
+      }
+      toast.success(t('leagues.bonusPointsSaved', { count: changed.length }));
+      setOpen(false);
+      await onSaved();
+    } catch (error) {
+      console.error('Error saving bonus points:', error);
+      toast.error(t('leagues.bonusPointsFailed'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Button variant="outline" size="sm" onClick={() => handleOpenChange(true)}>
+        <Star />
+        {t('leagues.bonusPoints')}
+      </Button>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('leagues.bonusPoints')}</DialogTitle>
+            <DialogDescription>{t('leagues.bonusPointsDescription')}</DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('leagues.player')}</TableHead>
+                <TableHead className="text-right">{t('leagues.tournamentPoints')}</TableHead>
+                <TableHead className="w-24 text-right">{t('leagues.bonus')}</TableHead>
+                <TableHead className="text-right">{t('leagues.points')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {leaderboard.map(entry => {
+                const id = entry.player.id;
+                const base = (entry.totalPoints || 0) - (entry.manualPoints || 0);
+                return (
+                  <TableRow key={id}>
+                    <TableCell className="font-medium">{entry.player.name}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{base}</TableCell>
+                    <TableCell className="text-right">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        step={1}
+                        className="ml-auto h-8 w-20 text-right tabular-nums"
+                        aria-label={`${t('leagues.bonus')}: ${entry.player.name}`}
+                        value={edited[id] ?? ''}
+                        onChange={(e) => setEdited(prev => ({ ...prev, [id]: e.target.value }))}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">{base + (parseInt(edited[id], 10) || 0)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSave} disabled={isSaving || changed.length === 0}>
+              {isSaving ? t('common.loading') : t('common.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
