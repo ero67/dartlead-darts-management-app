@@ -41,3 +41,6 @@ export function subscriptionLevel(paidUntil, today = todayIso()) {
   const days = daysLeft(paidUntil, today);
   return days < 0 ? 'expired' : days <= SUBSCRIPTION_WARNING_DAYS ? 'warn' : 'ok';
 }
+
+// A recorded payment ends the trial, whatever the notes still say.
+export const isTrial = (row) => !row.paid_at && /trial/i.test(row.notes || '');

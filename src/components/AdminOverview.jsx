@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatTile } from './shared/StatTile';
 import { EmptyState } from './shared/EmptyState';
+import { isTrial } from '../utils/billing';
 import { cn } from '@/lib/utils';
 
 // Admin overview: subscription health at a glance plus usage per manager.
@@ -18,8 +19,6 @@ const INACTIVE_DAYS = 60;
 const DAY = 24 * 60 * 60 * 1000;
 const daysUntil = (date) => Math.ceil((new Date(date) - new Date()) / DAY);
 const daysSince = (date) => Math.floor((new Date() - new Date(date)) / DAY);
-// A recorded payment ends the trial, whatever the notes still say.
-const isTrial = (row) => !row.paid_at && /trial/i.test(row.notes || '');
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
 
 const TONE_CLASS = {

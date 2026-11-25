@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, Settings, Search, Trophy, Save, GitMerge, ArrowRight, Link as LinkIcon, Unlink, MessageCircle, Store } from 'lucide-react';
+import { Briefcase, Crown, UserPlus, Mail, Check, X, AlertCircle, Loader, Users, Settings, Search, Trophy, Save, GitMerge, ArrowRight, Link as LinkIcon, Unlink, MessageCircle, Store } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { tournamentService } from '../services/tournamentService';
 import { leagueService } from '../services/leagueService';
 import { UserSearchPicker } from './UserSearchPicker';
 import { ManagerBilling } from './ManagerBilling';
 import { AdminOverview } from './AdminOverview';
+import { ManagerLeagues } from './ManagerLeagues';
 import { MatchStatsCleanup } from './MatchStatsCleanup';
 import { AssistantSettings } from './assistant/AssistantSettings';
 import { PartnerSettings } from './partners/PartnerSettings';
@@ -55,6 +56,7 @@ const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : nu
 const ADMIN_TABS = [
   { key: 'overview', label: 'Overview', icon: Trophy },
   { key: 'users', label: 'Users & roles', icon: Users },
+  { key: 'managers', label: 'Managers', icon: Briefcase },
   { key: 'billing', label: 'Billing', icon: Crown },
   { key: 'data', label: 'Data fixes', icon: Settings },
   { key: 'assistant', label: 'AI assistant', icon: MessageCircle },
@@ -1105,6 +1107,10 @@ export function AdminPanel() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="managers">
+          <ManagerLeagues />
         </TabsContent>
 
         <TabsContent value="billing">
