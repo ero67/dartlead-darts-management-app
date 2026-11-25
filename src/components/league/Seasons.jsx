@@ -132,7 +132,7 @@ function SeasonDialog({ season, isManager, onClose, onRenamed }) {
 
   return (
     <Dialog open={!!season} onOpenChange={(isOpen) => { if (!isOpen) { setIsRenaming(false); onClose(); } }}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         {season && (
           <>
             <DialogHeader>

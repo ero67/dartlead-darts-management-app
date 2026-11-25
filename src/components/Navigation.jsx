@@ -113,6 +113,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
   const roleLabel = isAdmin ? t('common.roleAdmin') : (isManager ? t('common.roleManager') : null);
 
   return (
+    <>
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:px-0">
@@ -246,8 +247,9 @@ export function Navigation({ currentView, onViewChange, tournament }) {
         </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
-
-      <DeviceSettings isOpen={showDeviceSettings} onClose={() => setShowDeviceSettings(false)} />
     </Sidebar>
+    {/* Outside the Sidebar: below 1024px its content is a drawer that unmounts when it closes, taking the dialog with it. */}
+    <DeviceSettings isOpen={showDeviceSettings} onClose={() => setShowDeviceSettings(false)} />
+    </>
   );
 }
