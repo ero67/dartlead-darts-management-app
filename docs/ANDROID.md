@@ -126,6 +126,7 @@ GitHub → repository → Settings → Secrets and variables → Actions:
 | `ANDROID_KEYSTORE_PASSWORD` | keystore password                               |
 | `ANDROID_KEY_ALIAS`         | key alias (e.g. `dartlead`)                      |
 | `ANDROID_KEY_PASSWORD`      | key password                                    |
+| `PLAY_SERVICE_ACCOUNT_JSON` | Play upload service-account key (see Play Store release) |
 
 Optional variables `VITE_SUPABASE_URL`, `VITE_PUBLIC_APP_URL` and
 `VITE_ASSISTANT_URL` (the assistant API on Cloud Run) override the
@@ -162,8 +163,36 @@ signed with the same upload key. URLs the Play Console asks for:
 The contact address on the privacy and deletion pages is `info@dartlead.app`
 (default in `src/utils/publicUrl.js`; `VITE_SUPPORT_EMAIL` overrides it).
 
-Still to do: Play Console account, listing (SK/EN), screenshots, feature
-graphic, content rating and data-safety forms. A Play upload step can be added
-to the workflow later (service account + internal track). Updates ship via the store, so a web-only fix does not reach Android
+### Automatic Play upload
+
+The last step of a tag build uploads `DartLead.aab` to the **production**
+track with status `completed`: once Google's review approves it, it rolls out
+to everyone without a click in Play Console. Manual "Run workflow" builds never
+upload. The step runs after the GitHub Releases, so if it fails the AAB is
+still on the release page for a manual upload.
+
+One-time setup:
+
+1. Google Cloud console (any project, e.g. the assistant's): enable the
+   **Google Play Android Developer API**.
+2. IAM & Admin → Service accounts → create one (e.g. `play-upload`, no
+   roles needed) → Keys → Add key → JSON. A JSON file downloads.
+3. Play Console → Users and permissions → Invite new users → the service
+   account's e-mail → App permissions: DartLead → tick **Release to
+   production, exclude devices, and use Play App Signing** and **Release apps
+   to testing tracks** → Invite.
+4. Paste the whole JSON file into the repository secret
+   `PLAY_SERVICE_ACCOUNT_JSON`, then delete the local file.
+
+Notes:
+
+- "The caller does not have permission" right after setup usually means the
+  new permission hasn't reached the API yet; it can take up to a day.
+- Re-running the workflow for the same tag fails at this step: Play never
+  accepts a versionCode twice. Release a fix with a new `npm version patch`.
+- If Managed publishing is on in Play Console, the approved release still waits
+  for your "Publish" click.
+
+Updates ship via the store, so a web-only fix does not reach Android
 users until a new version is published; everything server-side (RLS, RPCs,
 league scoring) applies to both immediately.
