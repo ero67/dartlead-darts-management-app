@@ -1,4 +1,6 @@
 import React from 'react';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 // Small darts-specific pieces shared across screens. Purely presentational.
@@ -82,4 +84,19 @@ export function PhaseBar({ steps, current, progress = 0, className }) {
 // Faint dartboard in a corner of a header or card. Parent needs `relative overflow-hidden`.
 export function BoardMotif({ className }) {
   return <span aria-hidden="true" className={cn('board-motif -right-32 -top-48 w-96 text-foreground opacity-[0.06] dark:opacity-[0.07]', className)} />;
+}
+
+// The sum of a visit's darts, placed after the dart chips: filled and bold so
+// it reads as the result, not a fourth dart. A bust says so instead of a sum
+// that never counted. Renders nothing when there is no total (see visitTotal),
+// so a typed 3-dart total never gets a second chip, bust or not.
+export function VisitTotal({ total, isBust = false, className }) {
+  const { t } = useLanguage();
+  if (total === null) return null;
+  return (
+    // Solid red in dark mode too: the variant's translucent red turns muddy on a green card.
+    <Badge variant={isBust ? 'destructive' : 'secondary'} className={cn('font-bold tabular-nums', isBust && 'dark:bg-destructive', className)}>
+      {isBust ? t('match.checkout.bust') : total}
+    </Badge>
+  );
 }

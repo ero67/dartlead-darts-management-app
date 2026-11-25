@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Badge } from '@/components/ui/badge';
-import { CheckoutRoute, LegPips } from '../shared/DartsAccents';
+import { CheckoutRoute, LegPips, VisitTotal } from '../shared/DartsAccents';
 import { cn } from '@/lib/utils';
 
 // One player's column on the live scoreboard: name, legs, the big remaining
@@ -38,6 +38,12 @@ function PlayerColumn({ player, isActive, isBusting, legsToWin }) {
           {player.throws.map((label, idx) => (
             <Badge key={idx} variant="outline" className={cn('min-w-8 px-1.5 text-[11px] tabular-nums', (isActive || isBusting) && 'border-current/40 text-inherit')}>{label}</Badge>
           ))}
+          <VisitTotal
+            total={player.visitTotal}
+            isBust={player.visitBust}
+            // On the red busting card a red chip would vanish: dark translucent fill instead.
+            className={cn('min-w-8 px-1.5 text-[11px]', isBusting && 'bg-black/25 text-inherit dark:bg-black/25')}
+          />
         </div>
       )}
       <span className={cn('text-xs tabular-nums', isActive || isBusting ? 'opacity-85' : 'text-muted-foreground')}>
@@ -48,7 +54,7 @@ function PlayerColumn({ player, isActive, isBusting, legsToWin }) {
 }
 
 // Two equal columns, phone-first. `players` is [{ name, legs, score, checkout,
-// throws, average, legDarts }, ...]; the active column is filled with the
+// throws, visitTotal, visitBust, average, legDarts }, ...]; the active column is filled with the
 // primary colour, the busting one flashes red (timing owned by the caller).
 export function Scoreboard({ players, currentPlayer, bustingPlayer, legsToWin }) {
   return (

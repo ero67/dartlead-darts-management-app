@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatTile } from '../shared/StatTile';
-import { BoardMotif, CheckoutRoute } from '../shared/DartsAccents';
+import { BoardMotif, CheckoutRoute, VisitTotal } from '../shared/DartsAccents';
 import { cn } from '@/lib/utils';
 
 // ---- History rows -----------------------------------------------------------
@@ -386,13 +386,14 @@ export function PracticeCheckoutHint({ route, className, children }) {
   );
 }
 
-// The darts of the last visit as chips.
-export function PracticeLastThrows({ labels, className }) {
+// The darts of the last visit as chips, then their total (or Bust).
+export function PracticeLastThrows({ labels, total = null, isBust = false, className }) {
   return (
     <div className={cn('flex min-h-8 flex-wrap justify-center gap-1.5', className)}>
       {labels.map((label, idx) => (
         <Badge key={idx} variant="outline" className="min-w-10 justify-center px-2.5 py-1 text-sm tabular-nums">{label}</Badge>
       ))}
+      <VisitTotal total={total} isBust={isBust} className="min-w-10 px-2.5 py-1 text-sm" />
     </div>
   );
 }

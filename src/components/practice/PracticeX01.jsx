@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   createSoloX01, applyDart, applyVisitTotal, undo, canUndo, dartFromInput,
-  liveRemaining, lastVisitLabels, displayLabel, computeStats, STARTING_SCORES
+  liveRemaining, lastVisit, lastVisitLabels, displayLabel, computeStats, STARTING_SCORES
 } from '../../lib/x01Engine';
 import {
   createX01Match, matchApplyDart, matchApplyVisitTotal, matchUndoHuman, matchCanUndo,
@@ -36,6 +36,7 @@ import { getUserDisplayName } from '../../utils/userDisplayName';
 import { useKeepScreenAwake } from '../../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../../hooks/useOnScreenKeypad';
 import { hapticTap, hapticBust, hapticLegWon, hapticMatchWon } from '../../lib/haptics';
+import { visitTotal } from '../../utils/dartStats';
 import checkoutData from '../../data/checkouts.json';
 
 const GAME = 'x01';
@@ -690,6 +691,7 @@ export function PracticeX01() {
     const stats = computeStats(session);
     const legDarts = session.current.visits.reduce((sum, v) => sum + v.darts, 0) + session.current.visit.darts.length;
     const labels = lastVisitLabels(session);
+    const visit = lastVisit(session);
     return (
       <PracticeBoard flash={boardFlash}>
         <div className="flex items-end justify-between gap-3">
@@ -697,7 +699,7 @@ export function PracticeX01() {
             <PracticeBoardLabel>{t('practice.remaining')}</PracticeBoardLabel>
             <PracticeBoardValue>{remaining}</PracticeBoardValue>
           </div>
-          <PracticeLastThrows labels={labels} className="max-w-[45%] justify-end" />
+          <PracticeLastThrows labels={labels} total={visitTotal(visit.darts)} isBust={visit.isBust} className="max-w-[45%] justify-end" />
         </div>
         <PracticeCheckoutHint route={suggestion} />
         <PracticeBoardStats
@@ -723,6 +725,7 @@ export function PracticeX01() {
           const isTurn = i === session.turn;
           const stats = computeStats(p);
           const labels = lastVisitLabels(p);
+          const visit = lastVisit(p);
           const legDarts = p.current.visits.reduce((sum, v) => sum + v.darts, 0) + p.current.visit.darts.length;
           return (
             <div key={i} className={cn('flex flex-col items-center gap-1 rounded-lg border bg-muted/40 p-3', isTurn && 'border-primary bg-primary text-primary-foreground shadow-md [&_[data-variant=outline]]:border-current/40 [&_[data-variant=outline]]:text-inherit')}>
@@ -731,7 +734,7 @@ export function PracticeX01() {
                 <Badge variant="secondary" className="tabular-nums">{session.legsWon[i]}</Badge>
               </div>
               <div className="font-display text-5xl font-semibold leading-none tabular-nums sm:text-6xl">{isTurn ? remaining : p.current.remaining}</div>
-              <PracticeLastThrows labels={labels} className="min-h-7" />
+              <PracticeLastThrows labels={labels} total={visitTotal(visit.darts)} isBust={visit.isBust} className="min-h-7" />
               <div className={cn('text-xs tabular-nums', isTurn ? 'opacity-85' : 'text-muted-foreground')}>
                 {t('practice.stats.average')} <b className={cn('font-semibold', !isTurn && 'text-foreground')}>{stats.average.toFixed(1)}</b>
                 {' · '}
