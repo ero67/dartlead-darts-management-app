@@ -2,6 +2,8 @@
 # the APK/AAB to a GitHub Release for that tag. The rolling `android-latest`
 # release is updated too, so the stable download link keeps working:
 #   https://github.com/<owner>/<repo>/releases/download/android-latest/DartLead.apk
+# Finally the AAB is uploaded to the Google Play production track, so it goes
+# live once Google's review approves it (setup: docs/ANDROID.md).
 #
 # Pushes to main do NOT build the app (the web app ships via Vercel on every
 # push; the phone build is the deliberate release). Release flow:
@@ -18,6 +20,7 @@
 #     ANDROID_KEYSTORE_PASSWORD  (with the keystore)
 #     ANDROID_KEY_ALIAS          (with the keystore)
 #     ANDROID_KEY_PASSWORD       (with the keystore)
+#     PLAY_SERVICE_ACCOUNT_JSON  Play upload service-account key (tag builds)
 #   Variables (optional, defaults below)
 #     VITE_SUPABASE_URL, VITE_PUBLIC_APP_URL, VITE_ASSISTANT_URL
 #
@@ -228,3 +231,17 @@ jobs:
 
             - Stable download link: `DartLead.apk` on this release always points at the newest release.
             - Signing: **${{ steps.keystore.outputs.signing }}**
+
+      # Last on purpose: if Play rejects the upload (missing secret, a
+      # versionCode it has seen before on a re-run), the GitHub Releases
+      # above already hold the AAB for a manual upload.
+      - name: Upload to Google Play (production)
+        if: steps.version.outputs.release == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.dartlead.app
+          releaseFiles: out/DartLead.aab
+          releaseName: ${{ steps.version.outputs.name }}
+          track: production
+          status: completed
