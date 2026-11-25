@@ -290,12 +290,12 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-3xl">
+      <DialogContent className="flex flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('registration.editTournamentSettings')}</DialogTitle>
         </DialogHeader>
 
-        <div className="-mx-6 flex flex-1 flex-col gap-6 overflow-y-auto px-6 py-1">
+        <div className="-mx-6 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-1">
           <Section title={t('schedule.title')}>
             <RoundScheduleFields idPrefix="mgmt" value={tournamentSettings} onChange={setTournamentSettings} />
           </Section>

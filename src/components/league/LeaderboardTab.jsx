@@ -162,7 +162,7 @@ function BonusPointsDialog({ league, onSaved }) {
         {t('leagues.bonusPoints')}
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('leagues.bonusPoints')}</DialogTitle>
             <DialogDescription>{t('leagues.bonusPointsDescription')}</DialogDescription>

@@ -652,9 +652,10 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
         </div>
       </div>
 
+      {/* min-w-0 on the columns: grid items otherwise grow to the player tabs row and widen the whole page on phones. */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Right column (first in DOM so it sits on top when stacked) */}
-        <div className="flex flex-col gap-6 lg:order-last">
+        <div className="flex min-w-0 flex-col gap-6 lg:order-last">
           {canManage && (
             <RegistrationRequests
               registrations={registrations}
@@ -682,7 +683,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
           )}
         </div>
 
-        <div className="flex flex-col gap-6 lg:col-span-2">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <PlayersSection
             tournament={tournament}
             players={players}

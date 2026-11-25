@@ -73,12 +73,12 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="flex flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('registration.editTournamentSettings')}</DialogTitle>
         </DialogHeader>
 
-        <div className="-mx-6 flex max-h-[80vh] flex-col gap-6 overflow-y-auto px-6">
+        <div className="-mx-6 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-1">
           <section className="flex flex-col gap-3">
             <h4 className="text-sm font-semibold">{t('schedule.title')}</h4>
             <RoundScheduleFields idPrefix="edit" value={settings} onChange={setSettings} />

@@ -47,8 +47,7 @@ export function DeviceSettings({ isOpen, onClose }) {
     }, 1000);
   };
 
-  // Dialog portals to document.body, so opening it from inside the sidebar
-  // drawer on phones still gives a real full-screen sheet.
+  // Rendered by Navigation outside the sidebar, so it survives the phone drawer closing.
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-md">
