@@ -1796,5 +1796,30 @@
     "label": "Partner",
     "offer": "{{discount}} s kódom {{code}}",
     "visitShop": "Navštíviť {{name}}"
+  },
+  "adminManagers": {
+    "title": "Ligy podľa manažérov",
+    "description": "Kto vytvoril ktoré ligy a kedy, ligy, ktoré spolu spravuje, a stav jeho predplatného. Najnovšia liga je prvá; otvor riadok pre celý zoznam.",
+    "refresh": "Obnoviť",
+    "loading": "Načítavam manažérov…",
+    "empty": "Zatiaľ žiadni manažéri.",
+    "manager": "Manažér",
+    "leagues": "Ligy",
+    "activeOfTotal": "Aktívne / všetky vytvorené ligy",
+    "latest": "Najnovšia liga",
+    "coManaging": "Spolu spravuje",
+    "billing": "Predplatné",
+    "noSubscription": "Bez predplatného",
+    "paidUntil": "Zaplatené do {{date}}",
+    "trialUntil": "Skúšobná verzia do {{date}}",
+    "overdueSince": "Po splatnosti od {{date}}",
+    "admin": "Admin",
+    "demo": "Demo",
+    "expand": "Zobraziť ligy: {{name}}",
+    "collapse": "Skryť ligy: {{name}}",
+    "createdLeagues": "Vytvorené ligy ({{count}})",
+    "coManagedLeagues": "Spolu spravované ligy ({{count}})",
+    "noLeagues": "Zatiaľ nevytvoril žiadnu ligu.",
+    "leagueMeta": "vytvorená {{date}} · hráči: {{members}} · turnaje: {{tournaments}}"
   }
 }

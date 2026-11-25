@@ -1796,5 +1796,30 @@
     "label": "Partner",
     "offer": "{{discount}} with code {{code}}",
     "visitShop": "Visit {{name}}"
+  },
+  "adminManagers": {
+    "title": "Leagues per manager",
+    "description": "Who created which leagues and when, the leagues they co-manage, and where their subscription stands. Newest league first; open a row for the full list.",
+    "refresh": "Refresh",
+    "loading": "Loading managers…",
+    "empty": "No managers yet.",
+    "manager": "Manager",
+    "leagues": "Leagues",
+    "activeOfTotal": "Active / total leagues created",
+    "latest": "Latest league",
+    "coManaging": "Co-managing",
+    "billing": "Subscription",
+    "noSubscription": "No subscription",
+    "paidUntil": "Paid until {{date}}",
+    "trialUntil": "Trial until {{date}}",
+    "overdueSince": "Overdue since {{date}}",
+    "admin": "Admin",
+    "demo": "Demo",
+    "expand": "Show leagues of {{name}}",
+    "collapse": "Hide leagues of {{name}}",
+    "createdLeagues": "Created leagues ({{count}})",
+    "coManagedLeagues": "Co-managed leagues ({{count}})",
+    "noLeagues": "Has not created a league yet.",
+    "leagueMeta": "created {{date}} · {{members}} members · {{tournaments}} tournaments"
   }
 }
