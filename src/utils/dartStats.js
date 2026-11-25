@@ -110,6 +110,20 @@ export const visitCheckoutAttempts = (turnStartScore, darts) => {
 };
 
 /**
+ * Sum of a visit's darts, shown after the dart chips. Null when there is
+ * nothing to add up: no darts, or a typed 3-dart total (its chip already is
+ * the total).
+ *
+ * @param {Array} darts - the visit's dart entries ({ value, isTurnTotal? })
+ * @returns {number|null}
+ */
+export const visitTotal = (darts) => {
+  if (!Array.isArray(darts) || darts.length === 0) return null;
+  if (darts.length === 1 && darts[0]?.isTurnTotal) return null;
+  return darts.reduce((sum, d) => sum + (Number(d?.value) || 0), 0);
+};
+
+/**
  * Checkout percentage from the stored match stats: legs won (every leg won is
  * one converted finish) over the attempts counted above.
  *

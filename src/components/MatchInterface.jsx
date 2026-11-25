@@ -10,7 +10,7 @@ import { enqueueWrite, QUEUE_TYPES } from '../lib/offlineQueue';
 import checkoutData from '../data/checkouts.json';
 import { useKeepScreenAwake } from '../hooks/useKeepScreenAwake';
 import { useOnScreenKeypad } from '../hooks/useOnScreenKeypad';
-import { visitCheckoutAttempts } from '../utils/dartStats';
+import { visitCheckoutAttempts, visitTotal } from '../utils/dartStats';
 import { DartKeypad } from './scoring/DartKeypad';
 import { TurnTotalKeypad } from './scoring/TurnTotalKeypad';
 import { PreMatchCard } from './match/PreMatchCard';
@@ -1983,21 +1983,24 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     return Number.isFinite(avg) ? avg : 0;
   };
 
-  // Get the last turn's throws for a player
+  // The last visit of a player as chip labels plus its total: the visit in
+  // progress for the thrower, else their last visit from history.
   const getLastTurnThrows = (playerIndex) => {
-    // First check if it's the current player's turn - show current turn throws
+    const summary = (scores, isBust) => ({
+      labels: scores.map(s => getDisplayLabel(s.label)).filter(Boolean),
+      total: visitTotal(scores),
+      isBust
+    });
+    // During the bust flash the busting darts are still the visit in progress.
     if (currentPlayer === playerIndex && currentTurn.scores.length > 0) {
-      return currentTurn.scores.map(s => getDisplayLabel(s.label)).filter(Boolean);
+      return summary(currentTurn.scores, bustingPlayer === playerIndex);
     }
-    
-    // Otherwise, find the last completed turn for this player from history
     for (let i = turnHistory.length - 1; i >= 0; i--) {
       if (turnHistory[i].player === playerIndex && turnHistory[i].turn.scores.length > 0) {
-        return turnHistory[i].turn.scores.map(s => getDisplayLabel(s.label)).filter(Boolean);
+        return summary(turnHistory[i].turn.scores, !!turnHistory[i].turn.isBust);
       }
     }
-    
-    return [];
+    return { labels: [], total: null, isBust: false };
   };
 
   if (matchComplete) {
@@ -2043,16 +2046,17 @@ function MatchInterfaceInner({ match, onMatchComplete, onBack }) {
     );
   }
 
-  const player1LastThrows = getLastTurnThrows(0);
-  const player2LastThrows = getLastTurnThrows(1);
   const scoreboardPlayers = ['player1', 'player2'].map((key, idx) => {
     const score = safeScore(legScores[key].currentScore, matchSettings.startingScore);
+    const lastVisit = getLastTurnThrows(idx);
     return {
       name: playerNames[idx],
       legs: legScores[key].legs,
       score,
       checkout: checkoutData[String(score)] || null,
-      throws: idx === 0 ? player1LastThrows : player2LastThrows,
+      throws: lastVisit.labels,
+      visitTotal: lastVisit.total,
+      visitBust: lastVisit.isBust,
       average: getAverage(key).toFixed(1),
       legDarts: legScores[key].legDarts
     };

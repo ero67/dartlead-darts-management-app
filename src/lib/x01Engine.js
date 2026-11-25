@@ -256,15 +256,18 @@ export const undo = (state) => {
 export const liveRemaining = (state) =>
   state.current.remaining - state.current.visit.darts.reduce((sum, d) => sum + d.value, 0);
 
-// Labels of the darts thrown in the visit in progress, or of the last
-// completed visit when none is in progress (same as the match screen).
-export const lastVisitLabels = (state) => {
+// The darts of the visit in progress, or of the last completed visit when none
+// is in progress (same as the match screen). A bust settles at once, so only a
+// completed visit can be one.
+export const lastVisit = (state) => {
   const { visit, visits } = state.current;
-  if (visit.darts.length > 0) return visit.darts.map(d => displayLabel(d.label));
+  if (visit.darts.length > 0) return { darts: visit.darts, isBust: false };
   const last = visits[visits.length - 1];
-  if (last) return last.dartsList.map(d => displayLabel(d.label));
-  return [];
+  if (last) return { darts: last.dartsList, isBust: last.isBust };
+  return { darts: [], isBust: false };
 };
+
+export const lastVisitLabels = (state) => lastVisit(state).darts.map(d => displayLabel(d.label));
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
