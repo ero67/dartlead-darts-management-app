@@ -243,5 +243,5 @@ jobs:
           packageName: com.dartlead.app
           releaseFiles: out/DartLead.aab
           releaseName: ${{ steps.version.outputs.name }}
-          track: production
+          tracks: production
           status: completed
