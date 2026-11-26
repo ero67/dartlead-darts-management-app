@@ -703,6 +703,7 @@
     "signInSubtitle": "Sign in to save your practice progress and follow your tournaments and leagues."
   },
   "common": {
+    "moreActions": "More actions",
     "save": "Save",
     "saved": "Saved!",
     "cancel": "Cancel",

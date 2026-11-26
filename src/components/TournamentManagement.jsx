@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Trophy, Trash2, Settings, Activity, X, ClipboardList, Monitor, CopyPlus, Target } from 'lucide-react';
+import { Trophy, Settings, Activity, X, ClipboardList, Monitor, CopyPlus, Target } from 'lucide-react';
 import { useLiveMatch } from '../contexts/LiveMatchContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
@@ -32,6 +32,7 @@ import { CorrectResultDialog } from './tournament/CorrectResultDialog';
 import { EditSettingsDialog } from './tournament/EditSettingsDialog';
 import { BoardsControl } from './tournament/BoardsControl';
 import { BoardWaitingScreen } from './tournament/BoardWaitingScreen';
+import { TournamentActionsMenu } from './tournament/TournamentActionsMenu';
 import { TournamentCrumbs } from './tournament/TournamentCrumbs';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
@@ -1494,6 +1495,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
   
+  const handleCopyTournament = () => navigate(cloneTournamentPath(tournament.id, tournament.leagueId));
+
   const handleDeleteTournament = async () => {
     if (!tournament) return;
     
@@ -2131,23 +2134,20 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
                 {t('registration.editSettings')}
               </Button>
             )}
-            {canManage && user && (
-              <Button variant="outline" onClick={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}>
+            {/* A finished round's next step is the next round: keep it in view then. */}
+            {canManage && user && tournament.status === 'completed' && (
+              <Button variant="outline" onClick={handleCopyTournament}>
                 <CopyPlus />
                 {tournament.leagueId ? t('tournaments.nextRound') : t('tournaments.duplicate')}
               </Button>
             )}
             {canManage && user && (
-              <Button
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={handleDeleteTournament}
-                title={t('management.deleteTournament')}
-                aria-label={t('management.deleteTournament')}
-              >
-                <Trash2 />
-                {t('management.deleteTournament')}
-              </Button>
+              <TournamentActionsMenu
+                tournament={tournament}
+                onCopy={tournament.status === 'completed' ? null : handleCopyTournament}
+                onDelete={handleDeleteTournament}
+                t={t}
+              />
             )}
           </div>
         </div>

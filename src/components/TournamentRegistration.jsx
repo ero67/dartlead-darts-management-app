@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Settings, Trash2, CopyPlus } from 'lucide-react';
+import { Play, Settings } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,6 +16,7 @@ import { PlayersSection } from './registration/PlayersSection';
 import { RegistrationRequests } from './registration/RegistrationRequests';
 import { SelfRegistration } from './registration/SelfRegistration';
 import { VenueSetup } from './registration/VenueSetup';
+import { TournamentActionsMenu } from './tournament/TournamentActionsMenu';
 import { EditSettingsDialog } from './registration/EditSettingsDialog';
 import { GroupsPreviewDialog } from './registration/GroupsPreviewDialog';
 import { getPublicAppUrl } from '../utils/publicUrl';
@@ -625,29 +626,19 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                 {t('registration.editSettings')}
               </Button>
             )}
-            {canManage && (
-              <Button variant="outline" onClick={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}>
-                <CopyPlus />
-                {tournament.leagueId ? t('tournaments.nextRound') : t('tournaments.duplicate')}
-              </Button>
-            )}
-            {canManage && onDeleteTournament && (
-              <Button
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={handleDeleteTournament}
-                title={t('management.deleteTournament')}
-                aria-label={t('management.deleteTournament')}
-              >
-                <Trash2 />
-                {t('management.deleteTournament')}
-              </Button>
-            )}
             {showStart && (
               <Button onClick={handleStartTournament} disabled={isStarting}>
                 <Play />
                 {isStarting ? t('common.loading') : t('registration.startTournament')}
               </Button>
+            )}
+            {canManage && (
+              <TournamentActionsMenu
+                tournament={tournament}
+                onCopy={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}
+                onDelete={onDeleteTournament ? handleDeleteTournament : null}
+                t={t}
+              />
             )}
           </div>
         </div>
