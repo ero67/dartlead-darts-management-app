@@ -15,6 +15,7 @@ import { RoundSchedule } from './shared/RoundSchedule';
 import { PlayersSection } from './registration/PlayersSection';
 import { RegistrationRequests } from './registration/RegistrationRequests';
 import { SelfRegistration } from './registration/SelfRegistration';
+import { VenueSetup } from './registration/VenueSetup';
 import { EditSettingsDialog } from './registration/EditSettingsDialog';
 import { GroupsPreviewDialog } from './registration/GroupsPreviewDialog';
 import { getPublicAppUrl } from '../utils/publicUrl';
@@ -667,6 +668,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               processingRegId={processingRegId}
             />
           )}
+          {canManage && <VenueSetup tournamentId={tournament.id} scorersAnchorId="tournament-scorers" />}
           {(!user || !canManage) && (
             <SelfRegistration
               user={user}
@@ -720,8 +722,12 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
           {/* Scorers can be set up before the first dart is thrown, not only
               once the tournament is running (previously this panel lived on the
               completed-tournament summary tab, which was far too late). */}
-          {canManage && <ScorersPanel type="tournament" entityId={tournament.id} />}
-          {canManage && tournament.leagueId && <ScorersPanel type="league" entityId={tournament.leagueId} />}
+          {canManage && (
+            <div id="tournament-scorers" className="flex scroll-mt-20 flex-col gap-6">
+              <ScorersPanel type="tournament" entityId={tournament.id} />
+              {tournament.leagueId && <ScorersPanel type="league" entityId={tournament.leagueId} />}
+            </div>
+          )}
         </div>
       </div>
 

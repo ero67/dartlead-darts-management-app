@@ -100,7 +100,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
             </Button>
             <Button variant="outline" onClick={onCreateLeague}>
               <Plus />
-              {t('leagues.title')}
+              {t('leagues.createLeague')}
             </Button>
           </div>
         )}
@@ -171,7 +171,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
             {canCreateTournaments && (
               <Button onClick={onCreateLeague}>
                 <Plus />
-                {t('leagues.title')}
+                {t('leagues.createLeague')}
               </Button>
             )}
           </EmptyState>

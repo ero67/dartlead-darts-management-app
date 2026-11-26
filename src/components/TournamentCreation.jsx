@@ -3,7 +3,7 @@ import { Trophy, ArrowLeft, ChevronUp, ChevronDown, Check, Plus, Users, Clipboar
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLeague } from '../contexts/LeagueContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { UserSearchPicker } from './UserSearchPicker';
 import { LoadingState } from './shared/LoadingState';
 import { RoundScheduleFields } from './shared/RoundSchedule';
@@ -52,8 +52,9 @@ const generateId = () => {
 export function TournamentCreation({ onTournamentCreated, onBack }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { currentLeague, selectLeague } = useLeague();
+  const { leagues, currentLeague, selectLeague } = useLeague();
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const leagueId = searchParams.get('leagueId');
   // ?from=<id>: "Duplicate" / "Create next round" — prefill from that tournament.
@@ -115,6 +116,22 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
 
   const handleRemoveScorer = (userId) => {
     setScorers(prev => prev.filter(s => s.id !== userId));
+  };
+
+  // Leagues this manager runs. Picking one sets ?leagueId=, the same path the
+  // league page uses, so its defaults and player pool load as they do there.
+  const ownLeagues = leagues.filter(l => l.createdBy === user?.id || l.managerIds?.includes(user?.id));
+  // An admin may arrive from someone else's league: keep it selectable.
+  const myLeagues = (leagueId && currentLeague?.id === leagueId && !ownLeagues.some(l => l.id === leagueId))
+    ? [...ownLeagues, currentLeague]
+    : ownLeagues;
+  const NO_LEAGUE = '__none';
+  const handleLeagueChange = (value) => {
+    const params = new URLSearchParams(location.search);
+    if (value === NO_LEAGUE) params.delete('leagueId');
+    else params.set('leagueId', value);
+    setSelectedPlayers([]); // they were picked from the previous league's pool
+    navigate({ search: params.toString() }, { replace: true });
   };
 
   // Load league if leagueId is provided
@@ -306,7 +323,8 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
           {clonePrefill ? <CopyPlus className="size-6 text-primary" /> : <Trophy className="size-6 text-primary" />}
           {t('tournaments.createNew')}
         </h1>
-        {leagueId && currentLeague?.id === leagueId && (
+        {/* The league picker shows the league otherwise; a copy hides the picker. */}
+        {fromId && leagueId && currentLeague?.id === leagueId && (
           <p className="text-sm text-muted-foreground">{t('tournaments.forLeague', { name: currentLeague.name })}</p>
         )}
         {clonePrefill && (
@@ -316,6 +334,28 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-6 lg:max-w-[760px]">
+          {!fromId && myLeagues.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('tournaments.leaguePickerTitle')}</CardTitle>
+                <CardDescription>{t('tournaments.leaguePickerHint')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={leagueId || NO_LEAGUE} onValueChange={handleLeagueChange}>
+                  <SelectTrigger id="tournament-league" className="w-full sm:max-w-md" aria-label={t('tournaments.leaguePickerTitle')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_LEAGUE}>{t('tournaments.noLeague')}</SelectItem>
+                    {myLeagues.map(l => (
+                      <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>{t('registration.tournamentType') || 'Tournament Type'}</CardTitle>

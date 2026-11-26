@@ -479,7 +479,7 @@ function AppContent() {
   const handleLeagueCreated = async (leagueData) => {
     try {
       await createLeague(leagueData);
-      navigate(`/league/${leagueData.id}`);
+      navigate(`/league/${leagueData.id}?tab=settings&section=defaults`);
     } catch (error) {
       console.error('Error creating league:', error);
       toast.error(t('leagues.failedToCreateLeague'));

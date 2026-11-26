@@ -713,7 +713,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   };
 
   return (
-    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-hidden p-4 text-foreground md:p-8">
+    // overflow-clip (not hidden) clips the board motif without making this a scroll container, which would break the sticky settings chips
+    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-clip p-4 text-foreground md:p-8">
       <BoardMotif />
       <div className="relative flex flex-col gap-3">
         <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>

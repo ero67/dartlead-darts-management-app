@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, X, Save, RotateCcw, ChevronUp, ChevronDown, ImageUp, Loader } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LeagueLogo } from '../shared/LeagueLogo';
@@ -36,6 +37,15 @@ const START_ROUNDS = [
 
 const radioCard = 'flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm font-medium transition-colors hover:bg-muted/50 has-data-[state=checked]:border-primary has-data-[state=checked]:ring-2 has-data-[state=checked]:ring-primary/30';
 const radioRow = 'flex cursor-pointer items-center gap-2 text-sm font-normal';
+// scroll-mt clears the sticky phone header (h-14) plus the chip row.
+const section = 'flex scroll-mt-28 flex-col gap-6 lg:scroll-mt-16';
+const SECTIONS = [
+  ['league', 'leagues.sectionLeague'],
+  ['people', 'leagues.sectionPeople'],
+  ['points', 'leagues.sectionPoints'],
+  ['defaults', 'leagues.sectionDefaults'],
+];
+const scrollToSection = (id) => document.getElementById(`league-settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 export function SettingsTab({
   league, canEditManagers,
@@ -49,6 +59,29 @@ export function SettingsTab({
 }) {
   const { t } = useLanguage();
   const logoInputRef = React.useRef(null);
+  const [searchParams] = useSearchParams();
+  const initialSection = searchParams.get('section');
+  const rootRef = React.useRef(null);
+
+  // ?section=defaults: a new league lands on how its nights are played.
+  // The managers/scorers cards above load later and push the section down,
+  // so re-aim while the page grows, until the user scrolls or 3 s pass.
+  useEffect(() => {
+    if (!initialSection || !rootRef.current) return;
+    const aim = () => document.getElementById(`league-settings-${initialSection}`)?.scrollIntoView({ block: 'start' });
+    const observer = new ResizeObserver(aim);
+    const stop = () => observer.disconnect();
+    observer.observe(rootRef.current);
+    const timer = setTimeout(stop, 3000);
+    window.addEventListener('wheel', stop, { once: true });
+    window.addEventListener('touchstart', stop, { once: true });
+    return () => {
+      stop();
+      clearTimeout(timer);
+      window.removeEventListener('wheel', stop);
+      window.removeEventListener('touchstart', stop);
+    };
+  }, [initialSection]);
 
   const getPlacementLabel = (position) => {
     if (position === 'playoffDefault') return t('leagues.playoffParticipant') || '🏟️ Other Playoff Participants';
@@ -56,7 +89,7 @@ export function SettingsTab({
     if (position === 1) return `${t('leagues.1stPlace')} 🥇`;
     if (position === 2) return `${t('leagues.2ndPlace')} 🥈`;
     if (position === 3) return `${t('leagues.3rdPlace')} 🥉`;
-    return `${position}. ${t('leagues.position').replace(':', '')}`;
+    return t('leagues.nthPlace', { n: position });
   };
 
   const roundLabel = (round) => round === 32
@@ -86,10 +119,57 @@ export function SettingsTab({
     setTournamentDefaults({ ...tournamentDefaults, standingsCriteriaOrder: newOrder });
   };
 
+  // Points apply top to bottom (leagueService.resolvePoints): exact place,
+  // then playoff round reached, then the two fallbacks. Keep each rule's
+  // index into scoringRules for the change handlers.
+  const indexedRules = scoringRules.map((rule, index) => ({ rule, index }));
+  const placeRules = indexedRules.filter(({ rule }) => !isFallbackRule(rule));
+  const fallbackRules = indexedRules.filter(({ rule }) => isFallbackRule(rule));
+  const renderRule = ({ rule, index }) => (
+    <div key={rule.position} className="flex flex-col gap-2">
+      <Label htmlFor={`placement-${rule.position}`} className={cn(rule.position <= 3 && 'font-semibold')}>
+        {getPlacementLabel(rule.position)}
+      </Label>
+      <div className="flex items-center gap-2">
+        <Input
+          id={`placement-${rule.position}`}
+          type="number"
+          min="0"
+          inputMode="numeric"
+          className="tabular-nums"
+          value={rule.points}
+          onChange={(e) => onScoringRuleChange(index, 'points', e.target.value)}
+        />
+        <span className="text-sm text-muted-foreground">{t('common.pts')}</span>
+        {!isFallbackRule(rule) && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={() => onRemovePlacement(index)}
+            title={t('leagues.removePlacement')}
+            aria-label={t('leagues.removePlacement')}
+          >
+            <X />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={rootRef} className="flex flex-col gap-6">
       <h2 className="text-lg font-semibold tracking-tight">{t('leagues.leagueSettings')}</h2>
 
+      <nav aria-label={t('leagues.leagueSettings')} className="sticky top-14 z-10 -my-2 flex gap-2 overflow-x-auto bg-background/95 py-2 backdrop-blur lg:top-0">
+        {SECTIONS.map(([id, labelKey]) => (
+          <Button key={id} variant="outline" size="sm" className="shrink-0 rounded-full" onClick={() => scrollToSection(id)}>
+            {t(labelKey)}
+          </Button>
+        ))}
+      </nav>
+
+      <section id="league-settings-league" className={section}>
       <Card>
         <CardHeader>
           <CardTitle>{t('leagues.logo')}</CardTitle>
@@ -133,50 +213,26 @@ export function SettingsTab({
           </Label>
         </CardContent>
       </Card>
+      </section>
 
-      <LeagueManagersPanel leagueId={league.id} canEdit={canEditManagers} />
-
-      <ScorersPanel type="league" entityId={league.id} />
+      <section id="league-settings-people" className={section}>
+        <LeagueManagersPanel leagueId={league.id} canEdit={canEditManagers} />
+        <ScorersPanel type="league" entityId={league.id} />
+      </section>
 
       {/* Scoring Rules Editor */}
+      <section id="league-settings-points" className={section}>
       <Card>
         <CardHeader>
           <CardTitle>{t('leagues.scoringRules')}</CardTitle>
           <CardDescription>{t('leagues.scoringRulesDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {scoringRules.map((rule, index) => (
-              <div key={rule.position} className="flex flex-col gap-2">
-                <Label htmlFor={`placement-${rule.position}`} className={cn(rule.position <= 3 && 'font-semibold')}>
-                  {getPlacementLabel(rule.position)}
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id={`placement-${rule.position}`}
-                    type="number"
-                    min="0"
-                    inputMode="numeric"
-                    className="tabular-nums"
-                    value={rule.points}
-                    onChange={(e) => onScoringRuleChange(index, 'points', e.target.value)}
-                  />
-                  <span className="text-sm text-muted-foreground">{t('common.pts')}</span>
-                  {!isFallbackRule(rule) && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => onRemovePlacement(index)}
-                      title={t('leagues.removePlacement')}
-                      aria-label={t('leagues.removePlacement')}
-                    >
-                      <X />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold">{t('leagues.pointsStepPlaces')}</h4>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {placeRules.map(renderRule)}
+            </div>
           </div>
 
           {/* Points by Playoff Round */}
@@ -221,6 +277,13 @@ export function SettingsTab({
             </div>
           </div>
 
+          <div className="flex flex-col gap-3">
+            <h4 className="text-sm font-semibold">{t('leagues.pointsStepOthers')}</h4>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {fallbackRules.map(renderRule)}
+            </div>
+          </div>
+
           {/* Add New Placement */}
           <div className="flex flex-col gap-3 rounded-lg border border-dashed p-4">
             <p className="text-sm text-muted-foreground">{t('leagues.addNewPlacement')}</p>
@@ -229,8 +292,10 @@ export function SettingsTab({
                 <Label htmlFor="new-placement-position" className="text-muted-foreground">{t('leagues.position')}</Label>
                 <Input
                   id="new-placement-position"
-                  type="text"
-                  placeholder="e.g. 6"
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  placeholder="6"
                   className="w-24 text-center"
                   value={newPlacement.position}
                   onChange={(e) => setNewPlacement({ ...newPlacement, position: e.target.value })}
@@ -242,7 +307,7 @@ export function SettingsTab({
                   id="new-placement-points"
                   type="number"
                   min="0"
-                  placeholder="e.g. 2"
+                  placeholder="2"
                   className="w-24 text-center tabular-nums"
                   value={newPlacement.points}
                   onChange={(e) => setNewPlacement({ ...newPlacement, points: e.target.value })}
@@ -263,8 +328,10 @@ export function SettingsTab({
           </Button>
         </CardFooter>
       </Card>
+      </section>
 
       {/* Default Tournament Settings Editor */}
+      <section id="league-settings-defaults" className={section}>
       <Card>
         <CardHeader>
           <CardTitle>{t('leagues.defaultTournamentSettings')}</CardTitle>
@@ -605,6 +672,7 @@ export function SettingsTab({
           </Button>
         </CardFooter>
       </Card>
+      </section>
     </div>
   );
 }
