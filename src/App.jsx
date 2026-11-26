@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -540,7 +540,8 @@ function AppContent() {
       <main className="flex min-w-0 flex-1 flex-col">
         <Suspense fallback={<LoadingState />}>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          {/* Signed-in users start on their dashboard (managers: the setup guide; players: PlayerHome). */}
+          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           <Route path="/dashboard" element={
             <PullToRefresh onRefresh={() => Promise.all([reloadTournaments(), reloadLeagues()])}>
               <Dashboard

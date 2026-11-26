@@ -73,7 +73,8 @@ export function Navigation({ currentView, onViewChange, tournament }) {
     {
       label: t('navigation.home'),
       items: [
-        { id: '/', label: t('navigation.home'), icon: Home },
+        // Signed in, "/" redirects to the dashboard, which has its own item below.
+        ...(user ? [] : [{ id: '/', label: t('navigation.home'), icon: Home }]),
         { id: '/practice', label: t('navigation.practice'), icon: Target },
       ],
     },
