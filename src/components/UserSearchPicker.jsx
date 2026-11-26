@@ -68,6 +68,7 @@ export function UserSearchPicker({ onSelect, excludeIds = [] }) {
           type="text"
           className="pl-9"
           placeholder={t('userSearch.placeholder')}
+          aria-label={t('userSearch.placeholder')}
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           onFocus={() => query.length >= 2 && setShowResults(true)}

@@ -723,7 +723,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               once the tournament is running (previously this panel lived on the
               completed-tournament summary tab, which was far too late). */}
           {canManage && (
-            <div id="tournament-scorers" className="flex scroll-mt-20 flex-col gap-6">
+            <div id="tournament-scorers" tabIndex={-1} className="flex scroll-mt-20 flex-col gap-6 outline-none">
               <ScorersPanel type="tournament" entityId={tournament.id} />
               {tournament.leagueId && <ScorersPanel type="league" entityId={tournament.leagueId} />}
             </div>

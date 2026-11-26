@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { GAME_TYPES, isCricketGame } from '@/lib/cricket';
-import { cn } from '@/lib/utils';
+import { cn, jumpTo } from '@/lib/utils';
 
 const LEGS_OPTIONS = [1, 2, 3, 4, 5, 7, 9];
 const PLAYOFF_LEGS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
@@ -37,15 +37,16 @@ const START_ROUNDS = [
 
 const radioCard = 'flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm font-medium transition-colors hover:bg-muted/50 has-data-[state=checked]:border-primary has-data-[state=checked]:ring-2 has-data-[state=checked]:ring-primary/30';
 const radioRow = 'flex cursor-pointer items-center gap-2 text-sm font-normal';
-// scroll-mt clears the sticky phone header (h-14) plus the chip row.
-const section = 'flex scroll-mt-28 flex-col gap-6 lg:scroll-mt-16';
+// scroll-mt clears the sticky phone header (h-14) plus the chip row; tabIndex
+// -1 sections take focus from the chips, without a ring around the whole block.
+const section = 'flex scroll-mt-28 flex-col gap-6 outline-none lg:scroll-mt-16';
 const SECTIONS = [
   ['league', 'leagues.sectionLeague'],
   ['people', 'leagues.sectionPeople'],
   ['points', 'leagues.sectionPoints'],
   ['defaults', 'leagues.sectionDefaults'],
 ];
-const scrollToSection = (id) => document.getElementById(`league-settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+const scrollToSection = (id) => jumpTo(`league-settings-${id}`);
 
 export function SettingsTab({
   league, canEditManagers,
@@ -73,13 +74,13 @@ export function SettingsTab({
     const stop = () => observer.disconnect();
     observer.observe(rootRef.current);
     const timer = setTimeout(stop, 3000);
-    window.addEventListener('wheel', stop, { once: true });
-    window.addEventListener('touchstart', stop, { once: true });
+    // Any sign of the user taking over: wheel, touch, scrollbar drag, keys.
+    const takeovers = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+    takeovers.forEach(ev => window.addEventListener(ev, stop, { once: true }));
     return () => {
       stop();
       clearTimeout(timer);
-      window.removeEventListener('wheel', stop);
-      window.removeEventListener('touchstart', stop);
+      takeovers.forEach(ev => window.removeEventListener(ev, stop));
     };
   }, [initialSection]);
 
@@ -169,7 +170,7 @@ export function SettingsTab({
         ))}
       </nav>
 
-      <section id="league-settings-league" className={section}>
+      <section id="league-settings-league" tabIndex={-1} className={section}>
       <Card>
         <CardHeader>
           <CardTitle>{t('leagues.logo')}</CardTitle>
@@ -215,13 +216,13 @@ export function SettingsTab({
       </Card>
       </section>
 
-      <section id="league-settings-people" className={section}>
+      <section id="league-settings-people" tabIndex={-1} className={section}>
         <LeagueManagersPanel leagueId={league.id} canEdit={canEditManagers} />
         <ScorersPanel type="league" entityId={league.id} />
       </section>
 
       {/* Scoring Rules Editor */}
-      <section id="league-settings-points" className={section}>
+      <section id="league-settings-points" tabIndex={-1} className={section}>
       <Card>
         <CardHeader>
           <CardTitle>{t('leagues.scoringRules')}</CardTitle>
@@ -262,6 +263,7 @@ export function SettingsTab({
                       min="0"
                       inputMode="numeric"
                       className="tabular-nums"
+                      aria-label={`${roundLabel(rule.round)}, ${t('leagues.points').replace(':', '')}`}
                       value={rule.points}
                       disabled={!rule.enabled}
                       onChange={(e) => {
@@ -331,7 +333,7 @@ export function SettingsTab({
       </section>
 
       {/* Default Tournament Settings Editor */}
-      <section id="league-settings-defaults" className={section}>
+      <section id="league-settings-defaults" tabIndex={-1} className={section}>
       <Card>
         <CardHeader>
           <CardTitle>{t('leagues.defaultTournamentSettings')}</CardTitle>

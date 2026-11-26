@@ -5,6 +5,7 @@ import { useLiveMatch } from '../../contexts/LiveMatchContext';
 import { DeviceSettings } from '../DeviceSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { jumpTo } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getPublicAppUrl } from '../../utils/publicUrl';
 
@@ -67,7 +68,7 @@ export function VenueSetup({ tournamentId, scorersAnchorId }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => document.getElementById(scorersAnchorId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            onClick={() => jumpTo(scorersAnchorId)}
           >
             {t('venue.manageScorers')}
           </Button>
