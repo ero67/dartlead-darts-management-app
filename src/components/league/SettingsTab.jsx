@@ -501,13 +501,23 @@ export function SettingsTab({
                       <span className="w-6 text-sm font-semibold text-muted-foreground tabular-nums">{index + 1}.</span>
                       <span className="flex-1 text-sm">{criterionLabels[criterion] || criterion}</span>
                       <div className="flex gap-1">
-                        <Button type="button" variant="ghost" size="icon-sm" onClick={() => moveCriterion(index, -1)} disabled={index === 0}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => moveCriterion(index, -1)}
+                          disabled={index === 0}
+                          title={t('registration.moveUp')}
+                          aria-label={`${t('registration.moveUp')}: ${criterionLabels[criterion]}`}
+                        >
                           <ChevronUp />
                         </Button>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon-sm"
+                          title={t('registration.moveDown')}
+                          aria-label={`${t('registration.moveDown')}: ${criterionLabels[criterion]}`}
                           onClick={() => moveCriterion(index, 1)}
                           disabled={index === tournamentDefaults.standingsCriteriaOrder.length - 1}
                         >

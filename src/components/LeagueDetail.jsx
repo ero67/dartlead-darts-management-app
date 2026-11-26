@@ -787,7 +787,9 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       </div>
 
       <Tabs value={activeTab === 'settings' && !isManager ? 'leaderboard' : activeTab} onValueChange={setActiveTab} className="gap-6">
-        <TabsList>
+        {/* Phones wrap instead of scrolling sideways: a scrolled-off Settings tab is one managers never find. */}
+        <TabsList className="max-sm:h-auto! max-sm:flex-wrap max-sm:[&>*]:h-8">
+
           <TabsTrigger value="leaderboard"><TrendingUp />{t('leagues.leaderboard')}</TabsTrigger>
           <TabsTrigger value="tournaments"><Trophy />{t('tournaments.title')}</TabsTrigger>
           <TabsTrigger value="statistics"><BarChart3 />{t('leagues.statistics')}</TabsTrigger>
