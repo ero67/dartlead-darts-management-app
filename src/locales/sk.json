@@ -1849,5 +1849,44 @@
     "boardNotSet": "Nemá nastavený terč. Nastavte ho, ak tento telefón zostane pri terči.",
     "setBoard": "Nastaviť terč",
     "boardsAfterStart": "Zápasy priradíte k terčom v záložke Zápasy po spustení turnaja."
+  },
+  "setup": {
+    "title": "Váš prvý ligový večer",
+    "progress": "{{done}} z {{total}}",
+    "optional": "nepovinné",
+    "done": "hotovo",
+    "dismiss": "Skryť sprievodcu",
+    "steps": {
+      "league": {
+        "title": "Vytvorte si ligu",
+        "hint": "Pomenujte ju a nastavte body za umiestnenia. Ostatné počká.",
+        "action": "Vytvoriť ligu"
+      },
+      "defaults": {
+        "title": "Nastavte, ako sa hrajú kolá",
+        "hint": "Miesto, legy, skupiny a play-off. Každé nové kolo z nich vychádza.",
+        "action": "Otvoriť nastavenia"
+      },
+      "round": {
+        "title": "Vytvorte prvé kolo",
+        "hint": "Turnaj vo vašej lige, aby sa počítal do rebríčka sezóny.",
+        "action": "Vytvoriť kolo"
+      },
+      "players": {
+        "title": "Pridajte hráčov",
+        "hint": "Pošlite registračný odkaz alebo pridajte hráčov z ligy.",
+        "action": "Otvoriť kolo"
+      },
+      "venue": {
+        "title": "Pripravte podnik",
+        "hint": "TV zobrazenie na obrazovke, zapisovatelia a čísla terčov v telefónoch.",
+        "action": "Otvoriť kolo"
+      },
+      "start": {
+        "title": "Spustite večer",
+        "hint": "Hráči sa rozlosujú a prvé zápasy sú pripravené na zapisovanie.",
+        "action": "Otvoriť kolo"
+      }
+    }
   }
 }

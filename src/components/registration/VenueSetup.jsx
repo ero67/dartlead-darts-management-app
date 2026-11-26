@@ -8,6 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { jumpTo } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getPublicAppUrl } from '../../utils/publicUrl';
+import { VENUE_READY_KEY } from '../SetupChecklist';
+
+// Ticks "Get the venue ready" in the dashboard setup guide (this device only).
+const markVenueReady = () => {
+  try { localStorage.setItem(VENUE_READY_KEY, '1'); } catch { /* private mode: step stays open */ }
+};
 
 function Row({ icon, title, hint, children }) {
   const Icon = icon;
@@ -34,6 +40,7 @@ export function VenueSetup({ tournamentId, scorersAnchorId }) {
   const tvPath = `/tv/${tournamentId}`;
 
   const handleCopyTvLink = async () => {
+    markVenueReady();
     const link = `${getPublicAppUrl()}${tvPath}`;
     try {
       await navigator.clipboard.writeText(link);
@@ -53,7 +60,7 @@ export function VenueSetup({ tournamentId, scorersAnchorId }) {
       <CardContent className="flex flex-col gap-4">
         <Row icon={Monitor} title={t('venue.tvTitle')} hint={t('venue.tvHint')}>
           <Button variant="outline" size="sm" asChild>
-            <a href={tvPath} target="_blank" rel="noopener noreferrer">
+            <a href={tvPath} target="_blank" rel="noopener noreferrer" onClick={markVenueReady}>
               <ExternalLink />
               {t('venue.openTv')}
             </a>

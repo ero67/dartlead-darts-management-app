@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { PlayerHome } from './PlayerHome';
+import { SetupChecklist } from './SetupChecklist';
+import { LoadingState } from './shared/LoadingState';
 import { StatusBadge } from './shared/StatusBadge';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { BoardMotif, LiveDot, PhaseBar } from './shared/DartsAccents';
@@ -69,10 +71,12 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin, canManage, canCreateTournaments } = useAdmin();
-  const { tournaments } = useTournament();
-  const { leagues } = useLeague();
+  const { tournaments, loading: isLoadingTournaments } = useTournament();
+  const { leagues, loading: isLoadingLeagues } = useLeague();
 
   if (!(user && canManage)) return <PlayerHome onNavigate={onNavigate} />;
+  // Before the first load the lists are empty: show no "nothing here yet" states or setup guide.
+  if (isLoadingTournaments || isLoadingLeagues) return <LoadingState text={t('common.loading')} />;
 
   const myTournaments = tournaments
     .filter(tr => tr.userId === user.id)
@@ -105,6 +109,8 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
           </div>
         )}
       </div>
+
+      <SetupChecklist />
 
       {liveTournaments.length > 0 && (
         <LiveNowCard tournaments={liveTournaments} onSelectTournament={onSelectTournament} t={t} />

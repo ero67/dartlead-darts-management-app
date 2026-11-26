@@ -1849,5 +1849,44 @@
     "boardNotSet": "No board set. Set one if this phone stays at a board.",
     "setBoard": "Set board",
     "boardsAfterStart": "Matches are assigned to boards in the Matches tab after you start."
+  },
+  "setup": {
+    "title": "Your first league night",
+    "progress": "{{done}} of {{total}}",
+    "optional": "optional",
+    "done": "done",
+    "dismiss": "Hide this guide",
+    "steps": {
+      "league": {
+        "title": "Create your league",
+        "hint": "Name it and set points for each place. Everything else can wait.",
+        "action": "Create league"
+      },
+      "defaults": {
+        "title": "Set how rounds are played",
+        "hint": "Venue, legs, groups and playoffs. Every new round starts from these.",
+        "action": "Open settings"
+      },
+      "round": {
+        "title": "Create the first round",
+        "hint": "A tournament inside your league, so it counts toward the season leaderboard.",
+        "action": "Create round"
+      },
+      "players": {
+        "title": "Get players in",
+        "hint": "Share the registration link, or add players from your league.",
+        "action": "Open round"
+      },
+      "venue": {
+        "title": "Get the venue ready",
+        "hint": "TV view on the screen, scorers and board numbers on the phones.",
+        "action": "Open round"
+      },
+      "start": {
+        "title": "Start the night",
+        "hint": "Players are drawn and the first matches are ready to score.",
+        "action": "Open round"
+      }
+    }
   }
 }

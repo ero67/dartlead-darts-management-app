@@ -64,7 +64,7 @@ const initialState = {
   tournaments: [],
   currentTournament: null,
   currentMatch: null,
-  loading: false,
+  loading: true, // until the first LOAD_TOURNAMENTS, so "no tournaments" never flashes while loading
   error: null
 };
 
@@ -627,16 +627,15 @@ export function TournamentProvider({ children }) {
         }
       } catch (error) {
         console.error('Error loading tournaments:', error);
-        // Fallback to localStorage if Supabase fails
-        const savedTournaments = localStorage.getItem('darts-tournaments');
-        if (savedTournaments) {
-          try {
-            const tournaments = JSON.parse(savedTournaments);
-            dispatch({ type: ACTIONS.LOAD_TOURNAMENTS, payload: tournaments });
-          } catch (localError) {
-            console.error('Error loading from localStorage:', localError);
-          }
+        // Fallback to localStorage if Supabase fails. Always dispatch, even
+        // with nothing saved, so the initial loading state ends.
+        let tournaments = [];
+        try {
+          tournaments = JSON.parse(localStorage.getItem('darts-tournaments')) || [];
+        } catch (localError) {
+          console.error('Error loading from localStorage:', localError);
         }
+        dispatch({ type: ACTIONS.LOAD_TOURNAMENTS, payload: tournaments });
       }
     };
 
