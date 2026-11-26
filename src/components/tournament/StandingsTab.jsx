@@ -92,7 +92,7 @@ export function StandingsTab({ tournament, uniqueGroups, defaultQualifierIdSet, 
                                 <TableCell className={cn(num, 'font-medium')}>{standing.matchesWon}</TableCell>
                                 <TableCell className={num}>{standing.matchesLost}</TableCell>
                                 <TableCell className={num}>{standing.legsWon}:{standing.legsLost}</TableCell>
-                                <TableCell className={cn(num, legDiff >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')}>
+                                <TableCell className={cn(num, legDiff >= 0 ? 'text-green-800 dark:text-green-400' : 'text-red-700 dark:text-red-400')}>
                                   {legDiff > 0 ? '+' : ''}{legDiff}
                                 </TableCell>
                                 <TableCell className={num}>{(standing.average || 0).toFixed(isCricket ? 2 : 1)}</TableCell>

@@ -2183,7 +2183,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
             {filteredLiveMatches.length > 0 ? <LiveDot /> : <Activity />}
             {t('management.liveMatches')}
             {filteredLiveMatches.length > 0 && (
-              <Badge variant="destructive" className="h-5 min-w-5 px-1 tabular-nums">{filteredLiveMatches.length}</Badge>
+              <Badge variant="live" className="h-5 min-w-5 px-1 tabular-nums">{filteredLiveMatches.length}</Badge>
             )}
           </TabsTrigger>
           {canManage && (

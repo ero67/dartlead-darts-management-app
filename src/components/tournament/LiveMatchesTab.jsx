@@ -79,7 +79,7 @@ export function LiveMatchesTab({ liveMatches, favoriteMatchIds, toggleFavoriteMa
                     <span>{t('management.firstTo')} {match.legs_to_win || 3}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Badge className="bg-destructive text-white">
+                    <Badge variant="live">
                       <Activity />
                       {t('management.live')}
                     </Badge>

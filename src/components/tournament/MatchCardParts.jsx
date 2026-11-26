@@ -14,7 +14,7 @@ import { confirmDialog } from '../../lib/confirmDialog';
 export function MatchStatusBadge({ status, isLive, children }) {
   if (isLive || status === 'in_progress') {
     return (
-      <Badge className="bg-destructive text-white">
+      <Badge variant="live">
         <span className="relative flex size-1.5">
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-white opacity-75" />
           <span className="relative inline-flex size-1.5 rounded-full bg-white" />

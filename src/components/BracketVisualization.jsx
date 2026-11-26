@@ -249,7 +249,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
         )}
       >
         {isLive && (
-          <span className="absolute -top-[0.6em] right-[0.5em] rounded-full bg-destructive px-[0.5em] text-[0.55em] font-semibold uppercase leading-[1.6] tracking-wider text-white">
+          <span className="absolute -top-[0.6em] right-[0.5em] rounded-full bg-live-solid px-[0.5em] text-[0.55em] font-semibold uppercase leading-[1.6] tracking-wider text-white">
             Live
           </span>
         )}
