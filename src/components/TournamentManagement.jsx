@@ -33,6 +33,7 @@ import { EditSettingsDialog } from './tournament/EditSettingsDialog';
 import { BoardsControl } from './tournament/BoardsControl';
 import { BoardWaitingScreen } from './tournament/BoardWaitingScreen';
 import { TournamentActionsMenu } from './tournament/TournamentActionsMenu';
+import { playoffRoundName } from '../utils/playoffRoundName';
 import { TournamentCrumbs } from './tournament/TournamentCrumbs';
 import { supabase } from '../lib/supabase';
 import { tournamentService, matchService } from '../services/tournamentService';
@@ -600,7 +601,7 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
       
       const round = {
         id: generateId(),
-        name: getRoundNameByMatches(numMatches, rounds.length),
+        name: playoffRoundName(numMatches, t),
         matches: [],
         isComplete: false
       };
@@ -1464,37 +1465,6 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
     }
   };
 
-  // Get round name based on number of matches, not players
-  // This ensures standard names even with odd numbers of qualifiers
-  const getRoundNameByMatches = (numMatches) => {
-    // Determine round name based on number of matches
-    // Standard tournament naming: 1 match = Final, 2 matches = Semifinals, 4 matches = Quarterfinals, etc.
-    switch (numMatches) {
-      case 1: return t('management.final');
-      case 2: return t('management.semiFinals');
-      case 4: return t('management.quarterFinals');
-      case 8: return t('management.top16');
-      case 16: return t('management.roundOf', { count: 32 });
-      case 32: return t('management.roundOf', { count: 64 });
-      default:
-        // For other numbers, determine based on closest standard round
-        if (numMatches === 3) {
-          // 3 matches - closest to Quarterfinals (4 matches)
-          return t('management.quarterFinals');
-        } else if (numMatches <= 2) {
-          return numMatches === 1 ? t('management.final') : t('management.semiFinals');
-        } else if (numMatches <= 4) {
-          return t('management.quarterFinals');
-        } else if (numMatches <= 8) {
-          return t('management.top16');
-        } else {
-          // For larger numbers, calculate Round of X
-          const totalPlayers = numMatches * 2;
-          return t('management.roundOf', { count: totalPlayers });
-        }
-    }
-  };
-  
   const handleCopyTournament = () => navigate(cloneTournamentPath(tournament.id, tournament.leagueId));
 
   const handleDeleteTournament = async () => {
@@ -2060,7 +2030,8 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
   const handleBoardStart = (next) => {
     const isPlayoff = next.roundSize != null;
     // Queue entries name their group/round in `label`; the dialog shows groupName.
-    const match = { ...next, groupName: next.groupName || next.label, ...(isPlayoff && { isPlayoff: true }) };
+    const label = isPlayoff ? playoffRoundName(next.roundSize / 2, t) : next.groupName || next.label;
+    const match = { ...next, groupName: label, ...(isPlayoff && { isPlayoff: true }) };
     handleStartMatchRequest(buildMatchData(match, tournament, isPlayoff ? getPlayoffLegsToWin(next.roundSize) : next.legsToWin || tournament.legsToWin));
   };
   const handleBoardContinue = (m) => {

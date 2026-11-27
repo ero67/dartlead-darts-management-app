@@ -8,6 +8,7 @@ import { BracketVisualization } from '../BracketVisualization';
 import { ExportMenu } from '../ExportMenu';
 import { EmptyState } from '../shared/EmptyState';
 import { mergeBracketRounds } from '../../utils/bracketView';
+import { roundLabel } from '../../utils/playoffRoundName';
 import { MatchStatusBadge, PlayerScoreRow, LoginHint, MatchActions, MatchBoard } from './MatchCardParts';
 import { buildMatchData as buildStartData } from '../../utils/matchStart';
 import { cn } from '@/lib/utils';
@@ -163,7 +164,9 @@ export function PlayoffsTab(props) {
     return <StartPlayoffsSection {...props} />;
   }
 
-  const { rounds, currentRound, qualifyingPlayers } = tournament.playoffs;
+  const { currentRound, qualifyingPlayers } = tournament.playoffs;
+  // Name rounds in the viewer's language; the stored name is the creator's.
+  const rounds = tournament.playoffs.rounds.map(round => ({ ...round, name: roundLabel(round, t) }));
   const playoffMatches = tournament.playoffMatches || [];
 
   return (
