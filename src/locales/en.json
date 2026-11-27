@@ -1255,7 +1255,21 @@
     "rotating": "Switching view every {{seconds}} s",
     "fullscreen": "Fullscreen (F)",
     "loadError": "Could not load the tournament",
-    "pinned": "Fixed view — remove ?view= from the address to rotate"
+    "pinned": "Fixed view — remove ?view= from the address to rotate",
+    "stageWaiting": "Before the start",
+    "stageGroups": "Group stage",
+    "stageFinished": "Final results",
+    "sceneWelcome": "Players",
+    "scenePodium": "Podium",
+    "playersCount": "Players: {{count}}",
+    "recordsTitle": "Records of the night",
+    "groupWinners": "Group winners",
+    "momentCheckout": "checkout",
+    "momentMatchWins": "wins {{score}}",
+    "momentAgainst": "against {{name}}",
+    "offline": "Offline · last update {{time}}",
+    "loadErrorHint": "Check the link. The screen tries again every 30 seconds.",
+    "next": "Next"
   },
   "boards": {
     "count": "Boards",

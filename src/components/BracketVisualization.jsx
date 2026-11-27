@@ -23,8 +23,12 @@ const playerRowClass = (isWinner, isLoser, isTbd) =>
 // connectors are measured from the DOM so they follow.
 // `liveScores` (optional) maps a match id to { player1Legs, player2Legs } for
 // matches being played right now.
-export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, liveScores = {} }) {
+export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, liveScores = {}, className }) {
   const { t } = useLanguage();
+  // The px geometry assumes a 16px root, but the cards are em-based off the real
+  // root (the TV scales it to the screen): scale the geometry with it as well.
+  const rootPx = typeof window === 'undefined' ? 16 : parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const unit = scale * (rootPx / 16);
   const matchRefs = useRef({});
   const containerRef = useRef(null);
   const [connections, setConnections] = useState([]);
@@ -60,9 +64,9 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
 
   // Calculate bracket structure with positions
   const bracketStructure = useMemo(() => {
-    const matchHeight = MATCH_H * scale;
-    const spacing = GAP * scale;
-    const roundWidth = ROUND_W * scale;
+    const matchHeight = MATCH_H * unit;
+    const spacing = GAP * unit;
+    const roundWidth = ROUND_W * unit;
 
     const structure = [];
 
@@ -142,7 +146,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
 
     return structure;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rounds, playoffMatches, scale]);
+  }, [rounds, playoffMatches, unit]);
 
   // Calculate connection lines based on actual DOM positions
   useEffect(() => {
@@ -221,10 +225,10 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
 
   const maxMatches = Math.max(...rounds.map(r => r.matches.filter(m => !m.isThirdPlaceMatch).length));
   // Same geometry as the position calc above, so the container fits the scaled cards.
-  const matchHeight = MATCH_H * scale;
-  const spacing = GAP * scale;
+  const matchHeight = MATCH_H * unit;
+  const spacing = GAP * unit;
   const totalHeight = (maxMatches * matchHeight) + ((maxMatches - 1) * spacing);
-  const roundWidth = ROUND_W * scale;
+  const roundWidth = ROUND_W * unit;
   const totalWidth = rounds.length * roundWidth;
 
   const renderMatchBox = (matchData, winner, { key, className, ...rest } = {}) => {
@@ -262,7 +266,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
   };
 
   return (
-    <div className="relative w-full overflow-x-auto py-6" ref={containerRef} style={{ fontSize: `${scale}rem` }}>
+    <div className={cn('relative w-full overflow-x-auto py-6', className)} ref={containerRef} style={{ fontSize: `${scale}rem` }}>
       <div className="relative z-[2] flex w-fit min-w-fit">
         {bracketStructure.map(({ round, matches, roundIndex }) => (
           <div key={round.id || roundIndex} className="flex min-w-[16.25em] shrink-0 flex-col items-start px-[1em]">

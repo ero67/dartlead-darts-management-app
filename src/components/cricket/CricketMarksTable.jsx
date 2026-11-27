@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 const SIZES = {
   sm: { root: 'text-xs', head: 'mb-1 rounded-md px-2 py-1', name: 'text-xs', points: 'text-xl', legs: 'text-[10px] px-1', row: 'h-6', number: 'text-sm w-10', glyph: 'size-4' },
   md: { root: 'text-sm', head: 'mb-1.5 rounded-lg px-3 py-1.5', name: 'text-sm', points: 'text-4xl', legs: 'text-xs px-1.5', row: 'h-9', number: 'text-xl w-14', glyph: 'size-6' },
+  // TV with the stage rail and up to four boards side by side
+  lg: { root: 'text-xl', head: 'mb-2 rounded-xl px-4 py-2', name: 'text-2xl', points: 'text-6xl', legs: 'text-lg px-2 py-0.5', row: 'h-14', number: 'text-4xl w-24', glyph: 'size-11' },
   tv: { root: 'text-2xl', head: 'mb-3 rounded-2xl px-6 py-3', name: 'text-3xl', points: 'text-8xl', legs: 'text-2xl px-3 py-0.5', row: 'h-20', number: 'text-6xl w-32', glyph: 'size-16' }
 };
 

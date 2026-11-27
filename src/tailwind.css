@@ -85,6 +85,11 @@
 @media (orientation: landscape) and (min-width: 900px) and (min-height: 500px) {
   html.tv-scale { font-size: min(calc(100vw / 120), calc(100vh / 67.5)); }
 }
+/* TV scene progress: the active segment fills over the scene's time. */
+@keyframes tv-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
 
 :root {
   --radius: 0.625rem;
