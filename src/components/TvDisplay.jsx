@@ -16,6 +16,7 @@ import { EmptyState } from './shared/EmptyState';
 import { StatusBadge } from './shared/StatusBadge';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { mergeBracketRounds, upcomingPlayoffMatches } from '../utils/bracketView';
+import { roundLabel } from '../utils/playoffRoundName';
 import { boardQueues } from '../utils/boardSchedule';
 import { getQualifyingPlayers } from '../utils/qualifiers';
 import { matchWinProbability } from '../lib/winProbability';
@@ -180,8 +181,13 @@ export function TvDisplay() {
   // Bracket entries with the match rows merged in and next-round slots only
   // filled once the feeding match completed (see utils/bracketView.js).
   const bracketRounds = useMemo(
-    () => mergeBracketRounds(tournament?.playoffs?.rounds, playoffRows, tournament?.players),
-    [tournament, playoffRows]
+    () => mergeBracketRounds(
+      // Round names in the viewer's language (the stored name is the creator's).
+      tournament?.playoffs?.rounds?.map((round) => ({ ...round, name: roundLabel(round, t) })),
+      playoffRows,
+      tournament?.players
+    ),
+    [tournament, playoffRows, t]
   );
 
   // Top-5 boards for the stats view, one row per player (same numbers as the

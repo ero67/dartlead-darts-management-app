@@ -228,6 +228,7 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
               <Separator />
               <section className="flex flex-col gap-4">
                 <h4 className="text-sm font-semibold">{t('registration.groupSettings')}</h4>
+                <p className="text-sm text-muted-foreground">{t('registration.groupSettingsHint')}</p>
                 <RadioGroup value={settings.groupSettings.type} onValueChange={(v) => setGroup({ type: v })} className="gap-2">
                   <Label htmlFor="edit-group-type-groups" className={radioRow}>
                     <RadioGroupItem id="edit-group-type-groups" value="groups" />
@@ -276,6 +277,7 @@ export function EditSettingsDialog({ open, onClose, settings, setSettings, playe
                   <>
                     <div className="flex flex-col gap-2">
                       <Label>{t('registration.qualificationMode')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('registration.qualificationModeHint')}</p>
                       <RadioGroup
                         value={settings.playoffSettings.qualificationMode}
                         onValueChange={(v) => setPlayoff({ qualificationMode: v })}

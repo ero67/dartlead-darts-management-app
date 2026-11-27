@@ -73,7 +73,8 @@ export function Navigation({ currentView, onViewChange, tournament }) {
     {
       label: t('navigation.home'),
       items: [
-        { id: '/', label: t('navigation.home'), icon: Home },
+        // Signed in, "/" redirects to the dashboard, which has its own item below.
+        ...(user ? [] : [{ id: '/', label: t('navigation.home'), icon: Home }]),
         { id: '/practice', label: t('navigation.practice'), icon: Target },
       ],
     },
@@ -114,7 +115,7 @@ export function Navigation({ currentView, onViewChange, tournament }) {
 
   return (
     <>
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" mobileTitle={t('navigation.menu')}>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:px-0">
           <img src={logoIcon} alt="DartLead" className="size-8 shrink-0 rounded-lg object-cover" />

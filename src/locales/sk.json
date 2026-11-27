@@ -32,6 +32,9 @@
   "dashboard": {
     "title": "Prehľad",
     "myDashboard": "Môj Prehľad",
+    "pendingRequests": "Čakajúce žiadosti o registráciu: {{count}}",
+    "pendingRequestsHint": "Hráči sa hlásia do vašich otvorených kôl.",
+    "pendingRequestsAction": "Vybaviť",
     "welcome": "Vitajte v Správcovi Šípkových Turnajov",
     "welcomeManager": "Vitajte späť, {{name}}",
     "noTournaments": "Zatiaľ žiadne turnaje",
@@ -89,6 +92,9 @@
     "copySuffix": "(kópia)",
     "copiedFrom": "Nastavenia sú prevzaté z turnaja {{name}} — pred vytvorením môžete čokoľvek zmeniť.",
     "forLeague": "Liga: {{name}}",
+    "leaguePickerTitle": "Liga",
+    "leaguePickerHint": "Do rebríčka sezóny sa počítajú len turnaje zaradené v lige.",
+    "noLeague": "Bez ligy (samostatný turnaj)",
     "samePlayers": "Rovnakí hráči ({{count}})",
     "copySourceFailed": "Turnaj na skopírovanie sa nepodarilo načítať — začínate s prázdnym formulárom.",
     "filterPlayers": "Hľadať hráčov...",
@@ -186,14 +192,14 @@
     "viewOnlyScoreDescription": "Na zapisovanie zápasov musíte byť prihlásený. Živé zápasy a tabuľky si môžete prezerať aj bez prihlásenia.",
     "player1": "Hráč 1",
     "player2": "Hráč 2",
-    "undo": "Späť",
+    "undo": "Vrátiť",
     "turnTotalLabel": "Súčet 3 šípok",
     "turnTotalInvalid": "Neplatný súčet (povolené: 0–180)",
     "turnTotalKeypadHint": "Zadajte súčet 3 šípok a stlačte OK. Bez čísla = 0.",
     "turnTotalTypeHint": "Napíšte 0–180 a stlačte Enter. Prázdne = 0.",
     "clear": "Vymazať",
     "ok": "OK",
-    "undoLastVisit": "Vrátiť posledný náhod",
+    "undoLastVisit": "Vrátiť posledný hod",
     "dartsCount": "{{count}} šípok",
     "okZero": "bez bodov (0)",
     "backspace": "Zmazať poslednú číslicu",
@@ -261,6 +267,8 @@
     "numberOfGroupsLabel": "Počet skupín:",
     "playersPerGroupLabel": "Hráčov na skupinu:",
     "qualificationMode": "Režim Kvalifikácie:",
+    "qualificationModeHint": "Zo skupiny: z každej skupiny postúpi rovnaký počet hráčov. Celkovo: postúpia najlepší hráči zo všetkých skupín spolu, až do zadaného počtu.",
+    "groupSettingsHint": "Zadajte počet skupín alebo hráčov v skupine; druhé sa dopočíta podľa počtu prihlásených.",
     "qualificationModePerGroup": "Hráčov na Skupinu",
     "qualificationModeTotalPlayers": "Celkový Počet Hráčov",
     "totalPlayersToAdvance": "Celkový počet hráčov na postup:",
@@ -700,6 +708,7 @@
     "signInSubtitle": "Prihlás sa a ukladaj si tréningový progres a sleduj svoje turnaje a ligy."
   },
   "common": {
+    "moreActions": "Ďalšie akcie",
     "save": "Uložiť",
     "saved": "Uložené!",
     "cancel": "Zrušiť",
@@ -782,7 +791,7 @@
   },
   "manager": {
     "title": "Panel Manažéra",
-    "subtitle": "Resetovanie dokončených zápasov a oprava chýb",
+    "subtitle": "Žiadosti o registráciu, zapisovatelia a opravy zápasov",
     "manageMatchState": "Správa Stavu Zápasu",
     "manageMatchStateDescription": "Vyberte turnaj a zápas na resetovanie do stavu čakania alebo manuálne zadanie výsledku.",
     "selectTournament": "Vybrať Turnaj",
@@ -926,12 +935,23 @@
     "leagueSettings": "Nastavenia Ligy",
     "scoringRules": "Bodovací Systém",
     "saveChanges": "Uložiť Zmeny",
-    "scoringRulesDescription": "Nastavte koľko bodov získajú hráči na základe ich konečného umiestnenia v turnaji.",
+    "settingsSaved": "Nastavenia ligy uložené",
+    "settingsSaveFailed": "Nastavenia ligy sa nepodarilo uložiť",
+    "unsavedChanges": "Neuložené zmeny",
+    "discardChanges": "Zahodiť",
+    "scoringRulesDescription": "Každý hráč dostane body z prvého kroku nižšie, ktorý naňho sedí, odhora nadol. Bonusové body pre jednotlivého hráča pridáte v Rebríčku.",
     "removePlacement": "Odstrániť umiestnenie",
-    "addNewPlacement": "Pridať nové umiestnenie:",
-    "position": "Pozícia:",
+    "addNewPlacement": "Pridať body za ďalšie miesto",
+    "position": "Miesto:",
     "defaultTournamentSettings": "Predvolené Nastavenia Turnaja",
-    "defaultPlacementTip": "Tip: Použite \"default\" ako pozíciu pre všetky umiestnenia, ktoré nie sú explicitne uvedené.",
+    "defaultPlacementTip": "Miesta bez vlastného riadku dostanú body z kroku 2 alebo 3.",
+    "sectionLeague": "Liga",
+    "sectionPeople": "Manažéri a zapisovatelia",
+    "sectionPoints": "Body",
+    "sectionDefaults": "Nastavenia kola",
+    "nthPlace": "{{n}}. miesto",
+    "pointsStepPlaces": "1. Konečné umiestnenie",
+    "pointsStepOthers": "3. Všetci ostatní",
     "1stPlace": "1. miesto",
     "2ndPlace": "2. miesto",
     "3rdPlace": "3. miesto",
@@ -972,7 +992,7 @@
     "resetDefaults": "Obnoviť predvolené",
     "noDefaultsSet": "Zatiaľ nie sú nakonfigurované žiadne predvolené nastavenia turnajov. Nakonfigurujte predvolené hodnoty nižšie, aby turnaje v tejto lige začínali s predvyplnenými nastaveniami.",
     "defaultSeedingMethod": "Predvolená Metóda Nasadenia",
-    "roundPointsTitle": "Body podľa kola playoff",
+    "roundPointsTitle": "2. Dosiahnuté kolo play-off",
     "roundPointsDescription": "Nastavte body za dosiahnutie jednotlivých kôl playoff. Hráči vyradení v danom kole získajú tieto body.",
     "roundOf32": "Kolo 32",
     "roundOf16": "Osemfinále",
@@ -1097,6 +1117,9 @@
     "dartsThrown": "Hodené šípky",
     "recentMatches": "Posledné zápasy",
     "noMatches": "Zatiaľ žiadne odohraté zápasy.",
+    "noStatsYet": "Zatiaľ žiadne štatistiky",
+    "noStatsYetHint": "Priemery, checkouty a forma sa objavia po prvom zápase.",
+    "removePhotoConfirm": "Odstrániť profilovú fotku?",
     "formWin": "V",
     "formLoss": "P",
     "versus": "vs",
@@ -1171,7 +1194,8 @@
     "removeError": "Nepodarilo sa odstrániť zapisovateľa",
     "managerNote": "Ako organizátor môžete zápasy vždy počítať aj sami.",
     "fromLeague": "Z ligy",
-    "fromLeagueHint": "Pridané v nastaveniach ligy; odstrániť sa dá tam."
+    "fromLeagueHint": "Pridané v nastaveniach ligy; odstrániť sa dá tam.",
+    "titleLeague": "Zapisovatelia ligy (všetky kolá)"
   },
   "account": {
     "title": "Účet",
@@ -1821,5 +1845,61 @@
     "coManagedLeagues": "Spolu spravované ligy ({{count}})",
     "noLeagues": "Zatiaľ nevytvoril žiadnu ligu.",
     "leagueMeta": "vytvorená {{date}} · hráči: {{members}} · turnaje: {{tournaments}}"
+  },
+  "venue": {
+    "title": "Príprava pred začiatkom",
+    "description": "Pripravte TV a telefóny na zapisovanie ešte pred príchodom hráčov.",
+    "tvTitle": "TV obrazovka",
+    "tvHint": "Otvorte ju na TV v podniku už teraz. Zápasy sa na nej zobrazia po spustení.",
+    "openTv": "Otvoriť TV",
+    "copyTvLink": "Kopírovať odkaz",
+    "tvLinkCopied": "Odkaz na TV skopírovaný",
+    "scorersTitle": "Zapisovatelia",
+    "scorersHint": "Kto môže zapisovať zápasy na vlastnom telefóne.",
+    "manageScorers": "Upraviť zapisovateľov",
+    "boardTitle": "Toto zariadenie",
+    "boardSet": "Zapisuje terč {{board}}.",
+    "boardNotSet": "Nemá nastavený terč. Nastavte ho, ak tento telefón zostane pri terči.",
+    "setBoard": "Nastaviť terč",
+    "boardsAfterStart": "Zápasy priradíte k terčom v záložke Zápasy po spustení turnaja."
+  },
+  "setup": {
+    "title": "Váš prvý ligový večer",
+    "progress": "{{done}} z {{total}}",
+    "optional": "nepovinné",
+    "done": "hotovo",
+    "dismiss": "Skryť sprievodcu",
+    "steps": {
+      "league": {
+        "title": "Vytvorte si ligu",
+        "hint": "Pomenujte ju a nastavte body za umiestnenia. Ostatné počká.",
+        "action": "Vytvoriť ligu"
+      },
+      "defaults": {
+        "title": "Nastavte, ako sa hrajú kolá",
+        "hint": "Miesto, legy, skupiny a play-off. Každé nové kolo z nich vychádza.",
+        "action": "Otvoriť nastavenia"
+      },
+      "round": {
+        "title": "Vytvorte prvé kolo",
+        "hint": "Turnaj vo vašej lige, aby sa počítal do rebríčka sezóny.",
+        "action": "Vytvoriť kolo"
+      },
+      "players": {
+        "title": "Pridajte hráčov",
+        "hint": "Pošlite registračný odkaz alebo pridajte hráčov z ligy.",
+        "action": "Otvoriť kolo"
+      },
+      "venue": {
+        "title": "Pripravte podnik",
+        "hint": "TV zobrazenie na obrazovke, zapisovatelia a čísla terčov v telefónoch.",
+        "action": "Otvoriť kolo"
+      },
+      "start": {
+        "title": "Spustite večer",
+        "hint": "Hráči sa rozlosujú a prvé zápasy sú pripravené na zapisovanie.",
+        "action": "Otvoriť kolo"
+      }
+    }
   }
 }

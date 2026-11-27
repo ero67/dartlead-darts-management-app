@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 // Pulsing red dot for anything happening on a board right now.
 export function LiveDot({ className }) {
-  return <span aria-hidden="true" className={cn('inline-block size-1.5 shrink-0 rounded-full bg-live animate-live-pulse', className)} />;
+  return <span aria-hidden="true" className={cn('inline-block size-1.5 shrink-0 rounded-full bg-live animate-live-pulse motion-reduce:animate-none', className)} />;
 }
 
 // Last results, oldest first: filled = win, hollow ring = loss (shape, not just colour).

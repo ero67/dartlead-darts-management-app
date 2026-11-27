@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -20,14 +20,9 @@ import { OfflineProvider } from './contexts/OfflineContext';
 import { Navigation, MobileHeader } from './components/Navigation';
 import { Dashboard } from './components/Dashboard';
 import { TournamentsList } from './components/TournamentsList';
-import { TournamentRegistration } from './components/TournamentRegistration';
-import { MatchInterface } from './components/MatchInterface';
-import { CricketMatchInterface } from './components/CricketMatchInterface';
 import { LeaguesList } from './components/LeaguesList';
 import { Auth } from './components/Auth';
-import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { LandingPage } from './components/LandingPage';
-import { PlayerProfile } from './components/PlayerProfile';
 import { OfflineBanner } from './components/OfflineBanner';
 import { AssistantChat } from './components/assistant/AssistantChat';
 import { PullToRefresh } from './components/PullToRefresh';
@@ -62,6 +57,12 @@ const PracticeCheckout = lazy(() => import('./components/practice/PracticeChecko
 const PracticeOneTwentyOne = lazy(() => import('./components/practice/PracticeOneTwentyOne').then(m => ({ default: m.PracticeOneTwentyOne })));
 const PracticeAroundTheClock = lazy(() => import('./components/practice/PracticeAroundTheClock').then(m => ({ default: m.PracticeAroundTheClock })));
 const PracticeCricket = lazy(() => import('./components/practice/PracticeCricket').then(m => ({ default: m.PracticeCricket })));
+// Not needed for the first screen: loaded on demand (the service worker precaches every chunk, so they still open offline).
+const TournamentRegistration = lazy(() => import('./components/TournamentRegistration').then(m => ({ default: m.TournamentRegistration })));
+const MatchInterface = lazy(() => import('./components/MatchInterface').then(m => ({ default: m.MatchInterface })));
+const CricketMatchInterface = lazy(() => import('./components/CricketMatchInterface').then(m => ({ default: m.CricketMatchInterface })));
+const PlayerProfile = lazy(() => import('./components/PlayerProfile').then(m => ({ default: m.PlayerProfile })));
+const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
 
 // Shown when a signed-in user has no player record yet (they have never been
 // approved into a tournament, so there are no stats to display).
@@ -479,7 +480,7 @@ function AppContent() {
   const handleLeagueCreated = async (leagueData) => {
     try {
       await createLeague(leagueData);
-      navigate(`/league/${leagueData.id}`);
+      navigate(`/league/${leagueData.id}?tab=settings&section=defaults`);
     } catch (error) {
       console.error('Error creating league:', error);
       toast.error(t('leagues.failedToCreateLeague'));
@@ -540,7 +541,8 @@ function AppContent() {
       <main className="flex min-w-0 flex-1 flex-col">
         <Suspense fallback={<LoadingState />}>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          {/* Signed-in users start on their dashboard (managers: the setup guide; players: PlayerHome). */}
+          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           <Route path="/dashboard" element={
             <PullToRefresh onRefresh={() => Promise.all([reloadTournaments(), reloadLeagues()])}>
               <Dashboard

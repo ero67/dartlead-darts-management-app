@@ -1,26 +1,32 @@
 import React from 'react';
-import { BarChart3 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { BarChart3, Hash, Target, Trophy, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { HIGH_SCORE_BANDS, cricketPlayerRecords } from '../../utils/dartStats';
 import { x01Leaderboards } from '../../utils/tournamentStats';
 import { isCricketGame } from '../../lib/cricket';
 import { MprInfo } from '../cricket/MprInfo';
+import { RankMedal, MILESTONE_TEXT } from '../shared/RankMedal';
+import { cn } from '@/lib/utils';
 
 function RankCell({ index }) {
   return (
     <TableCell className="tabular-nums">
-      {index === 0 ? <Badge className="size-6 justify-center rounded-full p-0">1</Badge> : <span className="text-muted-foreground">{index + 1}</span>}
+      <RankMedal rank={index + 1} />
     </TableCell>
   );
 }
 
-function StatCard({ title, children, isEmpty, t }) {
+const TONE_TEXT = { live: 'text-live-solid dark:text-live', primary: 'text-primary', muted: 'text-muted-foreground' };
+
+function StatCard({ title, icon: Icon, tone, children, isEmpty, t }) {
   return (
     <Card className="gap-3 py-4">
       <CardHeader className="px-4">
-        <CardTitle className="text-base">{title}</CardTitle>
+        <CardTitle className={cn('flex items-center gap-2 text-base', TONE_TEXT[tone])}>
+          {Icon && <Icon className="size-4" aria-hidden="true" />}
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent className="px-2">
         {isEmpty ? (
@@ -54,7 +60,7 @@ function CricketStatistics({ matches, renderPlayerLink, t }) {
     <div className="flex flex-col gap-4">
       <StatisticsHeading t={t} />
       <div className="grid gap-4 md:grid-cols-2">
-        <StatCard title={t('management.bestMpr')} isEmpty={bestMpr.length === 0} t={t}>
+        <StatCard title={t('management.bestMpr')} icon={Zap} tone="primary" isEmpty={bestMpr.length === 0} t={t}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -77,7 +83,7 @@ function CricketStatistics({ matches, renderPlayerLink, t }) {
           </Table>
         </StatCard>
 
-        <StatCard title={t('management.fewestDarts')} isEmpty={fewestDarts.length === 0} t={t}>
+        <StatCard title={t('management.fewestDarts')} icon={Hash} tone="muted" isEmpty={fewestDarts.length === 0} t={t}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -100,7 +106,7 @@ function CricketStatistics({ matches, renderPlayerLink, t }) {
           </Table>
         </StatCard>
 
-        <StatCard title={t('management.bestVisits')} isEmpty={bestVisits.length === 0} t={t}>
+        <StatCard title={t('management.bestVisits')} icon={Target} tone="live" isEmpty={bestVisits.length === 0} t={t}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -118,7 +124,7 @@ function CricketStatistics({ matches, renderPlayerLink, t }) {
                   <TableCell className="font-medium">{renderPlayerLink(entry.player)}</TableCell>
                   <TableCell className={`${num} font-semibold`}>{entry.bestVisit}</TableCell>
                   <TableCell className={num}>{entry.fiveMarkVisits}</TableCell>
-                  <TableCell className={num}>{entry.nineMarkVisits}</TableCell>
+                  <TableCell className={cn(num, entry.nineMarkVisits > 0 && MILESTONE_TEXT)}>{entry.nineMarkVisits}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -146,7 +152,7 @@ export function StatisticsTab({ tournament, uniqueGroups, renderPlayerLink, t })
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Best Averages Leaderboard */}
-        <StatCard title={t('management.bestAverages')} isEmpty={bestAverages.length === 0} t={t}>
+        <StatCard title={t('management.bestAverages')} icon={Zap} tone="primary" isEmpty={bestAverages.length === 0} t={t}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -161,7 +167,7 @@ export function StatisticsTab({ tournament, uniqueGroups, renderPlayerLink, t })
                 <TableRow key={`avg-${index}`}>
                   <RankCell index={index} />
                   <TableCell className="font-medium">{renderPlayerLink(entry.player)}</TableCell>
-                  <TableCell className={`${num} font-semibold`}>{entry.average.toFixed(1)}</TableCell>
+                  <TableCell className={cn(num, 'font-semibold', entry.average >= 100 && MILESTONE_TEXT)}>{entry.average.toFixed(1)}</TableCell>
                   <TableCell className="text-muted-foreground">{entry.opponent}</TableCell>
                 </TableRow>
               ))}
@@ -170,7 +176,7 @@ export function StatisticsTab({ tournament, uniqueGroups, renderPlayerLink, t })
         </StatCard>
 
         {/* Best Checkouts Leaderboard */}
-        <StatCard title={t('management.bestCheckouts')} isEmpty={bestCheckouts.length === 0} t={t}>
+        <StatCard title={t('management.bestCheckouts')} icon={Target} tone="live" isEmpty={bestCheckouts.length === 0} t={t}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -184,7 +190,14 @@ export function StatisticsTab({ tournament, uniqueGroups, renderPlayerLink, t })
                 <TableRow key={`checkout-${index}`}>
                   <RankCell index={index} />
                   <TableCell className="font-medium">{renderPlayerLink(entry.player)}</TableCell>
-                  <TableCell className={`${num} font-semibold`}>{entry.checkouts.join(', ')}</TableCell>
+                  <TableCell className={`${num} font-semibold`}>
+                    {entry.checkouts.map((c, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && ', '}
+                        <span className={cn(c >= 100 && MILESTONE_TEXT)}>{c}</span>
+                      </React.Fragment>
+                    ))}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -192,7 +205,7 @@ export function StatisticsTab({ tournament, uniqueGroups, renderPlayerLink, t })
         </StatCard>
 
         {/* Fewest Darts Leaderboard */}
-        <StatCard title={t('management.fewestDarts')} isEmpty={fewestDarts.length === 0} t={t}>
+        <StatCard title={t('management.fewestDarts')} icon={Hash} tone="muted" isEmpty={fewestDarts.length === 0} t={t}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -216,7 +229,7 @@ export function StatisticsTab({ tournament, uniqueGroups, renderPlayerLink, t })
         </StatCard>
 
         {/* High scores (visits of 80+, 95+, 133+, 170+ and 180) */}
-        <StatCard title={t('management.highScores')} isEmpty={highScores.length === 0} t={t}>
+        <StatCard title={t('management.highScores')} icon={Trophy} tone="primary" isEmpty={highScores.length === 0} t={t}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -233,7 +246,7 @@ export function StatisticsTab({ tournament, uniqueGroups, renderPlayerLink, t })
                   <RankCell index={index} />
                   <TableCell className="font-medium">{renderPlayerLink(entry.player)}</TableCell>
                   {HIGH_SCORE_BANDS.map(band => (
-                    <TableCell key={band} className={`${num} ${band === 180 ? 'font-semibold' : ''}`}>{entry.bands[band]}</TableCell>
+                    <TableCell key={band} className={cn(num, band === 180 && 'font-semibold', band === 180 && entry.bands[band] > 0 && MILESTONE_TEXT)}>{entry.bands[band]}</TableCell>
                   ))}
                 </TableRow>
               ))}

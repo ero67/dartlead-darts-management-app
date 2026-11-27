@@ -401,7 +401,7 @@ function CricketMatchInner({ match, onMatchComplete, onBack }) {
         {isViewOnly ? (
           <Badge variant="outline"><Eye />{t('match.viewOnlyMode')}</Badge>
         ) : (
-          <Badge className="bg-destructive text-white">{t('management.live')}</Badge>
+          <Badge variant="live">{t('management.live')}</Badge>
         )}
       </header>
 

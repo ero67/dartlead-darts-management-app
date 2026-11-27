@@ -94,7 +94,7 @@ export function ScorersPanel({ type, entityId, onScorersChange }) {
   return (
     <Card className="text-foreground">
       <CardHeader>
-        <CardTitle>{t('scorers.title')}</CardTitle>
+        <CardTitle>{type === 'league' ? t('scorers.titleLeague') : t('scorers.title')}</CardTitle>
         <CardDescription>
           {type === 'league' ? t('scorers.descriptionLeague') : t('scorers.descriptionTournament')}
           {' '}

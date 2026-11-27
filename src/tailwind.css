@@ -94,12 +94,13 @@
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.627 0.194 149.214); /* green-600 #16a34a, DartLead accent */
+  /* green-700 #15803d, DartLead accent. green-600 gave white button text and green text on white only ~3.1:1 (WCAG AA needs 4.5). */
+  --primary: oklch(0.527 0.154 150.069);
   --primary-foreground: oklch(0.982 0.018 155.826);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  --muted-foreground: oklch(0.53 0.016 285.938); /* 4.8:1 on --muted, 5.3:1 on white (0.552 was 4.39 on --muted) */
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
@@ -113,13 +114,17 @@
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.627 0.194 149.214);
+  --sidebar-primary: oklch(0.527 0.154 150.069);
   --sidebar-primary-foreground: oklch(0.982 0.018 155.826);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.627 0.194 149.214);
   --live: oklch(0.628 0.2 25); /* dartboard red: live, bust, trebles */
+  /* Solid red fill under white text (LIVE badges). One value for both themes:
+     the dark --destructive / --live are lighter so red *text* reads on dark,
+     but white on them is only ~2.9-3.5:1. red-600 with white is ~4.8:1. */
+  --live-solid: oklch(0.577 0.245 27.325);
 }
 
 .dark-mode {
@@ -194,6 +199,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-live: var(--live);
+  --color-live-solid: var(--live-solid);
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
   /* Scoreboard numerals: scores, KPIs, legs, ranks. Never body text. */
   --font-display: 'Barlow Condensed', 'Geist Variable', ui-sans-serif, sans-serif;

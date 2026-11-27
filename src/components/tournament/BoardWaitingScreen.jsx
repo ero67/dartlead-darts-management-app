@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { isCricketGame } from '@/lib/cricket';
+import { playoffRoundName } from '../../utils/playoffRoundName';
 
 const Versus = ({ match, t }) => (
   <div className="flex flex-wrap items-center justify-center gap-3 text-2xl font-semibold">
@@ -19,6 +20,8 @@ const Versus = ({ match, t }) => (
 // unfinished match, which comes first so a scorer never has to dig for it.
 export function BoardWaitingScreen({ tournament, boardNumber, next, then, ownLive, onStart, onContinue, onPickMatch, t }) {
   const featured = ownLive || next;
+  // Playoff entries carry roundSize: name the round in the viewer's language.
+  const featuredLabel = featured && (featured.roundSize != null ? playoffRoundName(featured.roundSize / 2, t) : featured.label || featured.groupName);
   return (
     <Card className="mx-auto w-full max-w-xl gap-5 p-6 text-center">
       <div className="flex flex-col items-center gap-1">
@@ -36,7 +39,7 @@ export function BoardWaitingScreen({ tournament, boardNumber, next, then, ownLiv
           </span>
           <Versus match={featured} t={t} />
           <div className="flex flex-wrap justify-center gap-2">
-            {(featured.label || featured.groupName) && <Badge variant="secondary">{featured.label || featured.groupName}</Badge>}
+            {featuredLabel && <Badge variant="secondary">{featuredLabel}</Badge>}
             {isCricketGame(featured.gameType || tournament.gameType) && <Badge variant="outline">{t('common.gameTypeCricket')}</Badge>}
           </div>
           <Button size="lg" className="mt-2 h-14 w-full text-lg" onClick={() => (ownLive ? onContinue(ownLive) : onStart(next))}>

@@ -74,6 +74,12 @@ export function LanguageProvider({ children }) {
 }
 
 // Custom hook to use language context
+// For shared ui/ primitives that may render outside the provider: no throw,
+// callers fall back to English.
+export function useOptionalLanguage() {
+  return useContext(LanguageContext);
+}
+
 export function useLanguage() {
   const context = useContext(LanguageContext);
   if (!context) {

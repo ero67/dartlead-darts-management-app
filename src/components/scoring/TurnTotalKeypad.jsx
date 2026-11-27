@@ -44,13 +44,18 @@ export function TurnTotalKeypad({
 
   const okButton = (
     <Button
-      className="col-span-3 h-14 w-full flex-col gap-0 text-lg short:h-10"
+      className={cn(
+        'col-span-3 h-14 w-full flex-col gap-0 text-lg short:h-10',
+        // Short landscape: OK becomes a 4th column beside the digits (like a
+        // numpad Enter), so the digit rows share the height 4 ways, not 5.
+        useOnScreenKeypad && 'short:landscape:col-span-1 short:landscape:col-start-4 short:landscape:row-span-4 short:landscape:row-start-1 short:landscape:h-auto'
+      )}
       onClick={submit}
       disabled={disabled || isInvalid}
       type="button"
     >
       <span>{t('match.ok')}</span>
-      {!value && <span className="text-xs font-normal opacity-80">{t('match.okZero')}</span>}
+      {!value && <span className="text-xs font-normal">{t('match.okZero')}</span>}
     </Button>
   );
 
@@ -105,7 +110,7 @@ export function TurnTotalKeypad({
         </div>
       )}
       {useOnScreenKeypad ? (
-        <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-1">
+        <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-1 short:landscape:grid-cols-4">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
             <button key={n} className={KEY} onClick={() => append(n)} type="button" disabled={disabled}>
               {n}

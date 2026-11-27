@@ -11,7 +11,8 @@ export function MprInfo({ className }) {
   return (
     <Popover>
       <PopoverTrigger
-        className={cn('inline-flex items-center gap-0.5 rounded-sm underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring', className)}
+        // after: an invisible ~40px-tall hit area around the 16px inline label, without moving the line.
+        className={cn("relative inline-flex items-center gap-0.5 rounded-sm underline decoration-dotted underline-offset-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] focus-visible:outline-2 focus-visible:outline-ring", className)}
       >
         {t('common.mpr')}
         <Info className="size-3 shrink-0 opacity-70" aria-hidden="true" />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Badge as BadgeIcon, RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save, Activity, UserCheck, ClipboardList, CreditCard, CheckCircle, XCircle, ExternalLink, Plus } from 'lucide-react';
+import { RotateCcw, Search, Loader, Check, AlertCircle, Edit3, Save, UserCheck, ClipboardList, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { tournamentService, matchService } from '../services/tournamentService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,11 +19,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from './shared/EmptyState';
-import { StatTile } from './shared/StatTile';
 import { SubscriptionNotice } from './shared/SubscriptionNotice';
 import { confirmDialog } from '../lib/confirmDialog';
 import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
-import { subscriptionLevel } from '../utils/billing';
 
 const formatMatchStateLabel = (status) => status.replace(/_/g, ' ');
 
@@ -31,10 +29,9 @@ export function ManagerPanel() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin } = useAdmin();
-  const navigate = useNavigate();
   const { tournaments } = useTournament();
   const { leagues } = useLeague();
-  const [activeTab, setActiveTab] = useState('overview'); // overview | requests | scorers | matches
+  const [activeTab, setActiveTab] = useState('requests'); // requests | scorers | matches
   const [message, setMessage] = useState({ type: '', text: '' });
   const [selectedTournamentForMatch, setSelectedTournamentForMatch] = useState('');
   const [matchesForTournament, setMatchesForTournament] = useState([]);
@@ -67,7 +64,6 @@ export function ManagerPanel() {
       ? leagues
       : leagues.filter(l => user && (l.createdBy === user.id || (l.managerIds || []).includes(user.id)))
   ), [leagues, isAdmin, user]);
-  const leagueNameById = useMemo(() => new Map(leagues.map(l => [l.id, l.name])), [leagues]);
 
   // Own tournaments plus every tournament of a league this user (co-)manages
   const myTournaments = useMemo(() => {
@@ -76,21 +72,11 @@ export function ManagerPanel() {
     return tournaments.filter(tr => user && (tr.userId === user.id || (tr.leagueId && leagueIds.has(tr.leagueId))));
   }, [tournaments, isAdmin, user, myLeagues]);
 
-  // --- Overview stats (counts come from the lightweight tournament summary) ---
-  const liveMatchesNow = myTournaments.reduce((sum, tr) => sum + (tr.inProgressMatches ?? 0), 0);
-  const pendingMatchesCount = myTournaments
-    .filter(tr => tr.status !== 'completed')
-    .reduce((sum, tr) => sum + (tr.pendingMatches ?? 0), 0);
+  // Tournaments open for registration: their pending requests are listed below.
   const openTournaments = myTournaments.filter(tr => tr.status === 'open_for_registration');
-  const attentionTournaments = myTournaments.filter(tr => (
-    tr.status === 'open_for_registration' ||
-    (tr.inProgressMatches ?? 0) > 0 ||
-    (tr.status !== 'completed' && (tr.pendingMatches ?? 0) > 0)
-  ));
 
   // --- Subscriptions that cover me: my own, or (as a co-manager) the league owner's ---
   const subscriptionStatuses = useSubscriptionStatus();
-  const datedSubscriptions = (subscriptionStatuses || []).filter(s => s.paid_until);
 
   // --- Pending registration requests across all my open tournaments ---
   const [requests, setRequests] = useState([]);
@@ -533,10 +519,6 @@ export function ManagerPanel() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
         <TabsList>
-          <TabsTrigger value="overview">
-            <Activity />
-            {t('manager.tabOverview')}
-          </TabsTrigger>
           <TabsTrigger value="requests">
             <UserCheck />
             {t('manager.tabRequests')}
@@ -551,109 +533,6 @@ export function ManagerPanel() {
             {t('manager.tabMatches')}
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="flex flex-col gap-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile label={t('manager.overviewLiveNow')} value={liveMatchesNow} icon={Activity} />
-            <StatTile label={t('manager.overviewPendingMatches')} value={pendingMatchesCount} icon={RotateCcw} />
-            <button
-              type="button"
-              className="rounded-xl text-left transition-colors hover:[&>*]:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => setActiveTab('requests')}
-            >
-              <StatTile label={t('manager.overviewPendingRequests')} value={requests.length} icon={UserCheck} />
-            </button>
-            <StatTile label={t('manager.overviewOpenTournaments')} value={openTournaments.length} icon={BadgeIcon} />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="size-4" />
-                  {t('manager.overviewActiveTitle')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {attentionTournaments.length === 0 ? (
-                  <div className="flex flex-col items-start gap-3">
-                    <p className="text-sm text-muted-foreground">{t('manager.overviewNothingActive')}</p>
-                    <Button size="sm" onClick={() => navigate('/create-tournament')}>
-                      <Plus />
-                      {t('tournaments.create')}
-                    </Button>
-                  </div>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {attentionTournaments.map((tr) => (
-                      <li key={tr.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate text-sm font-medium">{tr.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {[leagueNameById.get(tr.leagueId), tournamentStatusLabel(tr.status, t)].filter(Boolean).join(' · ')}
-                            {(tr.inProgressMatches ?? 0) > 0 && ` · ${tr.inProgressMatches} ${t('manager.overviewLiveNow').toLowerCase()}`}
-                            {tr.status !== 'open_for_registration' && (tr.pendingMatches ?? 0) > 0 && ` · ${tr.pendingMatches} ${t('manager.overviewPendingMatches').toLowerCase()}`}
-                          </span>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/tournament/${tr.id}`)}>
-                          <ExternalLink />
-                          {t('manager.openTournament')}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="size-4" />
-                  {t('manager.subscriptionTitle')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2 text-sm">
-                {isAdmin ? (
-                  <p className="text-muted-foreground">{t('manager.subscriptionAdmin')}</p>
-                ) : !subscriptionStatuses ? (
-                  <p className="text-muted-foreground">{t('common.loading')}</p>
-                ) : datedSubscriptions.length === 0 ? (
-                  <p className="text-muted-foreground">{t('manager.subscriptionNone')}</p>
-                ) : datedSubscriptions.map((s) => {
-                  const level = subscriptionLevel(s.paid_until);
-                  const date = new Date(s.paid_until).toLocaleDateString();
-                  return (
-                    <div key={s.owner_id} className="flex flex-col gap-1">
-                      {!s.is_own && (
-                        <p className="text-muted-foreground">
-                          {t('manager.subscriptionCoveredBy', { name: s.owner_name || t('manager.subscriptionLeagueOwner') })}
-                        </p>
-                      )}
-                      <Badge
-                        variant="outline"
-                        className={
-                          level === 'expired'
-                            ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
-                            : level === 'warn'
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
-                              : 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
-                        }
-                      >
-                        {level === 'expired'
-                          ? t('manager.subscriptionExpired', { date })
-                          : t('manager.subscriptionActiveUntil', { date })}
-                      </Badge>
-                      {level === 'warn' && (
-                        <p className="text-muted-foreground">{t('manager.subscriptionExpiresSoon')}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
 
         <TabsContent value="requests">
           <Card>

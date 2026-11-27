@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Settings, Trash2, CopyPlus } from 'lucide-react';
+import { Play, Settings } from 'lucide-react';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,8 @@ import { RoundSchedule } from './shared/RoundSchedule';
 import { PlayersSection } from './registration/PlayersSection';
 import { RegistrationRequests } from './registration/RegistrationRequests';
 import { SelfRegistration } from './registration/SelfRegistration';
+import { VenueSetup } from './registration/VenueSetup';
+import { TournamentActionsMenu } from './tournament/TournamentActionsMenu';
 import { EditSettingsDialog } from './registration/EditSettingsDialog';
 import { GroupsPreviewDialog } from './registration/GroupsPreviewDialog';
 import { getPublicAppUrl } from '../utils/publicUrl';
@@ -624,29 +626,19 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
                 {t('registration.editSettings')}
               </Button>
             )}
-            {canManage && (
-              <Button variant="outline" onClick={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}>
-                <CopyPlus />
-                {tournament.leagueId ? t('tournaments.nextRound') : t('tournaments.duplicate')}
-              </Button>
-            )}
-            {canManage && onDeleteTournament && (
-              <Button
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={handleDeleteTournament}
-                title={t('management.deleteTournament')}
-                aria-label={t('management.deleteTournament')}
-              >
-                <Trash2 />
-                {t('management.deleteTournament')}
-              </Button>
-            )}
             {showStart && (
               <Button onClick={handleStartTournament} disabled={isStarting}>
                 <Play />
                 {isStarting ? t('common.loading') : t('registration.startTournament')}
               </Button>
+            )}
+            {canManage && (
+              <TournamentActionsMenu
+                tournament={tournament}
+                onCopy={() => navigate(cloneTournamentPath(tournament.id, tournament.leagueId))}
+                onDelete={onDeleteTournament ? handleDeleteTournament : null}
+                t={t}
+              />
             )}
           </div>
         </div>
@@ -667,6 +659,7 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
               processingRegId={processingRegId}
             />
           )}
+          {canManage && <VenueSetup tournamentId={tournament.id} scorersAnchorId="tournament-scorers" />}
           {(!user || !canManage) && (
             <SelfRegistration
               user={user}
@@ -720,8 +713,12 @@ export function TournamentRegistration({ tournament, onBack, onDeleteTournament 
           {/* Scorers can be set up before the first dart is thrown, not only
               once the tournament is running (previously this panel lived on the
               completed-tournament summary tab, which was far too late). */}
-          {canManage && <ScorersPanel type="tournament" entityId={tournament.id} />}
-          {canManage && tournament.leagueId && <ScorersPanel type="league" entityId={tournament.leagueId} />}
+          {canManage && (
+            <div id="tournament-scorers" tabIndex={-1} className="flex scroll-mt-20 flex-col gap-6 outline-none">
+              <ScorersPanel type="tournament" entityId={tournament.id} />
+              {tournament.leagueId && <ScorersPanel type="league" entityId={tournament.leagueId} />}
+            </div>
+          )}
         </div>
       </div>
 

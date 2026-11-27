@@ -53,7 +53,7 @@ export function DartKeypad({
         </button>
         <button
           type="button"
-          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'triple' && 'border-live bg-live text-white')}
+          className={cn(KEY, 'font-sans text-base font-medium', inputMode === 'triple' && 'border-live-solid bg-live-solid text-white')}
           aria-pressed={inputMode === 'triple'}
           onClick={() => toggleMode('triple')}
         >

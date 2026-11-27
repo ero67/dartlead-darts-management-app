@@ -32,6 +32,9 @@
   "dashboard": {
     "title": "Dashboard",
     "myDashboard": "My Dashboard",
+    "pendingRequests": "Registration requests waiting: {{count}}",
+    "pendingRequestsHint": "Players asked to join your open rounds.",
+    "pendingRequestsAction": "Review",
     "welcome": "Welcome to Darts Tournament Manager",
     "welcomeManager": "Welcome back, {{name}}",
     "noTournaments": "No tournaments yet",
@@ -89,6 +92,9 @@
     "copySuffix": "(copy)",
     "copiedFrom": "Settings copied from {{name}} — change anything before creating.",
     "forLeague": "League: {{name}}",
+    "leaguePickerTitle": "League",
+    "leaguePickerHint": "Only tournaments in a league count toward its season leaderboard.",
+    "noLeague": "No league (standalone tournament)",
     "samePlayers": "Same players ({{count}})",
     "copySourceFailed": "Couldn't load the tournament to copy — starting with an empty form.",
     "filterPlayers": "Search players...",
@@ -261,6 +267,8 @@
     "numberOfGroupsLabel": "Number of groups:",
     "playersPerGroupLabel": "Players per group:",
     "qualificationMode": "Qualification Mode:",
+    "qualificationModeHint": "Per group: the same number of players go through from every group. Total: the best players across all groups go through, up to the number you set.",
+    "groupSettingsHint": "Set the number of groups or the players per group; the other follows from how many players sign up.",
     "qualificationModePerGroup": "Players per Group",
     "qualificationModeTotalPlayers": "Total Players",
     "totalPlayersToAdvance": "Total players to advance:",
@@ -700,6 +708,7 @@
     "signInSubtitle": "Sign in to save your practice progress and follow your tournaments and leagues."
   },
   "common": {
+    "moreActions": "More actions",
     "save": "Save",
     "saved": "Saved!",
     "cancel": "Cancel",
@@ -782,7 +791,7 @@
   },
   "manager": {
     "title": "Manager Panel",
-    "subtitle": "Reset completed matches and correct mistakes",
+    "subtitle": "Registration requests, scorers and match fixes",
     "manageMatchState": "Manage Match State",
     "manageMatchStateDescription": "Select a tournament and match to either reset it to pending or manually set the final result when recovery is needed.",
     "selectTournament": "Select Tournament",
@@ -926,12 +935,23 @@
     "leagueSettings": "League Settings",
     "scoringRules": "Scoring Rules",
     "saveChanges": "Save Changes",
-    "scoringRulesDescription": "Set how many points players earn based on their final tournament placement.",
+    "settingsSaved": "League settings saved",
+    "settingsSaveFailed": "Could not save the league settings",
+    "unsavedChanges": "Unsaved changes",
+    "discardChanges": "Discard",
+    "scoringRulesDescription": "Each player gets the points of the first step below that fits them, checked from the top. Bonus points for a single player are added on the Leaderboard.",
     "removePlacement": "Remove placement",
-    "addNewPlacement": "Add new placement:",
-    "position": "Position:",
+    "addNewPlacement": "Add points for another place",
+    "position": "Place:",
     "defaultTournamentSettings": "Default Tournament Settings",
-    "defaultPlacementTip": "Tip: Use \"default\" as position for all placements not explicitly listed.",
+    "defaultPlacementTip": "Places without their own row get the points from step 2 or 3.",
+    "sectionLeague": "League",
+    "sectionPeople": "Managers & scorers",
+    "sectionPoints": "Points",
+    "sectionDefaults": "Round defaults",
+    "nthPlace": "Place {{n}}",
+    "pointsStepPlaces": "1. Final place",
+    "pointsStepOthers": "3. Everyone else",
     "1stPlace": "1st Place",
     "2ndPlace": "2nd Place",
     "3rdPlace": "3rd Place",
@@ -972,7 +992,7 @@
     "resetDefaults": "Reset to Defaults",
     "noDefaultsSet": "No default tournament settings configured yet. Configure defaults below so tournaments in this league start with pre-filled settings.",
     "defaultSeedingMethod": "Default Seeding Method",
-    "roundPointsTitle": "Points by Playoff Round",
+    "roundPointsTitle": "2. Playoff round reached",
     "roundPointsDescription": "Set points for reaching each playoff round. Players eliminated in that round receive these points.",
     "roundOf32": "Round of 32",
     "roundOf16": "Round of 16",
@@ -1097,6 +1117,9 @@
     "dartsThrown": "Darts Thrown",
     "recentMatches": "Recent Matches",
     "noMatches": "No matches played yet.",
+    "noStatsYet": "No statistics yet",
+    "noStatsYetHint": "Averages, checkouts and form appear after the first match.",
+    "removePhotoConfirm": "Remove your profile photo?",
     "formWin": "W",
     "formLoss": "L",
     "versus": "vs",
@@ -1171,7 +1194,8 @@
     "removeError": "Failed to remove scorer",
     "managerNote": "As the manager you can always count matches yourself.",
     "fromLeague": "From league",
-    "fromLeagueHint": "Added in the league settings; remove it there."
+    "fromLeagueHint": "Added in the league settings; remove it there.",
+    "titleLeague": "League scorers (all rounds)"
   },
   "account": {
     "title": "Account",
@@ -1821,5 +1845,61 @@
     "coManagedLeagues": "Co-managed leagues ({{count}})",
     "noLeagues": "Has not created a league yet.",
     "leagueMeta": "created {{date}} · {{members}} members · {{tournaments}} tournaments"
+  },
+  "venue": {
+    "title": "Before you start",
+    "description": "Set up the TV and the scoring phones before players arrive.",
+    "tvTitle": "TV screen",
+    "tvHint": "Open it on the venue TV now. Matches appear on it once you start.",
+    "openTv": "Open TV view",
+    "copyTvLink": "Copy link",
+    "tvLinkCopied": "TV link copied",
+    "scorersTitle": "Scorers",
+    "scorersHint": "Who can score matches on their own phone.",
+    "manageScorers": "Manage scorers",
+    "boardTitle": "This device",
+    "boardSet": "Scores board {{board}}.",
+    "boardNotSet": "No board set. Set one if this phone stays at a board.",
+    "setBoard": "Set board",
+    "boardsAfterStart": "Matches are assigned to boards in the Matches tab after you start."
+  },
+  "setup": {
+    "title": "Your first league night",
+    "progress": "{{done}} of {{total}}",
+    "optional": "optional",
+    "done": "done",
+    "dismiss": "Hide this guide",
+    "steps": {
+      "league": {
+        "title": "Create your league",
+        "hint": "Name it and set points for each place. Everything else can wait.",
+        "action": "Create league"
+      },
+      "defaults": {
+        "title": "Set how rounds are played",
+        "hint": "Venue, legs, groups and playoffs. Every new round starts from these.",
+        "action": "Open settings"
+      },
+      "round": {
+        "title": "Create the first round",
+        "hint": "A tournament inside your league, so it counts toward the season leaderboard.",
+        "action": "Create round"
+      },
+      "players": {
+        "title": "Get players in",
+        "hint": "Share the registration link, or add players from your league.",
+        "action": "Open round"
+      },
+      "venue": {
+        "title": "Get the venue ready",
+        "hint": "TV view on the screen, scorers and board numbers on the phones.",
+        "action": "Open round"
+      },
+      "start": {
+        "title": "Start the night",
+        "hint": "Players are drawn and the first matches are ready to score.",
+        "action": "Open round"
+      }
+    }
   }
 }

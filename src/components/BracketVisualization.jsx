@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Medal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Slot geometry at scale 1, in px. MATCH_H matches the rendered card
 // (two rows + gap + padding, all em-based), so boxes centre on their slot.
@@ -23,6 +24,7 @@ const playerRowClass = (isWinner, isLoser, isTbd) =>
 // `liveScores` (optional) maps a match id to { player1Legs, player2Legs } for
 // matches being played right now.
 export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, liveScores = {} }) {
+  const { t } = useLanguage();
   const matchRefs = useRef({});
   const containerRef = useRef(null);
   const [connections, setConnections] = useState([]);
@@ -249,7 +251,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
         )}
       >
         {isLive && (
-          <span className="absolute -top-[0.6em] right-[0.5em] rounded-full bg-destructive px-[0.5em] text-[0.55em] font-semibold uppercase leading-[1.6] tracking-wider text-white">
+          <span className="absolute -top-[0.6em] right-[0.5em] rounded-full bg-live-solid px-[0.5em] text-[0.55em] font-semibold uppercase leading-[1.6] tracking-wider text-white">
             Live
           </span>
         )}
@@ -330,7 +332,7 @@ export function BracketVisualization({ rounds, playoffMatches = [], scale = 1, l
           <div className="mt-[2em] flex flex-col items-center gap-[0.75em] border-t border-dashed pt-[1.5em]">
             <h4 className="flex items-center gap-[0.4em] text-[0.8em] font-medium uppercase tracking-wider text-muted-foreground">
               <Medal className="size-[1.25em] text-amber-700" />
-              3rd Place Match
+              {t('management.thirdPlaceMatch')}
             </h4>
             {renderMatchBox(matchData, winner, { className: 'relative' })}
           </div>

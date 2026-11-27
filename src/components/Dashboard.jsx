@@ -1,19 +1,26 @@
-import React from 'react';
-import { Plus, Trophy, Users, Target, Calendar, TrendingUp, Crown, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Plus, Trophy, Users, Target, Calendar, TrendingUp, Crown, ArrowRight, UserCheck } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useTournament } from '../contexts/TournamentContext';
 import { useLeague } from '../contexts/LeagueContext';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { PlayerHome } from './PlayerHome';
+import { SetupChecklist } from './SetupChecklist';
+import { LoadingState } from './shared/LoadingState';
 import { StatusBadge } from './shared/StatusBadge';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { BoardMotif, LiveDot, PhaseBar } from './shared/DartsAccents';
 import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
+import { SubscriptionCard } from './shared/SubscriptionCard';
+import { SubscriptionNotice } from './shared/SubscriptionNotice';
+import { useSubscriptionStatus } from '../hooks/useSubscriptionStatus';
+import { supabase } from '../lib/supabase';
 import { isTournamentRunning, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
 import { getUserDisplayName } from '../utils/userDisplayName';
 
@@ -56,6 +63,44 @@ function LiveNowCard({ tournaments, onSelectTournament, t }) {
   );
 }
 
+// Registration requests waiting in the manager's open tournaments; they are
+// handled in the Manager Panel. A count-only query, so it stays cheap.
+function PendingRequestsNotice({ tournamentIds, onOpen, t }) {
+  const [count, setCount] = useState(0);
+  const idsKey = tournamentIds.join(',');
+
+  useEffect(() => {
+    if (!idsKey) { setCount(0); return undefined; }
+    let cancelled = false;
+    supabase
+      .from('tournament_registrations')
+      .select('id', { count: 'exact', head: true })
+      .in('tournament_id', idsKey.split(','))
+      .eq('status', 'pending')
+      .then(({ count: n, error }) => {
+        if (cancelled) return;
+        if (error) console.error('Error counting registration requests:', error);
+        setCount(n || 0);
+      });
+    return () => { cancelled = true; };
+  }, [idsKey]);
+
+  if (count === 0) return null;
+  return (
+    <Alert role="status">
+      <UserCheck />
+      <AlertTitle>{t('dashboard.pendingRequests', { count })}</AlertTitle>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+        <span>{t('dashboard.pendingRequestsHint')}</span>
+        <Button size="sm" onClick={onOpen}>
+          {t('dashboard.pendingRequestsAction')}
+          <ArrowRight />
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 function SectionHeader({ title, action }) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -69,10 +114,14 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isAdmin, canManage, canCreateTournaments } = useAdmin();
-  const { tournaments } = useTournament();
-  const { leagues } = useLeague();
+  const { tournaments, loading: isLoadingTournaments } = useTournament();
+  const { leagues, loading: isLoadingLeagues } = useLeague();
+  // Moved here from the Manager Panel's former Overview tab (admins need none).
+  const subscriptionStatuses = useSubscriptionStatus(Boolean(user && canManage && !isAdmin));
 
   if (!(user && canManage)) return <PlayerHome onNavigate={onNavigate} />;
+  // Before the first load the lists are empty: show no "nothing here yet" states or setup guide.
+  if (isLoadingTournaments || isLoadingLeagues) return <LoadingState text={t('common.loading')} />;
 
   const myTournaments = tournaments
     .filter(tr => tr.userId === user.id)
@@ -84,6 +133,11 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
   // Counts come from the lightweight summary (getTournamentsSummary).
   const myActiveMatches = myTournaments.reduce((sum, tr) => sum + (tr.inProgressMatches ?? 0), 0);
   const displayName = getUserDisplayName(user) || user?.email?.split('@')[0] || t('common.roleManager');
+  // Open tournaments whose requests this manager handles: own, or in a league they (co-)manage.
+  const myLeagueIds = new Set(myLeagues.map(l => l.id));
+  const openTournamentIds = tournaments
+    .filter(tr => tr.status === 'open_for_registration' && (tr.userId === user.id || myLeagueIds.has(tr.leagueId)))
+    .map(tr => tr.id);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 text-foreground md:p-8">
@@ -100,11 +154,17 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
             </Button>
             <Button variant="outline" onClick={onCreateLeague}>
               <Plus />
-              {t('leagues.title')}
+              {t('leagues.createLeague')}
             </Button>
           </div>
         )}
       </div>
+
+      {!isAdmin && <SubscriptionNotice statuses={subscriptionStatuses} />}
+
+      <SetupChecklist />
+
+      <PendingRequestsNotice tournamentIds={openTournamentIds} onOpen={() => onNavigate('/manager')} t={t} />
 
       {liveTournaments.length > 0 && (
         <LiveNowCard tournaments={liveTournaments} onSelectTournament={onSelectTournament} t={t} />
@@ -171,7 +231,7 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
             {canCreateTournaments && (
               <Button onClick={onCreateLeague}>
                 <Plus />
-                {t('leagues.title')}
+                {t('leagues.createLeague')}
               </Button>
             )}
           </EmptyState>
@@ -256,6 +316,8 @@ export function Dashboard({ onCreateTournament, onSelectTournament, onCreateLeag
           </EmptyState>
         )}
       </section>
+
+      {!isAdmin && <SubscriptionCard statuses={subscriptionStatuses} />}
     </div>
   );
 }

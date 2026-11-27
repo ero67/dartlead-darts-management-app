@@ -85,12 +85,12 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     { round: 16, points: 0, enabled: false },
     { round: 8, points: 0, enabled: false }
   ]);
-  const [isSavingScoring, setIsSavingScoring] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const savedSettings = useRef({ scoring: null, defaults: null });
   const [newPlacement, setNewPlacement] = useState({ position: '', points: '' });
 
   // Default tournament settings state
   const [tournamentDefaults, setTournamentDefaults] = useState(DEFAULT_TOURNAMENT_SETTINGS);
-  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
 
   // Add existing tournament state
   const [isLinkingTournament, setIsLinkingTournament] = useState(false);
@@ -168,18 +168,19 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
       setScoringRules(rulesArray);
 
       const rp = points.roundPoints || {};
-      setRoundPointsRules([
+      const roundRules = [
         { round: 32, points: rp['32'] || 0, enabled: rp['32'] !== undefined },
         { round: 16, points: rp['16'] || 0, enabled: rp['16'] !== undefined },
         { round: 8, points: rp['8'] || 0, enabled: rp['8'] !== undefined }
-      ]);
+      ];
+      setRoundPointsRules(roundRules);
+      savedSettings.current.scoring = JSON.stringify({ scoringRules: rulesArray, roundPointsRules: roundRules });
     }
   }, [currentLeague]);
 
   // Load default tournament settings when league changes
   useEffect(() => {
-    if (currentLeague?.defaultTournamentSettings) {
-      setTournamentDefaults({
+    const defaults = currentLeague?.defaultTournamentSettings ? {
         ...DEFAULT_TOURNAMENT_SETTINGS,
         ...currentLeague.defaultTournamentSettings,
         groupSettings: {
@@ -195,10 +196,9 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
           }
         },
         standingsCriteriaOrder: currentLeague.defaultTournamentSettings.standingsCriteriaOrder || DEFAULT_TOURNAMENT_SETTINGS.standingsCriteriaOrder
-      });
-    } else {
-      setTournamentDefaults(DEFAULT_TOURNAMENT_SETTINGS);
-    }
+      } : DEFAULT_TOURNAMENT_SETTINGS;
+    setTournamentDefaults(defaults);
+    savedSettings.current.defaults = JSON.stringify(defaults);
   }, [currentLeague]);
 
   // Load statistics lazily when the tab is first opened
@@ -551,8 +551,23 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
     setScoringRules(updated);
   };
 
-  const handleSaveScoringRules = async () => {
-    setIsSavingScoring(true);
+  // Points and round defaults save together from one sticky bar; this is what
+  // they were when last loaded or saved, to tell whether anything changed.
+  const isSettingsDirty =
+    (savedSettings.current.scoring !== null && JSON.stringify({ scoringRules, roundPointsRules }) !== savedSettings.current.scoring)
+    || (savedSettings.current.defaults !== null && JSON.stringify(tournamentDefaults) !== savedSettings.current.defaults);
+
+  const handleDiscardSettings = () => {
+    if (savedSettings.current.scoring) {
+      const saved = JSON.parse(savedSettings.current.scoring);
+      setScoringRules(saved.scoringRules);
+      setRoundPointsRules(saved.roundPointsRules);
+    }
+    if (savedSettings.current.defaults) setTournamentDefaults(JSON.parse(savedSettings.current.defaults));
+  };
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
     try {
       const placementPoints = {};
       scoringRules.forEach(rule => {
@@ -573,30 +588,16 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
         scoring_rules: {
           ...currentLeague.scoringRules,
           placementPoints
-        }
-      });
-      
-      toast.success(t('leagues.scoringSaved'));
-    } catch (error) {
-      console.error('Error saving scoring rules:', error);
-      toast.error(t('leagues.scoringSaveFailed'));
-    } finally {
-      setIsSavingScoring(false);
-    }
-  };
-
-  const handleSaveTournamentDefaults = async () => {
-    setIsSavingDefaults(true);
-    try {
-      await updateLeague(currentLeague.id, {
+        },
         default_tournament_settings: tournamentDefaults
       });
-      toast.success(t('leagues.defaultsSaved'));
+
+      toast.success(t('leagues.settingsSaved'));
     } catch (error) {
-      console.error('Error saving tournament defaults:', error);
-      toast.error(t('leagues.defaultsSaveFailed'));
+      console.error('Error saving league settings:', error);
+      toast.error(t('leagues.settingsSaveFailed'));
     } finally {
-      setIsSavingDefaults(false);
+      setIsSavingSettings(false);
     }
   };
 
@@ -713,7 +714,8 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
   };
 
   return (
-    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-hidden p-4 text-foreground md:p-8">
+    // overflow-clip (not hidden) clips the board motif without making this a scroll container, which would break the sticky settings chips
+    <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 overflow-clip p-4 text-foreground md:p-8">
       <BoardMotif />
       <div className="relative flex flex-col gap-3">
         <Button variant="ghost" size="sm" className="w-fit -ml-2 text-muted-foreground" onClick={onBack}>
@@ -787,6 +789,7 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
 
       <Tabs value={activeTab === 'settings' && !isManager ? 'leaderboard' : activeTab} onValueChange={setActiveTab} className="gap-6">
         <TabsList>
+
           <TabsTrigger value="leaderboard"><TrendingUp />{t('leagues.leaderboard')}</TabsTrigger>
           <TabsTrigger value="tournaments"><Trophy />{t('tournaments.title')}</TabsTrigger>
           <TabsTrigger value="statistics"><BarChart3 />{t('leagues.statistics')}</TabsTrigger>
@@ -906,13 +909,13 @@ export function LeagueDetail({ leagueId, onBack, onCreateTournament, onSelectTou
               newPlacement={newPlacement}
               setNewPlacement={setNewPlacement}
               onAddPlacement={handleAddPlacement}
-              isSavingScoring={isSavingScoring}
-              onSaveScoringRules={handleSaveScoringRules}
               tournamentDefaults={tournamentDefaults}
               setTournamentDefaults={setTournamentDefaults}
-              isSavingDefaults={isSavingDefaults}
-              onSaveDefaults={handleSaveTournamentDefaults}
               onResetDefaults={handleResetTournamentDefaults}
+              isDirty={isSettingsDirty}
+              isSaving={isSavingSettings}
+              onSave={handleSaveSettings}
+              onDiscard={handleDiscardSettings}
               onTogglePublic={handleTogglePublic}
               onLogoChange={handleLogoChange}
               isSavingLogo={isSavingLogo}
