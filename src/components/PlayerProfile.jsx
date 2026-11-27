@@ -24,6 +24,7 @@ import { PracticeBests } from './practice/PracticeBests';
 import { tournamentService } from '../services/tournamentService';
 import { mediaService } from '../services/mediaService';
 import { toast } from 'sonner';
+import { confirmDialog } from '../lib/confirmDialog';
 import { loadHistory } from '../lib/practiceStorage';
 
 const getInitials = (name) => {
@@ -134,6 +135,14 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const isOwnProfile = !!(user && player.user_id && player.user_id === user.id);
 
   // file = upload or replace your photo (crop = the square picked in the crop dialog); null = remove it.
+  const handleRemovePhoto = async () => {
+    const confirmed = await confirmDialog(t('playerProfile.removePhotoConfirm'), {
+      destructive: true,
+      confirmLabel: t('playerProfile.removePhoto'),
+    });
+    if (confirmed) handlePhotoChange(null);
+  };
+
   const handlePhotoChange = async (file, crop) => {
     const path = `avatars/${user.id}.webp`;
     setIsSavingPhoto(true);
@@ -156,6 +165,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
       setIsSavingPhoto(false);
     }
   };
+  const hasMatches = careerStats.matchesPlayed > 0;
   const winRate = careerStats.matchesPlayed > 0
     ? (careerStats.wins / careerStats.matchesPlayed) * 100
     : 0;
@@ -224,7 +234,8 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
       <BackButton onBack={onBack} t={t} />
 
       {/* Hero */}
-      <Card className="flex-col gap-6 p-6 lg:flex-row lg:items-start lg:justify-between">
+      {/* xl, not lg: beside the 256px sidebar, lg leaves ~690px and the 28rem stats column squeezed the name to 0px. */}
+      <Card className="flex-col gap-6 p-6 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
           <div className="relative size-20 shrink-0">
             <Avatar className="size-20">
@@ -275,7 +286,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
                     variant="secondary"
                     size="icon-sm"
                     className="absolute -top-1 -right-1 size-6 rounded-full shadow-sm"
-                    onClick={() => handlePhotoChange(null)}
+                    onClick={handleRemovePhoto}
                     disabled={isSavingPhoto}
                     title={t('playerProfile.removePhoto')}
                     aria-label={t('playerProfile.removePhoto')}
@@ -344,7 +355,8 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
           </div>
         </div>
 
-        <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[28rem]">
+        {hasMatches && (
+        <div className="flex w-full flex-col gap-3 xl:w-auto xl:min-w-[28rem]">
           <div className="grid gap-3 sm:grid-cols-3">
             {heroStats.map(stat => (
               <StatTile key={stat.key} label={stat.label} value={stat.value} icon={stat.icon} hint={stat.hint} />
@@ -360,16 +372,23 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
             </div>
           )}
         </div>
+        )}
       </Card>
 
       {/* Career Statistics */}
       <Section icon={Activity} title={t('playerProfile.careerStats')}>
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-          {statTiles.map(tile => (
-            <StatTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} />
-          ))}
-        </div>
-        <FormRating playerId={playerId} gameLabel={cricketStats ? t('common.gameTypeX01') : null} />
+        {hasMatches ? (
+          <>
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+              {statTiles.map(tile => (
+                <StatTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} />
+              ))}
+            </div>
+            <FormRating playerId={playerId} gameLabel={cricketStats ? t('common.gameTypeX01') : null} />
+          </>
+        ) : (
+          <EmptyState icon={Activity} title={t('playerProfile.noStatsYet')} description={t('playerProfile.noStatsYetHint')} />
+        )}
       </Section>
 
       {/* Practice bests */}
@@ -388,7 +407,8 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
         </Section>
       )}
 
-      {/* Recent matches */}
+      {/* Recent matches (the career empty state already says there are none) */}
+      {hasMatches && (
       <Section icon={Swords} title={t('playerProfile.recentMatches')}>
         {recentMatches.length > 0 ? (
           <Card className="gap-4 pb-0">
@@ -470,6 +490,7 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
           <EmptyState icon={Swords} title={t('playerProfile.noMatches')} />
         )}
       </Section>
+      )}
 
       {/* Tournament History */}
       <Section icon={Trophy} title={t('playerProfile.tournamentHistory')}>
