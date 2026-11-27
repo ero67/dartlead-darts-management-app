@@ -327,21 +327,39 @@ export function TvDisplay() {
     return cache.get(key);
   };
 
+  // The final round also holds the 3rd-place match: it must not read "Final" too.
+  const playoffLabel = useCallback(
+    (m, roundName) => (m.isThirdPlaceMatch ? t('management.thirdPlaceMatch') : roundName),
+    [t]
+  );
+
   const upNext = useMemo(() => {
     if (!tournament) return [];
     const liveIds = new Set(liveMatches.map((m) => m.id));
     // Anything that is not pending is either live or done — never "up next".
     const ready = (m) => m.status === 'pending' && m.player1 && m.player2 && !liveIds.has(m.id);
     const groupQueues = (tournament.groups || []).map((g) => (g.matches || []).filter(ready).map((m) => ({ ...m, label: g.name })));
-    const playoffItems = upcomingPlayoffMatches(bracketRounds).filter((m) => !liveIds.has(m.id)).map((m) => ({ ...m, label: m.roundName }));
-    return [...roundRobin(groupQueues), ...playoffItems];
-  }, [tournament, liveMatches, bracketRounds]);
+    // During the group stage only group matches are next, whatever the bracket says.
+    const playoffItems = stage === 'groups' ? [] : upcomingPlayoffMatches(bracketRounds)
+      .filter((m) => !liveIds.has(m.id))
+      .map((m) => ({ ...m, label: playoffLabel(m, m.roundName) }));
+    // Someone on a board right now can't start another match yet: free pairs first.
+    const busy = new Set(liveMatches.flatMap((m) => [m.player1?.id, m.player2?.id]).filter(Boolean));
+    const isFree = (m) => !busy.has(m.player1?.id) && !busy.has(m.player2?.id);
+    const all = [...roundRobin(groupQueues), ...playoffItems];
+    return [...all.filter(isFree), ...all.filter((m) => !isFree(m))];
+  }, [tournament, liveMatches, bracketRounds, stage, playoffLabel]);
 
-  // Waiting matches per assigned board, in the order they will be played.
-  const queues = useMemo(
-    () => (tournament ? boardQueues(tournament, new Set(liveMatches.map((m) => m.id))) : new Map()),
-    [tournament, liveMatches]
-  );
+  // Waiting matches per assigned board, in the order they will be played
+  // (group matches only while the group stage runs).
+  const queues = useMemo(() => {
+    if (!tournament) return new Map();
+    const all = boardQueues(tournament, new Set(liveMatches.map((m) => m.id)));
+    if (stage !== 'groups') return all;
+    // Playoff entries carry their round name; group entries don't.
+    const groupOnly = [...all].map(([board, list]) => [board, list.filter((m) => !m.roundName)]).filter(([, list]) => list.length > 0);
+    return new Map(groupOnly);
+  }, [tournament, liveMatches, stage]);
 
   // Same qualifiers as the management Standings tab, in either qualification mode.
   const qualifierIds = useMemo(
@@ -358,9 +376,9 @@ export function TvDisplay() {
   const matchLabels = useMemo(() => {
     const map = new Map();
     (tournament?.groups || []).forEach((g) => (g.matches || []).forEach((m) => map.set(m.id, g.name)));
-    bracketRounds.forEach((r) => r.matches.forEach((m) => map.set(m.id, r.name)));
+    bracketRounds.forEach((r) => r.matches.forEach((m) => map.set(m.id, playoffLabel(m, r.name))));
     return map;
-  }, [tournament, bracketRounds]);
+  }, [tournament, bracketRounds, playoffLabel]);
 
   // `?preview=moments`: a sample takeover every few seconds, with real names.
   const previewSourceRef = useRef(null);
