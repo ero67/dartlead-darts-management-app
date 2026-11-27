@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '../shared/EmptyState';
 import { PlayerLink } from './PlayerLink';
 import { cn } from '@/lib/utils';
+import { RankMedal } from '../shared/RankMedal';
 
 // Fixed series order for the chart (best average first): primary, amber, grey.
 const SERIES_CLASS = [
@@ -87,7 +88,7 @@ function StatBoard({ title, icon, rows, valueFn, detailFn, tone }) {
   return (
     <Card className="gap-0 overflow-hidden py-0">
       <div className={cn('flex flex-col gap-1 border-b px-4 py-4', tone === 'live' && 'bg-live/5', tone === 'primary' && 'bg-primary/5', tone === 'muted' && 'bg-muted/40')}>
-        <span className={cn('flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest', tone === 'live' ? 'text-live' : tone === 'primary' ? 'text-primary' : 'text-muted-foreground')}>
+        <span className={cn('flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest', tone === 'live' ? 'text-live-solid dark:text-live' : tone === 'primary' ? 'text-primary' : 'text-muted-foreground')}>
           {icon}
           {title}
         </span>
@@ -101,7 +102,7 @@ function StatBoard({ title, icon, rows, valueFn, detailFn, tone }) {
       </div>
       {rest.map((row, idx) => (
         <div key={row.player?.id || idx} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2.5 border-b px-4 py-2 last:border-b-0">
-          <span className="font-display text-base font-bold text-muted-foreground/70">{idx + 2}</span>
+          <RankMedal rank={idx + 2} className="font-display text-base font-bold" />
           <span className="flex min-w-0 flex-col leading-tight">
             <PlayerLink player={row.player} className="truncate text-left" />
             {detailFn(row) && <span className="truncate text-xs text-muted-foreground">{detailFn(row)}</span>}
