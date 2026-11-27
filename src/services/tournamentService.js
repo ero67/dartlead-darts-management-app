@@ -1690,22 +1690,26 @@ export const tournamentService = {
         // Win/loss from matches
         supabase
           .from('matches')
-          .select('id, winner_id, game_type')
+          .select('id, winner_id, game_type, player1_legs, player2_legs')
           .eq('player1_id', playerId)
           .eq('status', 'completed')
           .in('tournament_id', scopeIds),
         supabase
           .from('matches')
-          .select('id, winner_id, game_type')
+          .select('id, winner_id, game_type, player1_legs, player2_legs')
           .eq('player2_id', playerId)
           .eq('status', 'completed')
           .in('tournament_id', scopeIds),
-        // 180s (X01) and Cricket marks: only these result fields, not the
-        // full JSONB with its per-visit arrays
+        // 180s (X01), Cricket marks, and the X01 totals for matches without
+        // a match_player_stats row: only these result fields, not the full
+        // JSONB with its per-visit arrays
         supabase
           .from('matches')
           .select(`
-            player1_id, player2_id, game_type,
+            id, player1_id, player2_id, game_type,
+            s1:result->player1Stats->totalScore, s2:result->player2Stats->totalScore,
+            t1:result->player1Stats->totalDarts, t2:result->player2Stats->totalDarts,
+            c1:result->player1Stats->checkouts, c2:result->player2Stats->checkouts,
             l1:result->player1Legs, l2:result->player2Legs,
             o1:result->player1Stats->oneEighties, o2:result->player2Stats->oneEighties,
             m1:result->player1Stats->marks, m2:result->player2Stats->marks,
@@ -1750,22 +1754,42 @@ export const tournamentService = {
       const wins = allMatches.filter(m => m.winner_id === playerId).length;
       const losses = allMatches.length - wins;
 
-      // Career stats from match_player_stats
+      // Legs come from the match rows, so every completed match counts
+      let totalLegsWon = 0;
+      let totalLegsLost = 0;
+      (matchesAsP1 || []).forEach(m => { totalLegsWon += m.player1_legs || 0; totalLegsLost += m.player2_legs || 0; });
+      (matchesAsP2 || []).forEach(m => { totalLegsWon += m.player2_legs || 0; totalLegsLost += m.player1_legs || 0; });
+
+      // X01 totals per match: the match_player_stats row, or else the result
+      // JSON it is written from. Seeded, imported and some older matches have
+      // no row; without this the career numbers came from only part of the
+      // matches while wins, 180s and form counted all of them.
+      const statsByMatch = new Map((matchStats || []).map(s => [s.match_id, s]));
+      const x01ByMatch = new Map();
+      statsByMatch.forEach((s, matchId) => {
+        if (cricketMatchIds.has(matchId)) return;
+        x01ByMatch.set(matchId, { score: s.total_score || 0, darts: s.total_darts || 0, checkout: s.highest_checkout || 0 });
+      });
+      (matchesWithResults || []).forEach(m => {
+        if (isCricketGame(m.game_type) || x01ByMatch.has(m.id)) return;
+        const isPlayer1 = m.player1_id === playerId;
+        const checkouts = (isPlayer1 ? m.c1 : m.c2) || [];
+        x01ByMatch.set(m.id, {
+          score: Number(isPlayer1 ? m.s1 : m.s2) || 0,
+          darts: Number(isPlayer1 ? m.t1 : m.t2) || 0,
+          checkout: Math.max(0, ...checkouts.map(c => Number(c?.checkout) || 0))
+        });
+      });
+
       let bestAverage = 0;
       let highestCheckout = 0;
       let totalDarts = 0;
       let totalScore = 0;
-      let totalLegsWon = 0;
-      let totalLegsLost = 0;
-      (matchStats || []).forEach(s => {
-        totalLegsWon += s.legs_won || 0;
-        totalLegsLost += s.legs_lost || 0;
-        if (cricketMatchIds.has(s.match_id)) return;
-        const avg = parseFloat(s.average) || 0;
-        if (avg > bestAverage) bestAverage = avg;
-        if ((s.highest_checkout || 0) > highestCheckout) highestCheckout = s.highest_checkout;
-        totalDarts += s.total_darts || 0;
-        totalScore += s.total_score || 0;
+      x01ByMatch.forEach(({ score, darts, checkout }) => {
+        if (darts > 0) bestAverage = Math.max(bestAverage, (score / darts) * 3);
+        highestCheckout = Math.max(highestCheckout, checkout);
+        totalDarts += darts;
+        totalScore += score;
       });
       const overallAverage = totalDarts > 0 ? (totalScore / totalDarts) * 3 : 0;
 
@@ -1833,14 +1857,14 @@ export const tournamentService = {
       }));
 
       // Recent form — newest completed matches with opponent and score
-      const statsByMatch = new Map((matchStats || []).map(s => [s.match_id, s]));
       const tournamentNameById = new Map(tournaments.map(tourn => [tourn.id, tourn.name]));
 
       const recentMatches = (recentRaw || []).map(m => {
         const isPlayer1 = m.player1_id === playerId;
         const opponent = isPlayer1 ? m.player2 : m.player1;
         const isCricket = isCricketGame(m.game_type);
-        const matchAverage = isCricket ? NaN : parseFloat(statsByMatch.get(m.id)?.average);
+        const x01 = x01ByMatch.get(m.id);
+        const matchAverage = x01?.darts > 0 ? (x01.score / x01.darts) * 3 : NaN;
         const cricketSide = isCricket ? (isPlayer1 ? m.result?.player1Stats : m.result?.player2Stats) : null;
         return {
           id: m.id,

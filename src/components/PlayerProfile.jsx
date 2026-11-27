@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  ArrowLeft, Trophy, Target, Crown, Calendar, TrendingUp, Award, Medal,
-  Flame, Zap, Percent, Swords, ShieldCheck, ChevronRight, Activity, Pencil, BarChart3, Camera, Loader, X
+  ArrowLeft, Trophy, Target, Crown, Calendar, TrendingUp, Award,
+  Flame, Zap, Swords, ShieldCheck, ChevronRight, Activity, Pencil, BarChart3, Camera, Loader, X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,12 +10,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
 import { EmptyState } from './shared/EmptyState';
 import { StatTile } from './shared/StatTile';
-import { FormRating } from './FormRating';
+import { RankMedal, MILESTONE_TEXT } from './shared/RankMedal';
+import { FormChange, FormTrend } from './FormRating';
 import { DisplayNameEditor } from './DisplayNameEditor';
 import { AvatarCropDialog } from './AvatarCropDialog';
 import { AccountDeletion } from './AccountDeletion';
@@ -26,6 +27,7 @@ import { mediaService } from '../services/mediaService';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
 import { loadHistory } from '../lib/practiceStorage';
+import { useFormRating } from '../hooks/useFormRating';
 
 const getInitials = (name) => {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
@@ -44,7 +46,8 @@ const placementLabel = (placement, t) => {
 const WIN_BADGE = 'border-transparent bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200';
 const LOSS_BADGE = 'border-transparent bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200';
 const TITLE_BADGE = 'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200';
-const MEDAL_CLASS = { 1: 'text-amber-500', 2: 'text-zinc-400', 3: 'text-amber-700' };
+// Darts milestones get board red, as on the Statistics boards: a 100+ average, a ton-plus checkout
+const milestone = (value) => (value >= 100 ? MILESTONE_TEXT : undefined);
 
 const ROW_BUTTON = 'flex w-full items-center gap-3 px-6 py-3 text-left text-sm transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none';
 
@@ -57,6 +60,17 @@ function Section({ icon: Icon, title, children }) {
       </h2>
       {children}
     </section>
+  );
+}
+
+// One headline number in the hero: label, the number, a supporting line
+function Figure({ label, value, sub, isLead = false, valueClassName }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <div className={cn('font-display font-semibold leading-none tabular-nums', isLead ? 'text-5xl' : 'text-4xl', valueClassName)}>{value}</div>
+      {sub && <div className="text-sm text-muted-foreground">{sub}</div>}
+    </div>
   );
 }
 
@@ -79,6 +93,8 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [cropFile, setCropFile] = useState(null);
   const photoInputRef = useRef(null);
+  // Loads alongside the profile; the hero leads with it
+  const form = useFormRating(playerId);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,11 +118,8 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
     return (
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8" aria-busy="true" aria-label={t('common.loading')}>
         <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-          {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
-        </div>
-        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
@@ -178,48 +191,24 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
     return { ...acc, done: true };
   }, { won: false, count: 0, done: false });
 
-  const heroStats = [
-    {
-      key: 'matches',
-      icon: Swords,
-      label: t('playerProfile.matchesPlayed'),
-      value: careerStats.matchesPlayed
-    },
-    {
-      key: 'winRate',
-      icon: Percent,
-      label: t('playerProfile.winRate'),
-      value: `${winRate.toFixed(careerStats.matchesPlayed > 0 ? 1 : 0)}%`,
-      hint: careerStats.matchesPlayed > 0
-        ? `${plural('winsCount', careerStats.wins)} · ${plural('lossesCount', careerStats.losses)}`
-        : undefined
-    },
-    hasX01 ? {
-      key: 'average',
-      icon: TrendingUp,
-      label: x01(t('playerProfile.overallAverage')),
-      value: careerStats.overallAverage.toFixed(2)
-    } : {
-      key: 'mpr',
-      icon: TrendingUp,
-      label: t('playerProfile.cricketMpr'),
-      value: cricketStats.mpr.toFixed(2)
-    }
-  ];
+  // Hero: form leads (it drives the win chances), then the average and the record
+  const formLabel = x01(t('playerProfile.formRating'));
+  const averageFigure = hasX01
+    ? { label: x01(t('playerProfile.overallAverage')), value: careerStats.overallAverage.toFixed(2), valueClassName: milestone(careerStats.overallAverage) }
+    : { label: t('playerProfile.cricketMpr'), value: cricketStats.mpr.toFixed(2) };
+  const recordSub = `${t('playerProfile.winRate')} ${winRate.toFixed(1)}% · ${plural('matchesCount', careerStats.matchesPlayed)}`;
 
   const x01Tiles = hasX01 ? [
-    { key: 'bestAverage', icon: Award, label: x01(t('playerProfile.bestAverage')), value: careerStats.bestAverage.toFixed(2) },
-    { key: 'highestCheckout', icon: Zap, label: x01(t('playerProfile.highestCheckout')), value: careerStats.highestCheckout || '—' },
-    { key: 'total180s', icon: Flame, label: x01(t('playerProfile.total180s')), value: careerStats.total180s || 0 }
+    { key: 'bestAverage', icon: Award, label: x01(t('playerProfile.bestAverage')), value: careerStats.bestAverage.toFixed(2), tone: 'primary', valueClassName: milestone(careerStats.bestAverage) },
+    { key: 'highestCheckout', icon: Zap, label: x01(t('playerProfile.highestCheckout')), value: careerStats.highestCheckout || '—', tone: 'live', valueClassName: milestone(careerStats.highestCheckout) },
+    { key: 'total180s', icon: Flame, label: x01(t('playerProfile.total180s')), value: careerStats.total180s || 0, tone: 'primary' }
   ] : [];
   const cricketTiles = cricketStats ? [
     { key: 'cricketMatches', icon: Swords, label: t('playerProfile.cricketMatches'), value: cricketStats.matches },
-    { key: 'cricketMpr', icon: TrendingUp, label: t('playerProfile.cricketMpr'), value: (cricketStats.mpr || 0).toFixed(2) },
-    { key: 'cricketBestMpr', icon: Award, label: t('playerProfile.cricketBestMpr'), value: (cricketStats.bestMpr || 0).toFixed(2) }
+    { key: 'cricketMpr', icon: TrendingUp, label: t('playerProfile.cricketMpr'), value: (cricketStats.mpr || 0).toFixed(2), tone: 'primary' },
+    { key: 'cricketBestMpr', icon: Award, label: t('playerProfile.cricketBestMpr'), value: (cricketStats.bestMpr || 0).toFixed(2), tone: 'primary' }
   ] : [];
   const statTiles = [
-    { key: 'wins', icon: Trophy, label: t('playerProfile.wins'), value: careerStats.wins },
-    { key: 'losses', icon: Target, label: t('playerProfile.losses'), value: careerStats.losses },
     ...x01Tiles,
     { key: 'legs', icon: Activity, label: t('playerProfile.legsRecord'), value: `${careerStats.totalLegsWon || 0}:${careerStats.totalLegsLost || 0}` },
     { key: 'titles', icon: Crown, label: t('playerProfile.tournamentWins'), value: careerStats.tournamentWins || 0 },
@@ -228,14 +217,14 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
   ];
 
   const practiceHistory = isOwnProfile ? loadHistory() : [];
+  const showPractice = isOwnProfile && practiceHistory.length > 0;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 text-foreground md:p-8">
       <BackButton onBack={onBack} t={t} />
 
-      {/* Hero */}
-      {/* xl, not lg: beside the 256px sidebar, lg leaves ~690px and the 28rem stats column squeezed the name to 0px. */}
-      <Card className="flex-col gap-6 p-6 xl:flex-row xl:items-start xl:justify-between">
+      {/* Hero: who it is, then how they are playing */}
+      <Card className="gap-6 p-6">
         <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
           <div className="relative size-20 shrink-0">
             <Avatar className="size-20">
@@ -356,148 +345,134 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
         </div>
 
         {hasMatches && (
-        <div className="flex w-full flex-col gap-3 xl:w-auto xl:min-w-[28rem]">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {heroStats.map(stat => (
-              <StatTile key={stat.key} label={stat.label} value={stat.value} icon={stat.icon} hint={stat.hint} />
-            ))}
-          </div>
-          {careerStats.matchesPlayed > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{plural('winsCount', careerStats.wins)}</span>
-                <span>{plural('lossesCount', careerStats.losses)}</span>
-              </div>
-              <Progress value={winRate} aria-label={t('playerProfile.winRate')} />
+          // Trend always under the figures: beside them it was squeezed to ~90px even at 1280-1440
+          <div className="flex flex-col gap-6 border-t pt-6">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3">
+              {form.status !== 'none' && (
+                <Figure
+                  isLead
+                  label={formLabel}
+                  value={form.status === 'ready' ? form.now.toFixed(1) : <Skeleton className="h-12 w-24" />}
+                  sub={form.status === 'ready' ? <FormChange form={form} /> : null}
+                />
+              )}
+              <Figure label={averageFigure.label} value={averageFigure.value} valueClassName={averageFigure.valueClassName} />
+              <Figure label={t('playerProfile.record')} value={`${careerStats.wins}–${careerStats.losses}`} sub={recordSub} />
             </div>
-          )}
-        </div>
+            {form.status === 'ready' && <FormTrend form={form} />}
+          </div>
         )}
       </Card>
 
       {/* Career Statistics */}
       <Section icon={Activity} title={t('playerProfile.careerStats')}>
         {hasMatches ? (
-          <>
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-              {statTiles.map(tile => (
-                <StatTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} />
-              ))}
-            </div>
-            <FormRating playerId={playerId} gameLabel={cricketStats ? t('common.gameTypeX01') : null} />
-          </>
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+            {statTiles.map(tile => (
+              <StatTile key={tile.key} label={tile.label} value={tile.value} icon={tile.icon} tone={tile.tone} valueClassName={tile.valueClassName} />
+            ))}
+          </div>
         ) : (
           <EmptyState icon={Activity} title={t('playerProfile.noStatsYet')} description={t('playerProfile.noStatsYetHint')} />
         )}
       </Section>
 
-      {/* Practice bests */}
-      {isOwnProfile && practiceHistory.length > 0 && (
-        <Section icon={Target} title={t('practice.bests.profileTitle')}>
-          <Card>
-            <CardContent>
-              <PracticeBests entries={practiceHistory} compact />
-            </CardContent>
-            <CardFooter>
-              <Button type="button" variant="link" className="h-auto p-0" onClick={() => onSelectPractice?.()}>
-                {t('practice.bests.openPractice')} <ChevronRight />
-              </Button>
-            </CardFooter>
-          </Card>
-        </Section>
-      )}
-
-      {/* Recent matches (the career empty state already says there are none) */}
-      {hasMatches && (
-      <Section icon={Swords} title={t('playerProfile.recentMatches')}>
-        {recentMatches.length > 0 ? (
-          <Card className="gap-4 pb-0">
-            <CardHeader>
-              <div className="flex flex-wrap gap-1">
-                {[...recentMatches].reverse().map(match => (
-                  <Badge
-                    key={match.id}
-                    variant="outline"
-                    className={cn('size-6 justify-center p-0', match.won ? WIN_BADGE : LOSS_BADGE)}
-                    title={`${match.opponentName || t('common.unknown')} ${match.legsFor}:${match.legsAgainst}`}
-                  >
-                    {match.won ? t('playerProfile.formWin') : t('playerProfile.formLoss')}
-                  </Badge>
-                ))}
-              </div>
-            </CardHeader>
-            <CardContent className="divide-y px-0">
-              {recentMatches.map(match => (
-                <div key={match.id} className="flex items-center gap-3 px-6 py-3 text-sm">
-                  <Badge variant="outline" className={cn('size-6 shrink-0 justify-center p-0', match.won ? WIN_BADGE : LOSS_BADGE)}>
-                    {match.won ? t('playerProfile.formWin') : t('playerProfile.formLoss')}
-                  </Badge>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex flex-wrap items-center gap-1.5 font-medium">
-                      <span>
-                        {t('playerProfile.versus')}{' '}
-                        {match.opponentId && onSelectPlayer ? (
-                          <button
-                            type="button"
-                            className="font-medium underline-offset-4 hover:underline"
-                            onClick={() => onSelectPlayer({ id: match.opponentId })}
-                          >
-                            {match.opponentName || t('common.unknown')}
-                          </button>
-                        ) : (
-                          match.opponentName || t('common.unknown')
+      {/* Everything below the stats is one tap away instead of a long scroll */}
+      <Tabs defaultValue={hasMatches ? 'matches' : 'tournaments'} className="gap-4">
+        <TabsList>
+          {hasMatches && <TabsTrigger value="matches"><Swords />{t('playerProfile.recentMatches')}</TabsTrigger>}
+          <TabsTrigger value="tournaments"><Trophy />{t('tournaments.title')}</TabsTrigger>
+          {leagues.length > 0 && <TabsTrigger value="leagues"><Crown />{t('leagues.title')}</TabsTrigger>}
+          {showPractice && <TabsTrigger value="practice"><Target />{t('practice.bests.profileTitle')}</TabsTrigger>}
+        </TabsList>
+        {hasMatches && (
+          <TabsContent value="matches">
+          {recentMatches.length > 0 ? (
+            <Card className="gap-4 pb-0">
+              <CardHeader>
+                <div className="flex flex-wrap gap-1">
+                  {[...recentMatches].reverse().map(match => (
+                    <Badge
+                      key={match.id}
+                      variant="outline"
+                      className={cn('size-6 justify-center p-0', match.won ? WIN_BADGE : LOSS_BADGE)}
+                      title={`${match.opponentName || t('common.unknown')} ${match.legsFor}:${match.legsAgainst}`}
+                    >
+                      {match.won ? t('playerProfile.formWin') : t('playerProfile.formLoss')}
+                    </Badge>
+                  ))}
+                </div>
+              </CardHeader>
+              <CardContent className="divide-y px-0">
+                {recentMatches.map(match => (
+                  <div key={match.id} className="flex items-center gap-3 px-6 py-3 text-sm">
+                    <Badge variant="outline" className={cn('size-6 shrink-0 justify-center p-0', match.won ? WIN_BADGE : LOSS_BADGE)}>
+                      {match.won ? t('playerProfile.formWin') : t('playerProfile.formLoss')}
+                    </Badge>
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="flex flex-wrap items-center gap-1.5 font-medium">
+                        <span>
+                          {t('playerProfile.versus')}{' '}
+                          {match.opponentId && onSelectPlayer ? (
+                            <button
+                              type="button"
+                              className="font-medium underline-offset-4 hover:underline"
+                              onClick={() => onSelectPlayer({ id: match.opponentId })}
+                            >
+                              {match.opponentName || t('common.unknown')}
+                            </button>
+                          ) : (
+                            match.opponentName || t('common.unknown')
+                          )}
+                        </span>
+                        {match.isPlayoff && (
+                          <Badge variant="outline">{t('playerProfile.playoffTag')}</Badge>
                         )}
                       </span>
-                      {match.isPlayoff && (
-                        <Badge variant="outline">{t('playerProfile.playoffTag')}</Badge>
+                      {(match.tournamentName || match.playedAt) && (
+                        <span className="truncate text-xs text-muted-foreground">
+                          {[
+                            match.tournamentName,
+                            match.playedAt ? new Date(match.playedAt).toLocaleDateString() : null
+                          ].filter(Boolean).join(' · ')}
+                        </span>
                       )}
-                    </span>
-                    {(match.tournamentName || match.playedAt) && (
-                      <span className="truncate text-xs text-muted-foreground">
-                        {[
-                          match.tournamentName,
-                          match.playedAt ? new Date(match.playedAt).toLocaleDateString() : null
-                        ].filter(Boolean).join(' · ')}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end">
+                      <span className="font-display text-xl font-semibold">{match.legsFor}:{match.legsAgainst}</span>
+                      <span className={cn('text-xs text-muted-foreground tabular-nums', match.gameType !== 'cricket' && milestone(match.average))}>
+                        {match.gameType === 'cricket'
+                          ? `${match.mpr ? match.mpr.toFixed(2) : '—'} ${t('common.mpr')}`
+                          : `${match.average ? match.average.toFixed(2) : '—'} ${t('playerProfile.avgShort')}`}
                       </span>
+                    </div>
+                    {match.result && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground"
+                        onClick={() => setStatsMatch(match)}
+                        title={t('matchStats.open')}
+                        aria-label={t('matchStats.open')}
+                      >
+                        <BarChart3 />
+                      </Button>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end">
-                    <span className="font-display text-xl font-semibold">{match.legsFor}:{match.legsAgainst}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {match.gameType === 'cricket'
-                        ? `${match.mpr ? match.mpr.toFixed(2) : '—'} ${t('common.mpr')}`
-                        : `${match.average ? match.average.toFixed(2) : '—'} ${t('playerProfile.avgShort')}`}
-                    </span>
-                  </div>
-                  {match.result && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground"
-                      onClick={() => setStatsMatch(match)}
-                      title={t('matchStats.open')}
-                      aria-label={t('matchStats.open')}
-                    >
-                      <BarChart3 />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ) : (
-          <EmptyState icon={Swords} title={t('playerProfile.noMatches')} />
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <EmptyState icon={Swords} title={t('playerProfile.noMatches')} />
+          )}
+          </TabsContent>
         )}
-      </Section>
-      )}
-
-      {/* Tournament History */}
-      <Section icon={Trophy} title={t('playerProfile.tournamentHistory')}>
+        <TabsContent value="tournaments">
         {tournaments.length > 0 ? (
           <Card className="py-0">
             <CardContent className="divide-y px-0">
-              {tournaments.map((tourn, index) => (
+              {tournaments.map((tourn) => (
                 <button
                   type="button"
                   key={tourn.id}
@@ -505,11 +480,8 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
                   onClick={() => onSelectTournament && onSelectTournament(tourn)}
                 >
                   <span className="flex w-8 shrink-0 items-center justify-center">
-                    {tourn.placement && tourn.placement <= 3 ? (
-                      <Medal className={cn('size-5', MEDAL_CLASS[tourn.placement])} />
-                    ) : (
-                      <span className="text-xs text-muted-foreground tabular-nums">{tourn.placement || index + 1}</span>
-                    )}
+                    {/* Gold / silver / bronze chips, other places as a plain number */}
+                    {tourn.placement && <RankMedal rank={tourn.placement} />}
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="truncate font-medium">{tourn.name}</span>
@@ -532,31 +504,45 @@ export function PlayerProfile({ playerId, onBack, onSelectTournament, onSelectLe
         ) : (
           <EmptyState icon={Trophy} title={t('playerProfile.noTournaments')} />
         )}
-      </Section>
+        </TabsContent>
+        {leagues.length > 0 && (
+          <TabsContent value="leagues">
+            <Card className="py-0">
+              <CardContent className="divide-y px-0">
+                {leagues.map(lm => (
+                  <button
+                    type="button"
+                    key={lm.league_id}
+                    className={ROW_BUTTON}
+                    onClick={() => onSelectLeague && onSelectLeague({ id: lm.league_id })}
+                  >
+                    <Crown className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate font-medium">{lm.leagues?.name || lm.league_id}</span>
+                    {lm.is_active && <Badge variant="outline" className={WIN_BADGE}>{t('common.active')}</Badge>}
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+        {showPractice && (
+          <TabsContent value="practice">
+            <Card>
+              <CardContent>
+                <PracticeBests entries={practiceHistory} compact />
+              </CardContent>
+              <CardFooter>
+                <Button type="button" variant="link" className="h-auto p-0" onClick={() => onSelectPractice?.()}>
+                  {t('practice.bests.openPractice')} <ChevronRight />
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
 
-      {/* League Memberships */}
-      {leagues.length > 0 && (
-        <Section icon={Crown} title={t('playerProfile.leagues')}>
-          <Card className="py-0">
-            <CardContent className="divide-y px-0">
-              {leagues.map(lm => (
-                <button
-                  type="button"
-                  key={lm.league_id}
-                  className={ROW_BUTTON}
-                  onClick={() => onSelectLeague && onSelectLeague({ id: lm.league_id })}
-                >
-                  <Crown className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate font-medium">{lm.leagues?.name || lm.league_id}</span>
-                  {lm.is_active && <Badge variant="outline" className={WIN_BADGE}>{t('common.active')}</Badge>}
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-        </Section>
-      )}
-
+      {/* Stays a visible section: the public delete-account page sends users here */}
       {isOwnProfile && <AccountDeletion />}
 
       {statsMatch && (
