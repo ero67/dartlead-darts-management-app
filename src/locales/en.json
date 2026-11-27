@@ -1146,6 +1146,10 @@
     "lossesCountOne": "{{count}} loss",
     "lossesCountFew": "{{count}} losses",
     "lossesCountMany": "{{count}} losses",
+    "record": "Record",
+    "matchesCountOne": "{{count}} match",
+    "matchesCountFew": "{{count}} matches",
+    "matchesCountMany": "{{count}} matches",
     "cricketMpr": "Cricket MPR",
     "cricketBestMpr": "Best Cricket Match MPR",
     "cricketMatches": "Cricket Matches"

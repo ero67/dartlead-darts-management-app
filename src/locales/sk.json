@@ -1146,6 +1146,10 @@
     "lossesCountOne": "{{count}} prehra",
     "lossesCountFew": "{{count}} prehry",
     "lossesCountMany": "{{count}} prehier",
+    "record": "Bilancia",
+    "matchesCountOne": "{{count}} zápas",
+    "matchesCountFew": "{{count}} zápasy",
+    "matchesCountMany": "{{count}} zápasov",
     "cricketMpr": "Kriket MPR",
     "cricketBestMpr": "Najlepšie MPR v kriketovom zápase",
     "cricketMatches": "Kriketové zápasy"
