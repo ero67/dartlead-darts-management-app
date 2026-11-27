@@ -46,7 +46,7 @@ function PlayerColumn({ player, isActive, isBusting, legsToWin }) {
           />
         </div>
       )}
-      <span className={cn('text-xs tabular-nums', isActive || isBusting ? 'opacity-85' : 'text-muted-foreground')}>
+      <span className={cn('text-xs tabular-nums', isActive || isBusting ? '' : 'text-muted-foreground')}>
         {t('match.average')} {player.average} · {t('match.darts')} {player.legDarts}
       </span>
     </div>

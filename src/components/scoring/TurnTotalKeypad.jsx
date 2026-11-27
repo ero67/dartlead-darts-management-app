@@ -50,7 +50,7 @@ export function TurnTotalKeypad({
       type="button"
     >
       <span>{t('match.ok')}</span>
-      {!value && <span className="text-xs font-normal opacity-80">{t('match.okZero')}</span>}
+      {!value && <span className="text-xs font-normal">{t('match.okZero')}</span>}
     </Button>
   );
 
