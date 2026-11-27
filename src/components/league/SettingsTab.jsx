@@ -53,8 +53,8 @@ export function SettingsTab({
   scoringRules, onScoringRuleChange, isFallbackRule, onRemovePlacement,
   roundPointsRules, setRoundPointsRules,
   newPlacement, setNewPlacement, onAddPlacement,
-  isSavingScoring, onSaveScoringRules,
-  tournamentDefaults, setTournamentDefaults, isSavingDefaults, onSaveDefaults, onResetDefaults,
+  tournamentDefaults, setTournamentDefaults, onResetDefaults,
+  isDirty, isSaving, onSave, onDiscard,
   onTogglePublic,
   onLogoChange, isSavingLogo,
 }) {
@@ -323,12 +323,6 @@ export function SettingsTab({
             <p className="text-xs text-muted-foreground">{t('leagues.defaultPlacementTip')}</p>
           </div>
         </CardContent>
-        <CardFooter className="justify-end">
-          <Button onClick={onSaveScoringRules} disabled={isSavingScoring}>
-            <Save />
-            {isSavingScoring ? t('common.saving') : t('leagues.saveChanges')}
-          </Button>
-        </CardFooter>
       </Card>
       </section>
 
@@ -461,6 +455,7 @@ export function SettingsTab({
             <>
               <div className="flex flex-col gap-3">
                 <Label>{t('leagues.defaultGroupSettings')}</Label>
+                <p className="text-sm text-muted-foreground">{t('registration.groupSettingsHint')}</p>
                 <RadioGroup
                   value={tournamentDefaults.groupSettings.type}
                   onValueChange={(v) => setGroup({ type: v })}
@@ -554,6 +549,7 @@ export function SettingsTab({
                   <>
                     <div className="flex flex-col gap-2">
                       <Label className="text-muted-foreground">{t('leagues.defaultQualificationMode')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('registration.qualificationModeHint')}</p>
                       <RadioGroup
                         value={playoff.qualificationMode}
                         onValueChange={(v) => setPlayoff({ qualificationMode: v })}
@@ -678,13 +674,31 @@ export function SettingsTab({
             <RotateCcw />
             {t('leagues.resetDefaults')}
           </Button>
-          <Button onClick={onSaveDefaults} disabled={isSavingDefaults}>
-            <Save />
-            {isSavingDefaults ? t('common.saving') : t('leagues.saveChanges')}
-          </Button>
         </CardFooter>
       </Card>
       </section>
+
+      {/* One save for points and round defaults: two buttons let you save one
+          card and silently lose the other's edits. Logo, visibility and people
+          still save instantly. */}
+      {isDirty && (
+        <div
+          role="status"
+          // lg:pr-20 keeps Save clear of the assistant's floating button (lg+ only)
+          className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8 lg:pr-20"
+        >
+          <span className="text-sm font-medium">{t('leagues.unsavedChanges')}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onDiscard} disabled={isSaving}>
+              {t('leagues.discardChanges')}
+            </Button>
+            <Button onClick={onSave} disabled={isSaving}>
+              <Save />
+              {isSaving ? t('common.saving') : t('leagues.saveChanges')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

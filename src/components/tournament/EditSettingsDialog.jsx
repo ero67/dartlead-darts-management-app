@@ -148,6 +148,7 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <Label>{t('registration.qualificationMode')}</Label>
+          <p className="text-sm text-muted-foreground">{t('registration.qualificationModeHint')}</p>
           <RadioGroup
             name="qualificationMode"
             value={tournamentSettings.playoffSettings.qualificationMode}
@@ -421,7 +422,7 @@ export function EditSettingsDialog({ open, onClose, onSave, tournament, tourname
 
           <Separator />
 
-          <Section title={t('registration.groupSettings')} description={hasTournamentStarted ? t('registration.groupSettingsLocked') : undefined}>
+          <Section title={t('registration.groupSettings')} description={hasTournamentStarted ? t('registration.groupSettingsLocked') : t('registration.groupSettingsHint')}>
             <RadioGroup
               name="groupType"
               value={tournamentSettings.groupSettings.type}

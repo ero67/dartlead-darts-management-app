@@ -650,6 +650,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
             <Card>
               <CardHeader>
                 <CardTitle>{t('registration.groupSettings')}</CardTitle>
+                <CardDescription>{t('registration.groupSettingsHint')}</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <RadioGroup
@@ -712,6 +713,7 @@ export function TournamentCreation({ onTournamentCreated, onBack }) {
                     <>
                       <div className="flex flex-col gap-2">
                         <Label>{t('registration.qualificationMode')}</Label>
+                        <p className="text-sm text-muted-foreground">{t('registration.qualificationModeHint')}</p>
                         <RadioGroup
                           value={playoffSettings.qualificationMode}
                           onValueChange={(v) => setPlayoffSettings({ ...playoffSettings, qualificationMode: v })}
