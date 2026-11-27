@@ -1251,7 +1251,21 @@
     "rotating": "Zobrazenie sa mení každých {{seconds}} s",
     "fullscreen": "Celá obrazovka (F)",
     "loadError": "Turnaj sa nepodarilo načítať",
-    "pinned": "Pevné zobrazenie — odstráňte ?view= z adresy pre striedanie"
+    "pinned": "Pevné zobrazenie — odstráňte ?view= z adresy pre striedanie",
+    "stageWaiting": "Pred začiatkom",
+    "stageGroups": "Skupinová fáza",
+    "stageFinished": "Konečné poradie",
+    "sceneWelcome": "Hráči",
+    "scenePodium": "Stupne víťazov",
+    "playersCount": "Hráči: {{count}}",
+    "recordsTitle": "Rekordy večera",
+    "groupWinners": "Víťazi skupín",
+    "momentCheckout": "checkout",
+    "momentMatchWins": "vyhráva {{score}}",
+    "momentAgainst": "proti {{name}}",
+    "offline": "Bez spojenia · naposledy {{time}}",
+    "loadErrorHint": "Skontrolujte odkaz. Obrazovka to skúša znova každých 30 sekúnd.",
+    "next": "Ďalej"
   },
   "boards": {
     "count": "Počet terčov",
