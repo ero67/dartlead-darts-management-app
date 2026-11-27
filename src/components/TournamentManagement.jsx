@@ -1695,14 +1695,13 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
         const groupIds = uniqueGroups?.map(g => g.id) || [];
         const groupIdSet = new Set(groupIds);
         
-        // Get playoff matches for this tournament
-        const playoffMatchIds = tournament.playoffMatches?.map(m => m.id) || [];
-        const playoffIdSet = new Set(playoffMatchIds);
-
-        // Helper to ensure we only keep matches belonging to this tournament
+        // Helper to ensure we only keep matches belonging to this tournament.
+        // By tournament_id, not by known playoff ids: this effect keeps the
+        // tournament from mount, and first-round playoff rows are created when
+        // scoring starts, so a list of ids taken then misses them.
         const belongsToThisTournament = (match) => {
           const matchGroupId = match.group_id || match.group?.id;
-          return groupIdSet.has(matchGroupId) || playoffIdSet.has(match.id);
+          return match.tournament_id === tournament.id || groupIdSet.has(matchGroupId);
         };
         
         const allLiveMatches = [];
@@ -1729,28 +1728,27 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
           }
         }
 
-        // Load playoff matches if we have playoff matches
-        if (playoffMatchIds.length > 0) {
-          const playoffQuery = supabase
-            .from('matches')
-            .select(`
-              *,
-              player1:players!matches_player1_id_fkey(*),
-              player2:players!matches_player2_id_fkey(*)
-            `)
-            .eq('status', 'in_progress')
-            .in('id', playoffMatchIds);
+        // Load playoff matches (rows may be newer than this page's tournament)
+        const playoffQuery = supabase
+          .from('matches')
+          .select(`
+            *,
+            player1:players!matches_player1_id_fkey(*),
+            player2:players!matches_player2_id_fkey(*)
+          `)
+          .eq('status', 'in_progress')
+          .eq('is_playoff', true)
+          .eq('tournament_id', tournament.id);
 
-          const { data: playoffData, error: playoffError } = await playoffQuery;
-          if (!playoffError && playoffData) {
-            // Merge playoff matches, avoiding duplicates
-            const existingIds = new Set(allLiveMatches.map(m => m.id));
-            playoffData.forEach(match => {
-              if (!existingIds.has(match.id)) {
-                allLiveMatches.push(match);
-              }
-            });
-          }
+        const { data: playoffData, error: playoffError } = await playoffQuery;
+        if (!playoffError && playoffData) {
+          // Merge playoff matches, avoiding duplicates
+          const existingIds = new Set(allLiveMatches.map(m => m.id));
+          playoffData.forEach(match => {
+            if (!existingIds.has(match.id)) {
+              allLiveMatches.push(match);
+            }
+          });
         }
 
         // Stable order (board number, then id) so cards don't jump around
@@ -1984,7 +1982,9 @@ export function TournamentManagement({ tournament, onMatchStart, onBack, onDelet
 
   const belongsToThisTournament = (match) => {
     const matchGroupId = match.group_id || match.group?.id;
-    return tournamentGroupIds.has(matchGroupId) || tournamentPlayoffIds.has(match.id);
+    // tournament_id first: a first-round playoff row is created when scoring
+    // starts, after the last tournament fetch, so it is not in playoffMatches yet.
+    return match.tournament_id === tournament.id || tournamentGroupIds.has(matchGroupId) || tournamentPlayoffIds.has(match.id);
   };
   const filteredLiveMatches = liveMatches
     .filter(belongsToThisTournament)
