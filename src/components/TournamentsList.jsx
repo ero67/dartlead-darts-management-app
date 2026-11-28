@@ -120,9 +120,10 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                 <CardHeader className="gap-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-col gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
+                      <div className="flex min-w-0 items-start gap-2">
                         <LeagueLogo src={linkedLeague?.logoUrl} className="size-6" />
-                        <h2 className="truncate text-base font-semibold leading-6">{tournament.name}</h2>
+                        {/* Two lines: round names often end in what tells them apart ("… – 3. kolo – Cricket"). */}
+                        <h2 className="line-clamp-2 break-words text-base font-semibold leading-6">{tournament.name}</h2>
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge status={tournament.status} t={t} />
