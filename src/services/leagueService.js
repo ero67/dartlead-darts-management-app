@@ -99,7 +99,11 @@ export const leagueService = {
         return leagues.map(league => ({
           ...this.transformLeague(league),
           memberCount: Number(countsById.get(league.id)?.member_count || 0),
-          tournamentCount: Number(countsById.get(league.id)?.tournament_count || 0)
+          tournamentCount: Number(countsById.get(league.id)?.tournament_count || 0),
+          // Migration 20261128120000; absent (null) before it
+          leaderName: countsById.get(league.id)?.leader_name || null,
+          leaderPoints: countsById.get(league.id)?.leader_points ?? null,
+          nextRoundAt: countsById.get(league.id)?.next_round_at || null
         }));
       }
       console.warn('get_leagues_summary unavailable, falling back to per-league counts:', summaryError?.message);

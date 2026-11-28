@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Trophy, Users, Calendar, Trash2, Play, Crown, LayoutGrid } from 'lucide-react';
+import { Plus, Trophy, Users, Calendar, Trash2, Play, Crown, Target } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -70,8 +70,11 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         return new Date(b.updatedAt) - new Date(a.updatedAt);
     }
   });
-  // Default order: planned rounds still ahead lead, soonest first.
-  const visibleTournaments = sortBy === 'updated' ? upcomingFirst(sortedTournaments) : sortedTournaments;
+  // Default order: rounds being played now, then planned rounds (soonest first), then the rest.
+  const byDefault = upcomingFirst(sortedTournaments);
+  const visibleTournaments = sortBy === 'updated'
+    ? [...byDefault.filter(x => isTournamentRunning(x.status)), ...byDefault.filter(x => !isTournamentRunning(x.status))]
+    : sortedTournaments;
   const upcomingIds = new Set(upcomingRounds(filteredTournaments).map(x => x.id));
 
   const handleDelete = async (tournament) => {
@@ -146,6 +149,8 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
             const isOwner = isMine(tournament);
             const linkedLeague = tournament.leagueId ? leagues.find(l => l.id === tournament.leagueId) : null;
             const running = isTournamentRunning(tournament.status);
+            const isCompleted = tournament.status === 'completed';
+            const totalMatches = tournament.totalMatches ?? 0;
 
             return (
               <Card key={tournament.id} className="gap-4">
@@ -201,16 +206,25 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                 </CardHeader>
 
                 <CardContent className="flex flex-col gap-4">
+                  {isCompleted && tournament.winnerName && (
+                    <p className="flex min-w-0 items-center gap-2 text-sm">
+                      <Trophy className="size-4 shrink-0" aria-hidden="true" />
+                      <span className="text-muted-foreground">{t('tournaments.winner')}</span>
+                      <span className="truncate font-semibold">{tournament.winnerName}</span>
+                    </p>
+                  )}
                   <RoundSchedule startsAt={tournament.startsAt} venue={tournament.venue} className="font-medium text-foreground" />
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Users className="size-4" />
                       {countOf('playersCount', tournament.playerCount ?? tournament.players?.length ?? 0)}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <LayoutGrid className="size-4" />
-                      {countOf('groupsCount', tournament.groupCount ?? tournament.groups?.length ?? 0)}
-                    </span>
+                    {running && totalMatches > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <Target className="size-4" />
+                        {t(`common.matchCount${pluralSuffix(totalMatches)}`, { count: `${tournament.completedMatches ?? 0}/${totalMatches}` })}
+                      </span>
+                    )}
                     {!tournament.startsAt && (
                       <span className="flex items-center gap-1.5">
                         <Calendar className="size-4" />
@@ -218,18 +232,20 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{tournamentPhaseLabel(phase, t)}</span>
-                      {tournament.status !== 'open_for_registration' && (
-                        <span className="tabular-nums">{phase.percent}%</span>
-                      )}
+                  {!isCompleted && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{tournamentPhaseLabel(phase, t)}</span>
+                        {tournament.status !== 'open_for_registration' && (
+                          <span className="tabular-nums">{phase.percent}%</span>
+                        )}
+                      </div>
+                      <PhaseBar {...phase} />
                     </div>
-                    <PhaseBar {...phase} />
-                  </div>
+                  )}
                 </CardContent>
 
-                <CardFooter className="flex items-center justify-between gap-2">
+                <CardFooter className="mt-auto flex items-center justify-between gap-2">
                   <Button variant={running ? 'default' : 'outline'} onClick={() => onSelectTournament(tournament)}>
                     {running ? t('tournaments.continueTournament') : t('tournaments.openTournament')}
                   </Button>

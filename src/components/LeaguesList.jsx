@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trophy, Users, Calendar, Crown } from 'lucide-react';
+import { Plus, Trophy, Users, CalendarClock, Crown } from 'lucide-react';
 import { useLeague } from '../contexts/LeagueContext';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +12,7 @@ import { StatusBadge } from './shared/StatusBadge';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { EmptyState } from './shared/EmptyState';
 import { pluralSuffix } from '@/lib/practiceGames';
+import { formatRoundDate } from '../utils/roundSchedule';
 
 const STATUS_LABEL = { active: 'leagues.statusActive', completed: 'leagues.statusCompleted', archived: 'leagues.statusArchived' };
 const EMPTY_FILTER_TITLE = {
@@ -123,21 +124,40 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
                   <p className="line-clamp-2 text-sm text-muted-foreground">{league.description}</p>
                 )}
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Users className="size-4" />
-                  {countOf('membersCount', league.memberCount || 0)}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Trophy className="size-4" />
-                  {countOf('tournamentsCount', league.tournamentCount || 0)}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="size-4" />
-                  {new Date(league.createdAt).toLocaleDateString(language === 'sk' ? 'sk-SK' : 'en-GB')}
-                </span>
+              <CardContent className="flex flex-col gap-4">
+                {(league.leaderName || league.nextRoundAt) && (
+                  <div className="flex flex-col gap-1.5 text-sm">
+                    {league.leaderName && (
+                      <p className="flex min-w-0 items-center gap-2">
+                        <Crown className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="text-muted-foreground">{t('leagues.leader')}</span>
+                        <span className="truncate font-semibold">{league.leaderName}</span>
+                        {league.leaderPoints != null && (
+                          <span className="shrink-0 tabular-nums text-muted-foreground">{countOf('pointsCount', league.leaderPoints)}</span>
+                        )}
+                      </p>
+                    )}
+                    {league.nextRoundAt && (
+                      <p className="flex min-w-0 items-center gap-2">
+                        <CalendarClock className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="text-muted-foreground">{t('leagues.nextRound')}</span>
+                        <time dateTime={league.nextRoundAt} className="truncate font-medium">{formatRoundDate(league.nextRoundAt, language)}</time>
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="size-4" />
+                    {countOf('membersCount', league.memberCount || 0)}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Trophy className="size-4" />
+                    {countOf('tournamentsCount', league.tournamentCount || 0)}
+                  </span>
+                </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="mt-auto">
                 <Button variant="outline" className="w-full" onClick={() => handleSelectLeague(league)}>
                   {t('leagues.openLeague')}
                 </Button>
