@@ -221,7 +221,9 @@ export function PlayersSection({
         {players.length === 0 ? (
           <EmptyState icon={Users} title={t('registration.noPlayersYet')} />
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          /* Columns follow the card's own width, not the window's: beside the side panel a
+             3-column grid left each name about 30px. 18rem keeps a full name readable. */
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-2">
             {players.map((player, index) => {
               const isSeeded = seededPlayerIds.has(player.id);
               return (
