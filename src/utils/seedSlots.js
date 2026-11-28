@@ -24,16 +24,23 @@ export function groupLabel(name) {
   return match ? match[1] : name;
 }
 
+const ALL_PLAYERS = 9999; // "All" in the players-per-group select
+
 // How many players advance per group, given the qualification settings.
-// - perGroup mode  -> playersPerGroup
+// - perGroup mode  -> playersPerGroup ("All" = the largest group's size)
 // - totalPlayers   -> ceil(total / numGroups) so the editor exposes the maximum
 //   possible slots; seeds that end up unfilled simply become byes.
-export function qualifiersPerGroup(playoffSettings, numGroups) {
+export function qualifiersPerGroup(playoffSettings, groups) {
   const ps = playoffSettings || {};
+  const groupList = Array.isArray(groups) ? groups.filter((g) => g?.name) : [];
+  const numGroups = groupList.length;
   if (ps.qualificationMode === 'totalPlayers') {
     const total = ps.totalPlayersToAdvance || 0;
     if (!numGroups) return total;
     return Math.ceil(total / numGroups);
+  }
+  if (ps.playersPerGroup === ALL_PLAYERS) {
+    return Math.max(1, ...groupList.map((g) => g.players?.length || g.standings?.length || 0));
   }
   return ps.playersPerGroup || 1;
 }
@@ -44,10 +51,9 @@ export function qualifiersPerGroup(playoffSettings, numGroups) {
 // wrong bracket.
 export function buildSignature(playoffSettings, groups) {
   const groupNames = Array.isArray(groups) ? groups.map((g) => g?.name).filter(Boolean) : [];
-  const numGroups = groupNames.length;
   return {
-    numGroups,
-    qualifiersPerGroup: qualifiersPerGroup(playoffSettings, numGroups),
+    numGroups: groupNames.length,
+    qualifiersPerGroup: qualifiersPerGroup(playoffSettings, groups),
     groupNames,
   };
 }
@@ -140,7 +146,7 @@ export function presetKey(numGroups, bracketSize) {
 export function bracketSizeForSettings(playoffSettings, groups) {
   const numGroups = Array.isArray(groups) ? groups.filter((g) => g?.name).length : 0;
   if (numGroups > 0) {
-    return nextPow2(numGroups * qualifiersPerGroup(playoffSettings, numGroups));
+    return nextPow2(numGroups * qualifiersPerGroup(playoffSettings, groups));
   }
   return nextPow2(playoffSettings?.totalPlayersToAdvance || 0);
 }
