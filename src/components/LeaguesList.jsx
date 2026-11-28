@@ -11,9 +11,19 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { EmptyState } from './shared/EmptyState';
+import { pluralSuffix } from '@/lib/practiceGames';
+
+const STATUS_LABEL = { active: 'leagues.statusActive', completed: 'leagues.statusCompleted', archived: 'leagues.statusArchived' };
+const EMPTY_FILTER_TITLE = {
+  active: 'leagues.noActiveLeagues',
+  completed: 'leagues.noCompletedLeagues',
+  archived: 'leagues.noArchivedLeagues',
+  mine: 'leagues.noMyLeagues',
+};
 
 export function LeaguesList({ onCreateLeague, onSelectLeague }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const countOf = (key, n) => t(`common.${key}${pluralSuffix(n)}`, { count: n });
   const { user } = useAuth();
   const { canCreateTournaments } = useAdmin();
   const { leagues, loading } = useLeague();
@@ -27,7 +37,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
   const filters = [
     { key: 'all', label: t('tournaments.all'), count: leagues.length },
     { key: 'active', label: t('common.active'), count: leagues.filter(l => l.status === 'active').length },
-    { key: 'completed', label: t('common.completed'), count: leagues.filter(l => l.status === 'completed').length },
+    { key: 'completed', label: t('leagues.filterCompleted'), count: leagues.filter(l => l.status === 'completed').length },
     { key: 'archived', label: t('common.archived'), count: leagues.filter(l => l.status === 'archived').length },
     ...(canCreate ? [{ key: 'mine', label: t('leagues.myLeagues'), count: leagues.filter(isMyLeague).length }] : []),
   ];
@@ -47,7 +57,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">{t('leagues.title')}</h1>
           {!loading && (
-            <p className="text-sm text-muted-foreground">{leagues.length} {t('leagues.title').toLowerCase()}</p>
+            <p className="text-sm text-muted-foreground">{countOf('leaguesCount', leagues.length)}</p>
           )}
         </div>
         {canCreate && (
@@ -83,8 +93,14 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
           ))}
         </div>
       ) : filteredLeagues.length === 0 ? (
-        <EmptyState icon={Crown} title={t('leagues.noLeaguesFound')} description={t('leagues.createFirstLeagueHint')}>
-          {canCreate && (
+        <EmptyState
+          icon={Crown}
+          title={t(EMPTY_FILTER_TITLE[filter] ?? 'leagues.noLeaguesFound')}
+          description={filter === 'all'
+            ? t(canCreate ? 'leagues.createFirstLeagueHint' : 'leagues.noLeaguesYetHint')
+            : undefined}
+        >
+          {filter === 'all' && canCreate && (
             <Button onClick={onCreateLeague}>
               <Plus />
               {t('leagues.createLeague')}
@@ -101,7 +117,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
                     <LeagueLogo src={league.logoUrl} className="size-6" />
                     <h3 className="truncate text-base font-semibold leading-6">{league.name}</h3>
                   </div>
-                  <StatusBadge status={league.status} t={t} />
+                  <StatusBadge status={league.status} t={t} label={STATUS_LABEL[league.status] && t(STATUS_LABEL[league.status])} />
                 </div>
                 {league.description && (
                   <p className="line-clamp-2 text-sm text-muted-foreground">{league.description}</p>
@@ -110,20 +126,20 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
               <CardContent className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Users className="size-4" />
-                  {league.memberCount || 0} {t('leagues.members')}
+                  {countOf('membersCount', league.memberCount || 0)}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Trophy className="size-4" />
-                  {league.tournamentCount || 0} {t('leagues.tournaments')}
+                  {countOf('tournamentsCount', league.tournamentCount || 0)}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Calendar className="size-4" />
-                  {new Date(league.createdAt).toLocaleDateString()}
+                  {new Date(league.createdAt).toLocaleDateString(language === 'sk' ? 'sk-SK' : 'en-GB')}
                 </span>
               </CardContent>
               <CardFooter>
                 <Button variant="outline" className="w-full" onClick={() => handleSelectLeague(league)}>
-                  {t('leagues.viewLeague')}
+                  {t('leagues.openLeague')}
                 </Button>
               </CardFooter>
             </Card>

@@ -18,11 +18,19 @@ import { RoundSchedule } from './shared/RoundSchedule';
 import { isTournamentRunning, tournamentStatusClass, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
 import { upcomingRounds, upcomingFirst } from '../utils/roundSchedule';
 import { isCricketGame } from '@/lib/cricket';
+import { pluralSuffix } from '@/lib/practiceGames';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
 
+const EMPTY_FILTER_TITLE = {
+  active: 'tournaments.noInProgressTournaments',
+  completed: 'tournaments.noCompletedTournaments',
+  mine: 'tournaments.noMyTournaments',
+};
+
 export function TournamentsList({ tournaments, onCreateTournament, onSelectTournament, onDeleteTournament }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const countOf = (key, n) => t(`common.${key}${pluralSuffix(n)}`, { count: n });
   const { user } = useAuth();
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed', 'mine'
   const [sortBy, setSortBy] = useState('updated'); // 'updated', 'created', 'name'
@@ -39,11 +47,10 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
 
   const filters = [
     { key: 'all', label: t('tournaments.all'), count: inLeague.length },
-    { key: 'active', label: t('common.active'), count: inLeague.filter(x => isTournamentRunning(x.status)).length },
-    { key: 'completed', label: t('common.completed'), count: inLeague.filter(x => x.status === 'completed').length },
+    { key: 'active', label: t('tournaments.filterInProgress'), count: inLeague.filter(x => isTournamentRunning(x.status)).length },
+    { key: 'completed', label: t('tournaments.filterCompleted'), count: inLeague.filter(x => x.status === 'completed').length },
     ...(canCreate ? [{ key: 'mine', label: t('tournaments.myTournaments'), count: inLeague.filter(isMine).length }] : []),
   ];
-  const filterLabels = Object.fromEntries(filters.map(f => [f.key, f.label]));
 
   const filteredTournaments = inLeague.filter(tournament => {
     if (filter === 'all') return true;
@@ -80,7 +87,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">{t('tournaments.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            {tournaments.length} {t('tournaments.title').toLowerCase()}
+            {countOf('tournamentsCount', tournaments.length)}
           </p>
         </div>
         {canCreate && (
@@ -198,16 +205,16 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Users className="size-4" />
-                      {tournament.playerCount ?? tournament.players?.length ?? 0} {t('common.players')}
+                      {countOf('playersCount', tournament.playerCount ?? tournament.players?.length ?? 0)}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <LayoutGrid className="size-4" />
-                      {tournament.groupCount ?? tournament.groups?.length ?? 0} {t('common.groups')}
+                      {countOf('groupsCount', tournament.groupCount ?? tournament.groups?.length ?? 0)}
                     </span>
                     {!tournament.startsAt && (
                       <span className="flex items-center gap-1.5">
                         <Calendar className="size-4" />
-                        {new Date(tournament.createdAt).toLocaleDateString()}
+                        {new Date(tournament.createdAt).toLocaleDateString(language === 'sk' ? 'sk-SK' : 'en-GB')}
                       </span>
                     )}
                   </div>
@@ -224,7 +231,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
 
                 <CardFooter className="flex items-center justify-between gap-2">
                   <Button variant={running ? 'default' : 'outline'} onClick={() => onSelectTournament(tournament)}>
-                    {running ? t('tournaments.continue') : t('tournaments.view')} {t('tournaments.tournament')}
+                    {running ? t('tournaments.continueTournament') : t('tournaments.openTournament')}
                   </Button>
                   {tournament.status === 'open_for_registration' && user && !isOwner && (
                     <Badge variant="outline" className={tournamentStatusClass('open_for_registration')}>
@@ -241,10 +248,10 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
       {visibleTournaments.length === 0 && (
         <EmptyState
           icon={Trophy}
-          title={t('tournaments.noTournamentsFound')}
+          title={t(EMPTY_FILTER_TITLE[filter] ?? 'tournaments.noTournamentsFound')}
           description={filter === 'all'
-            ? t('tournaments.createFirstToGetStarted')
-            : t('tournaments.noFilteredTournaments', { filter: filterLabels[filter].toLowerCase() })}
+            ? t(canCreate ? 'tournaments.createFirstToGetStarted' : 'tournaments.noTournamentsYetHint')
+            : undefined}
         >
           {filter === 'all' && canCreate && (
             <Button onClick={onCreateTournament}>
