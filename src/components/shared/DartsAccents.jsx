@@ -66,9 +66,14 @@ export function CheckoutRoute({ route, className, chipClassName }) {
 
 // Segmented lifecycle bar (see getTournamentPhase): finished steps solid,
 // the current one filled to `progress`, the rest empty.
-export function PhaseBar({ steps, current, progress = 0, className }) {
+// Screen readers get it as one progressbar: `percent` of all matches played, named by `label`.
+export function PhaseBar({ steps, current, progress = 0, percent, label, className }) {
   return (
-    <div className={cn('grid gap-1', className)} style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+    <div
+      className={cn('grid gap-1', className)}
+      style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+      {...(label && percent != null && { role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': percent, 'aria-label': label })}
+    >
       {steps.map((step, i) => (
         <span key={step} className="h-1.5 overflow-hidden rounded-full bg-muted">
           <span

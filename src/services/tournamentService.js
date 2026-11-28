@@ -486,6 +486,8 @@ export const tournamentService = {
           completedMatches: Number(row.completed_matches) || 0,
           pendingMatches: Number(row.pending_matches) || 0,
           inProgressMatches: Number(row.in_progress_matches) || 0,
+          // Completed rounds only (migration 20261128120000; absent before it)
+          winnerName: row.winner_name || null,
           // Empty placeholders -- full data is hydrated lazily on open
           groups: [],
           players: [],
