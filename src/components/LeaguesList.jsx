@@ -42,6 +42,10 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
     { key: 'archived', label: t('common.archived'), count: leagues.filter(l => l.status === 'archived').length },
     ...(canCreate ? [{ key: 'mine', label: t('leagues.myLeagues'), count: leagues.filter(isMyLeague).length }] : []),
   ];
+  // A tab that narrows nothing (none, or the same as All) is noise; the one in use always stays.
+  const shownFilters = filters.filter(f => f.key === 'all' || f.key === filter || (f.count > 0 && f.count < leagues.length));
+  const showTabs = shownFilters.length > 1;
+  const ResultsPanel = showTabs ? TabsContent : React.Fragment;
 
   const filteredLeagues = leagues.filter(league => {
     if (filter === 'all') return true;
@@ -71,16 +75,19 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
 
       {/* The filter tabs control the results below (TabsContent), so their aria-controls resolve. */}
       <Tabs value={filter} onValueChange={setFilter} className="gap-6">
+        {showTabs && (
         <TabsList aria-label={t('common.filterByStatus')}>
-          {filters.map(f => (
+          {shownFilters.map(f => (
             <TabsTrigger key={f.key} value={f.key}>
               {f.label}{' '}
               <span className="text-muted-foreground tabular-nums">{f.count}</span>
             </TabsTrigger>
           ))}
         </TabsList>
+        )}
 
-      <TabsContent value={filter} tabIndex={-1}>
+      {/* Without tabs there is nothing to label the panel, so the results stand alone. */}
+      <ResultsPanel {...(showTabs ? { value: filter, tabIndex: -1 } : {})}>
       {loading ? (
         <CardGridSkeleton label={t('leagues.loadingLeagues')} />
       ) : filteredLeagues.length === 0 ? (
@@ -156,7 +163,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
           ))}
         </div>
       )}
-      </TabsContent>
+      </ResultsPanel>
       </Tabs>
     </div>
   );

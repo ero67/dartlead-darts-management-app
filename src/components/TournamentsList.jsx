@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Trophy, Users, Calendar, Trash2, Play, Crown, Target } from 'lucide-react';
+import { Plus, Trophy, Users, Calendar, Trash2, Crown, ArrowDownUp } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -17,25 +17,34 @@ import { LeagueLogo } from './shared/LeagueLogo';
 import { EmptyState } from './shared/EmptyState';
 import { PhaseBar } from './shared/DartsAccents';
 import { RoundSchedule } from './shared/RoundSchedule';
-import { isTournamentRunning, tournamentStatusClass, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
-import { upcomingRounds, upcomingFirst } from '../utils/roundSchedule';
+import { isTournamentRunning, getTournamentPhase, tournamentPhaseLabel } from '../utils/tournamentStatus';
+import { upcomingFirst } from '../utils/roundSchedule';
 import { isCricketGame } from '@/lib/cricket';
 import { pluralSuffix } from '@/lib/practiceGames';
 import { toast } from 'sonner';
 import { confirmDialog } from '../lib/confirmDialog';
 
 const EMPTY_FILTER_TITLE = {
+  registration: 'tournaments.noRegistrationTournaments',
   active: 'tournaments.noInProgressTournaments',
   completed: 'tournaments.noCompletedTournaments',
   mine: 'tournaments.noMyTournaments',
+};
+
+const matchesFilter = (filter, tournament, isMine) => {
+  if (filter === 'mine') return isMine(tournament);
+  if (filter === 'registration') return tournament.status === 'open_for_registration';
+  if (filter === 'active') return isTournamentRunning(tournament.status);
+  if (filter === 'completed') return tournament.status === 'completed';
+  return true;
 };
 
 export function TournamentsList({ tournaments, onCreateTournament, onSelectTournament, onDeleteTournament }) {
   const { t, language } = useLanguage();
   const countOf = (key, n) => t(`common.${key}${pluralSuffix(n)}`, { count: n });
   const { user } = useAuth();
-  const [filter, setFilter] = useState('all'); // 'all', 'active', 'completed', 'mine'
-  const [sortBy, setSortBy] = useState('updated'); // 'updated', 'created', 'name'
+  const [filter, setFilter] = useState('all'); // 'all', 'registration', 'active', 'completed', 'mine'
+  const [sortBy, setSortBy] = useState('updated'); // 'updated' (suggested order), 'created', 'name'
   const [leagueFilter, setLeagueFilter] = useState('all'); // 'all' or a league id
   const { isAdmin, canCreateTournaments } = useAdmin();
   const { leagues } = useLeague();
@@ -44,24 +53,25 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
 
   const canCreate = Boolean(user && canCreateTournaments);
   const isMine = (tournament) => Boolean(user && tournament.userId && user.id === tournament.userId);
+  // "Yours" only tells rounds apart when the list mixes your rounds with other people's.
+  const showOwnership = tournaments.some(isMine) && tournaments.some(x => !isMine(x));
 
   // Only leagues that actually have rounds in this list
   const leaguesInList = leagues.filter(l => tournaments.some(x => x.leagueId === l.id));
   const inLeague = leagueFilter === 'all' ? tournaments : tournaments.filter(x => x.leagueId === leagueFilter);
 
   const filters = [
-    { key: 'all', label: t('tournaments.all'), count: inLeague.length },
-    { key: 'active', label: t('tournaments.filterInProgress'), count: inLeague.filter(x => isTournamentRunning(x.status)).length },
-    { key: 'completed', label: t('tournaments.filterCompleted'), count: inLeague.filter(x => x.status === 'completed').length },
-    ...(canCreate ? [{ key: 'mine', label: t('tournaments.myTournaments'), count: inLeague.filter(isMine).length }] : []),
-  ];
+    { key: 'all', label: t('tournaments.all') },
+    { key: 'registration', label: t('tournaments.statusOpenForRegistration') },
+    { key: 'active', label: t('tournaments.filterInProgress') },
+    { key: 'completed', label: t('tournaments.filterCompleted') },
+    ...(canCreate ? [{ key: 'mine', label: t('tournaments.myTournaments') }] : []),
+  ].map(f => ({ ...f, count: inLeague.filter(x => matchesFilter(f.key, x, isMine)).length }));
+  // A tab that narrows nothing (none, or the same as All) is noise; the one in use always stays.
+  const shownFilters = filters.filter(f => f.key === 'all' || f.key === filter || (f.count > 0 && f.count < inLeague.length));
+  const showTabs = shownFilters.length > 1;
 
-  const filteredTournaments = inLeague.filter(tournament => {
-    if (filter === 'all') return true;
-    if (filter === 'mine') return isMine(tournament);
-    if (filter === 'active') return isTournamentRunning(tournament.status);
-    return tournament.status === filter;
-  });
+  const filteredTournaments = inLeague.filter(x => matchesFilter(filter, x, isMine));
 
   const sortedTournaments = [...filteredTournaments].sort((a, b) => {
     switch (sortBy) {
@@ -74,12 +84,11 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         return new Date(b.updatedAt) - new Date(a.updatedAt);
     }
   });
-  // Default order: rounds being played now, then planned rounds (soonest first), then the rest.
+  // Suggested order: rounds being played now, then planned rounds (soonest first), then the rest.
   const byDefault = upcomingFirst(sortedTournaments);
   const visibleTournaments = sortBy === 'updated'
     ? [...byDefault.filter(x => isTournamentRunning(x.status)), ...byDefault.filter(x => !isTournamentRunning(x.status))]
     : sortedTournaments;
-  const upcomingIds = new Set(upcomingRounds(filteredTournaments).map(x => x.id));
 
   const handleDelete = async (tournament) => {
     if (!(await confirmDialog(t('management.confirmDeleteTournament', { name: tournament.name }), { destructive: true }))) return;
@@ -88,76 +97,23 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
     });
   };
 
-  return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{t('tournaments.title')}</h1>
-          <p className="text-sm text-muted-foreground">
-            {countOf('tournamentsCount', tournaments.length)}
-          </p>
-        </div>
-        {canCreate && (
-          <Button onClick={onCreateTournament}>
-            <Plus />
-            {t('tournaments.create')}
-          </Button>
-        )}
-      </div>
-
-      {/* The filter tabs control the results below (TabsContent), so their aria-controls resolve. */}
-      <Tabs value={filter} onValueChange={setFilter} className="gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <TabsList aria-label={t('common.filterByStatus')}>
-          {filters.map(f => (
-            <TabsTrigger key={f.key} value={f.key}>
-              {f.label}{' '}
-              <span className="text-muted-foreground tabular-nums">{f.count}</span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {leaguesInList.length > 0 && (
-            <Select value={leagueFilter} onValueChange={setLeagueFilter}>
-              <SelectTrigger className="w-44" aria-label={t('tournaments.filterByLeague')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('tournaments.allLeagues')}</SelectItem>
-                {leaguesInList.map(l => (
-                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <span className="text-sm text-muted-foreground">{t('tournaments.sortBy')}</span>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-44" aria-label={t('tournaments.sortBy')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="updated">{t('tournaments.lastUpdated')}</SelectItem>
-              <SelectItem value="created">{t('tournaments.dateCreated')}</SelectItem>
-              <SelectItem value="name">{t('common.name')}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <TabsContent value={filter} tabIndex={-1} className="flex flex-col gap-6">
+  const results = (
+    <div className="flex flex-col gap-6">
       {isLoading && <CardGridSkeleton label={t('tournaments.loadingTournaments')} />}
 
       {visibleTournaments.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visibleTournaments.map(tournament => {
             const phase = getTournamentPhase(tournament);
-            const hasActiveMatches = (tournament.pendingMatches ?? 0) > 0;
             const isOwner = isMine(tournament);
             const linkedLeague = tournament.leagueId ? leagues.find(l => l.id === tournament.leagueId) : null;
             const running = isTournamentRunning(tournament.status);
             const isCompleted = tournament.status === 'completed';
             const totalMatches = tournament.totalMatches ?? 0;
+            // List summaries know match counts; a round hydrated by opening it falls back to its phase name.
+            const progressLabel = totalMatches > 0
+              ? t(`common.matchCount${pluralSuffix(totalMatches)}`, { count: `${tournament.completedMatches ?? 0}/${totalMatches}` })
+              : tournamentPhaseLabel(phase, t);
 
             return (
               <Card key={tournament.id} className="gap-4">
@@ -170,36 +126,22 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge status={tournament.status} t={t} />
-                        {upcomingIds.has(tournament.id) && <Badge variant="outline">{t('schedule.upcoming')}</Badge>}
                         {isCricketGame(tournament.gameType) && <Badge variant="secondary">{t('common.gameTypeCricket')}</Badge>}
-                        {isOwner && <Badge variant="outline">{t('tournaments.yours')}</Badge>}
+                        {showOwnership && isOwner && <Badge variant="outline">{t('tournaments.yours')}</Badge>}
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center">
-                      {hasActiveMatches && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onSelectTournament(tournament)}
-                          title={t('tournaments.continueTournament')}
-                          aria-label={t('tournaments.continueTournament')}
-                        >
-                          <Play />
-                        </Button>
-                      )}
-                      {(isAdmin || isOwner) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDelete(tournament)}
-                          title={t('management.deleteTournament')}
-                          aria-label={t('management.deleteTournament')}
-                        >
-                          <Trash2 />
-                        </Button>
-                      )}
-                    </div>
+                    {(isAdmin || isOwner) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(tournament)}
+                        title={t('management.deleteTournament')}
+                        aria-label={t('management.deleteTournament')}
+                      >
+                        <Trash2 />
+                      </Button>
+                    )}
                   </div>
                   {linkedLeague && (
                     <Link
@@ -226,12 +168,6 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       <Users className="size-4" />
                       {countOf('playersCount', tournament.playerCount ?? tournament.players?.length ?? 0)}
                     </span>
-                    {running && totalMatches > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <Target className="size-4" />
-                        {t(`common.matchCount${pluralSuffix(totalMatches)}`, { count: `${tournament.completedMatches ?? 0}/${totalMatches}` })}
-                      </span>
-                    )}
                     {!tournament.startsAt && (
                       <span className="flex items-center gap-1.5">
                         <Calendar className="size-4" />
@@ -239,28 +175,18 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                       </span>
                     )}
                   </div>
-                  {!isCompleted && (
+                  {running && (
                     <div className="flex flex-col gap-2">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{tournamentPhaseLabel(phase, t)}</span>
-                        {tournament.status !== 'open_for_registration' && (
-                          <span className="tabular-nums">{phase.percent}%</span>
-                        )}
-                      </div>
-                      <PhaseBar {...phase} label={tournamentPhaseLabel(phase, t)} />
+                      <span className="text-xs text-muted-foreground tabular-nums">{progressLabel}</span>
+                      <PhaseBar {...phase} label={progressLabel} />
                     </div>
                   )}
                 </CardContent>
 
-                <CardFooter className="mt-auto flex items-center justify-between gap-2">
+                <CardFooter className="mt-auto">
                   <Button variant={running ? 'default' : 'outline'} onClick={() => onSelectTournament(tournament)}>
                     {running ? t('tournaments.continueTournament') : t('tournaments.openTournament')}
                   </Button>
-                  {tournament.status === 'open_for_registration' && user && !isOwner && (
-                    <Badge variant="outline" className={tournamentStatusClass('open_for_registration')}>
-                      {t('registration.openForRegistration')}
-                    </Badge>
-                  )}
                 </CardFooter>
               </Card>
             );
@@ -284,7 +210,69 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
           )}
         </EmptyState>
       )}
-      </TabsContent>
+    </div>
+  );
+
+  return (
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 text-foreground md:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('tournaments.title')}</h1>
+          <p className="text-sm text-muted-foreground">
+            {countOf('tournamentsCount', tournaments.length)}
+          </p>
+        </div>
+        {canCreate && (
+          <Button onClick={onCreateTournament}>
+            <Plus />
+            {t('tournaments.create')}
+          </Button>
+        )}
+      </div>
+
+      {/* The filter tabs control the results below (TabsContent), so their aria-controls resolve. */}
+      <Tabs value={filter} onValueChange={setFilter} className="gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {showTabs && (
+            <TabsList aria-label={t('common.filterByStatus')}>
+              {shownFilters.map(f => (
+                <TabsTrigger key={f.key} value={f.key}>
+                  {f.label}{' '}
+                  <span className="text-muted-foreground tabular-nums">{f.count}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {leaguesInList.length > 0 && (
+              <Select value={leagueFilter} onValueChange={setLeagueFilter}>
+                <SelectTrigger className="w-44" aria-label={t('tournaments.filterByLeague')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('tournaments.allLeagues')}</SelectItem>
+                  {leaguesInList.map(l => (
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger aria-label={t('tournaments.sortBy')}>
+                <ArrowDownUp className="text-muted-foreground" aria-hidden="true" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="updated">{t('tournaments.sortSuggested')}</SelectItem>
+                <SelectItem value="created">{t('tournaments.sortNewest')}</SelectItem>
+                <SelectItem value="name">{t('tournaments.sortByName')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {showTabs ? <TabsContent value={filter} tabIndex={-1}>{results}</TabsContent> : results}
       </Tabs>
     </div>
   );
