@@ -5,12 +5,14 @@ import { useAdmin } from '../contexts/AdminContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useLeague } from '../contexts/LeagueContext';
+import { useTournament } from '../contexts/TournamentContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
+import { CardGridSkeleton } from './shared/LoadingState';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { EmptyState } from './shared/EmptyState';
 import { PhaseBar } from './shared/DartsAccents';
@@ -37,6 +39,8 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
   const [leagueFilter, setLeagueFilter] = useState('all'); // 'all' or a league id
   const { isAdmin, canCreateTournaments } = useAdmin();
   const { leagues } = useLeague();
+  const { loading: tournamentsLoading } = useTournament();
+  const isLoading = tournamentsLoading && tournaments.length === 0;
 
   const canCreate = Boolean(user && canCreateTournaments);
   const isMine = (tournament) => Boolean(user && tournament.userId && user.id === tournament.userId);
@@ -101,17 +105,17 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         )}
       </div>
 
+      {/* The filter tabs control the results below (TabsContent), so their aria-controls resolve. */}
+      <Tabs value={filter} onValueChange={setFilter} className="gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={filter} onValueChange={setFilter}>
-          <TabsList>
-            {filters.map(f => (
-              <TabsTrigger key={f.key} value={f.key}>
-                {f.label}
-                <span className="text-muted-foreground tabular-nums">{f.count}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <TabsList aria-label={t('common.filterByStatus')}>
+          {filters.map(f => (
+            <TabsTrigger key={f.key} value={f.key}>
+              {f.label}{' '}
+              <span className="text-muted-foreground tabular-nums">{f.count}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
         <div className="flex flex-wrap items-center gap-2">
           {leaguesInList.length > 0 && (
@@ -141,6 +145,9 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         </div>
       </div>
 
+      <TabsContent value={filter} tabIndex={-1} className="flex flex-col gap-6">
+      {isLoading && <CardGridSkeleton label={t('tournaments.loadingTournaments')} />}
+
       {visibleTournaments.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visibleTournaments.map(tournament => {
@@ -159,7 +166,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                     <div className="flex min-w-0 flex-col gap-2">
                       <div className="flex min-w-0 items-center gap-2">
                         <LeagueLogo src={linkedLeague?.logoUrl} className="size-6" />
-                        <h3 className="truncate text-base font-semibold leading-6">{tournament.name}</h3>
+                        <h2 className="truncate text-base font-semibold leading-6">{tournament.name}</h2>
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge status={tournament.status} t={t} />
@@ -197,7 +204,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                   {linkedLeague && (
                     <Link
                       to={`/league/${linkedLeague.id}`}
-                      className="flex w-fit max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                      className="flex min-h-6 w-fit max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
                     >
                       <Crown className="size-3" />
                       <span className="truncate">{linkedLeague.name}</span>
@@ -240,7 +247,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
                           <span className="tabular-nums">{phase.percent}%</span>
                         )}
                       </div>
-                      <PhaseBar {...phase} />
+                      <PhaseBar {...phase} label={tournamentPhaseLabel(phase, t)} />
                     </div>
                   )}
                 </CardContent>
@@ -261,7 +268,7 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
         </div>
       )}
 
-      {visibleTournaments.length === 0 && (
+      {!isLoading && visibleTournaments.length === 0 && (
         <EmptyState
           icon={Trophy}
           title={t(EMPTY_FILTER_TITLE[filter] ?? 'tournaments.noTournamentsFound')}
@@ -277,6 +284,8 @@ export function TournamentsList({ tournaments, onCreateTournament, onSelectTourn
           )}
         </EmptyState>
       )}
+      </TabsContent>
+      </Tabs>
     </div>
   );
 }

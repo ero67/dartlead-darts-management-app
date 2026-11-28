@@ -255,3 +255,15 @@
     overflow-x: hidden;
   }
 }
+
+/* Keyboard focus. The primitives' `ring-ring/50` halo is about 1.7:1 against
+   the page, under the 3:1 WCAG 1.4.11 asks for. A solid offset outline in the
+   ring colour, nudged toward the text colour (darker in light, lighter in
+   dark; oklab so the hue stays green), measures 3.9:1 or more on page, card
+   and tab-list backgrounds in both themes. Unlayered so it beats the primitives' `outline-none` utility. */
+:where(a[href], button, input, select, textarea, summary, [role="tab"], [role="button"],
+  [role="checkbox"], [role="radio"], [role="switch"], [role="menuitem"], [role="option"],
+  [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ring) 85%, var(--foreground));
+  outline-offset: 2px;
+}

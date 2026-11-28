@@ -6,9 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from './shared/StatusBadge';
+import { CardGridSkeleton } from './shared/LoadingState';
 import { LeagueLogo } from './shared/LeagueLogo';
 import { EmptyState } from './shared/EmptyState';
 import { pluralSuffix } from '@/lib/practiceGames';
@@ -69,30 +69,20 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
         )}
       </div>
 
-      <Tabs value={filter} onValueChange={setFilter}>
-        <TabsList>
+      {/* The filter tabs control the results below (TabsContent), so their aria-controls resolve. */}
+      <Tabs value={filter} onValueChange={setFilter} className="gap-6">
+        <TabsList aria-label={t('common.filterByStatus')}>
           {filters.map(f => (
             <TabsTrigger key={f.key} value={f.key}>
-              {f.label}
+              {f.label}{' '}
               <span className="text-muted-foreground tabular-nums">{f.count}</span>
             </TabsTrigger>
           ))}
         </TabsList>
-      </Tabs>
 
+      <TabsContent value={filter} tabIndex={-1}>
       {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label={t('leagues.loadingLeagues')}>
-          {[0, 1, 2].map(i => (
-            <Card key={i} className="gap-4">
-              <CardHeader className="gap-2">
-                <Skeleton className="h-6 w-2/3" />
-                <Skeleton className="h-4 w-full" />
-              </CardHeader>
-              <CardContent><Skeleton className="h-4 w-1/2" /></CardContent>
-              <CardFooter><Skeleton className="h-9 w-32" /></CardFooter>
-            </Card>
-          ))}
-        </div>
+        <CardGridSkeleton label={t('leagues.loadingLeagues')} />
       ) : filteredLeagues.length === 0 ? (
         <EmptyState
           icon={Crown}
@@ -116,7 +106,7 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <LeagueLogo src={league.logoUrl} className="size-6" />
-                    <h3 className="truncate text-base font-semibold leading-6">{league.name}</h3>
+                    <h2 className="truncate text-base font-semibold leading-6">{league.name}</h2>
                   </div>
                   <StatusBadge status={league.status} t={t} label={STATUS_LABEL[league.status] && t(STATUS_LABEL[league.status])} />
                 </div>
@@ -166,6 +156,8 @@ export function LeaguesList({ onCreateLeague, onSelectLeague }) {
           ))}
         </div>
       )}
+      </TabsContent>
+      </Tabs>
     </div>
   );
 }
